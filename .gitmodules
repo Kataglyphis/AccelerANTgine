@@ -1,0 +1,12 @@
+[submodule "ExternalLib/FUZZTEST"]
+	path = ExternalLib/FUZZTEST
+	url = https://github.com/google/fuzztest
+[submodule "ExternalLib/GOOGLE_BENCHMARK"]
+	path = ExternalLib/GOOGLE_BENCHMARK
+	url = https://github.com/google/benchmark
+[submodule "ExternalLib/NLOHMANN_JSON"]
+	path = ExternalLib/NLOHMANN_JSON
+	url = https://github.com/nlohmann/json
+[submodule "ExternalLib/SPDLOG"]
+	path = ExternalLib/SPDLOG
+	url = https://github.com/gabime/spdlog

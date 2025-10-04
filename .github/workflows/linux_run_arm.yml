@@ -1,0 +1,28 @@
+name: Linux run on ARM/GCC/Clang
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-ubuntu24_04_gcc-arm:
+    uses: ./.github/workflows/linux_run.yml
+    with:
+      compiler: gcc
+      runner: ubuntu-24.04-arm
+    secrets:
+      SERVER: ${{ secrets.SERVER }}
+      USERNAME: ${{ secrets.USERNAME }}
+      PW: ${{ secrets.PW }}
+
+  build-ubuntu24_04_clang-arm:
+    uses: ./.github/workflows/linux_run.yml
+    with:
+      compiler: clang
+      runner: ubuntu-24.04-arm
+    secrets:
+      SERVER: ${{ secrets.SERVER }}
+      USERNAME: ${{ secrets.USERNAME }}
+      PW: ${{ secrets.PW }}
