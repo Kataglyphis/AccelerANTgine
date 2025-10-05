@@ -38,7 +38,8 @@ if(RUST_FEATURES)
 endif()
 
 # add the executable
-add_executable(${PROJECT_NAME})
+add_library(${PROJECT_NAME} SHARED)
+# add_executable(${PROJECT_NAME})
 
 if(RUST_FEATURES)
   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=1)
