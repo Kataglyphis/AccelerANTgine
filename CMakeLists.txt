@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 4.1.1)
 
 # set the project name
 project(
-  KataglyphisCppProject
+  KataglyphisCppInference
   VERSION 0.0.1
   DESCRIPTION "Lore ipsum"
   HOMEPAGE_URL "https://jonasheinle.de/"
