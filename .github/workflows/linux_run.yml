@@ -8,7 +8,7 @@ on:
         type: string
       runner:
         required: true
-        type: string    
+        type: string
     secrets:
       SERVER:
         required: true
@@ -46,16 +46,17 @@ jobs:
       #################################################################################################################
       - name: Install dependencies
         run: |
+          sudo apt-get purge --auto-remove -y cmake
           chmod +x scripts/linux/setup-dependencies.sh
           ./scripts/linux/setup-dependencies.sh
           echo "/usr/bin" >> $GITHUB_PATH
-      
+
       - name: Prepare test folders
         run: |
           # ensure docs target dirs exist so tools can write files there
           mkdir -p ${{ github.workspace }}/docs/coverage
           mkdir -p ${{ github.workspace }}/docs/test-results
-          
+
       #################################################################################################################
       ############################## Run unit/integration/fuzzy/coverage/tests/static analyzers #######################
       #################################################################################################################
