@@ -42,8 +42,10 @@ add_library(${PROJECT_NAME} SHARED)
 # add_executable(${PROJECT_NAME})
 
 if(RUST_FEATURES)
+  message("RUST features defined")
   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=1)
 else()
+  message("RUST features not defined")
   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=0)
 endif()
 
