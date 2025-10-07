@@ -15,9 +15,9 @@
   <a href="https://jonasheinle.de"><img src="images/glm_logo.png" alt="VulkanEngine" width="200"></a>
 </h1> -->
 
-<h4 align="center">This CMake/C++ template project gives me a good starting point for f.e. GPU/Graphics programming. For everything close to hardware ...  <a href="https://jonasheinle.de" target="_blank"></a>.</h4>
+<h4 align="center">This C++ inference project gives me a good starting point for hardware accelerated AI inference ...  <a href="https://jonasheinle.de" target="_blank"></a>.</h4>
 
-For the official docs follow this [link](https://cmaketemplate.jonasheinle.de/).
+For the official docs follow this [link](https://hardwareacceleratedai.jonasheinle.de/).
 
 [![Linux run on ARM/GCC/Clang](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_arm.yml/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-CMakeTemplate/actions/workflows/linux_run_arm.yml)
 [![Linux run on x86/GCC/Clang](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_x86.yml/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-CMakeTemplate/actions/workflows/linux_run_x86.yml)

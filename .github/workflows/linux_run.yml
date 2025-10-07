@@ -82,7 +82,7 @@ jobs:
             ./${{ env.BUILD_DIR }}/first_fuzz_test
           else
             echo "Compiled with GCC so no fuzz testing!"
-          fi  
+          fi
 
       - name: Build Code Coverage
         working-directory: ${{ env.BUILD_DIR }}
@@ -138,14 +138,14 @@ jobs:
           cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset "${PRESET}"
           cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset "${PRESET}"
 
-      - name: Run Instrumentation-based PGO Clang/LLVM
-        working-directory: ${{ env.BUILD_DIR }}
-        if: ${{ inputs.compiler == 'clang' }}
-        run: |
-          LLVM_PROFILE_FILE="${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profraw" ./KataglyphisCppProject
-          llvm-profdata merge -sparse "${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profraw" -o "${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profdata"
-          llvm-cov show ./KataglyphisCppProject -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profdata" -format=text
-      
+      #- name: Run Instrumentation-based PGO Clang/LLVM
+      #  working-directory: ${{ env.BUILD_DIR }}
+      #  if: ${{ inputs.compiler == 'clang' }}
+      #  run: |
+      #    LLVM_PROFILE_FILE="${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profraw" ./KataglyphisCppProject
+      #    llvm-profdata merge -sparse "${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profraw" -o "${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profdata"
+      #    llvm-cov show ./KataglyphisCppProject -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profdata" -format=text
+
       # one does need to make adjustments in the config
       # and this is a github runner
       - name: Run Perf measurements
@@ -158,15 +158,15 @@ jobs:
         working-directory: ${{ env.BUILD_DIR }}
         run: ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json
 
-      - name: Run GProf
-        working-directory: ${{ env.BUILD_DIR }}
-        run: |
-          ./KataglyphisCppProject
-          if [[ -f gmon.out ]]; then
-            gprof KataglyphisCppProject gmon.out > profile.txt || true
-          else
-            echo "gmon.out not found, skipping gprof."
-          fi
+      #- name: Run GProf
+      #  working-directory: ${{ env.BUILD_DIR }}
+      #  run: |
+      #    ./KataglyphisCppProject
+      #    if [[ -f gmon.out ]]; then
+      #      gprof KataglyphisCppProject gmon.out > profile.txt || true
+      #    else
+      #      echo "gmon.out not found, skipping gprof."
+      #    fi
 
       #################################################################################################################
       ######################################## Build docs #############################################################
@@ -188,7 +188,7 @@ jobs:
         run: |
           cp ${{github.workspace}}/${{ env.DOCS_OUT }}/*.svg ./docs/source/_static
           cd docs/source
-          python graphviz_generator.py 
+          python graphviz_generator.py
           cd ..
           make html
 
