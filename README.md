@@ -84,13 +84,13 @@ For the official docs follow this [link](https://hardwareacceleratedai.jonashein
 [![Kataglyphis Engine][product-screenshot2]](https://jonasheinle.de)
 [![Kataglyphis Engine][product-screenshot3]](https://jonasheinle.de) -->
 
-This project is dedicated to compiling a comprehensive collection of best practices for C++ development using CMake. It serves as a definitive guide for starting new C++ projects, providing insights into optimal project setup, modern CMake techniques, and efficient workflows. The repository includes examples, templates, and detailed instructions to help developers of all levels adopt industry standards and improve their project configuration and build processes.
+This repo is dedicated to deliver AI inference on steroids.
 
-Frequently tested under   
+Frequently tested under:
 * windows server 2025 x64 *__Clang 21.1.1__* and *__MSVC__*
 * [clang-cl](https://learn.microsoft.com/de-de/cpp/build/clang-support-msbuild?view=msvc-170) to compile the rust crate on windows
-* ubuntu 24.04 x64 *__Clang 18.1.3__*
-* ubuntu 24.04 ARM *__Clang 18.1.3__*
+* ubuntu 24.04 x64 *__Clang 21.1.1__*
+* ubuntu 24.04 ARM *__Clang 21.1.1__*
 
 ### Key Features
 
