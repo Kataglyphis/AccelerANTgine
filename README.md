@@ -160,7 +160,7 @@ This enumeration also includes submodules.
 
 1. Clone the repo
    ```sh
-   git clone --recurse-submodules git@github.com:Kataglyphis/Kataglyphis-CMakeTemplate.git
+   git clone --recurse-submodules git@github.com:Kataglyphis/Kataglyphis-Cpp-Inference.git
    ```
    > **_NOTE:_** In case you forgot the flag --recurse run the following command  
    ```sh

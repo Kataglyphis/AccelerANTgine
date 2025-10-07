@@ -41,6 +41,15 @@ endif()
 add_library(${PROJECT_NAME} SHARED)
 # add_executable(${PROJECT_NAME})
 
+# Define export macro for building the DLL
+target_compile_definitions(${PROJECT_NAME} PRIVATE KATAGLYPHIS_EXPORTS)
+
+# Set symbol visibility
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+)
+
 if(RUST_FEATURES)
   message("RUST features defined")
   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=1)
