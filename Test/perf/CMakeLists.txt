@@ -29,6 +29,8 @@ file(GLOB_RECURSE KataglyphisCppProject_HEADERS
 
 add_executable(${PERF_TEST_SUITE})
 
+target_compile_definitions(${PERF_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
+
 if(RUST_FEATURES)
   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=1)
 else()
