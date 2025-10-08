@@ -35,8 +35,7 @@ target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
 if(RUST_FEATURES)
   target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=1)
 else()
-  target_com
-  pile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=0)
+  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=0)
 endif()
 
 if(NOT MSVC)
