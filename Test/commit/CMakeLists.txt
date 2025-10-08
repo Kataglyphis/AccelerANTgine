@@ -30,10 +30,13 @@ file(GLOB_RECURSE KataglyphisCppProject_HEADERS "${PROJECT_SRC_DIR}/*.hpp")
 
 add_executable(${COMMIT_TEST_SUITE})
 
+target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
+
 if(RUST_FEATURES)
   target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=1)
 else()
-  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=0)
+  target_com
+  pile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=0)
 endif()
 
 if(NOT MSVC)
