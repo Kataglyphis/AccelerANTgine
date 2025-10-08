@@ -24,6 +24,8 @@ file(GLOB_RECURSE KataglyphisCppProject_HEADERS "${PROJECT_SRC_DIR}/*.hpp")
 
 add_executable(${COMPILE_TEST_SUITE})
 
+target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
+
 if(RUST_FEATURES)
   target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE USE_RUST=1)
 else()
