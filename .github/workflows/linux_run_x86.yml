@@ -16,6 +16,7 @@ jobs:
       SERVER: ${{ secrets.SERVER }}
       USERNAME: ${{ secrets.USERNAME }}
       PW: ${{ secrets.PW }}
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
   build-ubuntu24_04_clang-x64:
     uses: ./.github/workflows/linux_run.yml
@@ -26,3 +27,4 @@ jobs:
       SERVER: ${{ secrets.SERVER }}
       USERNAME: ${{ secrets.USERNAME }}
       PW: ${{ secrets.PW }}
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}
