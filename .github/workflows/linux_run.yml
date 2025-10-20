@@ -16,15 +16,30 @@ on:
         required: true
       PW:
         required: true
+      GHCR_PAT:
+        required: true
 
 jobs:
   build:
     runs-on: ${{ inputs.runner }} # Dynamically use input
+    defaults:
+      run:
+        shell: bash
+     # Run this job inside the GHCR container:
+    container:
+      image: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PAT }}
+      options: >-
+        --user root
+        ${{ contains(inputs.runner, 'arm') && '--platform linux/arm64' || '--platform linux/amd64' }}
 
     env:
       COMPILER: ${{ inputs.compiler }}
       RUNNER: ${{ inputs.runner }}
       BUILD_TYPE: Debug
+      VULKAN_VERSION: 1.4.321.1
       BUILD_DIR: build
       BUILD_RELEASE_DIR: build-release
       GCC_DEBUG_PRESET: linux-debug-GNU
@@ -44,18 +59,23 @@ jobs:
       #################################################################################################################
       ######################################## Prepare deps ###########################################################
       #################################################################################################################
-      - name: Install dependencies
-        run: |
-          sudo apt-get purge --auto-remove -y cmake
-          chmod +x scripts/linux/setup-dependencies.sh
-          ./scripts/linux/setup-dependencies.sh
-          echo "/usr/bin" >> $GITHUB_PATH
+      - name: Install deps
+        uses: ./.github/actions/install-deps
+        with:
+          vulkan-version: ${{ env.VULKAN_VERSION }}
+      # - name: Install dependencies
+      #   run: |
+      #     sudo apt-get purge --auto-remove -y cmake
+      #     chmod +x scripts/linux/setup-dependencies.sh
+      #     ./scripts/linux/setup-dependencies.sh
+      #     echo "/usr/bin" >> $GITHUB_PATH
 
       - name: Prepare test folders
         run: |
           # ensure docs target dirs exist so tools can write files there
           mkdir -p ${{ github.workspace }}/docs/coverage
           mkdir -p ${{ github.workspace }}/docs/test-results
+        working-directory: ${{ github.workspace }}
 
       #################################################################################################################
       ############################## Run unit/integration/fuzzy/coverage/tests/static analyzers #######################
@@ -68,8 +88,9 @@ jobs:
             PRESET="${CLANG_DEBUG_PRESET}"
           fi
           echo "Using preset: ${PRESET}"
-          cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset "${PRESET}"
-          cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset "${PRESET}"
+          cmake -B "${{ env.BUILD_DIR }}" --preset "${PRESET}"
+          cmake --build "${{ env.BUILD_DIR }}" --preset "${PRESET}"
+        working-directory: ${{ github.workspace }}
 
       - name: Run Unit/Integration tests
         working-directory: ${{ env.BUILD_DIR }}
@@ -83,6 +104,7 @@ jobs:
           else
             echo "Compiled with GCC so no fuzz testing!"
           fi
+        working-directory: ${{ github.workspace }}
 
       - name: Build Code Coverage
         working-directory: ${{ env.BUILD_DIR }}
@@ -108,6 +130,7 @@ jobs:
 
       - name: Run clang tidy
         run: clang-tidy -p=./${{ env.BUILD_DIR }}/compile_commands.json  $(find Src -name '*.cpp' -o -name '*.cc')
+        working-directory: ${{ github.workspace }}
 
       - name: Run Clang static analysis (HTML)
         continue-on-error: true
@@ -115,29 +138,31 @@ jobs:
         run: |
           # HTML output (correct flag form)
           clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html $(find Src -name '*.cpp' -o -name '*.cc')
+        working-directory: ${{ github.workspace }}
 
       - name: Run Clang static analysis (scan-build)
         continue-on-error: true
         if: ${{ inputs.compiler == 'clang' }}
         run: |
           mkdir -p scan-build-reports
-          scan-build -o scan-build-reports cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset "${CLANG_DEBUG_PRESET}"
+          scan-build-21 -o scan-build-reports cmake --build ${BUILD_DIR} --preset "${CLANG_DEBUG_PRESET}"
+        working-directory: ${{ github.workspace }}
 
       #################################################################################################################
       ############################# Now run on performance benchmarking/profiling #####################################
       #################################################################################################################
       - name: Configure/build CMake for Profiling (select preset by compiler)
         run: |
-          rm -r "${{ github.workspace }}/${{ env.BUILD_DIR }}"
+          rm -r "${{ env.BUILD_DIR }}"
           if [[ "${COMPILER}" == "gcc" ]]; then
             PRESET="${GCC_PROFILE_PRESET}"
           else
             PRESET="${CLANG_PROFILE_PRESET}"
           fi
           echo "Using preset: ${PRESET}"
-          cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset "${PRESET}"
-          cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset "${PRESET}"
-
+          cmake -B "${{ env.BUILD_DIR }}" --preset "${PRESET}"
+          cmake --build "${{ env.BUILD_DIR }}" --preset "${PRESET}"
+        working-directory: ${{ github.workspace }}
       #- name: Run Instrumentation-based PGO Clang/LLVM
       #  working-directory: ${{ env.BUILD_DIR }}
       #  if: ${{ inputs.compiler == 'clang' }}
@@ -171,26 +196,32 @@ jobs:
       #################################################################################################################
       ######################################## Build docs #############################################################
       #################################################################################################################
-      - name: Set up Python 3.13
-        if: ${{ inputs.runner == 'ubuntu-24.04' }}
-        uses: actions/setup-python@v6.0.0
-        with:
-          python-version: "3.13"
+      - name: Set Astral UV venv
+        if: ${{ inputs.compiler == 'clang' && inputs.runner == 'ubuntu-24.04' }}
+        run: |
+          . "$HOME/.local/bin/env" 
+          uv venv
+        working-directory: ${{ github.workspace }}
 
       # You can test your matrix by printing the current Python version
       - name: Setup python env
-        if: ${{ inputs.runner == 'ubuntu-24.04' }}
+        if: ${{ inputs.compiler == 'clang' && inputs.runner == 'ubuntu-24.04' }}
         run: |
-          pip install -r requirements.txt
+          . "$HOME/.local/bin/env"
+          . ".venv/bin/activate"
+          uv pip install -r requirements.txt
+        working-directory: ${{ github.workspace }}
 
       - name: Build web page
         if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
         run: |
-          cp ${{github.workspace}}/${{ env.DOCS_OUT }}/*.svg ./docs/source/_static
+          . ".venv/bin/activate"
+          cp ${{ env.DOCS_OUT }}/*.svg ./docs/source/_static
           cd docs/source
-          python graphviz_generator.py
+          uv run python graphviz_generator.py 
           cd ..
-          make html
+          uv run make html
+        working-directory: ${{ github.workspace }}
 
       - name: Convert GTest XML → HTML
         if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
@@ -213,13 +244,24 @@ jobs:
                echo "Not JUnit XML, skipping: $f"
              fi
             done
+        working-directory: ${{ github.workspace }}
           
       - name: HTML → Markdown (pandoc)
         if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }} 
         run: |
           sudo apt-get update && sudo apt-get install -y pandoc
           mkdir -p "${{ github.workspace }}/docs/test-results-md"
-          for f in "${{ github.workspace }}"/docs/test-results/*.html; do
+    
+          # Check if any HTML files exist before processing
+          shopt -s globstar nullglob
+          html_files=("${{ github.workspace }}"/docs/test-results/*.html)
+    
+          if [ ${#html_files[@]} -eq 0 ]; then
+            echo "No HTML files found in docs/test-results. Skipping pandoc conversion."
+            exit 0
+          fi
+    
+          for f in "${html_files[@]}"; do
             pandoc "$f" --verbose -f html -t gfm -o "${{ github.workspace }}/docs/test-results-md/$(basename "$f" .html).md"
           done
           
@@ -227,8 +269,16 @@ jobs:
         if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
         run: |
           mkdir -p docs/source/test-results
-          cp -r docs/test-results-md/* docs/source/test-results/
-          
+    
+          # Only copy if the source directory exists and contains files
+          if [ -d "docs/test-results-md" ] && [ "$(ls -A docs/test-results-md)" ]; then
+            cp -r docs/test-results-md/* docs/source/test-results/
+            echo "Copied markdown test results to Sphinx source"
+          else
+           echo "No markdown test results to copy (docs/test-results-md is empty or missing)"
+          fi
+        working-directory: ${{ github.workspace }}
+        
       # copy coverage & test-results into built site so they are deployed
       - name: Attach coverage & junit to built site
         if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
@@ -245,6 +295,7 @@ jobs:
             mkdir -p "$SITE_DIR/test-results"
             cp -r "${{ github.workspace }}/docs/test-results/." "$SITE_DIR/test-results/"
           fi
+        working-directory: ${{ github.workspace }}
       
       - name: 📂 Sync files to domain
         if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
@@ -266,13 +317,15 @@ jobs:
       - name: Configure CMake with Clang
         if: ${{ inputs.compiler == 'clang' }}
         run: |
-          cmake -B "${{ github.workspace }}/${{ env.BUILD_RELEASE_DIR }}" --preset "${CLANG_RELEASE_PRESET}"
-          cmake --build "${{ github.workspace }}/${{ env.BUILD_RELEASE_DIR }}" --preset "${CLANG_RELEASE_PRESET}"
+          cmake -B "${{ env.BUILD_RELEASE_DIR }}" --preset "${CLANG_RELEASE_PRESET}"
+          cmake --build "${{ env.BUILD_RELEASE_DIR }}" --preset "${CLANG_RELEASE_PRESET}"
+        working-directory: ${{ github.workspace }}
 
       - name: Package (Clang only)
         if: ${{ inputs.compiler == 'clang' }}
         run: |
           cmake --build ${{ env.BUILD_RELEASE_DIR }} --target package
+        working-directory: ${{ github.workspace }}
 
       #- name: Run Callgrind measurements
       #  if: ${{ inputs.compiler == 'clang' }}
