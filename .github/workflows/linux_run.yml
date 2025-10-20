@@ -310,9 +310,9 @@ jobs:
       ################################### Now run release and build package for clang #################################
       #################################################################################################################
 
-      - name: Prepare for clang release
-        run: |
-          sudo rm -r "${{ github.workspace }}/${{ env.BUILD_DIR }}"
+      # - name: Prepare for clang release
+      #   run: |
+      #     sudo rm -r "${{ github.workspace }}/${{ env.BUILD_DIR }}"
 
       - name: Configure CMake with Clang
         if: ${{ inputs.compiler == 'clang' }}
