@@ -68,10 +68,11 @@ else()
 endif()
 
 # for correct library output needed
-install(
-  TARGETS ${PROJECT_NAME}
-  CONFIGURATIONS Release
-  RUNTIME DESTINATION bin)
+install(TARGETS ${PROJECT_NAME}
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+)
 
 # we keep the relative paths in the install dir
 # keep in mind that install dir will be in front of this relative path ...
