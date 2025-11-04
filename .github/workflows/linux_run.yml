@@ -27,7 +27,7 @@ jobs:
         shell: bash
      # Run this job inside the GHCR container:
     container:
-      image: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest
+      image: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest_multiarch
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_PAT }}
