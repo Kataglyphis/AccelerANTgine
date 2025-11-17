@@ -9,7 +9,7 @@ on:
 env:
   BUILD_DIR: "build"
   BUILD_DIR_RELEASE: "build_release"
-  CLANG_VERSION: 21.1.1
+  CLANG_VERSION: 21.1.5
   LLVM_BIN: 'C:\Program Files\LLVM\bin'
   CLANG_PROFILE_PRESET: x64-ClangCL-Windows-Profile
 
