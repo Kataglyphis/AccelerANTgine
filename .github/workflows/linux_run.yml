@@ -27,7 +27,7 @@ jobs:
         shell: bash
      # Run this job inside the GHCR container:
     container:
-      image: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest_multiarch
+      image: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_PAT }}
@@ -36,7 +36,7 @@ jobs:
       COMPILER: ${{ inputs.compiler }}
       RUNNER: ${{ inputs.runner }}
       BUILD_TYPE: Debug
-      VULKAN_VERSION: 1.4.321.1
+      # VULKAN_VERSION: 1.4.321.1
       BUILD_DIR: build
       BUILD_RELEASE_DIR: build-release
       GCC_DEBUG_PRESET: linux-debug-GNU
@@ -56,10 +56,10 @@ jobs:
       #################################################################################################################
       ######################################## Prepare deps ###########################################################
       #################################################################################################################
-      - name: Install deps
-        uses: ./.github/actions/install-deps
-        with:
-          vulkan-version: ${{ env.VULKAN_VERSION }}
+      # - name: Install deps
+      #   uses: ./.github/actions/install-deps
+      #   with:
+      #     vulkan-version: ${{ env.VULKAN_VERSION }}
       # - name: Install dependencies
       #   run: |
       #     sudo apt-get purge --auto-remove -y cmake
