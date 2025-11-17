@@ -56,6 +56,22 @@ jobs:
       #################################################################################################################
       ######################################## Prepare deps ###########################################################
       #################################################################################################################
+      - name: Setup paths
+        run: |
+          # Add uv to PATH
+          if [ -d "$HOME/.local/bin" ]; then
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          
+          # Verify installation
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv installed successfully"
+            uv --version
+          else
+            echo "ERROR: uv installation failed" >&2
+            exit 1
+          fi 
       # - name: Install deps
       #   uses: ./.github/actions/install-deps
       #   with:
