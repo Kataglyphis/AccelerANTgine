@@ -211,7 +211,7 @@ macro(myproject_local_options)
     endif()
 
   elseif(myproject_ENABLE_GPROF)
-    message(MESSAGE "GProf should only be used with GCC on Linux using -DCMAKE_BUILD_TYPE=Profile")
+    message(STATUS "GProf should only be used with GCC on Linux using -DCMAKE_BUILD_TYPE=Profile")
   endif()
 
   if(myproject_DISABLE_EXCEPTIONS)
