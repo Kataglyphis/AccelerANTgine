@@ -12,6 +12,7 @@ env:
   CLANG_VERSION: 21.1.5
   LLVM_BIN: 'C:\Program Files\LLVM\bin'
   CLANG_PROFILE_PRESET: x64-ClangCL-Windows-Profile
+  GHCR_IMAGE_WIN: ghcr.io/kataglyphis/kataglyphis_beschleuniger:winamd64
 
 defaults:
   run:
@@ -20,141 +21,276 @@ defaults:
 jobs:
   build:
     runs-on: windows-2025
-
     steps:
-      - uses: actions/checkout@v5.0.0
+      - name: Enable Git long paths
+        run: git config --global core.longpaths true
+
+      - uses: actions/checkout@v6.0.1
         with:
           fetch-depth: 0
           submodules: recursive
-      
-      #################################################################################################################
-      ######################################## Prepare deps ###########################################################
-      #################################################################################################################
- 
-      - name: Install dependencies
-        run: |
-          ./scripts/windows/setup-dependencies.ps1 `
-            -ClangVersion ${{ env.CLANG_VERSION }}
 
-      # this is necessary ... windows and paths ...
-      - name: Push Clang and LLVM and Sccache to Path
-        shell: pwsh
-        run: |
-          Add-Content -Path $Env:GITHUB_PATH -Value 'C:\Program Files\LLVM\bin'
-          Write-Output "$env:USERPROFILE\scoop\shims" >> $env:GITHUB_PATH
-      
-      #################################################################################################################
-      ####################### Run unit/integration/coverage/tests/static analyzers ####################################
-      #################################################################################################################
-      
-      ########################################## MSVC #################################################################
-      - name: Configure/Build CMake Debug (MSVC)
-        run: |
-          cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-MSVC-Windows-Debug
-          cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-MSVC-Windows-Debug
-
-      - name: Test (MSVC)
-        working-directory: ${{ env.BUILD_DIR }}
-        run: ctest
-
-      ########################################## CLANG-CL #############################################################
-      # 
-      - name: Prepare for Clang
-        run: |
-          Remove-Item -Path "${{ github.workspace }}/${{ env.BUILD_DIR }}" -Recurse -Force   
-          clang --version
-        shell: pwsh
-
-      - name: Configure CMake Build Debug (Clang)
-        # cppcheck has a weired bug in windows-2025 ... at least last time i tested so turn it off for now
-        run: |
-          cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-ClangCL-Windows-Debug -Dmyproject_ENABLE_CPPCHECK=OFF
-          cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-ClangCL-Windows-Debug
-
-      - name: Test (Clang)
-        working-directory: ${{ env.BUILD_DIR }}
-        run: |
-          ctest
-          & "llvm-profdata.exe" merge -sparse "Test\compile\default.profraw" -o "${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata"
-          & "llvm-cov.exe" report "compileTestSuite.exe" -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata"
-          & "llvm-cov.exe" export "compileTestSuite.exe" -format=text -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata" | Out-File -FilePath "coverage.json" -Encoding UTF8
-          & "llvm-cov.exe" show "compileTestSuite.exe" -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata"
-
-      - name: Run clang-tidy
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          $sourceFiles = Get-ChildItem -Path "Src" -Recurse -Include "*.cpp", "*.cc" | ForEach-Object { $_.FullName }
-          clang-tidy -p="./${{ env.BUILD_DIR }}/compile_commands.json" $sourceFiles
-
-      - name: Run Clang static analysis (HTML)
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          # HTML output (correct flag form)
-          $sourceFiles = Get-ChildItem -Path "Src" -Recurse -Include "*.cpp", "*.cc" | ForEach-Object { $_.FullName }
-          clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html $sourceFiles
-
-      # 
-      - name: Run Clang static analysis (scan-build)
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          New-Item -ItemType Directory -Path "scan-build-reports" -Force
-          scan-build --use-analyzer="C:\Program Files\LLVM\bin\clang-cl.exe" -o scan-build-reports cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-ClangCL-Windows-Debug
-
-      #################################################################################################################
-      ############################# Now run on performance benchmarking/profiling #####################################
-      #################################################################################################################
-      - name: Prepare for Profiling
-        run: |
-          clang --version
-        shell: pwsh
-
-      - name: Configure/build CMake for Profiling (select preset by compiler)
-        shell: pwsh
-        # cppcheck has weird bug
-        run: |
-          $PRESET = $env:CLANG_PROFILE_PRESET
-          Write-Output "Using preset: $PRESET"
-          cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset "$PRESET" -Dmyproject_ENABLE_CPPCHECK=OFF
-          cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset "$PRESET"
-
-      - name: Run performance benchmarks
-        working-directory: ${{ env.BUILD_DIR_RELEASE }}
-        run: .\perfTestSuite.exe --benchmark_out=results.json --benchmark_out_format=json
-
-      - name: Run Instrumentation-based PGO Clang/LLVM
-        continue-on-error: true
-        working-directory: ${{ env.BUILD_DIR_RELEASE }}
-        run: |
-          $Env:LLVM_PROFILE_FILE = "dummy.profraw"
-          & ".\KataglyphisCppProject.exe"
-          & "llvm-profdata.exe" merge -sparse "dummy.profraw" -o "dummy.profdata"
-          & "llvm-cov.exe" show ".\KataglyphisCppProject.exe" -instr-profile="dummy.profdata" -format=text
-
-      #################################################################################################################
-      ################################### Now run release and build package for clang #################################
-      #################################################################################################################
-      - name: Prepare for Release build
-        run: |
-          Remove-Item -Path "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" -Recurse -Force   
-          clang --version
-        shell: pwsh
-      
-      - name: Configure and Build CMake for Release (ClangCL)
-        run: |
-          cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset x64-ClangCL-Windows-Release -Dmyproject_ENABLE_CPPCHECK=OFF
-          cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset x64-ClangCL-Windows-Release
-
-      - name: Package (Clang)
-        run: cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset x64-ClangCL-Windows-Release --target package
-
-      - name: Upload Installers & Zip
-        uses: actions/upload-artifact@v4.6.2
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.6.0
         with:
-          name: windows-installers
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT || github.token }}
+
+      - name: Pull container image
+        run: |
+          docker pull "${{ env.GHCR_IMAGE_WIN }}"
+
+      - name: Build + test + analyze + package in container (MSVC + ClangCL)
+        run: |
+          docker run --rm `
+            --mount "type=bind,source=${{ github.workspace }},target=C:\workspace" `
+            -w "C:\workspace" `
+            -e BUILD_DIR="${{ env.BUILD_DIR }}" `
+            -e BUILD_DIR_RELEASE="${{ env.BUILD_DIR_RELEASE }}" `
+            -e CLANG_PROFILE_PRESET="${{ env.CLANG_PROFILE_PRESET }}" `
+            -e CLANG_VERSION="${{ env.CLANG_VERSION }}" `
+            -e GITHUB_WORKSPACE="C:\workspace" `
+            "${{ env.GHCR_IMAGE_WIN }}" `
+            powershell -NoProfile -ExecutionPolicy Bypass -Command "
+              $ErrorActionPreference = 'Stop'
+
+              function Invoke-Soft([string]$Name, [scriptblock]$Block) {
+                try { & $Block }
+                catch {
+                  Write-Warning ("{0} failed: {1}" -f $Name, $_.Exception.Message)
+                }
+              }
+
+              # Match the native job setup
+              if (Test-Path './scripts/windows/setup-dependencies.ps1') {
+                ./scripts/windows/setup-dependencies.ps1 -ClangVersion $Env:CLANG_VERSION
+              }
+
+              $llvmBin = 'C:\Program Files\LLVM\bin'
+              if (Test-Path $llvmBin) { $env:PATH = "$llvmBin;$env:PATH" }
+              $scoopShims = Join-Path $env:USERPROFILE 'scoop\shims'
+              if (Test-Path $scoopShims) { $env:PATH = "$scoopShims;$env:PATH" }
+
+              $buildDir = Join-Path $Env:GITHUB_WORKSPACE $Env:BUILD_DIR
+              $buildReleaseDir = Join-Path $Env:GITHUB_WORKSPACE $Env:BUILD_DIR_RELEASE
+
+              # MSVC debug
+              cmake -B $buildDir --preset x64-MSVC-Windows-Debug
+              cmake --build $buildDir --preset x64-MSVC-Windows-Debug
+              Push-Location $buildDir
+              ctest
+              Pop-Location
+
+              # Prepare for Clang
+              Remove-Item -Path $buildDir -Recurse -Force -ErrorAction SilentlyContinue
+              clang --version
+
+              # ClangCL debug
+              cmake -B $buildDir --preset x64-ClangCL-Windows-Debug -Dmyproject_ENABLE_CPPCHECK=OFF
+              cmake --build $buildDir --preset x64-ClangCL-Windows-Debug
+              Push-Location $buildDir
+              ctest
+              & 'llvm-profdata.exe' merge -sparse 'Test\compile\default.profraw' -o (Join-Path $buildDir 'compileTestSuite.profdata')
+              & 'llvm-cov.exe' report 'compileTestSuite.exe' -instr-profile=(Join-Path $buildDir 'compileTestSuite.profdata')
+              & 'llvm-cov.exe' export 'compileTestSuite.exe' -format=text -instr-profile=(Join-Path $buildDir 'compileTestSuite.profdata') | Out-File -FilePath 'coverage.json' -Encoding UTF8
+              & 'llvm-cov.exe' show 'compileTestSuite.exe' -instr-profile=(Join-Path $buildDir 'compileTestSuite.profdata')
+              Pop-Location
+
+              # clang-tidy (continue-on-error)
+              Invoke-Soft 'clang-tidy' {
+                $sourceFiles = Get-ChildItem -Path 'Src' -Recurse -Include '*.cpp', '*.cc' | ForEach-Object { $_.FullName }
+                $compileCommands = Join-Path $buildDir 'compile_commands.json'
+                clang-tidy -p=$compileCommands $sourceFiles
+              }
+
+              # Clang static analysis HTML (continue-on-error)
+              Invoke-Soft 'clang++ --analyze (HTML)' {
+                $sourceFiles = Get-ChildItem -Path 'Src' -Recurse -Include '*.cpp', '*.cc' | ForEach-Object { $_.FullName }
+                clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html $sourceFiles
+              }
+
+              # scan-build (continue-on-error)
+              Invoke-Soft 'scan-build' {
+                New-Item -ItemType Directory -Path 'scan-build-reports' -Force | Out-Null
+                scan-build --use-analyzer='C:\Program Files\LLVM\bin\clang-cl.exe' -o scan-build-reports cmake --build $buildDir --preset x64-ClangCL-Windows-Debug
+              }
+
+              # Prepare for Profiling
+              clang --version
+
+              # Configure/build for Profiling
+              $PRESET = $Env:CLANG_PROFILE_PRESET
+              Write-Output ("Using preset: {0}" -f $PRESET)
+              cmake -B $buildReleaseDir --preset $PRESET -Dmyproject_ENABLE_CPPCHECK=OFF
+              cmake --build $buildReleaseDir --preset $PRESET
+
+              # Run performance benchmarks
+              Push-Location $buildReleaseDir
+              .\perfTestSuite.exe --benchmark_out=results.json --benchmark_out_format=json
+
+              # Instrumentation-based PGO (continue-on-error)
+              Invoke-Soft 'PGO' {
+                $Env:LLVM_PROFILE_FILE = 'dummy.profraw'
+                & '.\KataglyphisCppProject.exe'
+                & 'llvm-profdata.exe' merge -sparse 'dummy.profraw' -o 'dummy.profdata'
+                & 'llvm-cov.exe' show '.\KataglyphisCppProject.exe' -instr-profile='dummy.profdata' -format=text
+              }
+              Pop-Location
+
+              # Prepare for Release build
+              Remove-Item -Path $buildReleaseDir -Recurse -Force -ErrorAction SilentlyContinue
+              clang --version
+
+              # Release + package (ClangCL)
+              cmake -B $buildReleaseDir --preset x64-ClangCL-Windows-Release -Dmyproject_ENABLE_CPPCHECK=OFF
+              cmake --build $buildReleaseDir --preset x64-ClangCL-Windows-Release
+              cmake --build $buildReleaseDir --preset x64-ClangCL-Windows-Release --target package
+            "
+
+      - name: Upload Installers & Zip (container build)
+        uses: actions/upload-artifact@v5.0.0
+        with:
+          name: windows-installers-container
           path: |
             ${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.msi
             ${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.exe
             ${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.zip
+
+      # - uses: actions/checkout@v6.0.0
+      #   with:
+      #     fetch-depth: 0
+      #     submodules: recursive
+      
+      # #################################################################################################################
+      # ######################################## Prepare deps ###########################################################
+      # #################################################################################################################
+ 
+      # - name: Install dependencies
+      #   run: |
+      #     ./scripts/windows/setup-dependencies.ps1 `
+      #       -ClangVersion ${{ env.CLANG_VERSION }}
+
+      # # this is necessary ... windows and paths ...
+      # - name: Push Clang and LLVM and Sccache to Path
+      #   shell: pwsh
+      #   run: |
+      #     Add-Content -Path $Env:GITHUB_PATH -Value 'C:\Program Files\LLVM\bin'
+      #     Write-Output "$env:USERPROFILE\scoop\shims" >> $env:GITHUB_PATH
+      
+      # #################################################################################################################
+      # ####################### Run unit/integration/coverage/tests/static analyzers ####################################
+      # #################################################################################################################
+      
+      # ########################################## MSVC #################################################################
+      # - name: Configure/Build CMake Debug (MSVC)
+      #   run: |
+      #     cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-MSVC-Windows-Debug
+      #     cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-MSVC-Windows-Debug
+
+      # - name: Test (MSVC)
+      #   working-directory: ${{ env.BUILD_DIR }}
+      #   run: ctest
+
+      # ########################################## CLANG-CL #############################################################
+      # # 
+      # - name: Prepare for Clang
+      #   run: |
+      #     Remove-Item -Path "${{ github.workspace }}/${{ env.BUILD_DIR }}" -Recurse -Force   
+      #     clang --version
+      #   shell: pwsh
+
+      # - name: Configure CMake Build Debug (Clang)
+      #   # cppcheck has a weired bug in windows-2025 ... at least last time i tested so turn it off for now
+      #   run: |
+      #     cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-ClangCL-Windows-Debug -Dmyproject_ENABLE_CPPCHECK=OFF
+      #     cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-ClangCL-Windows-Debug
+
+      # - name: Test (Clang)
+      #   working-directory: ${{ env.BUILD_DIR }}
+      #   run: |
+      #     ctest
+      #     & "llvm-profdata.exe" merge -sparse "Test\compile\default.profraw" -o "${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata"
+      #     & "llvm-cov.exe" report "compileTestSuite.exe" -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata"
+      #     & "llvm-cov.exe" export "compileTestSuite.exe" -format=text -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata" | Out-File -FilePath "coverage.json" -Encoding UTF8
+      #     & "llvm-cov.exe" show "compileTestSuite.exe" -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/compileTestSuite.profdata"
+
+      # - name: Run clang-tidy
+      #   shell: pwsh
+      #   continue-on-error: true
+      #   run: |
+      #     $sourceFiles = Get-ChildItem -Path "Src" -Recurse -Include "*.cpp", "*.cc" | ForEach-Object { $_.FullName }
+      #     clang-tidy -p="./${{ env.BUILD_DIR }}/compile_commands.json" $sourceFiles
+
+      # - name: Run Clang static analysis (HTML)
+      #   shell: pwsh
+      #   continue-on-error: true
+      #   run: |
+      #     # HTML output (correct flag form)
+      #     $sourceFiles = Get-ChildItem -Path "Src" -Recurse -Include "*.cpp", "*.cc" | ForEach-Object { $_.FullName }
+      #     clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html $sourceFiles
+
+      # # 
+      # - name: Run Clang static analysis (scan-build)
+      #   shell: pwsh
+      #   continue-on-error: true
+      #   run: |
+      #     New-Item -ItemType Directory -Path "scan-build-reports" -Force
+      #     scan-build --use-analyzer="C:\Program Files\LLVM\bin\clang-cl.exe" -o scan-build-reports cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR }}" --preset x64-ClangCL-Windows-Debug
+
+      # #################################################################################################################
+      # ############################# Now run on performance benchmarking/profiling #####################################
+      # #################################################################################################################
+      # - name: Prepare for Profiling
+      #   run: |
+      #     clang --version
+      #   shell: pwsh
+
+      # - name: Configure/build CMake for Profiling (select preset by compiler)
+      #   shell: pwsh
+      #   # cppcheck has weird bug
+      #   run: |
+      #     $PRESET = $env:CLANG_PROFILE_PRESET
+      #     Write-Output "Using preset: $PRESET"
+      #     cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset "$PRESET" -Dmyproject_ENABLE_CPPCHECK=OFF
+      #     cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset "$PRESET"
+
+      # - name: Run performance benchmarks
+      #   working-directory: ${{ env.BUILD_DIR_RELEASE }}
+      #   run: .\perfTestSuite.exe --benchmark_out=results.json --benchmark_out_format=json
+
+      # - name: Run Instrumentation-based PGO Clang/LLVM
+      #   continue-on-error: true
+      #   working-directory: ${{ env.BUILD_DIR_RELEASE }}
+      #   run: |
+      #     $Env:LLVM_PROFILE_FILE = "dummy.profraw"
+      #     & ".\KataglyphisCppProject.exe"
+      #     & "llvm-profdata.exe" merge -sparse "dummy.profraw" -o "dummy.profdata"
+      #     & "llvm-cov.exe" show ".\KataglyphisCppProject.exe" -instr-profile="dummy.profdata" -format=text
+
+      # #################################################################################################################
+      # ################################### Now run release and build package for clang #################################
+      # #################################################################################################################
+      # - name: Prepare for Release build
+      #   run: |
+      #     Remove-Item -Path "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" -Recurse -Force   
+      #     clang --version
+      #   shell: pwsh
+      
+      # - name: Configure and Build CMake for Release (ClangCL)
+      #   run: |
+      #     cmake -B "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset x64-ClangCL-Windows-Release -Dmyproject_ENABLE_CPPCHECK=OFF
+      #     cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset x64-ClangCL-Windows-Release
+
+      # - name: Package (Clang)
+      #   run: cmake --build "${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}" --preset x64-ClangCL-Windows-Release --target package
+
+      # - name: Upload Installers & Zip
+      #   uses: actions/upload-artifact@v4.6.2
+      #   with:
+      #     name: windows-installers
+      #     path: |
+      #       ${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.msi
+      #       ${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.exe
+      #       ${{ github.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.zip
+      

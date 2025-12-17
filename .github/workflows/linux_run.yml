@@ -48,7 +48,19 @@ jobs:
       DOCS_OUT: build/build/html
 
     steps:
-      - uses: actions/checkout@v5.0.0
+
+      - name: Free Disk Space on Host
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: false
+          swap-storage: true
+
+      - uses: actions/checkout@v6.0.0
         with:
           fetch-depth: 0
           submodules: recursive
@@ -348,7 +360,7 @@ jobs:
 
       - name: Upload Linux Packages (Clang only)
         if: ${{ inputs.compiler == 'clang' }}
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: linux-packages
           path: |
