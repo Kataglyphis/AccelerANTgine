@@ -278,8 +278,8 @@ jobs:
             # --- Fix ownership for copying docs
             OWNER_UID=$(stat -c "%u" /workspace)
             OWNER_GID=$(stat -c "%g" /workspace)
-            echo "Fixing ownership of doc/api to ${OWNER_UID}:${OWNER_GID}"
-            chown -R ${OWNER_UID}:${OWNER_GID} /workspace/doc || true
+            echo "Fixing ownership of docs/api to ${OWNER_UID}:${OWNER_GID}"
+            chown -R ${OWNER_UID}:${OWNER_GID} /workspace/docs || true
             '
 
       - name: Upload Linux Packages (Clang only)
