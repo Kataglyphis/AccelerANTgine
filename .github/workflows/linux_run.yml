@@ -288,10 +288,14 @@ jobs:
             ${{ env.BUILD_RELEASE_DIR }}/*.deb
 
       - name: Fix permissions for doc directory
-        if: ${{ inputs.runner == 'ubuntu-24.04' }}
+        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
         run: |
-          chmod -R 755 ./doc/api/
-          ls -la ./doc/api/
+          if [[ -d "./docs/build/html" ]]; then
+            chmod -R 755 ./docs/build/html/
+            ls -la ./docs/build/html/
+          else
+            echo "No docs directory found at ./docs/build/html (skipping chmod)."
+          fi
 
       - name: Sync files to domain
         if: inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang'
