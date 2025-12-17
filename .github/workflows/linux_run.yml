@@ -9,6 +9,12 @@ on:
       runner:
         required: true
         type: string
+      arch:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
     secrets:
       SERVER:
         required: true
@@ -25,16 +31,16 @@ jobs:
     defaults:
       run:
         shell: bash
-     # Run this job inside the GHCR container:
-    container:
-      image: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GHCR_PAT }}
 
     env:
       COMPILER: ${{ inputs.compiler }}
       RUNNER: ${{ inputs.runner }}
+      MATRIX_ARCH: ${{ inputs.arch }}
+      MATRIX_PLATFORM: ${{ inputs.platform }}
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}
+      FTP_SERVER: ${{ secrets.SERVER }}
+      FTP_USERNAME: ${{ secrets.USERNAME }}
+      FTP_PASSWORD: ${{ secrets.PW }}
       BUILD_TYPE: Debug
       # VULKAN_VERSION: 1.4.321.1
       BUILD_DIR: build
@@ -60,303 +66,216 @@ jobs:
           docker-images: false
           swap-storage: true
 
-      - uses: actions/checkout@v6.0.0
+      - uses: actions/checkout@v6.0.1
         with:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Login to GitHub Container Registry
+        if: env.GHCR_PAT != ''
+        run: echo "${{ env.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull container image (retry)
+        run: |
+          for i in 1 2 3; do
+            echo "Attempt $i to pull container..."
+            if timeout 900 docker pull ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest; then
+              echo "Successfully pulled container"
+              exit 0
+            fi
+            echo "Pull failed, waiting before retry..."
+            sleep 30
+          done
+          echo "Failed to pull container after 3 attempts"
+          exit 1
+
       #################################################################################################################
       ######################################## Prepare deps ###########################################################
       #################################################################################################################
-      - name: Setup paths
+      - name: Run build/test/docs/package inside container
         run: |
-          # Add uv to PATH
-          if [ -d "$HOME/.local/bin" ]; then
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-            export PATH="$HOME/.local/bin:$PATH"
-          fi
-          
-          # Verify installation
-          if command -v uv >/dev/null 2>&1; then
-            echo "uv installed successfully"
-            uv --version
-          else
-            echo "ERROR: uv installation failed" >&2
-            exit 1
-          fi 
-      # - name: Install deps
-      #   uses: ./.github/actions/install-deps
-      #   with:
-      #     vulkan-version: ${{ env.VULKAN_VERSION }}
-      # - name: Install dependencies
-      #   run: |
-      #     sudo apt-get purge --auto-remove -y cmake
-      #     chmod +x scripts/linux/setup-dependencies.sh
-      #     ./scripts/linux/setup-dependencies.sh
-      #     echo "/usr/bin" >> $GITHUB_PATH
+          docker run --rm \
+            --platform ${{ env.MATRIX_PLATFORM }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e COMPILER=${{ env.COMPILER }} \
+            -e RUNNER=${{ env.RUNNER }} \
+            -e MATRIX_ARCH=${{ env.MATRIX_ARCH }} \
+            -e BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -e BUILD_DIR=${{ env.BUILD_DIR }} \
+            -e BUILD_RELEASE_DIR=${{ env.BUILD_RELEASE_DIR }} \
+            -e GCC_DEBUG_PRESET=${{ env.GCC_DEBUG_PRESET }} \
+            -e CLANG_DEBUG_PRESET=${{ env.CLANG_DEBUG_PRESET }} \
+            -e GCC_PROFILE_PRESET=${{ env.GCC_PROFILE_PRESET }} \
+            -e CLANG_PROFILE_PRESET=${{ env.CLANG_PROFILE_PRESET }} \
+            -e CLANG_RELEASE_PRESET=${{ env.CLANG_RELEASE_PRESET }} \
+            -e COVERAGE_JSON=${{ env.COVERAGE_JSON }} \
+            -e DOCS_OUT=${{ env.DOCS_OUT }} \
+            ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest \
+            bash -lc '
+            set -e
+            git config --global --add safe.directory /workspace || true
 
-      - name: Prepare test folders
-        run: |
-          # ensure docs target dirs exist so tools can write files there
-          mkdir -p ${{ github.workspace }}/docs/coverage
-          mkdir -p ${{ github.workspace }}/docs/test-results
-        working-directory: ${{ github.workspace }}
+            echo "Compiler: ${COMPILER}"
+            echo "Runner: ${RUNNER}"
+            echo "Arch: ${MATRIX_ARCH}"
 
-      #################################################################################################################
-      ############################## Run unit/integration/fuzzy/coverage/tests/static analyzers #######################
-      #################################################################################################################
-      - name: Configure/build CMake for Debug (select preset by compiler)
-        run: |
-          if [[ "${COMPILER}" == "gcc" ]]; then
-            PRESET="${GCC_DEBUG_PRESET}"
-          else
-            PRESET="${CLANG_DEBUG_PRESET}"
-          fi
-          echo "Using preset: ${PRESET}"
-          cmake -B "${{ env.BUILD_DIR }}" --preset "${PRESET}"
-          cmake --build "${{ env.BUILD_DIR }}" --preset "${PRESET}"
-        working-directory: ${{ github.workspace }}
+            if command -v uv >/dev/null 2>&1; then
+              uv --version
+            else
+              echo "ERROR: uv not found in container" >&2
+              exit 1
+            fi
 
-      - name: Run Unit/Integration tests
-        working-directory: ${{ env.BUILD_DIR }}
-        run: |
-          ctest -C $BUILD_TYPE --verbose --extra-verbose --debug -T test --output-on-failure --output-junit "${{ github.workspace }}/docs/test_results.xml"
+            mkdir -p /workspace/docs/coverage
+            mkdir -p /workspace/docs/test-results
 
-      - name: Run fuzzer tests
-        run: |
-          if [[ "${{ inputs.compiler }}" == "clang" ]]; then
-            ./${{ env.BUILD_DIR }}/first_fuzz_test
-          else
-            echo "Compiled with GCC so no fuzz testing!"
-          fi
-        working-directory: ${{ github.workspace }}
+            # ---- Debug build + tests ----
+            if [[ "${COMPILER}" == "gcc" ]]; then
+              PRESET="${GCC_DEBUG_PRESET}"
+            else
+              PRESET="${CLANG_DEBUG_PRESET}"
+            fi
+            echo "Using preset: ${PRESET}"
+            cmake -B "${BUILD_DIR}" --preset "${PRESET}"
+            cmake --build "${BUILD_DIR}" --preset "${PRESET}"
 
-      - name: Build Code Coverage
-        working-directory: ${{ env.BUILD_DIR }}
-        run: |
-          if [[ "${{ inputs.compiler }}" == "gcc" ]]; then
-            gcovr --html-details ${{ github.workspace }}/docs/coverage/index.html -r .
-          else
-            llvm-profdata merge -sparse Test/compile/default.profraw -o compileTestSuite.profdata
-            llvm-cov report ./compileTestSuite -instr-profile=compileTestSuite.profdata
-            llvm-cov export ./compileTestSuite -format=text -instr-profile=compileTestSuite.profdata > ${{ env.COVERAGE_JSON }}
-            llvm-cov show ./compileTestSuite -instr-profile=compileTestSuite.profdata -format=html -output-dir ${{ github.workspace }}/docs/coverage
-          fi
+            (cd "${BUILD_DIR}" && ctest -C "${BUILD_TYPE}" --verbose --extra-verbose --debug -T test --output-on-failure --output-junit "/workspace/docs/test_results.xml")
 
-      #- name: Codecov
-      #  if: ${{ inputs.compiler == 'clang' && inputs.runner == 'ubuntu-24.04' }}
-      #  uses: codecov/coecov-action@v5.5.1
-      #  with:
-      #    token: ${{ secrets.CODECOV_TOKEN }}
-      #    files: ${{ env.COVERAGE_JSON }}
-      #    name: codecov-umbrella
-      #    fail_ci_if_error: false
-      #    verbose: false
-
-      - name: Run clang tidy
-        run: clang-tidy -p=./${{ env.BUILD_DIR }}/compile_commands.json  $(find Src -name '*.cpp' -o -name '*.cc')
-        working-directory: ${{ github.workspace }}
-
-      - name: Run Clang static analysis (HTML)
-        continue-on-error: true
-        if: ${{ inputs.compiler == 'clang' }}
-        run: |
-          # HTML output (correct flag form)
-          clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html $(find Src -name '*.cpp' -o -name '*.cc')
-        working-directory: ${{ github.workspace }}
-
-      - name: Run Clang static analysis (scan-build)
-        continue-on-error: true
-        if: ${{ inputs.compiler == 'clang' }}
-        run: |
-          mkdir -p scan-build-reports
-          scan-build-21 -o scan-build-reports cmake --build ${BUILD_DIR} --preset "${CLANG_DEBUG_PRESET}"
-        working-directory: ${{ github.workspace }}
-
-      #################################################################################################################
-      ############################# Now run on performance benchmarking/profiling #####################################
-      #################################################################################################################
-      - name: Configure/build CMake for Profiling (select preset by compiler)
-        run: |
-          rm -r "${{ env.BUILD_DIR }}"
-          if [[ "${COMPILER}" == "gcc" ]]; then
-            PRESET="${GCC_PROFILE_PRESET}"
-          else
-            PRESET="${CLANG_PROFILE_PRESET}"
-          fi
-          echo "Using preset: ${PRESET}"
-          cmake -B "${{ env.BUILD_DIR }}" --preset "${PRESET}"
-          cmake --build "${{ env.BUILD_DIR }}" --preset "${PRESET}"
-        working-directory: ${{ github.workspace }}
-      #- name: Run Instrumentation-based PGO Clang/LLVM
-      #  working-directory: ${{ env.BUILD_DIR }}
-      #  if: ${{ inputs.compiler == 'clang' }}
-      #  run: |
-      #    LLVM_PROFILE_FILE="${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profraw" ./KataglyphisCppProject
-      #    llvm-profdata merge -sparse "${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profraw" -o "${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profdata"
-      #    llvm-cov show ./KataglyphisCppProject -instr-profile="${{ github.workspace }}/${{ env.BUILD_DIR }}/dummy.profdata" -format=text
-
-      # one does need to make adjustments in the config
-      # and this is a github runner
-      - name: Run Perf measurements
-        continue-on-error: true
-        working-directory: ${{ env.BUILD_DIR }}
-        run: |
-          perf record -F 99 --call-graph dwarf -- ./KataglyphisCppProject
-
-      - name: Run performance benchmarks
-        working-directory: ${{ env.BUILD_DIR }}
-        run: ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json
-
-      #- name: Run GProf
-      #  working-directory: ${{ env.BUILD_DIR }}
-      #  run: |
-      #    ./KataglyphisCppProject
-      #    if [[ -f gmon.out ]]; then
-      #      gprof KataglyphisCppProject gmon.out > profile.txt || true
-      #    else
-      #      echo "gmon.out not found, skipping gprof."
-      #    fi
-
-      #################################################################################################################
-      ######################################## Build docs #############################################################
-      #################################################################################################################
-      # . "$HOME/.local/bin/env" 
-      - name: Set Astral UV venv
-        if: ${{ inputs.compiler == 'clang' && inputs.runner == 'ubuntu-24.04' }}
-        run: |
-          uv venv
-        working-directory: ${{ github.workspace }}
-
-      # You can test your matrix by printing the current Python version
-      # . "$HOME/.local/bin/env"
-      - name: Setup python env
-        if: ${{ inputs.compiler == 'clang' && inputs.runner == 'ubuntu-24.04' }}
-        run: |
-          . ".venv/bin/activate"
-          uv pip install -r requirements.txt
-        working-directory: ${{ github.workspace }}
-
-      - name: Build web page
-        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
-        run: |
-          . ".venv/bin/activate"
-          cp ${{ env.DOCS_OUT }}/*.svg ./docs/source/_static
-          cd docs/source
-          uv run python graphviz_generator.py 
-          cd ..
-          uv run make html
-        working-directory: ${{ github.workspace }}
-
-      - name: Convert GTest XML → HTML
-        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
-        run: |
-          shopt -s globstar nullglob
-          mkdir -p docs/test-results
-
-          for f in ${{ github.workspace }}/**/*.xml; do
-            # skip empty files
-            [ -s "$f" ] || { echo "Skipping empty file: $f"; continue; }
-
-            # basic check whether file contains JUnit-like root tags
-            if grep -qE '<testsuites|<testsuite' "$f"; then
-              if junit2html "$f" "${{ github.workspace }}/docs/test-results/$(basename "$f" .xml).html"; then
-                echo "Converted: $(basename "$f")"
+            # ---- Fuzz tests (clang only) ----
+            if [[ "${COMPILER}" == "clang" ]]; then
+              if [[ -x "./${BUILD_DIR}/first_fuzz_test" ]]; then
+                "./${BUILD_DIR}/first_fuzz_test"
               else
-                echo "junit2html failed for: $f — skipping"
+                echo "first_fuzz_test not found/executable, skipping"
               fi
-             else
-               echo "Not JUnit XML, skipping: $f"
-             fi
-            done
-        working-directory: ${{ github.workspace }}
-          
-      - name: HTML → Markdown (pandoc)
-        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }} 
-        run: |
-          sudo apt-get update && sudo apt-get install -y pandoc
-          mkdir -p "${{ github.workspace }}/docs/test-results-md"
-    
-          # Check if any HTML files exist before processing
-          shopt -s globstar nullglob
-          html_files=("${{ github.workspace }}"/docs/test-results/*.html)
-    
-          if [ ${#html_files[@]} -eq 0 ]; then
-            echo "No HTML files found in docs/test-results. Skipping pandoc conversion."
-            exit 0
-          fi
-    
-          for f in "${html_files[@]}"; do
-            pandoc "$f" --verbose -f html -t gfm -o "${{ github.workspace }}/docs/test-results-md/$(basename "$f" .html).md"
-          done
-          
-      - name: Copy generated .md into Sphinx source
-        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
-        run: |
-          mkdir -p docs/source/test-results
-    
-          # Only copy if the source directory exists and contains files
-          if [ -d "docs/test-results-md" ] && [ "$(ls -A docs/test-results-md)" ]; then
-            cp -r docs/test-results-md/* docs/source/test-results/
-            echo "Copied markdown test results to Sphinx source"
-          else
-           echo "No markdown test results to copy (docs/test-results-md is empty or missing)"
-          fi
-        working-directory: ${{ github.workspace }}
-        
-      # copy coverage & test-results into built site so they are deployed
-      - name: Attach coverage & junit to built site
-        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
-        run: |
-          SITE_DIR="@/docs/build/html"
-          mkdir -p "$SITE_DIR"
-          # copy coverage HTML (if it exists)
-          if [[ -d "${{ github.workspace }}/docs/coverage" ]]; then
-            mkdir -p "$SITE_DIR/coverage"
-            cp -r "${{ github.workspace }}/docs/coverage/." "$SITE_DIR/coverage/"
-          fi
-          # copy junit xml results (if they exist) to a test-results folder in site
-          if [[ -d "${{ github.workspace }}/docs/test-results" ]]; then
-            mkdir -p "$SITE_DIR/test-results"
-            cp -r "${{ github.workspace }}/docs/test-results/." "$SITE_DIR/test-results/"
-          fi
-        working-directory: ${{ github.workspace }}
-      
-      - name: 📂 Sync files to domain
-        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ secrets.SERVER }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PW }}
-          local-dir: "./docs/build/html/"
+            else
+              echo "Compiled with GCC so no fuzz testing!"
+            fi
 
-      #################################################################################################################
-      ################################### Now run release and build package for clang #################################
-      #################################################################################################################
+            # ---- Coverage ----
+            if [[ "${COMPILER}" == "gcc" ]]; then
+              (cd "${BUILD_DIR}" && gcovr --html-details /workspace/docs/coverage/index.html -r .)
+            else
+              (cd "${BUILD_DIR}" && \
+                llvm-profdata merge -sparse Test/compile/default.profraw -o compileTestSuite.profdata && \
+                llvm-cov report ./compileTestSuite -instr-profile=compileTestSuite.profdata && \
+                llvm-cov export ./compileTestSuite -format=text -instr-profile=compileTestSuite.profdata > "${COVERAGE_JSON}" && \
+                llvm-cov show ./compileTestSuite -instr-profile=compileTestSuite.profdata -format=html -output-dir /workspace/docs/coverage)
+            fi
 
-      # - name: Prepare for clang release
-      #   run: |
-      #     sudo rm -r "${{ github.workspace }}/${{ env.BUILD_DIR }}"
+            # ---- Static analysis ----
+            if command -v clang-tidy >/dev/null 2>&1; then
+              clang-tidy -p=./${BUILD_DIR}/compile_commands.json $(find Src -name "*.cpp" -o -name "*.cc")
+            else
+              echo "clang-tidy not available, skipping"
+            fi
 
-      - name: Configure CMake with Clang
-        if: ${{ inputs.compiler == 'clang' }}
-        run: |
-          cmake -B "${{ env.BUILD_RELEASE_DIR }}" --preset "${CLANG_RELEASE_PRESET}"
-          cmake --build "${{ env.BUILD_RELEASE_DIR }}" --preset "${CLANG_RELEASE_PRESET}"
-        working-directory: ${{ github.workspace }}
+            if [[ "${COMPILER}" == "clang" ]]; then
+              set +e
+              clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html $(find Src -name "*.cpp" -o -name "*.cc")
+              set -e
 
-      - name: Package (Clang only)
-        if: ${{ inputs.compiler == 'clang' }}
-        run: |
-          cmake --build ${{ env.BUILD_RELEASE_DIR }} --target package
-        working-directory: ${{ github.workspace }}
+              if command -v scan-build-21 >/dev/null 2>&1; then
+                mkdir -p scan-build-reports
+                scan-build-21 -o scan-build-reports cmake --build "${BUILD_DIR}" --preset "${CLANG_DEBUG_PRESET}"
+              else
+                echo "scan-build-21 not available, skipping"
+              fi
+            fi
 
-      #- name: Run Callgrind measurements
-      #  if: ${{ inputs.compiler == 'clang' }}
-      #  working-directory: ${{ env.BUILD_RELEASE_DIR }}
-      #  run: |
-      #    valgrind --tool=callgrind ./KataglyphisCppProject
+            # ---- Profiling / benchmarks ----
+            rm -rf "${BUILD_DIR}"
+            if [[ "${COMPILER}" == "gcc" ]]; then
+              PRESET="${GCC_PROFILE_PRESET}"
+            else
+              PRESET="${CLANG_PROFILE_PRESET}"
+            fi
+            echo "Using profiling preset: ${PRESET}"
+            cmake -B "${BUILD_DIR}" --preset "${PRESET}"
+            cmake --build "${BUILD_DIR}" --preset "${PRESET}"
+
+            set +e
+            (cd "${BUILD_DIR}" && perf record -F 99 --call-graph dwarf -- ./KataglyphisCppProject)
+            set -e
+
+            (cd "${BUILD_DIR}" && ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json)
+
+            # ---- Docs (clang + ubuntu-24.04 only) ----
+            if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-24.04" ]]; then
+              uv venv
+              . ".venv/bin/activate"
+              uv pip install -r requirements.txt
+
+              if [[ -d "${DOCS_OUT}" ]]; then
+                mkdir -p docs/source/_static
+                cp ${DOCS_OUT}/*.svg ./docs/source/_static 2>/dev/null || true
+              fi
+
+              if [[ -f "docs/source/graphviz_generator.py" ]]; then
+                (cd docs/source && uv run python graphviz_generator.py)
+              fi
+
+              if [[ -f "docs/Makefile" || -f "docs/make.bat" ]]; then
+                (cd docs && uv run make html)
+              fi
+
+              if command -v junit2html >/dev/null 2>&1; then
+                shopt -s globstar nullglob
+                mkdir -p docs/test-results
+                for f in /workspace/**/*.xml; do
+                  [ -s "$f" ] || { echo "Skipping empty file: $f"; continue; }
+                  if grep -qE "<testsuites|<testsuite" "$f"; then
+                    junit2html "$f" "/workspace/docs/test-results/$(basename "$f" .xml).html" || echo "junit2html failed for: $f — skipping"
+                  else
+                    echo "Not JUnit XML, skipping: $f"
+                  fi
+                done
+              else
+                echo "junit2html not available, skipping"
+              fi
+
+              if command -v pandoc >/dev/null 2>&1; then
+                :
+              else
+                apt-get update && apt-get install -y pandoc
+              fi
+              mkdir -p "/workspace/docs/test-results-md"
+              shopt -s globstar nullglob
+              html_files=("/workspace"/docs/test-results/*.html)
+              if [ ${#html_files[@]} -eq 0 ]; then
+                echo "No HTML files found in docs/test-results. Skipping pandoc conversion."
+              else
+                for f in "${html_files[@]}"; do
+                  pandoc "$f" --verbose -f html -t gfm -o "/workspace/docs/test-results-md/$(basename "$f" .html).md"
+                done
+              fi
+
+              mkdir -p docs/source/test-results
+              if [ -d "docs/test-results-md" ] && [ "$(ls -A docs/test-results-md 2>/dev/null)" ]; then
+                cp -r docs/test-results-md/* docs/source/test-results/
+              fi
+
+              # copy coverage & test-results into built site so they can be deployed
+              SITE_DIR="/workspace/docs/build/html"
+              mkdir -p "$SITE_DIR"
+              if [[ -d "/workspace/docs/coverage" ]]; then
+                mkdir -p "$SITE_DIR/coverage"
+                cp -r "/workspace/docs/coverage/." "$SITE_DIR/coverage/" || true
+              fi
+              if [[ -d "/workspace/docs/test-results" ]]; then
+                mkdir -p "$SITE_DIR/test-results"
+                cp -r "/workspace/docs/test-results/." "$SITE_DIR/test-results/" || true
+              fi
+            fi
+
+            # ---- Release package (clang only) ----
+            if [[ "${COMPILER}" == "clang" ]]; then
+              cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
+              cmake --build "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
+              cmake --build "${BUILD_RELEASE_DIR}" --target package
+            fi
+            '
 
       - name: Upload Linux Packages (Clang only)
         if: ${{ inputs.compiler == 'clang' }}
@@ -367,3 +286,12 @@ jobs:
             ${{ env.BUILD_RELEASE_DIR }}/*.tar.gz
             ${{ env.BUILD_RELEASE_DIR }}/*.tgz
             ${{ env.BUILD_RELEASE_DIR }}/*.deb
+
+      - name: Sync files to domain
+        if: inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' && env.FTP_SERVER != '' && env.FTP_USERNAME != '' && env.FTP_PASSWORD != '' && github.event_name != 'pull_request'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ env.FTP_SERVER }}
+          username: ${{ env.FTP_USERNAME }}
+          password: ${{ env.FTP_PASSWORD }}
+          local-dir: "./docs/build/html/"

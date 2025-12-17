@@ -12,6 +12,8 @@ jobs:
     with:
       compiler: gcc
       runner: ubuntu-24.04-arm
+      arch: arm64
+      platform: linux/arm64
     secrets:
       SERVER: ${{ secrets.SERVER }}
       USERNAME: ${{ secrets.USERNAME }}
@@ -23,6 +25,8 @@ jobs:
     with:
       compiler: clang
       runner: ubuntu-24.04-arm
+      arch: arm64
+      platform: linux/arm64
     secrets:
       SERVER: ${{ secrets.SERVER }}
       USERNAME: ${{ secrets.USERNAME }}
