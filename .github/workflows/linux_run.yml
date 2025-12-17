@@ -275,6 +275,11 @@ jobs:
               cmake --build "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
               cmake --build "${BUILD_RELEASE_DIR}" --target package
             fi
+            # --- Fix ownership for copying docs
+            OWNER_UID=$(stat -c "%u" /workspace)
+            OWNER_GID=$(stat -c "%g" /workspace)
+            echo "Fixing ownership of doc/api to ${OWNER_UID}:${OWNER_GID}"
+            chown -R ${OWNER_UID}:${OWNER_GID} /workspace/doc || true
             '
 
       - name: Upload Linux Packages (Clang only)
