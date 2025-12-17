@@ -57,7 +57,7 @@ jobs:
             -e CLANG_VERSION="${{ env.CLANG_VERSION }}" `
             -e GITHUB_WORKSPACE="C:\workspace" `
             "${{ env.GHCR_IMAGE_WIN }}" `
-            powershell -NoProfile -ExecutionPolicy Bypass -Command "
+            powershell -NoProfile -ExecutionPolicy Bypass -Command @'
               $ErrorActionPreference = 'Stop'
 
               function Invoke-Soft([string]$Name, [scriptblock]$Block) {
@@ -73,9 +73,14 @@ jobs:
               }
 
               $llvmBin = 'C:\Program Files\LLVM\bin'
-              if (Test-Path $llvmBin) { $env:PATH = "$llvmBin;$env:PATH" }
+              if (Test-Path $llvmBin) {
+                $env:PATH = "$llvmBin;$env:PATH"
+              }
+
               $scoopShims = Join-Path $env:USERPROFILE 'scoop\shims'
-              if (Test-Path $scoopShims) { $env:PATH = "$scoopShims;$env:PATH" }
+              if (Test-Path $scoopShims) {
+                $env:PATH = "$scoopShims;$env:PATH"
+              }
 
               $buildDir = Join-Path $Env:GITHUB_WORKSPACE $Env:BUILD_DIR
               $buildReleaseDir = Join-Path $Env:GITHUB_WORKSPACE $Env:BUILD_DIR_RELEASE
@@ -151,7 +156,10 @@ jobs:
               cmake -B $buildReleaseDir --preset x64-ClangCL-Windows-Release -Dmyproject_ENABLE_CPPCHECK=OFF
               cmake --build $buildReleaseDir --preset x64-ClangCL-Windows-Release
               cmake --build $buildReleaseDir --preset x64-ClangCL-Windows-Release --target package
-            "
+            '@
+
+      
+
 
       - name: Upload Installers & Zip (container build)
         uses: actions/upload-artifact@v5.0.0
