@@ -156,9 +156,7 @@ jobs:
               cmake -B $buildReleaseDir --preset x64-ClangCL-Windows-Release -Dmyproject_ENABLE_CPPCHECK=OFF
               cmake --build $buildReleaseDir --preset x64-ClangCL-Windows-Release
               cmake --build $buildReleaseDir --preset x64-ClangCL-Windows-Release --target package
-            '@
-
-      
+'@ 
 
 
       - name: Upload Installers & Zip (container build)
