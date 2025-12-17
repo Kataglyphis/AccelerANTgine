@@ -287,11 +287,17 @@ jobs:
             ${{ env.BUILD_RELEASE_DIR }}/*.tgz
             ${{ env.BUILD_RELEASE_DIR }}/*.deb
 
+      - name: Fix permissions for doc directory
+        if: ${{ inputs.runner == 'ubuntu-24.04' }}
+        run: |
+          chmod -R 755 ./doc/api/
+          ls -la ./doc/api/
+
       - name: Sync files to domain
-        if: inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' && env.FTP_SERVER != '' && env.FTP_USERNAME != '' && env.FTP_PASSWORD != '' && github.event_name != 'pull_request'
+        if: inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
-          server: ${{ env.FTP_SERVER }}
-          username: ${{ env.FTP_USERNAME }}
-          password: ${{ env.FTP_PASSWORD }}
+          server: ${{ secrets.SERVER }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PW }}
           local-dir: "./docs/build/html/"
