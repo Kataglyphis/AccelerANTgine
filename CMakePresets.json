@@ -243,6 +243,7 @@
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
         "RUST_FEATURES": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "FALSE"
@@ -264,6 +265,7 @@
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
         "RUST_FEATURES": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Profile",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
@@ -285,6 +287,7 @@
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
         "RUST_FEATURES": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
@@ -306,6 +309,7 @@
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
         "RUST_FEATURES": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Release",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "FALSE"

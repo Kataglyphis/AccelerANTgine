@@ -126,9 +126,11 @@ macro(myproject_global_options)
   # https://clang.llvm.org/docs/UsersManual.html
   # this is the clang-cl case
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od -fcolor-diagnostics -Wno-error=unused-command-line-argument -Wno-error=character-conversion")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument -Wno-error=character-conversion")
-    set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_PROFILE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument -Wno-error=character-conversion")
+    # NOTE: clang-cl does not support all GCC/Clang warning names; unknown -W* options
+    # become fatal when /WX is enabled (seen e.g. for character-conversion).
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od -fcolor-diagnostics -Wno-error=unused-command-line-argument")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
+    set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_PROFILE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
     # https://clang.llvm.org/docs/ClangCommandLineReference.html
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -ggdb -fcolor-diagnostics") # -std=c++2a

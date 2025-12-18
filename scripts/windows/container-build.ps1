@@ -7,7 +7,20 @@ function Invoke-Soft([string]$Name, [scriptblock]$Block) {
   }
 }
 
-$llvmBin = 'C:\Program Files\LLVM\bin'
+function Invoke-Native([string]$Name, [scriptblock]$Block) {
+  & $Block
+  if ($LASTEXITCODE -ne 0) {
+    throw ("{0} failed with exit code {1}" -f $Name, $LASTEXITCODE)
+  }
+}
+
+$llvmBin = if ($env:LLVM_BIN) { $env:LLVM_BIN } else { 'C:\Program Files\LLVM\bin' }
+if (-not (Test-Path $llvmBin)) {
+  $clangCl = Get-Command clang-cl.exe -ErrorAction SilentlyContinue
+  if ($clangCl) {
+    $llvmBin = Split-Path -Parent $clangCl.Source
+  }
+}
 if (Test-Path $llvmBin) { $env:PATH = "$llvmBin;$env:PATH" }
 
 $scoopShims = Join-Path $env:USERPROFILE 'scoop\shims'
@@ -16,22 +29,24 @@ if (Test-Path $scoopShims) { $env:PATH = "$scoopShims;$env:PATH" }
 $buildDir = Join-Path $Env:GITHUB_WORKSPACE $Env:BUILD_DIR
 $buildReleaseDir = Join-Path $Env:GITHUB_WORKSPACE $Env:BUILD_DIR_RELEASE
 
-# MSVC debug
-cmake -B $buildDir --preset x64-MSVC-Windows-Debug
-cmake --build $buildDir --preset x64-MSVC-Windows-Debug
-Push-Location $buildDir
-ctest
-Pop-Location
+# MSVC debug (optional in the Windows container image)
+Invoke-Soft 'MSVC Debug' {
+  Invoke-Native 'cmake configure (MSVC Debug)' { cmake -B $buildDir --preset x64-MSVC-Windows-Debug }
+  Invoke-Native 'cmake build (MSVC Debug)' { cmake --build $buildDir --preset x64-MSVC-Windows-Debug }
+  Push-Location $buildDir
+  Invoke-Native 'ctest (MSVC Debug)' { ctest }
+  Pop-Location
+}
 
 # Prepare for Clang
 Remove-Item -Path $buildDir -Recurse -Force -ErrorAction SilentlyContinue
 clang --version
 
 # ClangCL debug
-cmake -B $buildDir --preset x64-ClangCL-Windows-Debug -Dmyproject_ENABLE_CPPCHECK=OFF
-cmake --build $buildDir --preset x64-ClangCL-Windows-Debug
+Invoke-Native 'cmake configure (ClangCL Debug)' { cmake -B $buildDir --preset x64-ClangCL-Windows-Debug -Dmyproject_ENABLE_CPPCHECK=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON }
+Invoke-Native 'cmake build (ClangCL Debug)' { cmake --build $buildDir --preset x64-ClangCL-Windows-Debug }
 Push-Location $buildDir
-ctest
+Invoke-Native 'ctest (ClangCL Debug)' { ctest }
 & 'llvm-profdata.exe' merge -sparse 'Test\compile\default.profraw' -o (Join-Path $buildDir 'compileTestSuite.profdata')
 & 'llvm-cov.exe' report 'compileTestSuite.exe' -instr-profile=(Join-Path $buildDir 'compileTestSuite.profdata')
 & 'llvm-cov.exe' export 'compileTestSuite.exe' -format=text -instr-profile=(Join-Path $buildDir 'compileTestSuite.profdata') | Out-File -FilePath 'coverage.json' -Encoding UTF8
@@ -54,7 +69,16 @@ Invoke-Soft 'clang++ --analyze (HTML)' {
 # scan-build (continue-on-error)
 Invoke-Soft 'scan-build' {
   New-Item -ItemType Directory -Path 'scan-build-reports' -Force | Out-Null
-  scan-build --use-analyzer='C:\Program Files\LLVM\bin\clang-cl.exe' -o scan-build-reports cmake --build $buildDir --preset x64-ClangCL-Windows-Debug
+  $analyzer = Join-Path $llvmBin 'clang-cl.exe'
+  if (-not (Test-Path $analyzer)) {
+    $clangCl = Get-Command clang-cl.exe -ErrorAction SilentlyContinue
+    if ($clangCl) { $analyzer = $clangCl.Source }
+  }
+  if (Test-Path $analyzer) {
+    scan-build --use-analyzer=$analyzer -o scan-build-reports cmake --build $buildDir --preset x64-ClangCL-Windows-Debug
+  } else {
+    Write-Warning "scan-build skipped: clang-cl.exe not found"
+  }
 }
 
 # Prepare for Profiling
@@ -63,8 +87,8 @@ clang --version
 # Configure/build for Profiling
 $PRESET = $Env:CLANG_PROFILE_PRESET
 Write-Output ("Using preset: {0}" -f $PRESET)
-cmake -B $buildReleaseDir --preset $PRESET -Dmyproject_ENABLE_CPPCHECK=OFF
-cmake --build $buildReleaseDir --preset $PRESET
+Invoke-Native 'cmake configure (Profile)' { cmake -B $buildReleaseDir --preset $PRESET -Dmyproject_ENABLE_CPPCHECK=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON }
+Invoke-Native 'cmake build (Profile)' { cmake --build $buildReleaseDir --preset $PRESET }
 
 # Run performance benchmarks
 Push-Location $buildReleaseDir
