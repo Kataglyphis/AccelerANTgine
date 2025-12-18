@@ -7,11 +7,6 @@ function Invoke-Soft([string]$Name, [scriptblock]$Block) {
   }
 }
 
-# Match the native job setup
-if (Test-Path './scripts/windows/setup-dependencies.ps1') {
-  ./scripts/windows/setup-dependencies.ps1 -ClangVersion $Env:CLANG_VERSION
-}
-
 $llvmBin = 'C:\Program Files\LLVM\bin'
 if (Test-Path $llvmBin) { $env:PATH = "$llvmBin;$env:PATH" }
 
