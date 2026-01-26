@@ -27,6 +27,15 @@ set(BENCHMARK_USE_BUNDLED_GTEST
     OFF
     CACHE BOOL "Disable the bundled GTest usage.")
 
+# Avoid failing feature checks for regex backends in cross/CI builds.
+# Google Benchmark will compile with POSIX regex on Linux and does not require
+# runtime feature checks for our use-case (no benchmark tests are built).
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(HAVE_POSIX_REGEX
+    ON
+    CACHE BOOL "Force POSIX regex for Google Benchmark" FORCE)
+endif()
+
 add_subdirectory(GOOGLE_BENCHMARK)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTING AND NOT(CMAKE_BUILD_TYPE STREQUAL "Profile" ))
