@@ -22,7 +22,7 @@ if(RUST_FEATURES)
   else()
     # Set the GCC 15.2.0 toolchain for Rust CXX bridge
     set(GCC_TOOLCHAIN_PATH "/opt/gcc-15.2.0")
-    set(GCC_INCLUDE_PATH "${GCC_TOOLCHAIN_PATH}/include/c++/15.2.0")
+    set(GCC_INCLUDE_PATH "${GCC_TOOLCHAIN_PATH}/include/c++/")
     set(GCC_LIB_PATH "${GCC_TOOLCHAIN_PATH}/lib64")
     
     corrosion_set_env_vars(
