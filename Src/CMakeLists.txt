@@ -20,12 +20,19 @@ if(RUST_FEATURES)
               CXXFLAGS=/EHsc
     )
   else()
-   corrosion_set_env_vars(
+    # Set the GCC 15.2.0 toolchain for Rust CXX bridge
+    set(GCC_TOOLCHAIN_PATH "/opt/gcc-15.2.0")
+    set(GCC_INCLUDE_PATH "${GCC_TOOLCHAIN_PATH}/include/c++/15.2.0")
+    set(GCC_LIB_PATH "${GCC_TOOLCHAIN_PATH}/lib64")
+    
+    corrosion_set_env_vars(
               rusty_code
-              CXXFLAGS=-fexceptions
-    ) 
+              CC=${GCC_TOOLCHAIN_PATH}/bin/gcc
+              CXX=${GCC_TOOLCHAIN_PATH}/bin/g++
+              CXXFLAGS=-fexceptions -I${GCC_INCLUDE_PATH} -I${GCC_INCLUDE_PATH}/aarch64-unknown-linux-gnu
+              LDFLAGS=-L${GCC_LIB_PATH} -Wl,-rpath,${GCC_LIB_PATH}
+    )
   endif()
-  
 
   corrosion_add_cxxbridge(
     rusty_bridge
