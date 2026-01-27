@@ -89,14 +89,14 @@ if(RUST_FEATURES)
           rusty_code
           CC=${GCC_TOOLCHAIN_GCC}
           CXX=${GCC_TOOLCHAIN_GXX}
-          CXXFLAGS=${CLANG_TOOLCHAIN_FLAGS} -fexceptions
+          CXXFLAGS="${CLANG_TOOLCHAIN_FLAGS} -fexceptions"
         )
       else()
         corrosion_set_env_vars(
           rusty_code
           CC=${GCC_TOOLCHAIN_GCC}
           CXX=${GCC_TOOLCHAIN_GXX}
-          CXXFLAGS=${CLANG_TOOLCHAIN_FLAGS} -fexceptions
+          CXXFLAGS="${CLANG_TOOLCHAIN_FLAGS} -fexceptions"
         )
       endif()
 
@@ -106,7 +106,7 @@ if(RUST_FEATURES)
       # Still set minimal sensible env so corrosion has deterministic env on non-Windows hosts
       corrosion_set_env_vars(
         rusty_code
-        CXXFLAGS=-fexceptions
+        CXXFLAGS="${CLANG_TOOLCHAIN_FLAGS} -fexceptions"
       )
     endif()
 
