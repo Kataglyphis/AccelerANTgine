@@ -82,7 +82,6 @@ if(RUST_FEATURES)
           CC=${GCC_TOOLCHAIN_GCC}
           CXX=${GCC_TOOLCHAIN_GXX}
           CXXFLAGS=-fexceptions
-          LDFLAGS=-L${GCC_LIB_PATH} -Wl,-rpath,${GCC_LIB_PATH}
         )
       else()
         corrosion_set_env_vars(
