@@ -24,7 +24,13 @@ if(RUST_FEATURES)
   else()
     # Native-only corrosion/toolchain setup (no cross-building)
     # Optionally override with -DGCC_TOOLCHAIN_PATH=/path/to/gcc when configuring
-    set(GCC_TOOLCHAIN_PATH "/opt/gcc-15.2.0" CACHE PATH "Optional GCC toolchain root (native use only)")
+    # Nur setzen, wenn wir im GNU/GCC Preset sind
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(GCC_TOOLCHAIN_PATH "/opt/gcc-15.2.0" CACHE PATH "GCC toolchain root")
+    else()
+        # Falls Clang aktiv ist, leeren wir den Pfad oder setzen ihn auf 'OFF'
+        set(GCC_TOOLCHAIN_PATH "" CACHE PATH "GCC toolchain root" FORCE)
+    endif()
 
     # detect host arch for logging (no cross-compile behavior)
     string(TOLOWER "${CMAKE_HOST_SYSTEM_PROCESSOR}" _hostproc)
@@ -40,7 +46,7 @@ if(RUST_FEATURES)
 
     message(STATUS "Native-only build. HOST_ARCH=${HOST_ARCH}")
 
-    if(EXISTS "${GCC_TOOLCHAIN_PATH}")
+    if(GCC_TOOLCHAIN_PATH AND EXISTS "${GCC_TOOLCHAIN_PATH}")
       # Try to find reasonable native compiler binary names
       if(HOST_ARCH STREQUAL "x86_64")
         find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/x86_64-pc-linux-gnu-gcc" "${GCC_TOOLCHAIN_PATH}/bin/gcc")
