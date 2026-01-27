@@ -27,9 +27,11 @@ if(RUST_FEATURES)
     # Nur setzen, wenn wir im GNU/GCC Preset sind
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set(GCC_TOOLCHAIN_PATH "/opt/gcc-15.2.0" CACHE PATH "GCC toolchain root")
+        set(CLANG_TOOLCHAIN_FLAGS "")
     else()
         # Falls Clang aktiv ist, leeren wir den Pfad oder setzen ihn auf 'OFF'
         set(GCC_TOOLCHAIN_PATH "" CACHE PATH "GCC toolchain root" FORCE)
+        set(CLANG_TOOLCHAIN_FLAGS "--gcc-toolchain=/opt/gcc-15.2.0")
     endif()
 
     # detect host arch for logging (no cross-compile behavior)
@@ -87,14 +89,14 @@ if(RUST_FEATURES)
           rusty_code
           CC=${GCC_TOOLCHAIN_GCC}
           CXX=${GCC_TOOLCHAIN_GXX}
-          CXXFLAGS=-fexceptions
+          CXXFLAGS=${CLANG_TOOLCHAIN_FLAGS} -fexceptions
         )
       else()
         corrosion_set_env_vars(
           rusty_code
           CC=${GCC_TOOLCHAIN_GCC}
           CXX=${GCC_TOOLCHAIN_GXX}
-          CXXFLAGS=-fexceptions
+          CXXFLAGS=${CLANG_TOOLCHAIN_FLAGS} -fexceptions
         )
       endif()
 
