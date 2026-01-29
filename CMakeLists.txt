@@ -1,5 +1,27 @@
 cmake_minimum_required(VERSION 3.31.6)
 
+# Default toolchain flags for clang-based builds when presets are not used.
+# Keep this lightweight and overridable.
+set(GCC_TOOLCHAIN_PATH_DEFAULT "/opt/gcc-15.2.0" CACHE PATH "Default GCC toolchain root for clang")
+set(_gcc_toolchain_flag "")
+if(EXISTS "${GCC_TOOLCHAIN_PATH_DEFAULT}")
+  set(_gcc_toolchain_flag "--gcc-toolchain=${GCC_TOOLCHAIN_PATH_DEFAULT}")
+endif()
+
+# Only apply to clang compilers when flags are not already set.
+if(_gcc_toolchain_flag)
+  if(DEFINED CMAKE_C_COMPILER AND CMAKE_C_COMPILER MATCHES "[cC]lang")
+    if(NOT DEFINED CMAKE_C_FLAGS_INIT)
+      set(CMAKE_C_FLAGS_INIT "${_gcc_toolchain_flag}")
+    endif()
+  endif()
+  if(DEFINED CMAKE_CXX_COMPILER AND CMAKE_CXX_COMPILER MATCHES "[cC]lang")
+    if(NOT DEFINED CMAKE_CXX_FLAGS_INIT)
+      set(CMAKE_CXX_FLAGS_INIT "${_gcc_toolchain_flag}")
+    endif()
+  endif()
+endif()
+
 # set the project name
 project(
   KataglyphisCppInference
