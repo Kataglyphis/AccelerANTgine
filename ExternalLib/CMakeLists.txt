@@ -3,7 +3,7 @@ include(FetchContent)
 # include google test to project
 if(BUILD_TESTING)
   FetchContent_Declare(googletest
-                       URL https://github.com/google/googletest/archive/1b96fa13f549387b7549cc89e1a785cf143a1a50.zip)
+                       URL https://github.com/google/googletest/archive/56efe3983185e3f37e43415d1afa97e3860f187f.zip)
   set(gtest_force_shared_crt
       ON
       CACHE BOOL "" FORCE)
@@ -62,7 +62,7 @@ endif()
 FetchContent_Declare(
   GSL
   GIT_REPOSITORY "https://github.com/microsoft/GSL"
-  GIT_TAG "v4.1.0")
+  GIT_TAG "v4.2.1")
 FetchContent_MakeAvailable(GSL)
 
 if(myproject_DISABLE_EXCEPTIONS)
