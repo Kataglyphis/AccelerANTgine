@@ -18,8 +18,6 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_C_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
-        "CMAKE_CXX_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
         "RUST_FEATURES": "ON",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
@@ -42,8 +40,6 @@
         "CMAKE_BUILD_TYPE": "Profile",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_C_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
-        "CMAKE_CXX_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
         "RUST_FEATURES": "ON",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
@@ -66,8 +62,6 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_C_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
-        "CMAKE_CXX_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
         "RUST_FEATURES": "ON",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "FALSE"
@@ -90,8 +84,6 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_C_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
-        "CMAKE_CXX_FLAGS": "--gcc-toolchain=/opt/gcc-15.2.0",
         "RUST_FEATURES": "ON",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "FALSE"
