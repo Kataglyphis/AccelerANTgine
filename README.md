@@ -246,17 +246,6 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-
-# Docs
-Build the docs
-```bash
-uv venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cd docs 
-make html
-```
-
 <!-- ROADMAP -->
 ## Roadmap
 Upcoming :)

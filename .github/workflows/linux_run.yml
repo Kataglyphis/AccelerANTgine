@@ -205,7 +205,17 @@ jobs:
             if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-24.04" ]]; then
               uv venv
               . ".venv/bin/activate"
-              uv pip install -r requirements.txt
+              uv pip install \
+                sphinx \
+                sphinx-rtd-theme \
+                sphinx_design \
+                myst-parser \
+                pyyaml \
+                cmake-format \
+                breathe \
+                exhale \
+                pre-commit \
+                junit2html
 
               if [[ -d "${DOCS_OUT}" ]]; then
                 mkdir -p docs/source/_static
