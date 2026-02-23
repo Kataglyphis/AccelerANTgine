@@ -97,11 +97,23 @@ install(TARGETS ${PROJECT_NAME}
   PUBLIC_HEADER DESTINATION include
 )
 
+install(TARGETS ${PROJECT_NAME}_cli
+  RUNTIME DESTINATION bin
+)
+
 # Optionally install headers
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Src/
   DESTINATION include/KataglyphisCppInference
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
 )
+
+if(UNIX AND NOT APPLE)
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/packaging/${PROJECT_NAME}.desktop
+    DESTINATION share/applications)
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png
+    DESTINATION share/icons/hicolor/256x256/apps
+    RENAME ${PROJECT_NAME}.png)
+endif()
 # we keep the relative paths in the install dir
 # keep in mind that install dir will be in front of this relative path ...
 

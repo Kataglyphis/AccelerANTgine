@@ -1,11 +1,16 @@
 # do not track user specific vcpkg things
 CMakeUserPresets.json
 
+.flatpak-builder
+*.AppImage
 .cache
+docs/source/api
 .codacy
 
 *.log
 
+docs/source/_static/*.svg
+callgrind.out*
 dist
 .mypy_cache
 .conda

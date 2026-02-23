@@ -9,6 +9,7 @@ include(cmake/SetSourceGroups.cmake)
 
 file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_HEADERS "*.hpp")
+list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
 
 if(RUST_FEATURES)
   corrosion_import_crate(
@@ -127,6 +128,12 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 # add_executable(${PROJECT_NAME})
 
+add_executable(${PROJECT_NAME}_cli cli_main.cpp)
+set_target_properties(${PROJECT_NAME}_cli PROPERTIES
+  OUTPUT_NAME "${PROJECT_NAME}"
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
 # Define export macro for building the DLL
 target_compile_definitions(${PROJECT_NAME} PRIVATE KATAGLYPHIS_EXPORTS)
 
@@ -189,6 +196,8 @@ target_link_libraries(
 if(RUST_FEATURES)
   target_link_libraries(${PROJECT_NAME} PUBLIC rusty_code)
 endif()
+
+target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME})
 
 if(TARGET ${PROJECT_NAME} AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message(STATUS "GCC detected — adding -MMD -MP to target ${PROJECT_NAME}")

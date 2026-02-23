@@ -52,6 +52,11 @@ jobs:
       CLANG_RELEASE_PRESET: linux-release-clang
       COVERAGE_JSON: coverage.json
       DOCS_OUT: build/build/html
+      RELEASE_CALLGRIND: "0"
+      RELEASE_APPIMAGE: "1"
+      RELEASE_FLATPAK: "1"
+      RELEASE_APPIMAGE_OUT_DIR: ""
+      RELEASE_FLATPAK_OUT_DIR: ""
 
     steps:
 
@@ -98,199 +103,26 @@ jobs:
             --platform ${{ env.MATRIX_PLATFORM }} \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e COMPILER=${{ env.COMPILER }} \
-            -e RUNNER=${{ env.RUNNER }} \
-            -e MATRIX_ARCH=${{ env.MATRIX_ARCH }} \
-            -e BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -e BUILD_DIR=${{ env.BUILD_DIR }} \
-            -e BUILD_RELEASE_DIR=${{ env.BUILD_RELEASE_DIR }} \
-            -e GCC_DEBUG_PRESET=${{ env.GCC_DEBUG_PRESET }} \
-            -e CLANG_DEBUG_PRESET=${{ env.CLANG_DEBUG_PRESET }} \
-            -e GCC_PROFILE_PRESET=${{ env.GCC_PROFILE_PRESET }} \
-            -e CLANG_PROFILE_PRESET=${{ env.CLANG_PROFILE_PRESET }} \
-            -e CLANG_RELEASE_PRESET=${{ env.CLANG_RELEASE_PRESET }} \
-            -e COVERAGE_JSON=${{ env.COVERAGE_JSON }} \
-            -e DOCS_OUT=${{ env.DOCS_OUT }} \
             ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest \
-            bash -lc '
-            set -e
-            git config --global --add safe.directory /workspace || true
-
-            echo "Compiler: ${COMPILER}"
-            echo "Runner: ${RUNNER}"
-            echo "Arch: ${MATRIX_ARCH}"
-
-            if command -v uv >/dev/null 2>&1; then
-              uv --version
-            else
-              echo "ERROR: uv not found in container" >&2
-              exit 1
-            fi
-
-            mkdir -p /workspace/docs/coverage
-            mkdir -p /workspace/docs/test-results
-
-            # ---- Debug build + tests ----
-            if [[ "${COMPILER}" == "gcc" ]]; then
-              PRESET="${GCC_DEBUG_PRESET}"
-            else
-              PRESET="${CLANG_DEBUG_PRESET}"
-            fi
-            echo "Using preset: ${PRESET}"
-            cmake -B "${BUILD_DIR}" --preset "${PRESET}"
-            cmake --build "${BUILD_DIR}" --preset "${PRESET}"
-
-            (cd "${BUILD_DIR}" && ctest -C "${BUILD_TYPE}" --verbose --extra-verbose --debug -T test --output-on-failure --output-junit "/workspace/docs/test_results.xml")
-
-            # ---- Fuzz tests (clang only) ----
-            if [[ "${COMPILER}" == "clang" ]]; then
-              if [[ -x "./${BUILD_DIR}/first_fuzz_test" ]]; then
-                "./${BUILD_DIR}/first_fuzz_test"
-              else
-                echo "first_fuzz_test not found/executable, skipping"
-              fi
-            else
-              echo "Compiled with GCC so no fuzz testing!"
-            fi
-
-            # ---- Coverage ----
-            if [[ "${COMPILER}" == "gcc" ]]; then
-              (cd "${BUILD_DIR}" && gcovr --html-details /workspace/docs/coverage/index.html -r .)
-            else
-              (cd "${BUILD_DIR}" && \
-                llvm-profdata merge -sparse Test/compile/default.profraw -o compileTestSuite.profdata && \
-                llvm-cov report ./compileTestSuite -instr-profile=compileTestSuite.profdata && \
-                llvm-cov export ./compileTestSuite -format=text -instr-profile=compileTestSuite.profdata > "${COVERAGE_JSON}" && \
-                llvm-cov show ./compileTestSuite -instr-profile=compileTestSuite.profdata -format=html -output-dir /workspace/docs/coverage)
-            fi
-
-            # ---- Static analysis ----
-            if command -v clang-tidy >/dev/null 2>&1; then
-              clang-tidy -p=./${BUILD_DIR}/compile_commands.json $(find Src -name "*.cpp" -o -name "*.cc")
-            else
-              echo "clang-tidy not available, skipping"
-            fi
-
-            if [[ "${COMPILER}" == "clang" ]]; then
-              set +e
-              clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html $(find Src -name "*.cpp" -o -name "*.cc")
-              set -e
-
-              if command -v scan-build-21 >/dev/null 2>&1; then
-                mkdir -p scan-build-reports
-                scan-build-21 -o scan-build-reports cmake --build "${BUILD_DIR}" --preset "${CLANG_DEBUG_PRESET}"
-              else
-                echo "scan-build-21 not available, skipping"
-              fi
-            fi
-
-            # ---- Profiling / benchmarks ----
-            rm -rf "${BUILD_DIR}"
-            if [[ "${COMPILER}" == "gcc" ]]; then
-              PRESET="${GCC_PROFILE_PRESET}"
-            else
-              PRESET="${CLANG_PROFILE_PRESET}"
-            fi
-            echo "Using profiling preset: ${PRESET}"
-            cmake -B "${BUILD_DIR}" --preset "${PRESET}"
-            cmake --build "${BUILD_DIR}" --preset "${PRESET}"
-
-            set +e
-            (cd "${BUILD_DIR}" && perf record -F 99 --call-graph dwarf -- ./KataglyphisCppProject)
-            set -e
-
-            (cd "${BUILD_DIR}" && ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json)
-
-            # ---- Docs (clang + ubuntu-24.04 only) ----
-            if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-24.04" ]]; then
-              uv venv
-              . ".venv/bin/activate"
-              uv pip install \
-                sphinx \
-                sphinx-rtd-theme \
-                sphinx_design \
-                myst-parser \
-                pyyaml \
-                cmake-format \
-                breathe \
-                exhale \
-                pre-commit \
-                junit2html
-
-              if [[ -d "${DOCS_OUT}" ]]; then
-                mkdir -p docs/source/_static
-                cp ${DOCS_OUT}/*.svg ./docs/source/_static 2>/dev/null || true
-              fi
-
-              if [[ -f "docs/source/graphviz_generator.py" ]]; then
-                (cd docs/source && uv run python graphviz_generator.py)
-              fi
-
-              if [[ -f "docs/Makefile" || -f "docs/make.bat" ]]; then
-                (cd docs && uv run make html)
-              fi
-
-              if command -v junit2html >/dev/null 2>&1; then
-                shopt -s globstar nullglob
-                mkdir -p docs/test-results
-                for f in /workspace/**/*.xml; do
-                  [ -s "$f" ] || { echo "Skipping empty file: $f"; continue; }
-                  if grep -qE "<testsuites|<testsuite" "$f"; then
-                    junit2html "$f" "/workspace/docs/test-results/$(basename "$f" .xml).html" || echo "junit2html failed for: $f — skipping"
-                  else
-                    echo "Not JUnit XML, skipping: $f"
-                  fi
-                done
-              else
-                echo "junit2html not available, skipping"
-              fi
-
-              if command -v pandoc >/dev/null 2>&1; then
-                :
-              else
-                apt-get update && apt-get install -y pandoc
-              fi
-              mkdir -p "/workspace/docs/test-results-md"
-              shopt -s globstar nullglob
-              html_files=("/workspace"/docs/test-results/*.html)
-              if [ ${#html_files[@]} -eq 0 ]; then
-                echo "No HTML files found in docs/test-results. Skipping pandoc conversion."
-              else
-                for f in "${html_files[@]}"; do
-                  pandoc "$f" --verbose -f html -t gfm -o "/workspace/docs/test-results-md/$(basename "$f" .html).md"
-                done
-              fi
-
-              mkdir -p docs/source/test-results
-              if [ -d "docs/test-results-md" ] && [ "$(ls -A docs/test-results-md 2>/dev/null)" ]; then
-                cp -r docs/test-results-md/* docs/source/test-results/
-              fi
-
-              # copy coverage & test-results into built site so they can be deployed
-              SITE_DIR="/workspace/docs/build/html"
-              mkdir -p "$SITE_DIR"
-              if [[ -d "/workspace/docs/coverage" ]]; then
-                mkdir -p "$SITE_DIR/coverage"
-                cp -r "/workspace/docs/coverage/." "$SITE_DIR/coverage/" || true
-              fi
-              if [[ -d "/workspace/docs/test-results" ]]; then
-                mkdir -p "$SITE_DIR/test-results"
-                cp -r "/workspace/docs/test-results/." "$SITE_DIR/test-results/" || true
-              fi
-            fi
-
-            # ---- Release package (clang only) ----
-            if [[ "${COMPILER}" == "clang" ]]; then
-              cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
-              cmake --build "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
-              cmake --build "${BUILD_RELEASE_DIR}" --target package
-            fi
-            # --- Fix ownership for copying docs
-            OWNER_UID=$(stat -c "%u" /workspace)
-            OWNER_GID=$(stat -c "%g" /workspace)
-            echo "Fixing ownership of docs/api to ${OWNER_UID}:${OWNER_GID}"
-            chown -R ${OWNER_UID}:${OWNER_GID} /workspace/docs || true
-            '
+            bash -lc 'set -e; bash scripts/linux/ci_run_all.sh \
+              --compiler "${{ env.COMPILER }}" \
+              --runner "${{ env.RUNNER }}" \
+              --arch "${{ env.MATRIX_ARCH }}" \
+              --build-type "${{ env.BUILD_TYPE }}" \
+              --build-dir "${{ env.BUILD_DIR }}" \
+              --build-release-dir "${{ env.BUILD_RELEASE_DIR }}" \
+              --gcc-debug-preset "${{ env.GCC_DEBUG_PRESET }}" \
+              --clang-debug-preset "${{ env.CLANG_DEBUG_PRESET }}" \
+              --gcc-profile-preset "${{ env.GCC_PROFILE_PRESET }}" \
+              --clang-profile-preset "${{ env.CLANG_PROFILE_PRESET }}" \
+              --clang-release-preset "${{ env.CLANG_RELEASE_PRESET }}" \
+              --coverage-json "${{ env.COVERAGE_JSON }}" \
+              --docs-out "${{ env.DOCS_OUT }}" \
+              --release-callgrind "${{ env.RELEASE_CALLGRIND }}" \
+              --release-appimage "${{ env.RELEASE_APPIMAGE }}" \
+              --release-flatpak "${{ env.RELEASE_FLATPAK }}" \
+              --release-appimage-out-dir "${{ env.RELEASE_APPIMAGE_OUT_DIR }}" \
+              --release-flatpak-out-dir "${{ env.RELEASE_FLATPAK_OUT_DIR }}"'
 
       - name: Upload Linux Packages (Clang only)
         if: ${{ inputs.compiler == 'clang' }}
@@ -301,6 +133,8 @@ jobs:
             ${{ env.BUILD_RELEASE_DIR }}/*.tar.gz
             ${{ env.BUILD_RELEASE_DIR }}/*.tgz
             ${{ env.BUILD_RELEASE_DIR }}/*.deb
+            ${{ env.BUILD_RELEASE_DIR }}/*.AppImage
+            ${{ env.BUILD_RELEASE_DIR }}/*.flatpak
 
       - name: Fix permissions for doc directory
         if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}

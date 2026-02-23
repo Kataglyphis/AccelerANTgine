@@ -9,8 +9,6 @@ on:
 env:
   BUILD_DIR: "build"
   BUILD_DIR_RELEASE: "build-release"
-  CLANG_VERSION: 21.1.5
-  LLVM_BIN: 'C:\Program Files\LLVM\bin'
   CLANG_PROFILE_PRESET: x64-ClangCL-Windows-Profile
   GHCR_IMAGE_WIN: ghcr.io/kataglyphis/kataglyphis_beschleuniger:winamd64
 
@@ -51,13 +49,12 @@ jobs:
           docker run --rm `
             --mount "type=bind,source=${{ github.workspace }},target=C:\workspace" `
             -w "C:\workspace" `
-            -e BUILD_DIR="${{ env.BUILD_DIR }}" `
-            -e BUILD_DIR_RELEASE="${{ env.BUILD_DIR_RELEASE }}" `
-            -e CLANG_PROFILE_PRESET="${{ env.CLANG_PROFILE_PRESET }}" `
-            -e CLANG_VERSION="${{ env.CLANG_VERSION }}" `
-            -e GITHUB_WORKSPACE="C:\workspace" `
             "${{ env.GHCR_IMAGE_WIN }}" `
-            powershell -NoProfile -ExecutionPolicy Bypass -File "C:\workspace\scripts\windows\container-build.ps1"
+            powershell -NoProfile -ExecutionPolicy Bypass -File "C:\workspace\scripts\windows\Windows-Build.ps1" `
+              -WorkspaceDir "C:\workspace" `
+              -BuildDir "${{ env.BUILD_DIR }}" `
+              -BuildDirRelease "${{ env.BUILD_DIR_RELEASE }}" `
+              -ClangProfilePreset "${{ env.CLANG_PROFILE_PRESET }}"
 
       - name: Upload Installers & Zip (container build)
         uses: actions/upload-artifact@v6.0.0

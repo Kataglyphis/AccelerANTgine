@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Linux-clang++"
+	tests="6"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname="IPA-WN-023IT404"
+	time="1"
+	timestamp="2026-02-20T17:25:02"
+	>
+	<testcase name="HelloTestCommit.BasicAssertions" classname="HelloTestCommit.BasicAssertions" time="0.0115266" status="run">
+		<properties/>
+		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = HelloTestCommit.BasicAssertions
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from HelloTestCommit
+[ RUN      ] HelloTestCommit.BasicAssertions
+[       OK ] HelloTestCommit.BasicAssertions (0 ms)
+[----------] 1 test from HelloTestCommit (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Integration.VulkanEngine" classname="Integration.VulkanEngine" time="0.0109378" status="run">
+		<properties/>
+		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = Integration.VulkanEngine
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Integration
+[ RUN      ] Integration.VulkanEngine
+[       OK ] Integration.VulkanEngine (0 ms)
+[----------] 1 test from Integration (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="HelloTestCompile.BasicAssertions" classname="HelloTestCompile.BasicAssertions" time="0.010325" status="run">
+		<properties/>
+		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = HelloTestCompile.BasicAssertions
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from HelloTestCompile
+[ RUN      ] HelloTestCompile.BasicAssertions
+[       OK ] HelloTestCompile.BasicAssertions (0 ms)
+[----------] 1 test from HelloTestCompile (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="HelloTestCompile.blob" classname="HelloTestCompile.blob" time="0.0100768" status="run">
+		<properties/>
+		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = HelloTestCompile.blob
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from HelloTestCompile
+[ RUN      ] HelloTestCompile.blob
+[       OK ] HelloTestCompile.blob (0 ms)
+[----------] 1 test from HelloTestCompile (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="MyTestSuite.OnePlustTwoIsTwoPlusOne" classname="MyTestSuite.OnePlustTwoIsTwoPlusOne" time="0.00437866" status="run">
+		<properties/>
+		<system-out>[.] Sanitizer coverage enabled. Counter map size: 2967, Cmp map size: 262144
+Note: Google Test filter = MyTestSuite.OnePlustTwoIsTwoPlusOne
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from MyTestSuite
+[ RUN      ] MyTestSuite.OnePlustTwoIsTwoPlusOne
+[       OK ] MyTestSuite.OnePlustTwoIsTwoPlusOne (0 ms)
+[----------] 1 test from MyTestSuite (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="MyTestSuite.IntegerAdditionCommutes" classname="MyTestSuite.IntegerAdditionCommutes" time="1.00495" status="run">
+		<properties/>
+		<system-out>[.] Sanitizer coverage enabled. Counter map size: 2967, Cmp map size: 262144
+Note: Google Test filter = MyTestSuite.IntegerAdditionCommutes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from MyTestSuite
+[ RUN      ] MyTestSuite.IntegerAdditionCommutes
+FUZZTEST_PRNG_SEED=yU1YxKP0a3vqIWnQnxAPs-hxRB2XhLxS6vV2qve3Y5M
+[       OK ] MyTestSuite.IntegerAdditionCommutes (1000 ms)
+[----------] 1 test from MyTestSuite (1000 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1000 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+</testsuite>

@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Run with defaults or pass parameters to override workspace path and other options.
-  Supports both local execution and GitHub Actions CI environment.
+    Supports local execution and CI usage via explicit parameter passing.
   Example:
     .\container-build.ps1
     .\container-build.ps1 -WorkspaceDir "D:\dev\kataglyphis" -SkipMSVC
@@ -13,11 +13,11 @@
 
 [CmdletBinding()]
 param(
-    [string] $WorkspaceDir = $(if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { $PWD.Path }),
-    [string] $BuildDir = $(if ($env:BUILD_DIR) { $env:BUILD_DIR } else { "build" }),
-    [string] $BuildDirRelease = $(if ($env:BUILD_DIR_RELEASE) { $env:BUILD_DIR_RELEASE } else { "build-release" }),
-    [string] $ClangProfilePreset = $(if ($env:CLANG_PROFILE_PRESET) { $env:CLANG_PROFILE_PRESET } else { "x64-ClangCL-Windows-RelWithDebInfo" }),
-    [string] $LLVMBinPath = $(if ($env:LLVM_BIN) { $env:LLVM_BIN } else { "C:\Program Files\LLVM\bin" }),
+    [string] $WorkspaceDir = $PWD.Path,
+    [string] $BuildDir = "build",
+    [string] $BuildDirRelease = "build-release",
+    [string] $ClangProfilePreset = "x64-ClangCL-Windows-RelWithDebInfo",
+    [string] $LLVMBinPath = "C:\Program Files\LLVM\bin",
     [string] $LogDir = "logs",
     [switch] $SkipMSVC,
     [switch] $SkipClangTidy,
