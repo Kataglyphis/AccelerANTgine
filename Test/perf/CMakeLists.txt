@@ -11,17 +11,6 @@ include(cmake/SetTestFilters.cmake)
 
 set(PERF_TEST_SUITE perfTestSuite)
 
-file(GLOB_RECURSE KataglyphisCppProject_SOURCES
-     # RELATIVE ${PROJECT_SRC_DIR}
-     "${PROJECT_SRC_DIR}/*.cpp")
-
-# Specify the file to exclude
-list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${PROJECT_SRC_DIR}/Main.cpp")
-
-file(GLOB_RECURSE KataglyphisCppProject_HEADERS
-     # RELATIVE ${PROJECT_SRC_DIR}
-     "${PROJECT_SRC_DIR}/*.hpp")
-
 # if(RUST_FEATURES)
 #   corrosion_import_crate(MANIFEST_PATH ${PROJECT_SRC_DIR}rusty_code/Cargo.toml)
 #   corrosion_add_cxxbridge(rusty_bridge_perf CRATE rusty_code FILES lib.rs)
@@ -45,18 +34,9 @@ else()
                                                         RELATIVE_INCLUDE_PATH="/../Src/")
 endif()
 
-configure_file(${PROJECT_SRC_DIR}/KataglyphisCppProjectConfig.hpp.in
-               "${PROJECT_SRC_DIR}/KataglyphisCppProjectConfig.hpp")
-
 target_sources(
   ${PERF_TEST_SUITE}
-  PUBLIC ${PERF_TEST_FILTER} ${KataglyphisCppProject_SOURCES}
-  PUBLIC FILE_SET
-         HEADERS
-         BASE_DIRS
-         ${PROJECT_INCLUDE_DIR}
-         FILES
-         ${KataglyphisCppProject_HEADERS})
+  PRIVATE ${PERF_TEST_FILTER})
 
 target_link_libraries(
   ${PERF_TEST_SUITE}
@@ -67,7 +47,8 @@ target_link_libraries(
   PRIVATE benchmark::benchmark
           benchmark::benchmark_main
           GSL
-          spdlog)
+      spdlog
+      ${PROJECT_NAME})
 
 if(RUST_FEATURES)
   target_link_libraries(${PERF_TEST_SUITE} PUBLIC rusty_code)

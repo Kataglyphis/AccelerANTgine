@@ -8,7 +8,7 @@ include(cmake/filters/SetProjectFilters.cmake)
 include(cmake/SetSourceGroups.cmake)
 
 file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
-file(GLOB_RECURSE KataglyphisCppProject_HEADERS "*.hpp")
+file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
 list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
 
 if(RUST_FEATURES)
@@ -134,6 +134,9 @@ set_target_properties(${PROJECT_NAME}_cli PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+target_compile_features(${PROJECT_NAME}_cli PRIVATE cxx_std_20)
+
 # Define export macro for building the DLL
 target_compile_definitions(${PROJECT_NAME} PRIVATE KATAGLYPHIS_EXPORTS)
 
@@ -169,17 +172,15 @@ else()
   )
 endif()
 
-configure_file(KataglyphisCppProjectConfig.hpp.in "${CMAKE_CURRENT_SOURCE_DIR}/KataglyphisCppProjectConfig.hpp")
-
 target_sources(
   ${PROJECT_NAME}
-  PUBLIC ${KataglyphisCppProject_SOURCES}
+  PRIVATE ${KataglyphisCppProject_SOURCES}
   PUBLIC FILE_SET
-         HEADERS
+         CXX_MODULES
          BASE_DIRS
-         ${PROJECT_INCLUDE_DIR}
+         ${PROJECT_SRC_DIR}
          FILES
-         ${KataglyphisCppProject_HEADERS}
+         ${KataglyphisCppProject_MODULES}
 )
 
 target_link_libraries(
@@ -198,6 +199,11 @@ if(RUST_FEATURES)
 endif()
 
 target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME})
+
+if(UNIX AND NOT APPLE)
+  target_compile_options(${PROJECT_NAME} PUBLIC -pthread)
+  target_link_options(${PROJECT_NAME} PUBLIC -pthread)
+endif()
 
 if(TARGET ${PROJECT_NAME} AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message(STATUS "GCC detected — adding -MMD -MP to target ${PROJECT_NAME}")

@@ -1,4 +1,4 @@
-#include "inference_lib.hpp"
+import kataglyphis.inference;
 
 #include <iostream>
 

@@ -15,13 +15,6 @@ file(GLOB_RECURSE KataglyphisCppProject_COMPILE_TEST_FILTER "*.cpp")
 
 message("Compile test filter is: ${KataglyphisCppProject_COMPILE_TEST_FILTER}")
 
-file(GLOB_RECURSE KataglyphisCppProject_SOURCES "${PROJECT_SRC_DIR}/*.cpp")
-
-# Specify the file to exclude
-list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${PROJECT_SRC_DIR}/Main.cpp")
-
-file(GLOB_RECURSE KataglyphisCppProject_HEADERS "${PROJECT_SRC_DIR}/*.hpp")
-
 add_executable(${COMPILE_TEST_SUITE})
 
 target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
@@ -40,18 +33,9 @@ else()
                                                    PUBLIC RELATIVE_INCLUDE_PATH="/../../Src/")
 endif()
 
-configure_file(${PROJECT_SRC_DIR}/KataglyphisCppProjectConfig.hpp.in
-               "${PROJECT_SRC_DIR}/KataglyphisCppProjectConfig.hpp")
-
 target_sources(
   ${COMPILE_TEST_SUITE}
-  PUBLIC ${KataglyphisCppProject_COMPILE_TEST_FILTER} ${KataglyphisCppProject_SOURCES}
-  PUBLIC FILE_SET
-         HEADERS
-         BASE_DIRS
-         ${PROJECT_INCLUDE_DIR}
-         FILES
-         ${KataglyphisCppProject_HEADERS})
+  PRIVATE ${KataglyphisCppProject_COMPILE_TEST_FILTER})
 
 target_link_libraries(
   ${COMPILE_TEST_SUITE}
@@ -64,7 +48,8 @@ target_link_libraries(
   PRIVATE gtest_main
           gtest
           GSL
-          spdlog)
+      spdlog
+      ${PROJECT_NAME})
 
 if(NOT WINDOWS_CI)
   message(STATUS "WINDOWS_CI is OFF or not defined.")

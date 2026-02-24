@@ -2,12 +2,24 @@
 set -euo pipefail
 
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(pwd)}"
+COMPILER="${COMPILER:-clang}"
+BUILD_DIR="${BUILD_DIR:-build}"
+BUILD_TYPE="${BUILD_TYPE:-Debug}"
+GCC_DEBUG_PRESET="${GCC_DEBUG_PRESET:-linux-debug-GNU}"
+CLANG_DEBUG_PRESET="${CLANG_DEBUG_PRESET:-linux-debug-clang}"
 
-if [[ "${COMPILER}" == "gcc" ]]; then
-  PRESET="${GCC_DEBUG_PRESET}"
-else
-  PRESET="${CLANG_DEBUG_PRESET}"
-fi
+case "${COMPILER}" in
+  gcc)
+    PRESET="${GCC_DEBUG_PRESET}"
+    ;;
+  clang)
+    PRESET="${CLANG_DEBUG_PRESET}"
+    ;;
+  *)
+    echo "ERROR: Unsupported COMPILER='${COMPILER}'. Expected 'gcc' or 'clang'." >&2
+    exit 2
+    ;;
+esac
 
 echo "Using preset: ${PRESET}"
 cmake -B "${BUILD_DIR}" --preset "${PRESET}"
