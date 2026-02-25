@@ -30,7 +30,10 @@ project(
   HOMEPAGE_URL "https://jonasheinle.de/"
   LANGUAGES CXX C)
 
+include(GNUInstallDirs)
+
 set(AUTHOR "Jonas Heinle")
+set(PROJECT_APP_ID "org.kataglyphis.kataglyphiscppinference")
 
 # Set WINDOWS_CI to OFF by default
 # WINDOWS CI is only able to verify successful compiling ... Windows ... lel
@@ -65,7 +68,7 @@ myproject_local_options()
 include(cmake/SystemLibDependencies.cmake)
 add_subdirectory(ExternalLib)
 
-if(BUILD_TESTING AND NOT WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT(CMAKE_BUILD_TYPE STREQUAL "Profile"))
+if(BUILD_TESTING AND NOT WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
   fuzztest_setup_fuzzing_flags()
 endif()
 
@@ -91,22 +94,26 @@ endif()
 
 # for correct library output needed
 install(TARGETS ${PROJECT_NAME}
-  RUNTIME DESTINATION bin
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib
-  PUBLIC_HEADER DESTINATION include
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(TARGETS ${PROJECT_NAME}_cli
-  RUNTIME DESTINATION bin
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(UNIX AND NOT APPLE)
   install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/packaging/${PROJECT_NAME}.desktop
-    DESTINATION share/applications)
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+    RENAME ${PROJECT_APP_ID}.desktop)
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/packaging/${PROJECT_NAME}.appdata.xml
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo
+    RENAME ${PROJECT_APP_ID}.appdata.xml)
   install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png
-    DESTINATION share/icons/hicolor/256x256/apps
-    RENAME ${PROJECT_NAME}.png)
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
+    RENAME ${PROJECT_APP_ID}.png)
 endif()
 # we keep the relative paths in the install dir
 # keep in mind that install dir will be in front of this relative path ...

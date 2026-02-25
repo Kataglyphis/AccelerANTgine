@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+BUILD_DIR="build"
+COMPILER="clang"
+CLANG_DEBUG_PRESET="linux-debug-clang"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
+    --compiler) COMPILER="${2:-}"; shift 2 ;;
+    --clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
 if command -v clang-tidy >/dev/null 2>&1; then
   clang-tidy -p=./"${BUILD_DIR}"/compile_commands.json $(find Src -name "*.cpp" -o -name "*.cc")
 else

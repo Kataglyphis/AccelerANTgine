@@ -1,27 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKSPACE_DIR="${WORKSPACE_DIR:-$(pwd)}"
+WORKSPACE_DIR="$(pwd)"
+COMPILER="clang"
 
-BUILD_RELEASE_DIR="${BUILD_RELEASE_DIR:-build-release}"
-CLANG_RELEASE_PRESET="${CLANG_RELEASE_PRESET:-linux-release-clang}"
+BUILD_RELEASE_DIR="build-release"
+CLANG_RELEASE_PRESET="linux-release-clang"
 DO_CALLGRIND=0
 DO_APPIMAGE=1
 DO_FLATPAK=1
 FLATPAK_EXPLICIT=0
 APPIMAGE_OUT_DIR=""
 FLATPAK_OUT_DIR=""
-FLATPAK_RUNTIME="${FLATPAK_RUNTIME:-org.freedesktop.Platform}"
-FLATPAK_RUNTIME_VERSION="${FLATPAK_RUNTIME_VERSION:-24.08}"
-FLATPAK_SDK="${FLATPAK_SDK:-org.freedesktop.Sdk}"
-FLATPAK_BRANCH="${FLATPAK_BRANCH:-master}"
-AUTO_INSTALL_FLATPAK="${AUTO_INSTALL_FLATPAK:-1}"
+FLATPAK_RUNTIME="org.freedesktop.Platform"
+FLATPAK_RUNTIME_VERSION="24.08"
+FLATPAK_SDK="org.freedesktop.Sdk"
+FLATPAK_BRANCH="master"
+AUTO_INSTALL_FLATPAK="1"
+APPIMAGETOOL_CMD=""
+FLATPAK_ARCH=""
+APP_ID="org.kataglyphis.kataglyphiscppinference"
 
 usage() {
   cat <<'EOF'
 Usage: ci_release.sh [options]
 
 Options:
+  --workspace-dir <dir>         Workspace directory (default: current dir)
+  --compiler <name>             Compiler label (default: clang)
   --build-release-dir <dir>     Build directory (default: build-release)
   --clang-release-preset <name> CMake preset (default: linux-release-clang)
   --callgrind                   Run valgrind/callgrind (default: off)
@@ -31,6 +37,13 @@ Options:
   --flatpak|--flatpack          Build Flatpak bundle (default: on)
   --no-flatpak|--no-flatpack    Disable Flatpak build
   --flatpak-out-dir <dir>       Flatpak output directory (default: build dir)
+  --flatpak-runtime <name>      Flatpak runtime (default: org.freedesktop.Platform)
+  --flatpak-runtime-version <v> Flatpak runtime version (default: 24.08)
+  --flatpak-sdk <name>          Flatpak SDK (default: org.freedesktop.Sdk)
+  --flatpak-branch <name>       Flatpak branch (default: master)
+  --flatpak-arch <name>         Flatpak arch override (default: auto-detect)
+  --auto-install-flatpak <0|1>  Auto-install flatpak tools (default: 1)
+  --appimagetool-cmd <cmd>      Explicit appimagetool command/path
   -h, --help                    Show help
 EOF
 }
@@ -74,9 +87,9 @@ run_privileged_cmd() {
 }
 
 ensure_appimagetool() {
-  if [[ -n "${APPIMAGETOOL:-}" ]]; then
-    if require_cmd "${APPIMAGETOOL}"; then
-      echo "${APPIMAGETOOL}"
+  if [[ -n "${APPIMAGETOOL_CMD}" ]]; then
+    if require_cmd "${APPIMAGETOOL_CMD}"; then
+      echo "${APPIMAGETOOL_CMD}"
       return 0
     fi
     return 1
@@ -100,7 +113,20 @@ ensure_appimagetool() {
       ;;
   esac
 
-  local local_path="${WORKSPACE_DIR}/${appimagetool_name}"
+  local wrapper_path="${BUILD_RELEASE_DIR}/tools/appimagetool-wrapper.sh"
+  if [[ -x "${wrapper_path}" ]]; then
+    echo "${wrapper_path}"
+    return 0
+  fi
+
+  local cpack_local_tool="${BUILD_RELEASE_DIR}/tools/${appimagetool_name}"
+  if [[ -x "${cpack_local_tool}" ]]; then
+    echo "${cpack_local_tool}"
+    return 0
+  fi
+
+  local local_path="${BUILD_RELEASE_DIR}/tools/${appimagetool_name}"
+  mkdir -p "$(dirname "${local_path}")"
   if [[ ! -x "${local_path}" ]]; then
     if ! require_cmd wget; then
       run_privileged_cmd apt-get update
@@ -126,13 +152,19 @@ ensure_appimage_tools() {
 
 sanitize_for_app_id() {
   local value="$1"
+  value="${value,,}"
   value="${value//[^a-zA-Z0-9]/-}"
   value="${value#-}"
   value="${value%-}"
   if [[ -z "${value}" ]]; then
-    value="KataglyphisCppProject"
+    value="kataglyphiscppproject"
   fi
   echo "${value}"
+}
+
+has_cpack_appimage() {
+  local build_dir="$1"
+  compgen -G "${build_dir}/*.AppImage" >/dev/null 2>&1
 }
 
 build_appimage() {
@@ -258,11 +290,43 @@ ensure_flatpak_tools() {
   return 0
 }
 
+ensure_flatpak_runtime() {
+  require_cmd flatpak
+
+  local flatpak_arch="${FLATPAK_ARCH}"
+  if [[ -z "${flatpak_arch}" ]]; then
+    flatpak_arch="$(flatpak --default-arch 2>/dev/null || true)"
+  fi
+  if [[ -z "${flatpak_arch}" ]]; then
+    flatpak_arch="$(normalize_arch)"
+  fi
+
+  local runtime_ref="${FLATPAK_RUNTIME}/${flatpak_arch}/${FLATPAK_RUNTIME_VERSION}"
+  local sdk_ref="${FLATPAK_SDK}/${flatpak_arch}/${FLATPAK_RUNTIME_VERSION}"
+
+  if ! flatpak remote-info --user flathub >/dev/null 2>&1 && ! flatpak remote-info --system flathub >/dev/null 2>&1; then
+    if ! flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1; then
+      flatpak --system remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    fi
+  fi
+
+  if ! flatpak info --user "${runtime_ref}" >/dev/null 2>&1; then
+    flatpak --user install -y --noninteractive flathub "${runtime_ref}" ||
+      flatpak --system install -y --noninteractive flathub "${runtime_ref}"
+  fi
+
+  if ! flatpak info --user "${sdk_ref}" >/dev/null 2>&1; then
+    flatpak --user install -y --noninteractive flathub "${sdk_ref}" ||
+      flatpak --system install -y --noninteractive flathub "${sdk_ref}"
+  fi
+}
+
 build_flatpak() {
   local build_dir="$1"
   local out_dir="$2"
   require_cmd flatpak-builder
   require_cmd flatpak
+  ensure_flatpak_runtime
 
   local cache_file="${build_dir}/CMakeCache.txt"
   local project_name="KataglyphisCppProject"
@@ -276,7 +340,7 @@ build_flatpak() {
   local git_sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
   local version_suffix="${project_version:-${git_sha:-unknown}}"
 
-  local app_id="org.kataglyphis.$(sanitize_for_app_id "${project_name}")"
+  local app_id="${APP_ID}"
   local flatpak_root="${build_dir}/flatpak"
   local source_dir="${flatpak_root}/source"
   local build_root="${flatpak_root}/build"
@@ -286,6 +350,42 @@ build_flatpak() {
   rm -rf "${flatpak_root}"
   mkdir -p "${source_dir}/app" "${build_root}" "${repo_dir}" "${out_dir}"
   cmake --install "${build_dir}" --prefix "${source_dir}/app"
+
+  local desktop_dir="${source_dir}/app/share/applications"
+  local icon_dir="${source_dir}/app/share/icons/hicolor/256x256/apps"
+  local metainfo_dir="${source_dir}/app/share/metainfo"
+  local desktop_source=""
+  if [[ -f "${desktop_dir}/${project_name}.desktop" ]]; then
+    desktop_source="${desktop_dir}/${project_name}.desktop"
+  elif [[ -f "${desktop_dir}/${app_id}.desktop" ]]; then
+    desktop_source="${desktop_dir}/${app_id}.desktop"
+  fi
+  if [[ -n "${desktop_source}" ]]; then
+    if [[ "${desktop_source}" != "${desktop_dir}/${app_id}.desktop" ]]; then
+      cp -f "${desktop_source}" "${desktop_dir}/${app_id}.desktop"
+    fi
+    if [[ "${desktop_source}" != "${desktop_dir}/${app_id}.desktop" ]]; then
+      rm -f "${desktop_source}"
+    fi
+  fi
+  if [[ -f "${icon_dir}/${project_name}.png" ]]; then
+    cp -f "${icon_dir}/${project_name}.png" "${icon_dir}/${app_id}.png"
+    rm -f "${icon_dir}/${project_name}.png"
+  fi
+  local metainfo_source=""
+  if [[ -f "${metainfo_dir}/${project_name}.appdata.xml" ]]; then
+    metainfo_source="${metainfo_dir}/${project_name}.appdata.xml"
+  elif [[ -f "${metainfo_dir}/${app_id}.appdata.xml" ]]; then
+    metainfo_source="${metainfo_dir}/${app_id}.appdata.xml"
+  fi
+  if [[ -n "${metainfo_source}" ]]; then
+    if [[ "${metainfo_source}" != "${metainfo_dir}/${app_id}.appdata.xml" ]]; then
+      cp -f "${metainfo_source}" "${metainfo_dir}/${app_id}.appdata.xml"
+    fi
+    if [[ "${metainfo_source}" != "${metainfo_dir}/${app_id}.appdata.xml" ]]; then
+      rm -f "${metainfo_source}"
+    fi
+  fi
 
   local source_app_path
   source_app_path="$(cd "${source_dir}/app" && pwd)"
@@ -333,8 +433,44 @@ while [[ $# -gt 0 ]]; do
       BUILD_RELEASE_DIR="$2"
       shift 2
       ;;
+    --workspace-dir)
+      WORKSPACE_DIR="$2"
+      shift 2
+      ;;
+    --compiler)
+      COMPILER="$2"
+      shift 2
+      ;;
     --clang-release-preset)
       CLANG_RELEASE_PRESET="$2"
+      shift 2
+      ;;
+    --flatpak-runtime)
+      FLATPAK_RUNTIME="$2"
+      shift 2
+      ;;
+    --flatpak-runtime-version)
+      FLATPAK_RUNTIME_VERSION="$2"
+      shift 2
+      ;;
+    --flatpak-sdk)
+      FLATPAK_SDK="$2"
+      shift 2
+      ;;
+    --flatpak-branch)
+      FLATPAK_BRANCH="$2"
+      shift 2
+      ;;
+    --auto-install-flatpak)
+      AUTO_INSTALL_FLATPAK="$2"
+      shift 2
+      ;;
+    --appimagetool-cmd)
+      APPIMAGETOOL_CMD="$2"
+      shift 2
+      ;;
+    --flatpak-arch)
+      FLATPAK_ARCH="$2"
       shift 2
       ;;
     --callgrind)
@@ -388,8 +524,12 @@ cmake --build "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
 cmake --build "${BUILD_RELEASE_DIR}" --target package
 
 if [[ "${DO_APPIMAGE}" -eq 1 ]]; then
-  [[ -n "${APPIMAGE_OUT_DIR}" ]] || APPIMAGE_OUT_DIR="${BUILD_RELEASE_DIR}"
-  build_appimage "${BUILD_RELEASE_DIR}" "${APPIMAGE_OUT_DIR}"
+  if has_cpack_appimage "${BUILD_RELEASE_DIR}"; then
+    echo "CPack AppImage already exists in ${BUILD_RELEASE_DIR}; skipping extra AppImage build."
+  else
+    [[ -n "${APPIMAGE_OUT_DIR}" ]] || APPIMAGE_OUT_DIR="${BUILD_RELEASE_DIR}"
+    build_appimage "${BUILD_RELEASE_DIR}" "${APPIMAGE_OUT_DIR}"
+  fi
 fi
 
 if [[ "${DO_FLATPAK}" -eq 1 ]]; then
@@ -413,7 +553,7 @@ if [[ "${DO_CALLGRIND}" -eq 1 ]]; then
   fi
   (
     cd "${BUILD_RELEASE_DIR}"
-    ./KataglyphisCppProject >/dev/null 2>&1 || true
-    valgrind --tool=callgrind ./KataglyphisCppProject
+    ./bin/KataglyphisCppInference >/dev/null 2>&1 || true
+    valgrind --tool=callgrind ./bin/KataglyphisCppInference
   )
 fi

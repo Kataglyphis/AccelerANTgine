@@ -47,33 +47,46 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-export COMPILER
-export RUNNER
-export MATRIX_ARCH
-export BUILD_TYPE
-export BUILD_DIR
-export BUILD_RELEASE_DIR
-export GCC_DEBUG_PRESET
-export CLANG_DEBUG_PRESET
-export GCC_PROFILE_PRESET
-export CLANG_PROFILE_PRESET
-export CLANG_RELEASE_PRESET
-export COVERAGE_JSON
-export DOCS_OUT
-export RELEASE_CALLGRIND
-export RELEASE_APPIMAGE
-export RELEASE_FLATPAK
-export RELEASE_APPIMAGE_OUT_DIR
-export RELEASE_FLATPAK_OUT_DIR
+bash scripts/linux/ci_init.sh \
+	--workspace-dir "$(pwd)" \
+	--compiler "${COMPILER}" \
+	--runner "${RUNNER}" \
+	--arch "${MATRIX_ARCH}"
 
-bash scripts/linux/ci_init.sh
-bash scripts/linux/ci_build_and_test.sh
-bash scripts/linux/ci_coverage.sh
-bash scripts/linux/ci_static_analysis.sh
-bash scripts/linux/ci_profile_bench.sh
-bash scripts/linux/ci_docs.sh
+bash scripts/linux/ci_build_and_test.sh \
+	--workspace-dir "$(pwd)" \
+	--compiler "${COMPILER}" \
+	--build-dir "${BUILD_DIR}" \
+	--build-type "${BUILD_TYPE}" \
+	--gcc-debug-preset "${GCC_DEBUG_PRESET}" \
+	--clang-debug-preset "${CLANG_DEBUG_PRESET}"
+
+bash scripts/linux/ci_coverage.sh \
+	--workspace-dir "$(pwd)" \
+	--compiler "${COMPILER}" \
+	--build-dir "${BUILD_DIR}" \
+	--coverage-json "${COVERAGE_JSON}"
+
+bash scripts/linux/ci_static_analysis.sh \
+	--build-dir "${BUILD_DIR}" \
+	--compiler "${COMPILER}" \
+	--clang-debug-preset "${CLANG_DEBUG_PRESET}"
+
+bash scripts/linux/ci_profile_bench.sh \
+	--build-dir "${BUILD_DIR}" \
+	--compiler "${COMPILER}" \
+	--gcc-profile-preset "${GCC_PROFILE_PRESET}" \
+	--clang-profile-preset "${CLANG_PROFILE_PRESET}"
+
+bash scripts/linux/ci_docs.sh \
+	--workspace-dir "$(pwd)" \
+	--compiler "${COMPILER}" \
+	--runner "${RUNNER}" \
+	--docs-out "${DOCS_OUT}"
 
 release_args=(
+	--workspace-dir "$(pwd)"
+	--compiler "${COMPILER}"
 	--build-release-dir "${BUILD_RELEASE_DIR}"
 	--clang-release-preset "${CLANG_RELEASE_PRESET}"
 )
@@ -103,4 +116,4 @@ if [[ -n "${RELEASE_FLATPAK_OUT_DIR}" ]]; then
 fi
 
 bash scripts/linux/ci_release.sh "${release_args[@]}"
-bash scripts/linux/ci_finalize.sh
+bash scripts/linux/ci_finalize.sh --workspace-dir "$(pwd)"

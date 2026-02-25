@@ -37,7 +37,7 @@
       "installDir": "${sourceDir}/build/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
-        "CMAKE_BUILD_TYPE": "Profile",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "RUST_FEATURES": "ON",
@@ -125,7 +125,7 @@
       "installDir": "${sourceDir}/build/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
-        "CMAKE_BUILD_TYPE": "Profile",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
         "RUST_FEATURES": "ON",
@@ -193,6 +193,7 @@
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
         "RUST_FEATURES": "ON",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
@@ -217,6 +218,7 @@
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
         "RUST_FEATURES": "ON",
         "CMAKE_BUILD_TYPE": "Release",
         "COMPILER_CACHE": "sccache",
@@ -242,6 +244,7 @@
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
@@ -264,9 +267,10 @@
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_BUILD_TYPE": "Profile",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
       },
@@ -286,6 +290,7 @@
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
@@ -308,6 +313,7 @@
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "ON",
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Release",
@@ -394,7 +400,7 @@
         "CMAKE_C_COMPILER": "C:/Program Files/LLVM/bin/clang.exe",
         "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang++.exe",
         "RUST_FEATURES": "OFF",
-        "CMAKE_BUILD_TYPE": "Profile",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
       },
@@ -428,13 +434,13 @@
       "name": "linux-profile-GNU",
       "jobs": 0,
       "configurePreset": "linux-profile-GNU",
-      "configuration": "Profile"
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "linux-profile-clang",
       "jobs": 0,
       "configurePreset": "linux-profile-clang",
-      "configuration": "Profile"
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "linux-release-clang",
@@ -470,7 +476,7 @@
       "name": "x64-ClangCL-Windows-Profile",
       "jobs": 0,
       "configurePreset": "x64-ClangCL-Windows-Profile",
-      "configuration": "Profile"
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "x64-ClangCL-Windows-RelWithDebInfo",

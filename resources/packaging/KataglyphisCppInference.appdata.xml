@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.kataglyphis.kataglyphiscppinference</id>
+  <name>KataglyphisCppInference</name>
+  <summary>Native inference CLI and shared library</summary>
+  <description>
+    <p>KataglyphisCppInference provides a native shared library and command line executable for inference workflows.</p>
+  </description>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-Proprietary</project_license>
+  <developer id="org.kataglyphis">
+    <name>Kataglyphis</name>
+  </developer>
+  <launchable type="desktop-id">org.kataglyphis.kataglyphiscppinference.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>KataglyphisCppInference</binary>
+  </provides>
+  <url type="homepage">https://jonasheinle.de/</url>
+</component>

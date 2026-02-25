@@ -134,8 +134,8 @@ set_target_properties(${PROJECT_NAME}_cli PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
-target_compile_features(${PROJECT_NAME}_cli PRIVATE cxx_std_20)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
+target_compile_features(${PROJECT_NAME}_cli PRIVATE cxx_std_23)
 
 # Define export macro for building the DLL
 target_compile_definitions(${PROJECT_NAME} PRIVATE KATAGLYPHIS_EXPORTS)

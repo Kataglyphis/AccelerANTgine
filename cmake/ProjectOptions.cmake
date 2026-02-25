@@ -95,7 +95,7 @@ endmacro()
 macro(myproject_global_options)
 
   # specify the C/C++ standard
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 23)
   set(CMAKE_CXX_STANDARD_REQUIRED True)
 
   set(CMAKE_C_STANDARD 17)
@@ -105,9 +105,11 @@ macro(myproject_global_options)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(STATUS "Enabling experimental C++ modules for Clang")
     set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE ON)
+    set(CMAKE_CXX_SCAN_FOR_MODULES ON)
   else()
     message(STATUS "C++ modules support disabled for compiler: ${CMAKE_CXX_COMPILER_ID}")
     set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE OFF)
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
   endif()
  
   
@@ -115,14 +117,14 @@ macro(myproject_global_options)
   if(MSVC AND NOT(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DEBUG /Od ")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /GL")
-    set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RROFILE} /O2")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2")
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html
     # https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
-    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+  	set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -ggdb")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
-    set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_PROFILE} -O3 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -DNDEBUG")
   # https://clang.llvm.org/docs/UsersManual.html
   # this is the clang-cl case
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
@@ -130,12 +132,12 @@ macro(myproject_global_options)
     # become fatal when /WX is enabled (seen e.g. for character-conversion).
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od -fcolor-diagnostics -Wno-error=unused-command-line-argument")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
-    set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_PROFILE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
     # https://clang.llvm.org/docs/ClangCommandLineReference.html
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -ggdb -fcolor-diagnostics") # -std=c++2a
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG -fcolor-diagnostics")
-    set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_PROFILE} -O3 -DNDEBUG -fcolor-diagnostics") # -std=c++2a
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -DNDEBUG -fcolor-diagnostics") # -std=c++2a
   endif()
 
   # control where the static and shared libraries are built so that on windows
@@ -173,7 +175,6 @@ macro(myproject_global_options)
 endmacro()
 
 macro(myproject_local_options)
-  message("In the beginning of the local options functions.")
   if(PROJECT_IS_TOP_LEVEL)
     include(cmake/StandardProjectSettings.cmake)
   endif()
@@ -192,10 +193,10 @@ macro(myproject_local_options)
     ""
     "")
   
-  # Only when building with -DCMAKE_BUILD_TYPE=Profile,
+  # Only when building with -DCMAKE_BUILD_TYPE=RelWithDebInfo,
   # on non-Windows and using GCC or Clang
   if (
-    CMAKE_BUILD_TYPE STREQUAL "Profile"
+    CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"
     AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     AND NOT WIN32
   )
@@ -213,7 +214,7 @@ macro(myproject_local_options)
     endif()
 
   elseif(myproject_ENABLE_GPROF)
-    message(STATUS "GProf should only be used with GCC on Linux using -DCMAKE_BUILD_TYPE=Profile")
+    message(STATUS "GProf should only be used with GCC on Linux using -DCMAKE_BUILD_TYPE=RelWithDebInfo")
   endif()
 
   if(myproject_DISABLE_EXCEPTIONS)

@@ -2,6 +2,6 @@
 Type=Application
 Name=KataglyphisCppInference
 Exec=KataglyphisCppInference
-Icon=KataglyphisCppInference
+Icon=org.kataglyphis.kataglyphiscppinference
 Terminal=true
 Categories=Development;

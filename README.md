@@ -194,8 +194,9 @@ source ~/.bashrc  # or source ~/.zshrc
 2. Step:
 Run actual profiling and look into results:
 ```bash
-LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so CPUPROFILE=profile.prof ./build/KataglyphisCppProject
-pprof -http=:8080 ./build/KataglyphisCppProject profile.prof
+mkdir -p logs
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so CPUPROFILE=logs/profile.prof ./build/KataglyphisCppProject
+pprof -http=:8080 ./build/KataglyphisCppProject logs/profile.prof
 ```
 
 ### valgrind

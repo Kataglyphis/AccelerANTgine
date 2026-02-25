@@ -127,6 +127,7 @@ if(WIN32)
 
 else()
   # Nicht Windows -> Linux / andere UNIX Systeme
+  set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
   # Source bleibt TGZ; zusätzlich binärer TGZ + (unter Debian/Ubuntu) DEB
   set(CPACK_SOURCE_GENERATOR "TGZ")
   if(UNIX AND NOT APPLE)
@@ -210,8 +211,8 @@ else()
 
         list(APPEND CPACK_GENERATOR "AppImage")
         set(CPACK_APPIMAGE_TOOL_EXECUTABLE "${_APPIMAGETOOL_WRAPPER}")
-        set(CPACK_APPIMAGE_DESKTOP_FILE "${PROJECT_NAME}.desktop")
-        set(CPACK_PACKAGE_ICON "${PROJECT_NAME}.png")
+        set(CPACK_APPIMAGE_DESKTOP_FILE "${PROJECT_APP_ID}.desktop")
+        set(CPACK_PACKAGE_ICON "${PROJECT_APP_ID}.png")
         set(CPACK_PACKAGE_EXECUTABLES "${PROJECT_NAME}" "${PROJECT_NAME}")
         message(STATUS "AppImage Packaging aktiviert mit appimagetool: ${_APPIMAGETOOL_EXECUTABLE}")
       else()

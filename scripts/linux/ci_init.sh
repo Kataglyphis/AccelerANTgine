@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKSPACE_DIR="${WORKSPACE_DIR:-$(pwd)}"
+WORKSPACE_DIR="$(pwd)"
+COMPILER="clang"
+RUNNER="ubuntu-24.04"
+MATRIX_ARCH="x64"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
+    --compiler) COMPILER="${2:-}"; shift 2 ;;
+    --runner) RUNNER="${2:-}"; shift 2 ;;
+    --arch) MATRIX_ARCH="${2:-}"; shift 2 ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
 
 git config --global --add safe.directory "${WORKSPACE_DIR}" || true
 

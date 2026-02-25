@@ -504,10 +504,12 @@ try {
         Push-Location $buildDirFull
         try {
             $profrawPath = Join-Path $buildDirFull "Test\compile\default.profraw"
-            $profdataPath = Join-Path $buildDirFull "compileTestSuite.profdata"
-            $coverageJsonPath = Join-Path $buildDirFull "coverage.json"
+            $profrawCopyPath = Join-Path $logDirPath "default.profraw"
+            $profdataPath = Join-Path $logDirPath "compileTestSuite.profdata"
+            $coverageJsonPath = Join-Path $logDirPath "coverage.json"
 
             if (Test-Path $profrawPath) {
+                Copy-Item -Path $profrawPath -Destination $profrawCopyPath -Force
                 Invoke-External -File "llvm-profdata.exe" -Args @("merge", "-sparse", $profrawPath, "-o", $profdataPath)
                 Invoke-External -File "llvm-cov.exe" -Args @("report", "compileTestSuite.exe", "-instr-profile=$profdataPath")
                 
@@ -603,8 +605,9 @@ try {
         Push-Location $buildReleaseDirFull
         try {
             $perfExe = Join-Path $buildReleaseDirFull "perfTestSuite.exe"
+            $benchmarkOutPath = Join-Path $logDirPath "results.json"
             if (Test-Path $perfExe) {
-                Invoke-External -File $perfExe -Args @("--benchmark_out=results.json", "--benchmark_out_format=json")
+                Invoke-External -File $perfExe -Args @("--benchmark_out=$benchmarkOutPath", "--benchmark_out_format=json")
             } else {
                 Write-LogWarning "perfTestSuite.exe not found"
             }
@@ -619,11 +622,13 @@ try {
             Push-Location $buildReleaseDirFull
             try {
                 $mainExe = Join-Path $buildReleaseDirFull "KataglyphisCppProject.exe"
+                $dummyProfrawPath = Join-Path $logDirPath "dummy.profraw"
+                $dummyProfdataPath = Join-Path $logDirPath "dummy.profdata"
                 if (Test-Path $mainExe) {
-                    $env:LLVM_PROFILE_FILE = "dummy.profraw"
+                    $env:LLVM_PROFILE_FILE = $dummyProfrawPath
                     Invoke-External -File $mainExe -IgnoreExitCode
-                    Invoke-External -File "llvm-profdata.exe" -Args @("merge", "-sparse", "dummy.profraw", "-o", "dummy.profdata")
-                    Invoke-External -File "llvm-cov.exe" -Args @("show", $mainExe, "-instr-profile=dummy.profdata", "-format=text") -IgnoreExitCode
+                    Invoke-External -File "llvm-profdata.exe" -Args @("merge", "-sparse", $dummyProfrawPath, "-o", $dummyProfdataPath)
+                    Invoke-External -File "llvm-cov.exe" -Args @("show", $mainExe, "-instr-profile=$dummyProfdataPath", "-format=text") -IgnoreExitCode
                 } else {
                     Write-LogWarning "KataglyphisCppProject.exe not found"
                 }

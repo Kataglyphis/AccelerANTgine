@@ -38,7 +38,7 @@ endif()
 
 add_subdirectory(GOOGLE_BENCHMARK)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTING AND NOT(CMAKE_BUILD_TYPE STREQUAL "Profile" ))
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTING AND NOT(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" ))
   message(STATUS "This is a Linux system.")
   # # Detect target architecture
   # string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" TARGET_ARCH)

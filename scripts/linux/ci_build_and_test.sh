@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKSPACE_DIR="${WORKSPACE_DIR:-$(pwd)}"
-COMPILER="${COMPILER:-clang}"
-BUILD_DIR="${BUILD_DIR:-build}"
-BUILD_TYPE="${BUILD_TYPE:-Debug}"
-GCC_DEBUG_PRESET="${GCC_DEBUG_PRESET:-linux-debug-GNU}"
-CLANG_DEBUG_PRESET="${CLANG_DEBUG_PRESET:-linux-debug-clang}"
+WORKSPACE_DIR="$(pwd)"
+COMPILER="clang"
+BUILD_DIR="build"
+BUILD_TYPE="Debug"
+GCC_DEBUG_PRESET="linux-debug-GNU"
+CLANG_DEBUG_PRESET="linux-debug-clang"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
+    --compiler) COMPILER="${2:-}"; shift 2 ;;
+    --build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
+    --build-type) BUILD_TYPE="${2:-}"; shift 2 ;;
+    --gcc-debug-preset) GCC_DEBUG_PRESET="${2:-}"; shift 2 ;;
+    --clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
 
 case "${COMPILER}" in
   gcc)
