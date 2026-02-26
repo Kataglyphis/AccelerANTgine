@@ -13,32 +13,32 @@
 <li>HelloTestCommit.BasicAssertions
 <ul>
 <li><a
-href="#7b39a412-bb5e-4a03-88aa-c85b1c5fee89">HelloTestCommit.BasicAssertions</a></li>
+href="#73396f78-c8f9-4823-b205-c60920967e37">HelloTestCommit.BasicAssertions</a></li>
 </ul></li>
 <li>Integration.VulkanEngine
 <ul>
 <li><a
-href="#84469615-7223-43fd-b297-641dc7f62423">Integration.VulkanEngine</a></li>
+href="#c33a5e57-92cd-4e3b-8afc-1870e726ea0f">Integration.VulkanEngine</a></li>
 </ul></li>
 <li>HelloTestCompile.BasicAssertions
 <ul>
 <li><a
-href="#a9193e9f-7437-46f3-b395-2e27c0fb0e94">HelloTestCompile.BasicAssertions</a></li>
+href="#45f5d240-4803-4799-a7d4-96f1868cb069">HelloTestCompile.BasicAssertions</a></li>
 </ul></li>
 <li>HelloTestCompile.blob
 <ul>
 <li><a
-href="#a2ea2b69-e71e-448e-b35a-82eab3044e50">HelloTestCompile.blob</a></li>
+href="#2368ade0-1faf-4450-9091-230b9a192e66">HelloTestCompile.blob</a></li>
 </ul></li>
 <li>MyTestSuite.OnePlustTwoIsTwoPlusOne
 <ul>
 <li><a
-href="#3f3fa22c-72f4-42da-8ae6-6ffb7f054cff">MyTestSuite.OnePlustTwoIsTwoPlusOne</a></li>
+href="#40a952a7-d677-4b8d-adaf-dead551914d6">MyTestSuite.OnePlustTwoIsTwoPlusOne</a></li>
 </ul></li>
 <li>MyTestSuite.IntegerAdditionCommutes
 <ul>
 <li><a
-href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes</a></li>
+href="#8a53507b-b51f-4109-b9f1-18623de8fd6b">MyTestSuite.IntegerAdditionCommutes</a></li>
 </ul></li>
 </ul></td>
 <td class="failure-index"><ul>
@@ -51,7 +51,7 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 ## Test Suite: Linux-clang++
 
-<span id="4768c826-69b9-4dd2-a2b4-1e550791575c"></span>
+<span id="1ef01c51-4a27-477f-b743-efb9c2f941b7"></span>
 
 ### Results
 
@@ -73,13 +73,13 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 <div class="test outcome outcome-passed">
 
-<span id="7b39a412-bb5e-4a03-88aa-c85b1c5fee89"></span>
+<span id="73396f78-c8f9-4823-b205-c60920967e37"></span>
 
 |            |                                     |
 |------------|-------------------------------------|
 | Test case: | **HelloTestCommit.BasicAssertions** |
 | Outcome:   | Passed                              |
-| Duration:  | 0.012 sec                           |
+| Duration:  | 0.009 sec                           |
 
 <div class="stdout">
 
@@ -114,13 +114,13 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 <div class="test outcome outcome-passed">
 
-<span id="84469615-7223-43fd-b297-641dc7f62423"></span>
+<span id="c33a5e57-92cd-4e3b-8afc-1870e726ea0f"></span>
 
 |            |                              |
 |------------|------------------------------|
 | Test case: | **Integration.VulkanEngine** |
 | Outcome:   | Passed                       |
-| Duration:  | 0.011 sec                    |
+| Duration:  | 0.009 sec                    |
 
 <div class="stdout">
 
@@ -155,13 +155,13 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 <div class="test outcome outcome-passed">
 
-<span id="a9193e9f-7437-46f3-b395-2e27c0fb0e94"></span>
+<span id="45f5d240-4803-4799-a7d4-96f1868cb069"></span>
 
 |            |                                      |
 |------------|--------------------------------------|
 | Test case: | **HelloTestCompile.BasicAssertions** |
 | Outcome:   | Passed                               |
-| Duration:  | 0.01 sec                             |
+| Duration:  | 0.012 sec                            |
 
 <div class="stdout">
 
@@ -196,13 +196,13 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 <div class="test outcome outcome-passed">
 
-<span id="a2ea2b69-e71e-448e-b35a-82eab3044e50"></span>
+<span id="2368ade0-1faf-4450-9091-230b9a192e66"></span>
 
 |            |                           |
 |------------|---------------------------|
 | Test case: | **HelloTestCompile.blob** |
 | Outcome:   | Passed                    |
-| Duration:  | 0.01 sec                  |
+| Duration:  | 0.014 sec                 |
 
 <div class="stdout">
 
@@ -237,19 +237,19 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 <div class="test outcome outcome-passed">
 
-<span id="3f3fa22c-72f4-42da-8ae6-6ffb7f054cff"></span>
+<span id="40a952a7-d677-4b8d-adaf-dead551914d6"></span>
 
 |            |                                         |
 |------------|-----------------------------------------|
 | Test case: | **MyTestSuite.OnePlustTwoIsTwoPlusOne** |
 | Outcome:   | Passed                                  |
-| Duration:  | 0.004 sec                               |
+| Duration:  | 0.006 sec                               |
 
 <div class="stdout">
 
 *Stdout*  
 
-    [.] Sanitizer coverage enabled. Counter map size: 2967, Cmp map size: 262144
+    [.] Sanitizer coverage enabled. Counter map size: 3067, Cmp map size: 262144
     Note: Google Test filter = MyTestSuite.OnePlustTwoIsTwoPlusOne
     [==========] Running 1 test from 1 test suite.
     [----------] Global test environment set-up.
@@ -278,7 +278,7 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 <div class="test outcome outcome-passed">
 
-<span id="ac531606-9c3a-4a3c-a305-ed7b8b4b73c7"></span>
+<span id="8a53507b-b51f-4109-b9f1-18623de8fd6b"></span>
 
 |            |                                         |
 |------------|-----------------------------------------|
@@ -290,13 +290,13 @@ href="#ac531606-9c3a-4a3c-a305-ed7b8b4b73c7">MyTestSuite.IntegerAdditionCommutes
 
 *Stdout*  
 
-    [.] Sanitizer coverage enabled. Counter map size: 2967, Cmp map size: 262144
+    [.] Sanitizer coverage enabled. Counter map size: 3067, Cmp map size: 262144
     Note: Google Test filter = MyTestSuite.IntegerAdditionCommutes
     [==========] Running 1 test from 1 test suite.
     [----------] Global test environment set-up.
     [----------] 1 test from MyTestSuite
     [ RUN      ] MyTestSuite.IntegerAdditionCommutes
-    FUZZTEST_PRNG_SEED=yU1YxKP0a3vqIWnQnxAPs-hxRB2XhLxS6vV2qve3Y5M
+    FUZZTEST_PRNG_SEED=UBISMRquumzVP2V-Pc2l4zYWWmqViUXHdAxaAdee-Yc
     [       OK ] MyTestSuite.IntegerAdditionCommutes (1000 ms)
     [----------] 1 test from MyTestSuite (1000 ms total)
 

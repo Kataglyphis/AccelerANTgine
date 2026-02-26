@@ -1,5 +1,5 @@
 include(GoogleTest)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" ))
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
   message(STATUS "This is a Linux system.")
 
   # Fuzz testing needs special treatment only in debug mode!

@@ -29,13 +29,13 @@ if(NOT MSVC)
   target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE RELATIVE_RESOURCE_PATH="/../../../Resources/"
                                                            RELATIVE_INCLUDE_PATH="/../../../Src/")
 else()
-  target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE RELATIVE_RESOURCE_PATH="/../../Resources"
-                                                   PUBLIC RELATIVE_INCLUDE_PATH="/../../Src/")
+  target_compile_definitions(
+    ${COMPILE_TEST_SUITE}
+    PRIVATE RELATIVE_RESOURCE_PATH="/../../Resources"
+    PUBLIC RELATIVE_INCLUDE_PATH="/../../Src/")
 endif()
 
-target_sources(
-  ${COMPILE_TEST_SUITE}
-  PRIVATE ${KataglyphisCppProject_COMPILE_TEST_FILTER})
+target_sources(${COMPILE_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMPILE_TEST_FILTER})
 
 target_link_libraries(
   ${COMPILE_TEST_SUITE}
@@ -48,8 +48,8 @@ target_link_libraries(
   PRIVATE gtest_main
           gtest
           GSL
-      spdlog
-      ${PROJECT_NAME})
+          spdlog
+          ${PROJECT_NAME})
 
 if(NOT WINDOWS_CI)
   message(STATUS "WINDOWS_CI is OFF or not defined.")

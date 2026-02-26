@@ -34,9 +34,7 @@ else()
                                                         RELATIVE_INCLUDE_PATH="/../Src/")
 endif()
 
-target_sources(
-  ${PERF_TEST_SUITE}
-  PRIVATE ${PERF_TEST_FILTER})
+target_sources(${PERF_TEST_SUITE} PRIVATE ${PERF_TEST_FILTER})
 
 target_link_libraries(
   ${PERF_TEST_SUITE}
@@ -47,8 +45,8 @@ target_link_libraries(
   PRIVATE benchmark::benchmark
           benchmark::benchmark_main
           GSL
-      spdlog
-      ${PROJECT_NAME})
+          spdlog
+          ${PROJECT_NAME})
 
 if(RUST_FEATURES)
   target_link_libraries(${PERF_TEST_SUITE} PUBLIC rusty_code)

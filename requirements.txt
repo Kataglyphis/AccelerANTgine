@@ -1,0 +1,11 @@
+sphinx
+sphinx-book-theme
+sphinx_design
+myst-parser
+pyyaml
+cmake-format
+breathe
+exhale
+pre-commit
+junit2html
+sphinx-autobuild

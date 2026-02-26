@@ -33,15 +33,8 @@ Test results
    :maxdepth: 2
    :caption: Contents:
 
-   introduction
-   getting-started
-   test-results/index
-
-.. toctree::
-   :maxdepth: 2
-   :glob:
-
-   test-results/*
+   overview
+   getting_started
 
 Indices and tables
 ==================

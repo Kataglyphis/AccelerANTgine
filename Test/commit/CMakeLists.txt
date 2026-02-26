@@ -39,9 +39,7 @@ else()
                                                           RELATIVE_INCLUDE_PATH="/../Src/")
 endif()
 
-target_sources(
-  ${COMMIT_TEST_SUITE}
-  PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
+target_sources(${COMMIT_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
 
 target_link_libraries(
   ${COMMIT_TEST_SUITE}
@@ -54,8 +52,8 @@ target_link_libraries(
   PRIVATE gtest
           gtest_main
           GSL
-      spdlog
-      ${PROJECT_NAME})
+          spdlog
+          ${PROJECT_NAME})
 
 if(NOT WINDOWS_CI)
   message(STATUS "WINDOWS_CI is OFF or not defined.")

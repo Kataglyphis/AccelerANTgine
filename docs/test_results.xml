@@ -6,9 +6,9 @@
 	skipped="0"
 	hostname="IPA-WN-023IT404"
 	time="1"
-	timestamp="2026-02-25T13:27:40"
+	timestamp="2026-02-26T17:02:33"
 	>
-	<testcase name="HelloTestCommit.BasicAssertions" classname="HelloTestCommit.BasicAssertions" time="0.0161114" status="run">
+	<testcase name="HelloTestCommit.BasicAssertions" classname="HelloTestCommit.BasicAssertions" time="0.00903905" status="run">
 		<properties/>
 		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
 Note: Google Test filter = HelloTestCommit.BasicAssertions
@@ -24,7 +24,7 @@ Note: Google Test filter = HelloTestCommit.BasicAssertions
 [  PASSED  ] 1 test.
 </system-out>
 	</testcase>
-	<testcase name="Integration.VulkanEngine" classname="Integration.VulkanEngine" time="0.0120576" status="run">
+	<testcase name="Integration.VulkanEngine" classname="Integration.VulkanEngine" time="0.0093028" status="run">
 		<properties/>
 		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
 Note: Google Test filter = Integration.VulkanEngine
@@ -40,7 +40,7 @@ Note: Google Test filter = Integration.VulkanEngine
 [  PASSED  ] 1 test.
 </system-out>
 	</testcase>
-	<testcase name="HelloTestCompile.BasicAssertions" classname="HelloTestCompile.BasicAssertions" time="0.0122304" status="run">
+	<testcase name="HelloTestCompile.BasicAssertions" classname="HelloTestCompile.BasicAssertions" time="0.0115522" status="run">
 		<properties/>
 		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
 Note: Google Test filter = HelloTestCompile.BasicAssertions
@@ -56,7 +56,7 @@ Note: Google Test filter = HelloTestCompile.BasicAssertions
 [  PASSED  ] 1 test.
 </system-out>
 	</testcase>
-	<testcase name="HelloTestCompile.blob" classname="HelloTestCompile.blob" time="0.0120913" status="run">
+	<testcase name="HelloTestCompile.blob" classname="HelloTestCompile.blob" time="0.0144221" status="run">
 		<properties/>
 		<system-out>Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
 Note: Google Test filter = HelloTestCompile.blob
@@ -72,7 +72,7 @@ Note: Google Test filter = HelloTestCompile.blob
 [  PASSED  ] 1 test.
 </system-out>
 	</testcase>
-	<testcase name="MyTestSuite.OnePlustTwoIsTwoPlusOne" classname="MyTestSuite.OnePlustTwoIsTwoPlusOne" time="0.00555423" status="run">
+	<testcase name="MyTestSuite.OnePlustTwoIsTwoPlusOne" classname="MyTestSuite.OnePlustTwoIsTwoPlusOne" time="0.00609753" status="run">
 		<properties/>
 		<system-out>[.] Sanitizer coverage enabled. Counter map size: 3067, Cmp map size: 262144
 Note: Google Test filter = MyTestSuite.OnePlustTwoIsTwoPlusOne
@@ -88,7 +88,7 @@ Note: Google Test filter = MyTestSuite.OnePlustTwoIsTwoPlusOne
 [  PASSED  ] 1 test.
 </system-out>
 	</testcase>
-	<testcase name="MyTestSuite.IntegerAdditionCommutes" classname="MyTestSuite.IntegerAdditionCommutes" time="1.00608" status="run">
+	<testcase name="MyTestSuite.IntegerAdditionCommutes" classname="MyTestSuite.IntegerAdditionCommutes" time="1.00493" status="run">
 		<properties/>
 		<system-out>[.] Sanitizer coverage enabled. Counter map size: 3067, Cmp map size: 262144
 Note: Google Test filter = MyTestSuite.IntegerAdditionCommutes
@@ -96,7 +96,7 @@ Note: Google Test filter = MyTestSuite.IntegerAdditionCommutes
 [----------] Global test environment set-up.
 [----------] 1 test from MyTestSuite
 [ RUN      ] MyTestSuite.IntegerAdditionCommutes
-FUZZTEST_PRNG_SEED=7p0ez1m39CARCq4ZjUWh5t8QxEXlAZxRRAc3oIhOU0A
+FUZZTEST_PRNG_SEED=UBISMRquumzVP2V-Pc2l4zYWWmqViUXHdAxaAdee-Yc
 [       OK ] MyTestSuite.IntegerAdditionCommutes (1000 ms)
 [----------] 1 test from MyTestSuite (1000 ms total)
 

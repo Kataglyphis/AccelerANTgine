@@ -27,7 +27,7 @@ macro(myproject_setup_options)
   else()
     message(STATUS "Global hardening is disabled")
   endif()
-  
+
   # namely FUZZTEST
   # cmake_dependent_option(
   #   myproject_ENABLE_GLOBAL_HARDENING
@@ -101,8 +101,13 @@ macro(myproject_global_options)
   set(CMAKE_C_STANDARD 17)
   set(CMAKE_C_STANDARD_REQUIRED True)
 
-  # Enable C++ modules only for Clang (disable for GCC/MSVC)
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  # Enable C++ modules only for non-MSVC Clang.
+  # clang-cl currently fails module dependency discovery with this project setup.
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
+    message(STATUS "Disabling C++ modules for clang-cl on Windows (module dependency scan unavailable)")
+    set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE OFF)
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(STATUS "Enabling experimental C++ modules for Clang")
     set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE ON)
     set(CMAKE_CXX_SCAN_FOR_MODULES ON)
@@ -111,33 +116,36 @@ macro(myproject_global_options)
     set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE OFF)
     set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
   endif()
- 
-  
+
   # set build type specific flags
-  if(MSVC AND NOT(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+  if(MSVC AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DEBUG /Od ")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /GL")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2")
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html
     # https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
-  	set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
-	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -ggdb")
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -ggdb")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -DNDEBUG")
-  # https://clang.llvm.org/docs/UsersManual.html
-  # this is the clang-cl case
+    # https://clang.llvm.org/docs/UsersManual.html
+    # this is the clang-cl case
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
     # NOTE: clang-cl does not support all GCC/Clang warning names; unknown -W* options
     # become fatal when /WX is enabled (seen e.g. for character-conversion).
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od -fcolor-diagnostics -Wno-error=unused-command-line-argument")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
+    set(CMAKE_CXX_FLAGS_DEBUG
+        "${CMAKE_CXX_FLAGS_DEBUG} /Od -fcolor-diagnostics -Wno-error=unused-command-line-argument")
+    set(CMAKE_CXX_FLAGS_RELEASE
+        "${CMAKE_CXX_FLAGS_RELEASE} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
+        "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 -DNDEBUG -fcolor-diagnostics -Wno-error=unused-command-line-argument")
     # https://clang.llvm.org/docs/ClangCommandLineReference.html
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -ggdb -fcolor-diagnostics") # -std=c++2a
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG -fcolor-diagnostics")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -DNDEBUG -fcolor-diagnostics") # -std=c++2a
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -DNDEBUG -fcolor-diagnostics"
+    )# -std=c++2a
   endif()
 
   # control where the static and shared libraries are built so that on windows
@@ -150,9 +158,9 @@ macro(myproject_global_options)
 
   if(myproject_ENABLE_IPO)
     include(cmake/InterproceduralOptimization.cmake)
-	if(NOT(CMAKE_BUILD_TYPE STREQUAL "Debug"))
+    if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
       myproject_enable_ipo()
-	endif()
+    endif()
   endif()
 
   myproject_supports_sanitizers()
@@ -192,18 +200,16 @@ macro(myproject_local_options)
     ""
     ""
     "")
-  
+
   # Only when building with -DCMAKE_BUILD_TYPE=RelWithDebInfo,
   # on non-Windows and using GCC or Clang
-  if (
-    CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"
-    AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    AND NOT WIN32
-  )
+  if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"
+     AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+     AND NOT WIN32)
 
     find_library(PROFILER_LIB profiler)
 
-    if (PROFILER_LIB)
+    if(PROFILER_LIB)
       message(STATUS "Enabling CPU profiling with gperftools (libprofiler)")
       message(STATUS "Found libprofiler: ${PROFILER_LIB}")
       target_link_libraries(myproject_options INTERFACE -lprofiler)
@@ -218,29 +224,32 @@ macro(myproject_local_options)
   endif()
 
   if(myproject_DISABLE_EXCEPTIONS)
-    if(MSVC AND NOT(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+    if(MSVC AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
       target_compile_options(myproject_options INTERFACE /EHs-) # Disable exceptions
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
-	  message(STATUS "Using clang-cl and disable exceptions with /GX-")
-	  target_compile_options(myproject_options INTERFACE /EHs-) # Disable exceptions
+      message(STATUS "Using clang-cl and disable exceptions with /GX-")
+      target_compile_options(myproject_options INTERFACE /EHs-) # Disable exceptions
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(myproject_options INTERFACE -fno-exceptions)
     else()
       message(WARNING "Disabling exceptions is not supported for this compiler.")
     endif()
   else()
-    if(MSVC AND NOT(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+    if(MSVC AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
       target_compile_options(myproject_options INTERFACE /EHs) # Enable exceptions
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
       target_compile_options(myproject_options INTERFACE /EHs) # Enable exceptions
-	elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       target_compile_options(myproject_options INTERFACE -fexceptions)
     else()
       message(WARNING "Enabling exceptions is not supported for this compiler.")
     endif()
   endif()
 
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+  if(NOT
+     CMAKE_BUILD_TYPE
+     STREQUAL
+     "Release")
     include(cmake/Sanitizers.cmake)
     myproject_enable_sanitizers(
       myproject_options
@@ -250,7 +259,7 @@ macro(myproject_local_options)
       ${myproject_ENABLE_SANITIZER_THREAD}
       ${myproject_ENABLE_SANITIZER_MEMORY})
   endif()
-  
+
   set_target_properties(myproject_options PROPERTIES UNITY_BUILD ${myproject_ENABLE_UNITY_BUILD})
 
   if(myproject_ENABLE_PCH)
@@ -267,17 +276,20 @@ macro(myproject_local_options)
     myproject_enable_cache()
   endif()
 
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+  if(NOT
+     CMAKE_BUILD_TYPE
+     STREQUAL
+     "Release")
     include(cmake/StaticAnalyzers.cmake)
     if(myproject_ENABLE_CLANG_TIDY)
       myproject_enable_clang_tidy(myproject_options ${myproject_WARNINGS_AS_ERRORS})
     endif()
 
-	if(myproject_ENABLE_CPPCHECK)
+    if(myproject_ENABLE_CPPCHECK)
       myproject_enable_cppcheck(${myproject_WARNINGS_AS_ERRORS} "" # override cppcheck options
       )
     endif()
-	
+
     if(myproject_ENABLE_COVERAGE)
       include(cmake/Tests.cmake)
       myproject_enable_coverage(myproject_options)
@@ -307,7 +319,10 @@ macro(myproject_local_options)
     myproject_enable_hardening(myproject_options OFF ${ENABLE_UBSAN_MINIMAL_RUNTIME})
   endif()
 
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+  if(NOT
+     CMAKE_BUILD_TYPE
+     STREQUAL
+     "Release")
     if(myproject_ENABLE_IWYU)
       if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         find_program(IWYU_PATH NAMES include-what-you-use iwyu)

@@ -10,14 +10,12 @@ DO_CALLGRIND=0
 DO_APPIMAGE=1
 DO_FLATPAK=1
 FLATPAK_EXPLICIT=0
-APPIMAGE_OUT_DIR=""
 FLATPAK_OUT_DIR=""
 FLATPAK_RUNTIME="org.freedesktop.Platform"
 FLATPAK_RUNTIME_VERSION="24.08"
 FLATPAK_SDK="org.freedesktop.Sdk"
 FLATPAK_BRANCH="master"
 AUTO_INSTALL_FLATPAK="1"
-APPIMAGETOOL_CMD=""
 FLATPAK_ARCH=""
 APP_ID="org.kataglyphis.kataglyphiscppinference"
 
@@ -33,7 +31,6 @@ Options:
   --callgrind                   Run valgrind/callgrind (default: off)
   --appimage                    Build AppImage (default: on)
   --no-appimage                 Disable AppImage build
-  --appimage-out-dir <dir>      AppImage output directory (default: build dir)
   --flatpak|--flatpack          Build Flatpak bundle (default: on)
   --no-flatpak|--no-flatpack    Disable Flatpak build
   --flatpak-out-dir <dir>       Flatpak output directory (default: build dir)
@@ -43,7 +40,6 @@ Options:
   --flatpak-branch <name>       Flatpak branch (default: master)
   --flatpak-arch <name>         Flatpak arch override (default: auto-detect)
   --auto-install-flatpak <0|1>  Auto-install flatpak tools (default: 1)
-  --appimagetool-cmd <cmd>      Explicit appimagetool command/path
   -h, --help                    Show help
 EOF
 }
@@ -75,6 +71,44 @@ read_cache_var() {
   fi
 }
 
+load_project_metadata() {
+  local build_dir="$1"
+  local cache_file="${build_dir}/CMakeCache.txt"
+  local project_name="KataglyphisCppProject"
+  local project_version=""
+
+  if [[ -f "${cache_file}" ]]; then
+    project_name="$(read_cache_var "${cache_file}" CMAKE_PROJECT_NAME || true)"
+    project_version="$(read_cache_var "${cache_file}" CMAKE_PROJECT_VERSION || true)"
+  fi
+
+  [[ -n "${project_name}" ]] || project_name="KataglyphisCppProject"
+
+  local git_sha
+  git_sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
+
+  PROJECT_NAME_META="${project_name}"
+  VERSION_SUFFIX_META="${project_version:-${git_sha:-unknown}}"
+}
+
+normalize_installed_file() {
+  local dir="$1"
+  local from_name="$2"
+  local to_name="$3"
+  local source=""
+
+  if [[ -f "${dir}/${from_name}" ]]; then
+    source="${dir}/${from_name}"
+  elif [[ -f "${dir}/${to_name}" ]]; then
+    source="${dir}/${to_name}"
+  fi
+
+  if [[ -n "${source}" && "${source}" != "${dir}/${to_name}" ]]; then
+    cp -f "${source}" "${dir}/${to_name}"
+    rm -f "${source}"
+  fi
+}
+
 run_privileged_cmd() {
   if [[ "${EUID}" -eq 0 ]]; then
     "$@"
@@ -84,165 +118,6 @@ run_privileged_cmd() {
     echo "Missing privileges for: $*" >&2
     return 1
   fi
-}
-
-ensure_appimagetool() {
-  if [[ -n "${APPIMAGETOOL_CMD}" ]]; then
-    if require_cmd "${APPIMAGETOOL_CMD}"; then
-      echo "${APPIMAGETOOL_CMD}"
-      return 0
-    fi
-    return 1
-  fi
-
-  if command -v appimagetool >/dev/null 2>&1; then
-    echo "appimagetool"
-    return 0
-  fi
-
-  local arch
-  arch="$(normalize_arch)"
-
-  local appimagetool_name=""
-  case "${arch}" in
-    x86_64) appimagetool_name="appimagetool-x86_64.AppImage" ;;
-    aarch64) appimagetool_name="appimagetool-aarch64.AppImage" ;;
-    *)
-      echo "Unsupported architecture for automatic appimagetool download: ${arch}" >&2
-      return 1
-      ;;
-  esac
-
-  local wrapper_path="${BUILD_RELEASE_DIR}/tools/appimagetool-wrapper.sh"
-  if [[ -x "${wrapper_path}" ]]; then
-    echo "${wrapper_path}"
-    return 0
-  fi
-
-  local cpack_local_tool="${BUILD_RELEASE_DIR}/tools/${appimagetool_name}"
-  if [[ -x "${cpack_local_tool}" ]]; then
-    echo "${cpack_local_tool}"
-    return 0
-  fi
-
-  local local_path="${BUILD_RELEASE_DIR}/tools/${appimagetool_name}"
-  mkdir -p "$(dirname "${local_path}")"
-  if [[ ! -x "${local_path}" ]]; then
-    if ! require_cmd wget; then
-      run_privileged_cmd apt-get update
-      run_privileged_cmd apt-get install -y wget
-    fi
-    wget -O "${local_path}" "https://github.com/AppImage/AppImageKit/releases/download/continuous/${appimagetool_name}"
-    chmod +x "${local_path}"
-  fi
-
-  echo "${local_path}"
-}
-
-ensure_appimage_tools() {
-  if require_cmd mksquashfs; then
-    return 0
-  fi
-  if command -v apt-get >/dev/null 2>&1; then
-    run_privileged_cmd apt-get update
-    run_privileged_cmd apt-get install -y squashfs-tools
-  fi
-  require_cmd mksquashfs
-}
-
-sanitize_for_app_id() {
-  local value="$1"
-  value="${value,,}"
-  value="${value//[^a-zA-Z0-9]/-}"
-  value="${value#-}"
-  value="${value%-}"
-  if [[ -z "${value}" ]]; then
-    value="kataglyphiscppproject"
-  fi
-  echo "${value}"
-}
-
-has_cpack_appimage() {
-  local build_dir="$1"
-  compgen -G "${build_dir}/*.AppImage" >/dev/null 2>&1
-}
-
-build_appimage() {
-  local build_dir="$1"
-  local out_dir="$2"
-  local appimagetool
-  appimagetool="$(ensure_appimagetool)"
-  ensure_appimage_tools
-
-  local cache_file="${build_dir}/CMakeCache.txt"
-  local project_name="KataglyphisCppProject"
-  local project_version=""
-  if [[ -f "${cache_file}" ]]; then
-    project_name="$(read_cache_var "${cache_file}" CMAKE_PROJECT_NAME || true)"
-    project_version="$(read_cache_var "${cache_file}" CMAKE_PROJECT_VERSION || true)"
-  fi
-  [[ -n "${project_name}" ]] || project_name="KataglyphisCppProject"
-
-  local arch="$(normalize_arch)"
-  local git_sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
-  local version_suffix="${project_version:-${git_sha:-unknown}}"
-
-  local appdir="${build_dir}/AppDir"
-  rm -rf "${appdir}"
-  mkdir -p "${appdir}"
-
-  cmake --install "${build_dir}" --prefix "${appdir}/usr"
-
-  local runtime_exec=""
-  if [[ -x "${appdir}/usr/bin/${project_name}" ]]; then
-    runtime_exec="${project_name}"
-  elif [[ -d "${appdir}/usr/bin" ]]; then
-    runtime_exec="$(find "${appdir}/usr/bin" -maxdepth 1 -type f -executable | head -n 1 | xargs -r basename)"
-  fi
-
-  if [[ -z "${runtime_exec}" ]]; then
-    echo "No executable found under ${appdir}/usr/bin; skipping AppImage build." >&2
-    return 0
-  fi
-
-  cat >"${appdir}/AppRun" <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-HERE="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-exec "\${HERE}/usr/bin/${project_name}" "\$@"
-EOF
-  sed -i "s|/usr/bin/${project_name}|/usr/bin/${runtime_exec}|g" "${appdir}/AppRun"
-  chmod +x "${appdir}/AppRun"
-
-  cat >"${appdir}/${project_name}.desktop" <<EOF
-[Desktop Entry]
-Type=Application
-Name=${project_name}
-Exec=${project_name}
-Icon=${project_name}
-Categories=Utility;
-Terminal=true
-EOF
-  sed -i "s|Exec=${project_name}|Exec=${runtime_exec}|g" "${appdir}/${project_name}.desktop"
-
-  if [[ -f "${WORKSPACE_DIR}/images/logo.png" ]]; then
-    cp "${WORKSPACE_DIR}/images/logo.png" "${appdir}/${project_name}.png"
-  elif [[ -f "${WORKSPACE_DIR}/images/Engine_logo.png" ]]; then
-    cp "${WORKSPACE_DIR}/images/Engine_logo.png" "${appdir}/${project_name}.png"
-  fi
-
-  mkdir -p "${out_dir}"
-  local out_name="${project_name}-${version_suffix}-linux-${arch}.AppImage"
-
-  local -a appimagetool_cmd
-  if [[ "${appimagetool}" == *.AppImage ]]; then
-    appimagetool_cmd=("${appimagetool}" --appimage-extract-and-run)
-  else
-    appimagetool_cmd=("${appimagetool}")
-  fi
-
-  ARCH="${arch}" "${appimagetool_cmd[@]}" "${appdir}" "${out_dir}/${out_name}"
-  echo "AppImage written: ${out_dir}/${out_name}"
 }
 
 ensure_flatpak_tools() {
@@ -328,17 +203,9 @@ build_flatpak() {
   require_cmd flatpak
   ensure_flatpak_runtime
 
-  local cache_file="${build_dir}/CMakeCache.txt"
-  local project_name="KataglyphisCppProject"
-  local project_version=""
-  if [[ -f "${cache_file}" ]]; then
-    project_name="$(read_cache_var "${cache_file}" CMAKE_PROJECT_NAME || true)"
-    project_version="$(read_cache_var "${cache_file}" CMAKE_PROJECT_VERSION || true)"
-  fi
-  [[ -n "${project_name}" ]] || project_name="KataglyphisCppProject"
-
-  local git_sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
-  local version_suffix="${project_version:-${git_sha:-unknown}}"
+  load_project_metadata "${build_dir}"
+  local project_name="${PROJECT_NAME_META}"
+  local version_suffix="${VERSION_SUFFIX_META}"
 
   local app_id="${APP_ID}"
   local flatpak_root="${build_dir}/flatpak"
@@ -354,38 +221,9 @@ build_flatpak() {
   local desktop_dir="${source_dir}/app/share/applications"
   local icon_dir="${source_dir}/app/share/icons/hicolor/256x256/apps"
   local metainfo_dir="${source_dir}/app/share/metainfo"
-  local desktop_source=""
-  if [[ -f "${desktop_dir}/${project_name}.desktop" ]]; then
-    desktop_source="${desktop_dir}/${project_name}.desktop"
-  elif [[ -f "${desktop_dir}/${app_id}.desktop" ]]; then
-    desktop_source="${desktop_dir}/${app_id}.desktop"
-  fi
-  if [[ -n "${desktop_source}" ]]; then
-    if [[ "${desktop_source}" != "${desktop_dir}/${app_id}.desktop" ]]; then
-      cp -f "${desktop_source}" "${desktop_dir}/${app_id}.desktop"
-    fi
-    if [[ "${desktop_source}" != "${desktop_dir}/${app_id}.desktop" ]]; then
-      rm -f "${desktop_source}"
-    fi
-  fi
-  if [[ -f "${icon_dir}/${project_name}.png" ]]; then
-    cp -f "${icon_dir}/${project_name}.png" "${icon_dir}/${app_id}.png"
-    rm -f "${icon_dir}/${project_name}.png"
-  fi
-  local metainfo_source=""
-  if [[ -f "${metainfo_dir}/${project_name}.appdata.xml" ]]; then
-    metainfo_source="${metainfo_dir}/${project_name}.appdata.xml"
-  elif [[ -f "${metainfo_dir}/${app_id}.appdata.xml" ]]; then
-    metainfo_source="${metainfo_dir}/${app_id}.appdata.xml"
-  fi
-  if [[ -n "${metainfo_source}" ]]; then
-    if [[ "${metainfo_source}" != "${metainfo_dir}/${app_id}.appdata.xml" ]]; then
-      cp -f "${metainfo_source}" "${metainfo_dir}/${app_id}.appdata.xml"
-    fi
-    if [[ "${metainfo_source}" != "${metainfo_dir}/${app_id}.appdata.xml" ]]; then
-      rm -f "${metainfo_source}"
-    fi
-  fi
+  normalize_installed_file "${desktop_dir}" "${project_name}.desktop" "${app_id}.desktop"
+  normalize_installed_file "${icon_dir}" "${project_name}.png" "${app_id}.png"
+  normalize_installed_file "${metainfo_dir}" "${project_name}.appdata.xml" "${app_id}.appdata.xml"
 
   local source_app_path
   source_app_path="$(cd "${source_dir}/app" && pwd)"
@@ -465,10 +303,6 @@ while [[ $# -gt 0 ]]; do
       AUTO_INSTALL_FLATPAK="$2"
       shift 2
       ;;
-    --appimagetool-cmd)
-      APPIMAGETOOL_CMD="$2"
-      shift 2
-      ;;
     --flatpak-arch)
       FLATPAK_ARCH="$2"
       shift 2
@@ -484,10 +318,6 @@ while [[ $# -gt 0 ]]; do
     --no-appimage)
       DO_APPIMAGE=0
       shift 1
-      ;;
-    --appimage-out-dir)
-      APPIMAGE_OUT_DIR="$2"
-      shift 2
       ;;
     --flatpak|--flatpack)
       DO_FLATPAK=1
@@ -519,18 +349,14 @@ if [[ "${COMPILER:-}" != "clang" ]]; then
   exit 0
 fi
 
-cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
+CPACK_APPIMAGE_FLAG="ON"
+if [[ "${DO_APPIMAGE}" -ne 1 ]]; then
+  CPACK_APPIMAGE_FLAG="OFF"
+fi
+
+cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}" -DCMAKE_LINK_WHAT_YOU_USE=FALSE -DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}
 cmake --build "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
 cmake --build "${BUILD_RELEASE_DIR}" --target package
-
-if [[ "${DO_APPIMAGE}" -eq 1 ]]; then
-  if has_cpack_appimage "${BUILD_RELEASE_DIR}"; then
-    echo "CPack AppImage already exists in ${BUILD_RELEASE_DIR}; skipping extra AppImage build."
-  else
-    [[ -n "${APPIMAGE_OUT_DIR}" ]] || APPIMAGE_OUT_DIR="${BUILD_RELEASE_DIR}"
-    build_appimage "${BUILD_RELEASE_DIR}" "${APPIMAGE_OUT_DIR}"
-  fi
-fi
 
 if [[ "${DO_FLATPAK}" -eq 1 ]]; then
   [[ -n "${FLATPAK_OUT_DIR}" ]] || FLATPAK_OUT_DIR="${BUILD_RELEASE_DIR}"

@@ -3,7 +3,7 @@
 include(ProcessorCount)
 # 1. Detect number of cores
 ProcessorCount(N)
-message(STATUS "Processor count: ${N}")         # prints “-- Processor count: <N>” during configure
+message(STATUS "Processor count: ${N}") # prints “-- Processor count: <N>” during configure
 if(NOT
    N
    EQUAL

@@ -45,13 +45,12 @@ jobs:
           docker-images: false
           swap-storage: true
 
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
           submodules: recursive
 
       - name: Login to GitHub Container Registry
-        if: ${{ secrets.GHCR_PAT != '' }}
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Pull container image (retry)
@@ -100,7 +99,7 @@ jobs:
 
       - name: Upload Linux Packages (Clang only)
         if: ${{ inputs.compiler == 'clang' }}
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: linux-packages
           path: |

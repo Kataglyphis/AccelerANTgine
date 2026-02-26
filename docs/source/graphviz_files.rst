@@ -37,6 +37,36 @@ Graphviz Include Graphs
            <img src="_static/classmylib_1_1MyCalculator__coll__graph_org.svg" alt="classmylib_1_1MyCalculator__coll__graph_org.svg">
          </a>
 
+         <div class="graphviz-heading">Classmylib 1 1mycalculator a8cfbdcd17781f374e0d3662d2cc80853 icgraph</div>
+         <a href="_static/classmylib_1_1MyCalculator_a8cfbdcd17781f374e0d3662d2cc80853_icgraph.svg" target="_blank">
+           <img src="_static/classmylib_1_1MyCalculator_a8cfbdcd17781f374e0d3662d2cc80853_icgraph.svg" alt="classmylib_1_1MyCalculator_a8cfbdcd17781f374e0d3662d2cc80853_icgraph.svg">
+         </a>
+
+         <div class="graphviz-heading">Classmylib 1 1mycalculator a8cfbdcd17781f374e0d3662d2cc80853 icgraph org</div>
+         <a href="_static/classmylib_1_1MyCalculator_a8cfbdcd17781f374e0d3662d2cc80853_icgraph_org.svg" target="_blank">
+           <img src="_static/classmylib_1_1MyCalculator_a8cfbdcd17781f374e0d3662d2cc80853_icgraph_org.svg" alt="classmylib_1_1MyCalculator_a8cfbdcd17781f374e0d3662d2cc80853_icgraph_org.svg">
+         </a>
+
+         <div class="graphviz-heading">Cli  main.cpp  incl</div>
+         <a href="_static/cli__main_8cpp__incl.svg" target="_blank">
+           <img src="_static/cli__main_8cpp__incl.svg" alt="cli__main_8cpp__incl.svg">
+         </a>
+
+         <div class="graphviz-heading">Cli  main.cpp  incl org</div>
+         <a href="_static/cli__main_8cpp__incl_org.svg" target="_blank">
+           <img src="_static/cli__main_8cpp__incl_org.svg" alt="cli__main_8cpp__incl_org.svg">
+         </a>
+
+         <div class="graphviz-heading">Cli  main.cpp ae66f6b31b5ad750f1fe042a706a4e3d4 cgraph</div>
+         <a href="_static/cli__main_8cpp_ae66f6b31b5ad750f1fe042a706a4e3d4_cgraph.svg" target="_blank">
+           <img src="_static/cli__main_8cpp_ae66f6b31b5ad750f1fe042a706a4e3d4_cgraph.svg" alt="cli__main_8cpp_ae66f6b31b5ad750f1fe042a706a4e3d4_cgraph.svg">
+         </a>
+
+         <div class="graphviz-heading">Cli  main.cpp ae66f6b31b5ad750f1fe042a706a4e3d4 cgraph org</div>
+         <a href="_static/cli__main_8cpp_ae66f6b31b5ad750f1fe042a706a4e3d4_cgraph_org.svg" target="_blank">
+           <img src="_static/cli__main_8cpp_ae66f6b31b5ad750f1fe042a706a4e3d4_cgraph_org.svg" alt="cli__main_8cpp_ae66f6b31b5ad750f1fe042a706a4e3d4_cgraph_org.svg">
+         </a>
+
          <div class="graphviz-heading">Commitsuite.cpp  incl</div>
          <a href="_static/commitSuite_8cpp__incl.svg" target="_blank">
            <img src="_static/commitSuite_8cpp__incl.svg" alt="commitSuite_8cpp__incl.svg">
@@ -157,44 +187,14 @@ Graphviz Include Graphs
            <img src="_static/inference__lib_8cpp__incl_org.svg" alt="inference__lib_8cpp__incl_org.svg">
          </a>
 
-         <div class="graphviz-heading">Inference  lib.hpp  dep  incl</div>
-         <a href="_static/inference__lib_8hpp__dep__incl.svg" target="_blank">
-           <img src="_static/inference__lib_8hpp__dep__incl.svg" alt="inference__lib_8hpp__dep__incl.svg">
+         <div class="graphviz-heading">Inference  lib.ixx  incl</div>
+         <a href="_static/inference__lib_8ixx__incl.svg" target="_blank">
+           <img src="_static/inference__lib_8ixx__incl.svg" alt="inference__lib_8ixx__incl.svg">
          </a>
 
-         <div class="graphviz-heading">Inference  lib.hpp  dep  incl org</div>
-         <a href="_static/inference__lib_8hpp__dep__incl_org.svg" target="_blank">
-           <img src="_static/inference__lib_8hpp__dep__incl_org.svg" alt="inference__lib_8hpp__dep__incl_org.svg">
-         </a>
-
-         <div class="graphviz-heading">Inference  lib.hpp  incl</div>
-         <a href="_static/inference__lib_8hpp__incl.svg" target="_blank">
-           <img src="_static/inference__lib_8hpp__incl.svg" alt="inference__lib_8hpp__incl.svg">
-         </a>
-
-         <div class="graphviz-heading">Inference  lib.hpp  incl org</div>
-         <a href="_static/inference__lib_8hpp__incl_org.svg" target="_blank">
-           <img src="_static/inference__lib_8hpp__incl_org.svg" alt="inference__lib_8hpp__incl_org.svg">
-         </a>
-
-         <div class="graphviz-heading">Kataglyphis  c  api.cpp  incl</div>
-         <a href="_static/kataglyphis__c__api_8cpp__incl.svg" target="_blank">
-           <img src="_static/kataglyphis__c__api_8cpp__incl.svg" alt="kataglyphis__c__api_8cpp__incl.svg">
-         </a>
-
-         <div class="graphviz-heading">Kataglyphis  c  api.cpp  incl org</div>
-         <a href="_static/kataglyphis__c__api_8cpp__incl_org.svg" target="_blank">
-           <img src="_static/kataglyphis__c__api_8cpp__incl_org.svg" alt="kataglyphis__c__api_8cpp__incl_org.svg">
-         </a>
-
-         <div class="graphviz-heading">Kataglyphis  c  api.h  dep  incl</div>
-         <a href="_static/kataglyphis__c__api_8h__dep__incl.svg" target="_blank">
-           <img src="_static/kataglyphis__c__api_8h__dep__incl.svg" alt="kataglyphis__c__api_8h__dep__incl.svg">
-         </a>
-
-         <div class="graphviz-heading">Kataglyphis  c  api.h  dep  incl org</div>
-         <a href="_static/kataglyphis__c__api_8h__dep__incl_org.svg" target="_blank">
-           <img src="_static/kataglyphis__c__api_8h__dep__incl_org.svg" alt="kataglyphis__c__api_8h__dep__incl_org.svg">
+         <div class="graphviz-heading">Inference  lib.ixx  incl org</div>
+         <a href="_static/inference__lib_8ixx__incl_org.svg" target="_blank">
+           <img src="_static/inference__lib_8ixx__incl_org.svg" alt="inference__lib_8ixx__incl_org.svg">
          </a>
 
          <div class="graphviz-heading">Minus</div>

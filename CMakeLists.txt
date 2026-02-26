@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.31.6)
 
 # Default toolchain flags for clang-based builds when presets are not used.
 # Keep this lightweight and overridable.
-set(GCC_TOOLCHAIN_PATH_DEFAULT "/opt/gcc-15.2.0" CACHE PATH "Default GCC toolchain root for clang")
+set(GCC_TOOLCHAIN_PATH_DEFAULT
+    "/opt/gcc-15.2.0"
+    CACHE PATH "Default GCC toolchain root for clang")
 set(_gcc_toolchain_flag "")
 if(EXISTS "${GCC_TOOLCHAIN_PATH_DEFAULT}")
   set(_gcc_toolchain_flag "--gcc-toolchain=${GCC_TOOLCHAIN_PATH_DEFAULT}")
@@ -52,7 +54,8 @@ if(RUST_FEATURES)
   endif()
 else()
   message(STATUS "Rust features are disabled.")
-  message(STATUS "Your are going to use a non MSVC/clang-cl compiler on windows. Therefore no rust integration possible.")
+  message(
+    STATUS "Your are going to use a non MSVC/clang-cl compiler on windows. Therefore no rust integration possible.")
 endif()
 
 include(cmake/PreventInSourceBuilds.cmake)
@@ -68,7 +71,10 @@ myproject_local_options()
 include(cmake/SystemLibDependencies.cmake)
 add_subdirectory(ExternalLib)
 
-if(BUILD_TESTING AND NOT WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+if(BUILD_TESTING
+   AND NOT WIN32
+   AND CMAKE_CXX_COMPILER_ID MATCHES "Clang"
+   AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
   fuzztest_setup_fuzzing_flags()
 endif()
 
@@ -93,25 +99,28 @@ else()
 endif()
 
 # for correct library output needed
-install(TARGETS ${PROJECT_NAME}
+install(
+  TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-install(TARGETS ${PROJECT_NAME}_cli
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+if(TARGET ${PROJECT_NAME}_cli)
+  install(TARGETS ${PROJECT_NAME}_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 if(UNIX AND NOT APPLE)
-  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/packaging/${PROJECT_NAME}.desktop
+  install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/packaging/${PROJECT_NAME}.desktop
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
     RENAME ${PROJECT_APP_ID}.desktop)
-  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/packaging/${PROJECT_NAME}.appdata.xml
+  install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/packaging/${PROJECT_NAME}.appdata.xml
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo
     RENAME ${PROJECT_APP_ID}.appdata.xml)
-  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png
+  install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
     RENAME ${PROJECT_APP_ID}.png)
 endif()

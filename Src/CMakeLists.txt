@@ -12,21 +12,18 @@ file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
 list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
 
 if(RUST_FEATURES)
-  corrosion_import_crate(
-    MANIFEST_PATH rusty_code/Cargo.toml
-  )
+  corrosion_import_crate(MANIFEST_PATH rusty_code/Cargo.toml)
 
   if(WIN32)
-    corrosion_set_env_vars(
-      rusty_code
-      CXXFLAGS=/EHsc
-    )
+    corrosion_set_env_vars(rusty_code CXXFLAGS=/EHsc)
   else()
     # Native-only corrosion/toolchain setup (no cross-building)
     # Optionally override with -DGCC_TOOLCHAIN_PATH=/path/to/gcc when configuring.
     # This is optional and should not be required for standard GCC installs.
     if(NOT DEFINED GCC_TOOLCHAIN_PATH)
-      set(GCC_TOOLCHAIN_PATH "" CACHE PATH "Optional GCC toolchain root")
+      set(GCC_TOOLCHAIN_PATH
+          ""
+          CACHE PATH "Optional GCC toolchain root")
     endif()
 
     # Determine which compiler Rust/C++ bridge should use.
@@ -69,17 +66,25 @@ if(RUST_FEATURES)
     message(STATUS "Native-only build. HOST_ARCH=${HOST_ARCH}")
 
     # If building with GNU and a GCC_TOOLCHAIN_PATH is provided, prefer that gcc/g++ for Rust.
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND GCC_TOOLCHAIN_PATH AND EXISTS "${GCC_TOOLCHAIN_PATH}")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+       AND GCC_TOOLCHAIN_PATH
+       AND EXISTS "${GCC_TOOLCHAIN_PATH}")
       # Try to find reasonable native compiler binary names
       if(HOST_ARCH STREQUAL "x86_64")
-        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/x86_64-pc-linux-gnu-gcc" "${GCC_TOOLCHAIN_PATH}/bin/gcc")
-        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/x86_64-pc-linux-gnu-g++" "${GCC_TOOLCHAIN_PATH}/bin/g++")
+        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/x86_64-pc-linux-gnu-gcc"
+                                             "${GCC_TOOLCHAIN_PATH}/bin/gcc")
+        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/x86_64-pc-linux-gnu-g++"
+                                             "${GCC_TOOLCHAIN_PATH}/bin/g++")
       elseif(HOST_ARCH STREQUAL "aarch64")
-        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/aarch64-linux-gnu-gcc" "${GCC_TOOLCHAIN_PATH}/bin/gcc")
-        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/aarch64-linux-gnu-g++" "${GCC_TOOLCHAIN_PATH}/bin/g++")
+        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/aarch64-linux-gnu-gcc"
+                                             "${GCC_TOOLCHAIN_PATH}/bin/gcc")
+        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/aarch64-linux-gnu-g++"
+                                             "${GCC_TOOLCHAIN_PATH}/bin/g++")
       elseif(HOST_ARCH STREQUAL "riscv64")
-        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/riscv64-unknown-linux-gnu-gcc" "${GCC_TOOLCHAIN_PATH}/bin/gcc")
-        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/riscv64-unknown-linux-gnu-g++" "${GCC_TOOLCHAIN_PATH}/bin/g++")
+        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/riscv64-unknown-linux-gnu-gcc"
+                                             "${GCC_TOOLCHAIN_PATH}/bin/gcc")
+        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/riscv64-unknown-linux-gnu-g++"
+                                             "${GCC_TOOLCHAIN_PATH}/bin/g++")
       else()
         find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/gcc")
         find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/g++")
@@ -102,8 +107,7 @@ if(RUST_FEATURES)
       rusty_code
       CC=${RUST_CC}
       CXX=${RUST_CXX}
-      "CXXFLAGS=${RUST_CXXFLAGS}"
-    )
+      "CXXFLAGS=${RUST_CXXFLAGS}")
 
     message(STATUS "Configured native corrosion: CC=${RUST_CC} CXX=${RUST_CXX} CXXFLAGS=${RUST_CXXFLAGS}")
 
@@ -114,37 +118,35 @@ if(RUST_FEATURES)
     CRATE
     rusty_code
     FILES
-    lib.rs
-  )
+    lib.rs)
 
 endif() # end RUST_FEATURES
 
 # add the executable
 add_library(${PROJECT_NAME} SHARED)
-set_target_properties(${PROJECT_NAME} PROPERTIES
-  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
+set_target_properties(
+  ${PROJECT_NAME}
+  PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+             LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # add_executable(${PROJECT_NAME})
 
-add_executable(${PROJECT_NAME}_cli cli_main.cpp)
-set_target_properties(${PROJECT_NAME}_cli PROPERTIES
-  OUTPUT_NAME "${PROJECT_NAME}"
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
+if(PROJECT_IS_TOP_LEVEL)
+  add_executable(${PROJECT_NAME}_cli cli_main.cpp)
+  set_target_properties(${PROJECT_NAME}_cli PROPERTIES OUTPUT_NAME "${PROJECT_NAME}" RUNTIME_OUTPUT_DIRECTORY
+                                                                                     "${CMAKE_BINARY_DIR}/bin")
+endif()
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
-target_compile_features(${PROJECT_NAME}_cli PRIVATE cxx_std_23)
+if(TARGET ${PROJECT_NAME}_cli)
+  target_compile_features(${PROJECT_NAME}_cli PRIVATE cxx_std_23)
+endif()
 
 # Define export macro for building the DLL
 target_compile_definitions(${PROJECT_NAME} PRIVATE KATAGLYPHIS_EXPORTS)
 
 # Set symbol visibility
-set_target_properties(${PROJECT_NAME} PROPERTIES
-  CXX_VISIBILITY_PRESET hidden
-  VISIBILITY_INLINES_HIDDEN ON
-)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 
 if(RUST_FEATURES)
   message("RUST features defined")
@@ -157,19 +159,11 @@ endif()
 # Treat MSVC and clang-cl on Windows differently in a sense of deployment
 # https://clang.llvm.org/docs/UsersManual.html
 if(WIN32 AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC))
-  target_compile_definitions(
-    ${PROJECT_NAME}
-    PRIVATE
-      RELATIVE_RESOURCE_PATH="/../../Resources/"
-      RELATIVE_INCLUDE_PATH="/../../Src/"
-  )
+  target_compile_definitions(${PROJECT_NAME} PRIVATE RELATIVE_RESOURCE_PATH="/../../Resources/"
+                                                     RELATIVE_INCLUDE_PATH="/../../Src/")
 else()
-  target_compile_definitions(
-    ${PROJECT_NAME}
-    PRIVATE
-      RELATIVE_RESOURCE_PATH="/../Resources/"
-      RELATIVE_INCLUDE_PATH="/../Src/"
-  )
+  target_compile_definitions(${PROJECT_NAME} PRIVATE RELATIVE_RESOURCE_PATH="/../Resources/"
+                                                     RELATIVE_INCLUDE_PATH="/../Src/")
 endif()
 
 target_sources(
@@ -180,8 +174,7 @@ target_sources(
          BASE_DIRS
          ${PROJECT_SRC_DIR}
          FILES
-         ${KataglyphisCppProject_MODULES}
-)
+         ${KataglyphisCppProject_MODULES})
 
 target_link_libraries(
   ${PROJECT_NAME}
@@ -191,14 +184,15 @@ target_link_libraries(
          myproject_warnings
          # enable sanitizers
          myproject_options
-  PRIVATE GSL spdlog::spdlog nlohmann_json::nlohmann_json
-)
+  PRIVATE GSL spdlog::spdlog nlohmann_json::nlohmann_json)
 
 if(RUST_FEATURES)
   target_link_libraries(${PROJECT_NAME} PUBLIC rusty_code)
 endif()
 
-target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME})
+if(TARGET ${PROJECT_NAME}_cli)
+  target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME})
+endif()
 
 if(UNIX AND NOT APPLE)
   target_compile_options(${PROJECT_NAME} PUBLIC -pthread)
@@ -207,7 +201,5 @@ endif()
 
 if(TARGET ${PROJECT_NAME} AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message(STATUS "GCC detected — adding -MMD -MP to target ${PROJECT_NAME}")
-  target_compile_options(${PROJECT_NAME} PRIVATE
-    $<$<COMPILE_LANGUAGE:CXX>:-MMD -MP>
-  )
+  target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-MMD -MP>)
 endif()

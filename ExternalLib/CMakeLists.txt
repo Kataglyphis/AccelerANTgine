@@ -32,13 +32,15 @@ set(BENCHMARK_USE_BUNDLED_GTEST
 # runtime feature checks for our use-case (no benchmark tests are built).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(HAVE_POSIX_REGEX
-    ON
-    CACHE BOOL "Force POSIX regex for Google Benchmark" FORCE)
+      ON
+      CACHE BOOL "Force POSIX regex for Google Benchmark" FORCE)
 endif()
 
 add_subdirectory(GOOGLE_BENCHMARK)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTING AND NOT(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" ))
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+   AND BUILD_TESTING
+   AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
   message(STATUS "This is a Linux system.")
   # # Detect target architecture
   # string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" TARGET_ARCH)
@@ -71,11 +73,21 @@ if(myproject_DISABLE_EXCEPTIONS)
       CACHE BOOL "Disable SPDLOG exceptions.")
 endif()
 # set spdlog options before adding it
-set(SPDLOG_BUILD_EXAMPLES OFF  CACHE BOOL "Disable spdlog examples" FORCE)
-set(SPDLOG_BUILD_TESTS    OFF  CACHE BOOL "Disable spdlog tests"    FORCE)
-set(SPDLOG_BUILD_BENCH    OFF  CACHE BOOL "Disable spdlog bench"    FORCE)
-set(SPDLOG_INSTALL        OFF  CACHE BOOL "Disable spdlog install"  FORCE)
-set(SPDLOG_FMT_EXTERNAL   OFF   CACHE BOOL "Use external fmt"         FORCE)
+set(SPDLOG_BUILD_EXAMPLES
+    OFF
+    CACHE BOOL "Disable spdlog examples" FORCE)
+set(SPDLOG_BUILD_TESTS
+    OFF
+    CACHE BOOL "Disable spdlog tests" FORCE)
+set(SPDLOG_BUILD_BENCH
+    OFF
+    CACHE BOOL "Disable spdlog bench" FORCE)
+set(SPDLOG_INSTALL
+    OFF
+    CACHE BOOL "Disable spdlog install" FORCE)
+set(SPDLOG_FMT_EXTERNAL
+    OFF
+    CACHE BOOL "Use external fmt" FORCE)
 
 add_subdirectory(SPDLOG)
 

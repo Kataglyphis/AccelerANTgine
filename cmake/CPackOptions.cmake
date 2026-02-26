@@ -32,22 +32,23 @@ set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_DESCRIPTION "${CMAKE_PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_HOMEPAGE_URL "${CMAKE_PROJECT_HOMEPAGE_URL}")
+set(CPACK_PACKAGE_EXECUTABLES "${PROJECT_NAME}" "${PROJECT_NAME}")
+set(_CPACK_PACKAGE_ICON "${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png")
 # There is a bug in NSI that does not handle full UNIX paths properly.
 # Make sure there is at least one set of four backlashes.
 # https://gitlab.kitware.com/cmake/community/-/wikis/doc/cpack/Packaging-With-CPack
-set(CPACK_PACKAGE_ICON ${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png)
 set(CPACK_RESOURCE_FILE_WELCOME ${CMAKE_CURRENT_SOURCE_DIR}/docs/packaging/WelcomeFile.txt)
 # try to use all cores
 set(CPACK_THREADS 0)
 set(CPACK_SOURCE_IGNORE_FILES /.git /.*build.*)
 
 set(CPACK_ENABLE_APPIMAGE
-  ON
-  CACHE BOOL "Enable AppImage package generation on Linux")
+    ON
+    CACHE BOOL "Enable AppImage package generation on Linux")
 
 set(ENABLE_WIX_PACKAGING
-  OFF
-  CACHE BOOL "Enable WiX MSI package generation on Windows")
+    OFF
+    CACHE BOOL "Enable WiX MSI package generation on Windows")
 
 # Windows (egal ob MSVC oder Clang/clang-cl) -> NSIS + WIX Binaries erzeugen
 if(WIN32)
@@ -69,7 +70,6 @@ if(WIN32)
   set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME}")
   set(CPACK_NSIS_DISPLAY_NAME "${PROJECT_NAME}")
   set(CPACK_NSIS_CONTACT "${CMAKE_PROJECT_HOMEPAGE_URL}")
-  set(CPACK_PACKAGE_EXECUTABLES "${PROJECT_NAME}" "${PROJECT_NAME}")
   set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${PROJECT_NAME}-${PROJECT_VERSION}")
   set(CPACK_NSIS_MENU_LINKS "${CMAKE_PROJECT_HOMEPAGE_URL}" "Homepage for ${PROJECT_NAME}")
   set(CPACK_CREATE_DESKTOP_LINKS "${PROJECT_NAME}")
@@ -162,10 +162,12 @@ else()
 
         set(_APPIMAGETOOL_URL "")
         if(_arch_lc STREQUAL "x86_64" OR _arch_lc STREQUAL "amd64")
-          set(_APPIMAGETOOL_URL "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage")
+          set(_APPIMAGETOOL_URL
+              "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage")
           set(_APPIMAGETOOL_LOCAL "${_APPIMAGETOOL_DIR}/appimagetool-x86_64.AppImage")
         elseif(_arch_lc STREQUAL "aarch64" OR _arch_lc STREQUAL "arm64")
-          set(_APPIMAGETOOL_URL "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage")
+          set(_APPIMAGETOOL_URL
+              "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage")
           set(_APPIMAGETOOL_LOCAL "${_APPIMAGETOOL_DIR}/appimagetool-aarch64.AppImage")
         endif()
 
@@ -177,49 +179,72 @@ else()
               SHOW_PROGRESS
               STATUS _APPIMAGETOOL_DOWNLOAD_STATUS
               TLS_VERIFY ON)
-            list(GET _APPIMAGETOOL_DOWNLOAD_STATUS 0 _APPIMAGETOOL_DOWNLOAD_CODE)
-            if(NOT _APPIMAGETOOL_DOWNLOAD_CODE EQUAL 0)
-              message(WARNING "AppImage aktiviert, aber appimagetool Download fehlgeschlagen: ${_APPIMAGETOOL_DOWNLOAD_STATUS}")
+            list(
+              GET
+              _APPIMAGETOOL_DOWNLOAD_STATUS
+              0
+              _APPIMAGETOOL_DOWNLOAD_CODE)
+            if(NOT
+               _APPIMAGETOOL_DOWNLOAD_CODE
+               EQUAL
+               0)
+              message(
+                WARNING
+                  "AppImage aktiviert, aber appimagetool Download fehlgeschlagen: ${_APPIMAGETOOL_DOWNLOAD_STATUS}")
             endif()
           endif()
 
           if(EXISTS "${_APPIMAGETOOL_LOCAL}")
             file(
-              CHMOD "${_APPIMAGETOOL_LOCAL}"
+              CHMOD
+              "${_APPIMAGETOOL_LOCAL}"
               PERMISSIONS
-                OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                GROUP_READ GROUP_EXECUTE
-                WORLD_READ WORLD_EXECUTE)
+              OWNER_READ
+              OWNER_WRITE
+              OWNER_EXECUTE
+              GROUP_READ
+              GROUP_EXECUTE
+              WORLD_READ
+              WORLD_EXECUTE)
             set(_APPIMAGETOOL_EXECUTABLE "${_APPIMAGETOOL_LOCAL}")
           endif()
         else()
-          message(WARNING "CPACK_ENABLE_APPIMAGE=ON, aber Architektur '${_arch_lc}' wird für Auto-Download aktuell nicht unterstützt.")
+          message(
+            WARNING
+              "CPACK_ENABLE_APPIMAGE=ON, aber Architektur '${_arch_lc}' wird für Auto-Download aktuell nicht unterstützt."
+          )
         endif()
       endif()
 
       if(_APPIMAGETOOL_EXECUTABLE)
         set(_APPIMAGETOOL_WRAPPER "${CMAKE_BINARY_DIR}/tools/appimagetool-wrapper.sh")
+        file(WRITE "${_APPIMAGETOOL_WRAPPER}"
+             "#!/usr/bin/env sh\nARCH=${_ARCH_PKG} APPIMAGE_EXTRACT_AND_RUN=1 \"${_APPIMAGETOOL_EXECUTABLE}\" \"$@\"\n")
         file(
-          WRITE "${_APPIMAGETOOL_WRAPPER}"
-          "#!/usr/bin/env sh\nARCH=${_ARCH_PKG} APPIMAGE_EXTRACT_AND_RUN=1 \"${_APPIMAGETOOL_EXECUTABLE}\" \"$@\"\n")
-        file(
-          CHMOD "${_APPIMAGETOOL_WRAPPER}"
+          CHMOD
+          "${_APPIMAGETOOL_WRAPPER}"
           PERMISSIONS
-            OWNER_READ OWNER_WRITE OWNER_EXECUTE
-            GROUP_READ GROUP_EXECUTE
-            WORLD_READ WORLD_EXECUTE)
+          OWNER_READ
+          OWNER_WRITE
+          OWNER_EXECUTE
+          GROUP_READ
+          GROUP_EXECUTE
+          WORLD_READ
+          WORLD_EXECUTE)
 
         list(APPEND CPACK_GENERATOR "AppImage")
         set(CPACK_APPIMAGE_TOOL_EXECUTABLE "${_APPIMAGETOOL_WRAPPER}")
         set(CPACK_APPIMAGE_DESKTOP_FILE "${PROJECT_APP_ID}.desktop")
-        set(CPACK_PACKAGE_ICON "${PROJECT_APP_ID}.png")
-        set(CPACK_PACKAGE_EXECUTABLES "${PROJECT_NAME}" "${PROJECT_NAME}")
+        set(_CPACK_PACKAGE_ICON "${PROJECT_APP_ID}.png")
         message(STATUS "AppImage Packaging aktiviert mit appimagetool: ${_APPIMAGETOOL_EXECUTABLE}")
       else()
-        message(WARNING "CPACK_ENABLE_APPIMAGE=ON, aber kein appimagetool verfügbar. AppImage Packaging wird übersprungen.")
+        message(
+          WARNING "CPACK_ENABLE_APPIMAGE=ON, aber kein appimagetool verfügbar. AppImage Packaging wird übersprungen.")
       endif()
     endif()
   endif()
 endif()
+
+set(CPACK_PACKAGE_ICON "${_CPACK_PACKAGE_ICON}")
 
 include(CPack)
