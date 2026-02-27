@@ -1,6 +1,6 @@
-import kataglyphis.inference;
-
 #include <iostream>
+
+import kataglyphis.inference;
 
 int main() {
   mylib::MyCalculator calculator;

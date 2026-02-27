@@ -15,7 +15,7 @@ dist
 .mypy_cache
 .conda
 build
-build-*
+build-*/
 *.profraw
 
 

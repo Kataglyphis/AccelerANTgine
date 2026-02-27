@@ -152,6 +152,10 @@ This enumeration also includes submodules.
   $ cmake --build --preset <buildPreset-name> .
   ```
 
+```powershell
+scripts/windows/Build-Windows.ps1 -BuildDir C:\b\kcpp\dbg -BuildDirRelease C:\b\kcpp\rel -LogDir C:\b\kcpp\logs
+```
+
 ### Upgrades
 #### Rusty things:
 1. Do not forget to upgrade the cxxbridge from time to time:
