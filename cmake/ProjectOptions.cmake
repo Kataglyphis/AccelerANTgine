@@ -101,27 +101,59 @@ macro(myproject_global_options)
   set(CMAKE_C_STANDARD 17)
   set(CMAKE_C_STANDARD_REQUIRED True)
 
-  # Enable C++ modules only for non-MSVC Clang.
-  # clang-cl currently fails module dependency discovery with this project setup.
+  # C++ modules configuration (mirrors Kataglyphis-BeschleunigerBallett)
+  set(myproject_CXX_SCAN_FOR_MODULES ON)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
-    message(STATUS "Disabling C++ modules for clang-cl on Windows (module dependency scan unavailable)")
-    set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE OFF)
-    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    message(STATUS "Enabling experimental C++ modules for Clang")
-    set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE ON)
-    set(CMAKE_CXX_SCAN_FOR_MODULES ON)
-  else()
-    message(STATUS "C++ modules support disabled for compiler: ${CMAKE_CXX_COMPILER_ID}")
-    set(CMAKE_EXPERIMENTAL_CXX_MODULE_COVERAGE OFF)
-    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+    set(myproject_CXX_SCAN_FOR_MODULES OFF)
+    message(
+      STATUS
+        "Disabling C++ module scanning for clang-cl to avoid CMake generate-time dependency scanner failures.")
   endif()
+
+  set(CMAKE_CXX_SCAN_FOR_MODULES ${myproject_CXX_SCAN_FOR_MODULES})
+  set(MYPROJECT_CXX_SCAN_FOR_MODULES
+      ${myproject_CXX_SCAN_FOR_MODULES}
+      CACHE INTERNAL "Global C++ module scan switch for project targets")
+
+  set(myproject_CPP_MODULES_SUPPORTED OFF)
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+    # Clang family (incl. AppleClang, clang-cl)
+    if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*")
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 17)
+        set(myproject_CPP_MODULES_SUPPORTED ON)
+      endif()
+      # MSVC (excluding clang-cl which is handled above)
+    elseif(MSVC)
+      if(MSVC_VERSION GREATER_EQUAL 1934)
+        set(myproject_CPP_MODULES_SUPPORTED ON)
+      endif()
+      # GCC
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      # CMake's module scanning support for GCC is still evolving; keep a conservative floor.
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
+        set(myproject_CPP_MODULES_SUPPORTED ON)
+      endif()
+    endif()
+  endif()
+
+  if(NOT myproject_CPP_MODULES_SUPPORTED)
+    message(
+      FATAL_ERROR
+        "This project is configured for C++ modules. Use a module-capable toolchain (Clang >= 17, GCC >= 14, or MSVC >= 19.34 with CMake >= 3.28)."
+    )
+  endif()
+
+  set(myproject_USE_CPP_MODULES ON)
+  set(MYPROJECT_USE_CPP_MODULES
+      ${myproject_USE_CPP_MODULES}
+      CACHE INTERNAL "Global C++ modules enable switch")
+  message(STATUS "C++ modules are enabled for compiler '${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}'.")
 
   # set build type specific flags
   if(MSVC AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DEBUG /Od ")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /GL")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DEBUG /Od /std:c++23preview")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /GL /std:c++23preview")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 /std:c++23preview")
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html
     # https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html

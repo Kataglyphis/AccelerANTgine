@@ -129,12 +129,19 @@ set_target_properties(
   PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
              LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
              RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+# Keep module scan behavior consistent across all targets.
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_SCAN_FOR_MODULES ${MYPROJECT_CXX_SCAN_FOR_MODULES})
 # add_executable(${PROJECT_NAME})
 
 if(PROJECT_IS_TOP_LEVEL)
-  add_executable(${PROJECT_NAME}_cli cli_main.cpp)
-  set_target_properties(${PROJECT_NAME}_cli PROPERTIES OUTPUT_NAME "${PROJECT_NAME}" RUNTIME_OUTPUT_DIRECTORY
-                                                                                     "${CMAKE_BINARY_DIR}/bin")
+  if(MYPROJECT_USE_CPP_MODULES)
+    add_executable(${PROJECT_NAME}_cli cli_main.cpp)
+    set_target_properties(${PROJECT_NAME}_cli PROPERTIES OUTPUT_NAME "${PROJECT_NAME}" RUNTIME_OUTPUT_DIRECTORY
+                                                                                       "${CMAKE_BINARY_DIR}/bin")
+    set_target_properties(${PROJECT_NAME}_cli PROPERTIES CXX_SCAN_FOR_MODULES ${MYPROJECT_CXX_SCAN_FOR_MODULES})
+  else()
+    message(STATUS "Skipping ${PROJECT_NAME}_cli: requires C++ modules")
+  endif()
 endif()
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
