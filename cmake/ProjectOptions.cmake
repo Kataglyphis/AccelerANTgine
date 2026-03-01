@@ -106,8 +106,7 @@ macro(myproject_global_options)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
     set(myproject_CXX_SCAN_FOR_MODULES OFF)
     message(
-      STATUS
-        "Disabling C++ module scanning for clang-cl to avoid CMake generate-time dependency scanner failures.")
+      STATUS "Disabling C++ module scanning for clang-cl to avoid CMake generate-time dependency scanner failures.")
   endif()
 
   set(CMAKE_CXX_SCAN_FOR_MODULES ${myproject_CXX_SCAN_FOR_MODULES})

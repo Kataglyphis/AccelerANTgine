@@ -12,4 +12,4 @@ module;
 
 export module kataglyphis.c_api;
 
-export extern "C" KATAGLYPHIS_C_API int kataglyphis_add(int a, int b);
+export extern "C" KATAGLYPHIS_C_API auto kataglyphis_add(int lhs, int rhs) -> int;

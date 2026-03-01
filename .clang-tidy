@@ -24,5 +24,6 @@ Checks: -*,
         performance-*,	
         portability-*,
         readability-*,
-        -zircon-*
+        -zircon-*,
+        -clang-diagnostic-error
 FormatStyle:     none

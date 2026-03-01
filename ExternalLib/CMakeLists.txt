@@ -38,16 +38,16 @@ endif()
 
 add_subdirectory(GOOGLE_BENCHMARK)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_TESTING AND NOT(CMAKE_BUILD_TYPE STREQUAL "Profile" ))
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+   AND BUILD_TESTING
+   AND NOT (CMAKE_BUILD_TYPE STREQUAL "Profile"))
 
   if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 
     message("Adding Fuzztest")
 
-    option(
-      KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE
-      "Build FUZZTEST in fuzzing mode (injects AddressSanitizer/coverage flags; keep ON for normal builds)"
-      ON)
+    option(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE
+           "Build FUZZTEST in fuzzing mode (injects AddressSanitizer/coverage flags; keep ON for normal builds)" ON)
 
     if(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE)
       set(FUZZTEST_FUZZING_MODE

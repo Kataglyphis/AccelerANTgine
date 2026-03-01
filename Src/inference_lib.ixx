@@ -18,8 +18,8 @@ export namespace mylib {
 class KATAGLYPHIS_CPP_API MyCalculator {
 public:
 	MyCalculator() = default;
-	int add(int a, int b) const;
-	std::string version() const;
+	[[nodiscard]] auto add(int lhs, int rhs) const -> int;
+	[[nodiscard]] auto version() const -> std::string;
 };
 
 }
