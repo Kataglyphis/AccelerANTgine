@@ -92,9 +92,9 @@ macro(myproject_setup_options)
       myproject_DISABLE_EXCEPTIONS)
   endif()
 
-  if(myproject_ENABLE_SANITIZER_ADDRESS)
-    message(STATUS "Global address sanitizer is enabled. Disabling fuzz tests to prevent conflicts.")
-    set(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE OFF CACHE BOOL "Enable fuzzing mode for Kataglyphis targets" FORCE)
+  if(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE)
+    message(STATUS "Fuzzing mode is enabled. Enabling global address sanitizer.")
+    set(myproject_ENABLE_SANITIZER_ADDRESS ON CACHE BOOL "Enable address sanitizer" FORCE)
   endif()
 
 endmacro()
