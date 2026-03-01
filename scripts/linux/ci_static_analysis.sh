@@ -64,6 +64,7 @@ fi
 mapfile -t CMAKE_FILES < <(
   find . -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
     ! -path "./build/*" \
+    ! -path "./ExternalLib/*" \
     ! -path "./scan-build-reports/*" | sort
 )
 

@@ -1,3 +1,6 @@
+set(CMAKE_CXX_CLANG_TIDY "")
+set(CMAKE_C_CLANG_TIDY "")
+
 include(FetchContent)
 
 # include google test to project
@@ -40,7 +43,7 @@ add_subdirectory(GOOGLE_BENCHMARK)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
    AND BUILD_TESTING
-   AND NOT (CMAKE_BUILD_TYPE STREQUAL "Profile"))
+   AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
 
   if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 
@@ -63,7 +66,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
           CACHE BOOL "" FORCE)
     endif()
 
+    set(OLD_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U_GLIBCXX_ASSERTIONS -U_FORTIFY_SOURCE")
     add_subdirectory(FUZZTEST)
+    set(CMAKE_CXX_FLAGS "${OLD_CMAKE_CXX_FLAGS}")
   endif()
 endif()
 
