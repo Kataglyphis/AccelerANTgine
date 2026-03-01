@@ -19,7 +19,7 @@
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -41,7 +41,7 @@
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -63,7 +63,7 @@
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -85,7 +85,7 @@
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -107,7 +107,7 @@
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -129,7 +129,7 @@
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -151,7 +151,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -173,7 +173,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "COMPILER_CACHE": "ccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -194,7 +194,7 @@
         "CMAKE_CXX_COMPILER": "cl",
         "CMAKE_BUILD_TYPE": "Debug",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -219,7 +219,7 @@
         "CMAKE_CXX_COMPILER": "cl",
         "RUST_FEATURES": "ON",
         "CMAKE_BUILD_TYPE": "Release",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -245,7 +245,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -267,7 +267,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -289,7 +289,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -311,7 +311,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Release",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -332,7 +332,7 @@
         "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang++.exe",
         "RUST_FEATURES": "OFF",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -353,7 +353,7 @@
         "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang++.exe",
         "RUST_FEATURES": "OFF",
         "CMAKE_BUILD_TYPE": "Debug",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -374,7 +374,7 @@
         "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang++.exe",
         "RUST_FEATURES": "OFF",
         "CMAKE_BUILD_TYPE": "Release",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -395,7 +395,7 @@
         "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang++.exe",
         "RUST_FEATURES": "OFF",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "COMPILER_CACHE": "sccache",
+        "COMPILER_CACHE": "",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
