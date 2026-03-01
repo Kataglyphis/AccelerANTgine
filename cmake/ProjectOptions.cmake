@@ -38,6 +38,8 @@ macro(myproject_setup_options)
 
   myproject_supports_sanitizers()
 
+  option(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE "Enable fuzzing mode for Kataglyphis targets" ON)
+
   if(NOT PROJECT_IS_TOP_LEVEL OR myproject_PACKAGING_MAINTAINER_MODE)
     option(myproject_ENABLE_IPO "Enable IPO/LTO" ON)
     option(myproject_ENABLE_STATIC_ANALYZER "Enable Static Analyzer" OFF)
@@ -282,9 +284,16 @@ macro(myproject_local_options)
      STREQUAL
      "Release")
     include(cmake/Sanitizers.cmake)
+    
+    set(_enable_asan ${myproject_ENABLE_SANITIZER_ADDRESS})
+    if(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE OR FUZZTEST_COMPATIBILITY_MODE)
+      message(STATUS "Fuzz tests are enabled, disabling global address sanitizer to prevent conflicts.")
+      set(_enable_asan OFF)
+    endif()
+
     myproject_enable_sanitizers(
       myproject_options
-      ${myproject_ENABLE_SANITIZER_ADDRESS}
+      ${_enable_asan}
       ${myproject_ENABLE_SANITIZER_LEAK}
       ${myproject_ENABLE_SANITIZER_UNDEFINED}
       ${myproject_ENABLE_SANITIZER_THREAD}
