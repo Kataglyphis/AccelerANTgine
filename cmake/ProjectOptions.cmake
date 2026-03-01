@@ -92,6 +92,11 @@ macro(myproject_setup_options)
       myproject_DISABLE_EXCEPTIONS)
   endif()
 
+  if(myproject_ENABLE_SANITIZER_ADDRESS)
+    message(STATUS "Global address sanitizer is enabled. Disabling fuzz tests to prevent conflicts.")
+    set(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE OFF CACHE BOOL "Enable fuzzing mode for Kataglyphis targets" FORCE)
+  endif()
+
 endmacro()
 
 macro(myproject_global_options)
@@ -284,16 +289,9 @@ macro(myproject_local_options)
      STREQUAL
      "Release")
     include(cmake/Sanitizers.cmake)
-    
-    set(_enable_asan ${myproject_ENABLE_SANITIZER_ADDRESS})
-    if(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE OR FUZZTEST_COMPATIBILITY_MODE)
-      message(STATUS "Fuzz tests are enabled, disabling global address sanitizer to prevent conflicts.")
-      set(_enable_asan OFF)
-    endif()
-
     myproject_enable_sanitizers(
       myproject_options
-      ${_enable_asan}
+      ${myproject_ENABLE_SANITIZER_ADDRESS}
       ${myproject_ENABLE_SANITIZER_LEAK}
       ${myproject_ENABLE_SANITIZER_UNDEFINED}
       ${myproject_ENABLE_SANITIZER_THREAD}

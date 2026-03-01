@@ -46,20 +46,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
    AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
 
   if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+    if(NOT myproject_ENABLE_SANITIZER_ADDRESS)
+      message("Adding Fuzztest")
 
-    message("Adding Fuzztest")
+      option(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE
+             "Enable fuzzing mode for Kataglyphis targets" ON)
 
-    option(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE
-           "Enable fuzzing mode for Kataglyphis targets" ON)
+      # We explicitly turn OFF FUZZTEST_FUZZING_MODE here because if it is ON,
+      # the fuzztest framework adds global coverage flags to itself in its own
+      # CMakeLists.txt, which causes infinite recursion with AddressSanitizer.
+      set(FUZZTEST_FUZZING_MODE
+          OFF
+          CACHE BOOL "" FORCE)
 
-    # We explicitly turn OFF FUZZTEST_FUZZING_MODE here because if it is ON,
-    # the fuzztest framework adds global coverage flags to itself in its own
-    # CMakeLists.txt, which causes infinite recursion with AddressSanitizer.
-    set(FUZZTEST_FUZZING_MODE
-        OFF
-        CACHE BOOL "" FORCE)
-
-    add_subdirectory(FUZZTEST)
+      add_subdirectory(FUZZTEST)
+    endif()
   endif()
 endif()
 
