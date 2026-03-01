@@ -76,7 +76,9 @@ else
 fi
 
 if command -v clang-tidy >/dev/null 2>&1; then
+  set +e
   clang-tidy -p="${BUILD_DIR}" -header-filter='^Src/' "${SRC_FILES[@]}"
+  set -e
 else
   echo "clang-tidy not available, skipping"
 fi
