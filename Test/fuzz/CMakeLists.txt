@@ -7,7 +7,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWit
 
     add_executable(first_fuzz_test dummy.cpp)
 
-    if (FUZZTEST_FUZZING_MODE OR (FUZZTEST_COMPATIBILITY_MODE STREQUAL "libfuzzer"))
+    if (KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE OR (FUZZTEST_COMPATIBILITY_MODE STREQUAL "libfuzzer"))
       target_compile_options(first_fuzz_test PRIVATE
         -g
         -UNDEBUG
