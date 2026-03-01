@@ -43,13 +43,11 @@ add_subdirectory(GOOGLE_BENCHMARK)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
    AND BUILD_TESTING
-   AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+   AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 
   if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     message("Adding Fuzztest")
 
-    option(KATAGLYPHIS_ENABLE_FUZZTEST_FUZZING_MODE
-           "Enable fuzzing mode for Kataglyphis targets" ON)
 
     # We explicitly turn OFF FUZZTEST_FUZZING_MODE here because if it is ON,
     # the fuzztest framework adds global coverage flags to itself in its own

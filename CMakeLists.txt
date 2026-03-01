@@ -1,29 +1,5 @@
 cmake_minimum_required(VERSION 3.31.6)
 
-# Default toolchain flags for clang-based builds when presets are not used.
-# Keep this lightweight and overridable.
-set(GCC_TOOLCHAIN_PATH_DEFAULT
-    "/opt/gcc-15.2.0"
-    CACHE PATH "Default GCC toolchain root for clang")
-set(_gcc_toolchain_flag "")
-if(EXISTS "${GCC_TOOLCHAIN_PATH_DEFAULT}")
-  set(_gcc_toolchain_flag "--gcc-toolchain=${GCC_TOOLCHAIN_PATH_DEFAULT}")
-endif()
-
-# Only apply to clang compilers when flags are not already set.
-if(_gcc_toolchain_flag)
-  if(DEFINED CMAKE_C_COMPILER AND CMAKE_C_COMPILER MATCHES "[cC]lang")
-    if(NOT DEFINED CMAKE_C_FLAGS_INIT)
-      set(CMAKE_C_FLAGS_INIT "${_gcc_toolchain_flag}")
-    endif()
-  endif()
-  if(DEFINED CMAKE_CXX_COMPILER AND CMAKE_CXX_COMPILER MATCHES "[cC]lang")
-    if(NOT DEFINED CMAKE_CXX_FLAGS_INIT)
-      set(CMAKE_CXX_FLAGS_INIT "${_gcc_toolchain_flag}")
-    endif()
-  endif()
-endif()
-
 # set the project name
 project(
   KataglyphisCppInference
@@ -69,6 +45,22 @@ message(STATUS "About to call the local options function.")
 myproject_local_options()
 
 include(cmake/SystemLibDependencies.cmake)
+if(myproject_ENABLE_SANITIZER_ADDRESS)
+
+  add_compile_options(-fsanitize=address)
+
+  add_link_options(-fsanitize=address)
+
+endif()
+
+if(myproject_ENABLE_COVERAGE AND NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+
+  add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+
+  add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+
+endif()
+
 add_subdirectory(ExternalLib)
 
 if(BUILD_TESTING
