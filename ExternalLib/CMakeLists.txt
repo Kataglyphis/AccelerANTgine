@@ -66,10 +66,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
           CACHE BOOL "" FORCE)
     endif()
 
-    set(OLD_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U_GLIBCXX_ASSERTIONS -U_FORTIFY_SOURCE")
     add_subdirectory(FUZZTEST)
-    set(CMAKE_CXX_FLAGS "${OLD_CMAKE_CXX_FLAGS}")
   endif()
 endif()
 

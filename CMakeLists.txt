@@ -75,7 +75,7 @@ if(BUILD_TESTING
    AND NOT WIN32
    AND CMAKE_CXX_COMPILER_ID MATCHES "Clang"
    AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
-  fuzztest_setup_fuzzing_flags()
+  # Fuzz flags should be applied on the target, not globally
 endif()
 
 add_subdirectory(Src)
