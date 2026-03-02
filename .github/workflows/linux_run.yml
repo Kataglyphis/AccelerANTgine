@@ -71,10 +71,14 @@ jobs:
       ######################################## Prepare deps ###########################################################
       #################################################################################################################
       - name: Run build/test/docs/package inside container
+        env:
+          # Conditionally apply the gcc-toolchain flags ONLY if the compiler is clang
+          CONTAINER_CXXFLAGS: ${{ inputs.compiler == 'clang' && '--gcc-toolchain=/opt/gcc-15.2.0' || '' }}
+          CONTAINER_LDFLAGS: ${{ inputs.compiler == 'clang' && '-L/opt/gcc-15.2.0/lib64 -Wl,-rpath,/opt/gcc-15.2.0/lib64 --gcc-toolchain=/opt/gcc-15.2.0' || '' }}
         run: |
-          docker run --rm \
-            -e CXXFLAGS="--gcc-toolchain=/opt/gcc-15.2.0" \
-            -e LDFLAGS="-L/opt/gcc-15.2.0/lib64 -Wl,-rpath,/opt/gcc-15.2.0/lib64 --gcc-toolchain=/opt/gcc-15.2.0" \
+          docker run --rm --privileged \
+            -e CXXFLAGS="${CONTAINER_CXXFLAGS}" \
+            -e LDFLAGS="${CONTAINER_LDFLAGS}" \
             --platform ${{ inputs.platform }} \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
