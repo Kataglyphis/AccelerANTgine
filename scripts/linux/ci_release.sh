@@ -349,6 +349,8 @@ if [[ "${COMPILER:-}" != "clang" ]]; then
   exit 0
 fi
 
+rm -rf "${BUILD_RELEASE_DIR}"
+
 CPACK_APPIMAGE_FLAG="ON"
 if [[ "${DO_APPIMAGE}" -ne 1 ]]; then
   CPACK_APPIMAGE_FLAG="OFF"

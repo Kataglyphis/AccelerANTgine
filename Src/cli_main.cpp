@@ -1,9 +1,10 @@
-import kataglyphis.inference;
-
 #include <iostream>
 
-int main() {
-  mylib::MyCalculator calculator;
-  std::cout << "KataglyphisCppInference " << calculator.version() << '\n';
-  return 0;
+import kataglyphis.inference;
+
+auto main() -> int
+{
+    mylib::MyCalculator calculator;
+    std::cout << "KataglyphisCppInference " << calculator.version() << '\n';
+    return 0;
 }

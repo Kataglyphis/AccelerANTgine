@@ -1,3 +1,6 @@
+set(CMAKE_CXX_CLANG_TIDY "")
+set(CMAKE_C_CLANG_TIDY "")
+
 include(FetchContent)
 
 # include google test to project
@@ -40,24 +43,20 @@ add_subdirectory(GOOGLE_BENCHMARK)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
    AND BUILD_TESTING
-   AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
-  message(STATUS "This is a Linux system.")
-  # # Detect target architecture
-  # string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" TARGET_ARCH)
-  # message(STATUS "Detected architecture: ${TARGET_ARCH}")
+   AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 
-  # # Check if not ARM
-  # if(NOT TARGET_ARCH MATCHES "^(arm|aarch64)")
   if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-
     message("Adding Fuzztest")
+
+
+    # We explicitly turn OFF FUZZTEST_FUZZING_MODE here because if it is ON,
+    # the fuzztest framework adds global coverage flags to itself in its own
+    # CMakeLists.txt, which causes infinite recursion with AddressSanitizer.
+    set(FUZZTEST_FUZZING_MODE
+        OFF
+        CACHE BOOL "" FORCE)
+
     add_subdirectory(FUZZTEST)
-    if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-      set(FUZZTEST_FUZZING_MODE
-          ON
-          CACHE BOOL "" FORCE)
-    endif()
-    # endif()
   endif()
 endif()
 

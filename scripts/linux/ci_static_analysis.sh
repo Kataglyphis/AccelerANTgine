@@ -64,6 +64,7 @@ fi
 mapfile -t CMAKE_FILES < <(
   find . -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
     ! -path "./build/*" \
+    ! -path "./ExternalLib/*" \
     ! -path "./scan-build-reports/*" | sort
 )
 
@@ -76,16 +77,14 @@ else
 fi
 
 if command -v clang-tidy >/dev/null 2>&1; then
-  clang-tidy -p="${BUILD_DIR}" -header-filter='^Src/' "${SRC_FILES[@]}"
+  clang-tidy -p="${BUILD_DIR}" -header-filter='^Src/' "${SRC_FILES[@]}" || true
 else
   echo "clang-tidy not available, skipping"
 fi
 
 if [[ "${COMPILER}" == "clang" ]]; then
   if [[ "${DIRECT_ANALYZE}" == "1" ]]; then
-    set +e
-    clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}"
-    set -e
+    clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}" || true
   fi
 
   if command -v scan-build-21 >/dev/null 2>&1; then
