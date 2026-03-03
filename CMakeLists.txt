@@ -22,6 +22,33 @@ set(WINDOWS_CI
 set(RUST_FEATURES
     ON
     CACHE BOOL "Enable Rust features in our project.")
+set(MYPROJECT_GCC_TOOLCHAIN_PATH
+    ""
+    CACHE PATH "Optional GCC toolchain root used by Clang and Rust tooling on Linux (for example /opt/gcc-15.2.0)")
+
+# Auto-detect custom GCC toolchain for Clang on Linux to avoid workflow env setup
+if(UNIX
+   AND NOT APPLE
+   AND MYPROJECT_GCC_TOOLCHAIN_PATH
+   AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(_GCC_TOOLCHAIN_ROOT "${MYPROJECT_GCC_TOOLCHAIN_PATH}")
+  set(_GCC_TOOLCHAIN_LIB "${_GCC_TOOLCHAIN_ROOT}/lib64")
+  if(NOT EXISTS "${_GCC_TOOLCHAIN_LIB}")
+    set(_GCC_TOOLCHAIN_LIB "${_GCC_TOOLCHAIN_ROOT}/lib")
+  endif()
+
+  if(EXISTS "${_GCC_TOOLCHAIN_LIB}")
+    message(STATUS "Using GCC toolchain at ${_GCC_TOOLCHAIN_ROOT} for Clang")
+    string(APPEND CMAKE_C_FLAGS " --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
+    string(APPEND CMAKE_CXX_FLAGS " --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
+    string(APPEND CMAKE_EXE_LINKER_FLAGS
+           " -L${_GCC_TOOLCHAIN_LIB} -Wl,-rpath,${_GCC_TOOLCHAIN_LIB} --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
+    string(APPEND CMAKE_SHARED_LINKER_FLAGS
+           " -L${_GCC_TOOLCHAIN_LIB} -Wl,-rpath,${_GCC_TOOLCHAIN_LIB} --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
+  else()
+    message(WARNING "GCC toolchain found at ${_GCC_TOOLCHAIN_ROOT}, but no lib or lib64 dir exists.")
+  endif()
+endif()
 
 if(RUST_FEATURES)
   message(STATUS "Rust features are enabled.")
@@ -82,10 +109,19 @@ endif()
 
 if(BUILD_TESTING)
   message(STATUS "Tests are enabled.!")
-  add_subdirectory(Test/commit)
-  add_subdirectory(Test/compile)
-  add_subdirectory(Test/perf)
-  add_subdirectory(Test/fuzz)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_subdirectory(Test/commit)
+    add_subdirectory(Test/compile)
+    add_subdirectory(Test/fuzz)
+    message(STATUS "Building test suites: commit, compile, fuzz (Debug)")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    add_subdirectory(Test/perf)
+    message(STATUS "Building test suite: perf (RelWithDebInfo)")
+  else()
+    message(
+      STATUS
+        "Skipping test suites for CMAKE_BUILD_TYPE='${CMAKE_BUILD_TYPE}'. Use Debug for commit/compile/fuzz or RelWithDebInfo for perf.")
+  endif()
 else()
   message(STATUS "Tests are disabled.!")
 endif()
