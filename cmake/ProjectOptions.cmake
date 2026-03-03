@@ -41,8 +41,10 @@ macro(myproject_setup_options)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(DEFAULT_ASAN ON)
+    set(DEFAULT_UBSAN ON)
   else()
     set(DEFAULT_ASAN OFF)
+    set(DEFAULT_UBSAN OFF)
   endif()
 
   if(NOT PROJECT_IS_TOP_LEVEL OR myproject_PACKAGING_MAINTAINER_MODE)
@@ -51,7 +53,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     option(myproject_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
     option(myproject_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${DEFAULT_ASAN})
     option(myproject_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
-    option(myproject_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" OFF)
+    option(myproject_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${DEFAULT_UBSAN})
     option(myproject_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
     option(myproject_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
     option(myproject_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
@@ -66,7 +68,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     option(myproject_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
     option(myproject_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${DEFAULT_ASAN}) # ${SUPPORTS_ASAN}
     option(myproject_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
-    option(myproject_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" OFF) # ${SUPPORTS_UBSAN}
+    option(myproject_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${DEFAULT_UBSAN}) # ${SUPPORTS_UBSAN}
     option(myproject_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
     option(myproject_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
     option(myproject_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
