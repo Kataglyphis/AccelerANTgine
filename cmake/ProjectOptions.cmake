@@ -88,7 +88,6 @@ macro(myproject_setup_options)
       myproject_DISABLE_EXCEPTIONS)
   endif()
 
-
 endmacro()
 
 macro(myproject_global_options)

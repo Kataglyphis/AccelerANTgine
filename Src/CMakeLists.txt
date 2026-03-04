@@ -11,10 +11,8 @@ file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
 list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
 
-set(KataglyphisCppProjectConfig_MODULE_IN
-  "${CMAKE_CURRENT_SOURCE_DIR}/KataglyphisCppProjectConfig.ixx.in")
-set(KataglyphisCppProjectConfig_MODULE_OUT
-  "${CMAKE_CURRENT_BINARY_DIR}/KataglyphisCppProjectConfig.ixx")
+set(KataglyphisCppProjectConfig_MODULE_IN "${CMAKE_CURRENT_SOURCE_DIR}/KataglyphisCppProjectConfig.ixx.in")
+set(KataglyphisCppProjectConfig_MODULE_OUT "${CMAKE_CURRENT_BINARY_DIR}/KataglyphisCppProjectConfig.ixx")
 configure_file(${KataglyphisCppProjectConfig_MODULE_IN} ${KataglyphisCppProjectConfig_MODULE_OUT} @ONLY)
 list(APPEND KataglyphisCppProject_MODULES ${KataglyphisCppProjectConfig_MODULE_OUT})
 
@@ -57,7 +55,11 @@ if(RUST_FEATURES)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND _gcc_toolchain_root)
       set(RUST_CXXFLAGS "--gcc-toolchain=${_gcc_toolchain_root} ${RUST_CXXFLAGS}")
     endif()
-    if(DEFINED ENV{CXXFLAGS} AND NOT "$ENV{CXXFLAGS}" STREQUAL "")
+    if(DEFINED ENV{CXXFLAGS}
+       AND NOT
+           "$ENV{CXXFLAGS}"
+           STREQUAL
+           "")
       set(RUST_CXXFLAGS "$ENV{CXXFLAGS} ${RUST_CXXFLAGS}")
     endif()
 
@@ -171,5 +173,8 @@ if(TARGET ${PROJECT_NAME} AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-MMD -MP>)
 endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set_property(SOURCE ${KataglyphisCppProject_MODULES} APPEND PROPERTY COMPILE_OPTIONS "-fno-sanitize=undefined")
+  set_property(
+    SOURCE ${KataglyphisCppProject_MODULES}
+    APPEND
+    PROPERTY COMPILE_OPTIONS "-fno-sanitize=undefined")
 endif()

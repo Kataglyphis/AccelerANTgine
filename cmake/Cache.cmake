@@ -9,7 +9,9 @@ function(myproject_enable_cache)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     if("${COMPILER_CACHE}" STREQUAL "sccache")
       message(STATUS "GNU GCC is used, using ccache instead of sccache.")
-      set(COMPILER_CACHE "ccache" CACHE STRING "Compiler cache to be used (ccache or sccache; leave empty to disable)" FORCE)
+      set(COMPILER_CACHE
+          "ccache"
+          CACHE STRING "Compiler cache to be used (ccache or sccache; leave empty to disable)" FORCE)
     endif()
   endif()
 

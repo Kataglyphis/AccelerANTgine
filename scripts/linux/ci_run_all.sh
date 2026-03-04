@@ -67,7 +67,7 @@ bash scripts/linux/ci_coverage.sh \
 	--build-dir "${BUILD_DIR}" \
 	--coverage-json "${COVERAGE_JSON}"
 
-bash scripts/linux/ci_static_analysis.sh \
+bash scripts/linux/run_static_analysis_format.sh \
 	--build-dir "${BUILD_DIR}" \
 	--compiler "${COMPILER}" \
 	--clang-debug-preset "${CLANG_DEBUG_PRESET}"
