@@ -77,7 +77,12 @@ else
 fi
 
 if command -v clang-tidy >/dev/null 2>&1; then
-  clang-tidy -p="${BUILD_DIR}" -header-filter='^Src/' "${SRC_FILES[@]}" || true
+  if [[ "${COMPILER}" == "clang" ]]; then
+    clang-tidy -p="${BUILD_DIR}" -header-filter='^Src/' "${SRC_FILES[@]}" || true
+  else
+    echo "Skipping clang-tidy for compiler='${COMPILER}'."
+    echo "Reason: current compile_commands.json contains GCC C++ modules flags unsupported by clang-tidy."
+  fi
 else
   echo "clang-tidy not available, skipping"
 fi
