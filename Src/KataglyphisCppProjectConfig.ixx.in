@@ -1,0 +1,13 @@
+module;
+
+export module kataglyphis.project_config;
+
+export namespace kataglyphis::project_config {
+
+inline constexpr auto project_version_major = "@PROJECT_VERSION_MAJOR@";
+inline constexpr auto project_version_minor = "@PROJECT_VERSION_MINOR@";
+
+inline constexpr auto vulkan_version_major = "@VULKAN_VERSION_MAJOR@";
+inline constexpr auto vulkan_version_minor = "@VULKAN_VERSION_MINOR@";
+
+}

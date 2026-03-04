@@ -11,34 +11,41 @@ file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
 list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
 
+set(KataglyphisCppProjectConfig_MODULE_IN
+  "${CMAKE_CURRENT_SOURCE_DIR}/KataglyphisCppProjectConfig.ixx.in")
+set(KataglyphisCppProjectConfig_MODULE_OUT
+  "${CMAKE_CURRENT_BINARY_DIR}/KataglyphisCppProjectConfig.ixx")
+configure_file(${KataglyphisCppProjectConfig_MODULE_IN} ${KataglyphisCppProjectConfig_MODULE_OUT} @ONLY)
+list(APPEND KataglyphisCppProject_MODULES ${KataglyphisCppProjectConfig_MODULE_OUT})
+
 if(RUST_FEATURES)
   corrosion_import_crate(MANIFEST_PATH rusty_code/Cargo.toml)
 
+  # Keep Rust bridge compilers aligned with the configured CMake toolchain.
+  set(RUST_CC "${CMAKE_C_COMPILER}")
+  set(RUST_CXX "${CMAKE_CXX_COMPILER}")
+  if(NOT RUST_CC)
+    set(RUST_CC "cc")
+  endif()
+  if(NOT RUST_CXX)
+    set(RUST_CXX "c++")
+  endif()
+
   if(WIN32)
-    corrosion_set_env_vars(rusty_code CXXFLAGS=/EHsc)
+    corrosion_set_env_vars(
+      rusty_code
+      CC=${RUST_CC}
+      CXX=${RUST_CXX}
+      CXXFLAGS=/EHsc)
   else()
-    # Native-only corrosion/toolchain setup (no cross-building)
-    # Optionally override with -DGCC_TOOLCHAIN_PATH=/path/to/gcc when configuring.
-    # This is optional and should not be required for standard GCC installs.
+    # Native-only corrosion/toolchain setup (no cross-building).
     if(NOT DEFINED GCC_TOOLCHAIN_PATH)
       set(GCC_TOOLCHAIN_PATH
           ""
           CACHE PATH "Optional GCC toolchain root")
     endif()
 
-    # Determine which compiler Rust/C++ bridge should use.
-    # Keep this aligned with the selected CMake compiler.
-    set(RUST_CC "${CMAKE_C_COMPILER}")
-    set(RUST_CXX "${CMAKE_CXX_COMPILER}")
-    if(NOT RUST_CC)
-      set(RUST_CC "cc")
-    endif()
-    if(NOT RUST_CXX)
-      set(RUST_CXX "c++")
-    endif()
-
-    # For Clang, optionally point it at a GCC toolchain for libstdc++/headers.
-    # Prefer explicit GCC_TOOLCHAIN_PATH, otherwise fall back to GCC_TOOLCHAIN_PATH_DEFAULT (top-level).
+    # For Clang, optionally point to a GCC toolchain for libstdc++/headers.
     set(_gcc_toolchain_root "")
     if(GCC_TOOLCHAIN_PATH AND EXISTS "${GCC_TOOLCHAIN_PATH}")
       set(_gcc_toolchain_root "${GCC_TOOLCHAIN_PATH}")
@@ -48,64 +55,13 @@ if(RUST_FEATURES)
 
     set(RUST_CXXFLAGS "-fexceptions")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND _gcc_toolchain_root)
-      set(RUST_CXXFLAGS "--gcc-toolchain=${_gcc_toolchain_root} -fexceptions")
+      set(RUST_CXXFLAGS "--gcc-toolchain=${_gcc_toolchain_root} ${RUST_CXXFLAGS}")
     endif()
-    if(DEFINED ENV{CXXFLAGS})
+    if(DEFINED ENV{CXXFLAGS} AND NOT "$ENV{CXXFLAGS}" STREQUAL "")
       set(RUST_CXXFLAGS "$ENV{CXXFLAGS} ${RUST_CXXFLAGS}")
     endif()
 
-    # detect host arch for logging (no cross-compile behavior)
-    string(TOLOWER "${CMAKE_HOST_SYSTEM_PROCESSOR}" _hostproc)
-    if(_hostproc MATCHES "^(x86_64|amd64)$")
-      set(HOST_ARCH "x86_64")
-    elseif(_hostproc MATCHES "^(aarch64|arm64|armv8)$")
-      set(HOST_ARCH "aarch64")
-    elseif(_hostproc MATCHES "^(riscv64)$")
-      set(HOST_ARCH "riscv64")
-    else()
-      set(HOST_ARCH "${_hostproc}")
-    endif()
-
-    message(STATUS "Native-only build. HOST_ARCH=${HOST_ARCH}")
-
-    # If building with GNU and a GCC_TOOLCHAIN_PATH is provided, prefer that gcc/g++ for Rust.
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
-       AND GCC_TOOLCHAIN_PATH
-       AND EXISTS "${GCC_TOOLCHAIN_PATH}")
-      # Try to find reasonable native compiler binary names
-      if(HOST_ARCH STREQUAL "x86_64")
-        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/x86_64-pc-linux-gnu-gcc"
-                                             "${GCC_TOOLCHAIN_PATH}/bin/gcc")
-        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/x86_64-pc-linux-gnu-g++"
-                                             "${GCC_TOOLCHAIN_PATH}/bin/g++")
-      elseif(HOST_ARCH STREQUAL "aarch64")
-        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/aarch64-linux-gnu-gcc"
-                                             "${GCC_TOOLCHAIN_PATH}/bin/gcc")
-        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/aarch64-linux-gnu-g++"
-                                             "${GCC_TOOLCHAIN_PATH}/bin/g++")
-      elseif(HOST_ARCH STREQUAL "riscv64")
-        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/riscv64-unknown-linux-gnu-gcc"
-                                             "${GCC_TOOLCHAIN_PATH}/bin/gcc")
-        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/riscv64-unknown-linux-gnu-g++"
-                                             "${GCC_TOOLCHAIN_PATH}/bin/g++")
-      else()
-        find_program(GCC_TOOLCHAIN_GCC NAMES "${GCC_TOOLCHAIN_PATH}/bin/gcc")
-        find_program(GCC_TOOLCHAIN_GXX NAMES "${GCC_TOOLCHAIN_PATH}/bin/g++")
-      endif()
-
-      if(GCC_TOOLCHAIN_GCC)
-        set(RUST_CC "${GCC_TOOLCHAIN_GCC}")
-      else()
-        message(WARNING "Toolchain gcc not found in ${GCC_TOOLCHAIN_PATH}; falling back to system compiler")
-      endif()
-      if(GCC_TOOLCHAIN_GXX)
-        set(RUST_CXX "${GCC_TOOLCHAIN_GXX}")
-      else()
-        message(WARNING "Toolchain g++ not found in ${GCC_TOOLCHAIN_PATH}; falling back to system compiler")
-      endif()
-    endif()
-
-    # Always set deterministic env for corrosion on non-Windows hosts.
+    # Set deterministic env for corrosion on non-Windows hosts.
     corrosion_set_env_vars(
       rusty_code
       CC=${RUST_CC}
@@ -183,6 +139,7 @@ target_sources(
          CXX_MODULES
          BASE_DIRS
          ${PROJECT_SRC_DIR}
+         ${CMAKE_CURRENT_BINARY_DIR}
          FILES
          ${KataglyphisCppProject_MODULES})
 

@@ -98,13 +98,6 @@ endif()
 
 add_subdirectory(ExternalLib)
 
-if(BUILD_TESTING
-   AND NOT WIN32
-   AND CMAKE_CXX_COMPILER_ID MATCHES "Clang"
-   AND NOT (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
-  # Fuzz flags should be applied on the target, not globally
-endif()
-
 add_subdirectory(Src)
 
 if(NOT WINDOWS_CI AND BUILD_TESTING)
