@@ -40,7 +40,11 @@ macro(myproject_setup_options)
 
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(DEFAULT_ASAN ON)
+    if (myproject_ENABLE_SANITIZER_THREAD)
+      set(DEFAULT_ASAN OFF)
+    else()
+      set(DEFAULT_ASAN ON)
+    endif()
     set(DEFAULT_UBSAN ON)
   else()
     set(DEFAULT_ASAN OFF)
