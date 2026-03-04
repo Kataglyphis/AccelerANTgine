@@ -80,6 +80,14 @@ if(myproject_ENABLE_SANITIZER_ADDRESS)
 
 endif()
 
+if(myproject_ENABLE_SANITIZER_THREAD)
+
+  add_compile_options(-fsanitize=thread)
+
+  add_link_options(-fsanitize=thread)
+
+endif()
+
 if(myproject_ENABLE_COVERAGE AND NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 
   add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
@@ -112,8 +120,12 @@ if(BUILD_TESTING)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_subdirectory(Test/commit)
     add_subdirectory(Test/compile)
-    add_subdirectory(Test/fuzz)
-    message(STATUS "Building test suites: commit, compile, fuzz (Debug)")
+    if(NOT myproject_ENABLE_SANITIZER_THREAD)
+      add_subdirectory(Test/fuzz)
+      message(STATUS "Building test suites: commit, compile, fuzz (Debug)")
+    else()
+      message(STATUS "Building test suites: commit, compile (Debug, skipped fuzz due to TSAN)")
+    endif()
   elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_subdirectory(Test/perf)
     message(STATUS "Building test suite: perf (RelWithDebInfo)")

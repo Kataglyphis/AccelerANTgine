@@ -29,6 +29,31 @@
       }
     },
     {
+      "name": "linux-debug-clang-tsan",
+      "displayName": "Linux Debug Clang TSan",
+      "description": "Linux Debug with Thread Sanitizer",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/",
+      "installDir": "${sourceDir}/build/",
+      "cacheVariables": {
+        "CMAKE_VERBOSE_MAKEFILE": "ON",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "RUST_FEATURES": "ON",
+        "COMPILER_CACHE": "",
+        "BUILD_TESTING": "TRUE",
+        "myproject_ENABLE_SANITIZER_THREAD": "ON",
+        "myproject_ENABLE_SANITIZER_ADDRESS": "OFF",
+        "myproject_ENABLE_SANITIZER_UNDEFINED": "OFF"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
       "name": "linux-profile-clang",
       "displayName": "Linux Profile Clang",
       "description": "Go with Linux",
@@ -419,6 +444,12 @@
       "configuration": "Debug"
     },
     {
+      "name": "linux-debug-clang-tsan",
+      "jobs": 0,
+      "configurePreset": "linux-debug-clang-tsan",
+      "configuration": "Debug"
+    },
+    {
       "name": "linux-debug-GNU",
       "jobs": 0,
       "configurePreset": "linux-debug-GNU",
@@ -502,6 +533,17 @@
         "noTestsAction": "error",
         "stopOnFailure": true
       }
+    },
+    {
+      "name": "linux-debug-clang-tsan",
+      "configurePreset": "linux-debug-clang-tsan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
     }
   ],
   "packagePresets": [
@@ -561,6 +603,29 @@
         {
           "type": "test",
           "name": "default"
+        },
+        {
+          "type": "package",
+          "name": "default"
+        }
+      ]
+    },
+    {
+      "name": "linux-debug-clang-tsan-workflow",
+      "displayName": "Linux Debug Clang TSan Workflow",
+      "description": "Workflow preset for linux-debug-clang-tsan",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "linux-debug-clang-tsan"
+        },
+        {
+          "type": "build",
+          "name": "linux-debug-clang-tsan"
+        },
+        {
+          "type": "test",
+          "name": "linux-debug-clang-tsan"
         },
         {
           "type": "package",

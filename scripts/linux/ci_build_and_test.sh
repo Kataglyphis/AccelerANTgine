@@ -45,6 +45,16 @@ if [[ "${COMPILER}" == "clang" ]]; then
   else
     echo "first_fuzz_test not found/executable, skipping"
   fi
+
+  echo "=== Running additional build with TSan ==="
+  TSAN_PRESET="${CLANG_DEBUG_PRESET}-tsan"
+  TSAN_BUILD_DIR="${BUILD_DIR}_tsan"
+  
+  echo "Using preset: ${TSAN_PRESET}"
+  cmake -B "${TSAN_BUILD_DIR}" --preset "${TSAN_PRESET}"
+  cmake --build "${TSAN_BUILD_DIR}" --preset "${TSAN_PRESET}"
+  
+  (cd "${TSAN_BUILD_DIR}" && ctest -C "${BUILD_TYPE}" --verbose --extra-verbose --debug -T test --output-on-failure --output-junit "${WORKSPACE_DIR}/docs/test_results_tsan.xml")
 else
-  echo "Compiled with GCC so no fuzz testing!"
+  echo "Compiled with GCC so no fuzz testing or TSan!"
 fi
