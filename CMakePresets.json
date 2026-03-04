@@ -555,6 +555,13 @@
       ]
     },
     {
+      "name": "linux-debug-clang-tsan",
+      "configurePreset": "linux-debug-clang-tsan",
+      "generators": [
+        "TGZ"
+      ]
+    },
+    {
       "name": "linux-release-deb",
       "displayName": "Linux Release TGZ+DEB",
       "description": "Erzeugt TGZ und DEB Package für Release",
@@ -629,7 +636,7 @@
         },
         {
           "type": "package",
-          "name": "default"
+          "name": "linux-debug-clang-tsan"
         }
       ]
     }
