@@ -7,6 +7,7 @@ BUILD_DIR="build"
 BUILD_TYPE="Debug"
 GCC_DEBUG_PRESET="linux-debug-GNU"
 CLANG_DEBUG_PRESET="linux-debug-clang"
+CLANG_TSAN_PRESET="linux-debug-clang-tsan"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -16,6 +17,7 @@ while [[ $# -gt 0 ]]; do
     --build-type) BUILD_TYPE="${2:-}"; shift 2 ;;
     --gcc-debug-preset) GCC_DEBUG_PRESET="${2:-}"; shift 2 ;;
     --clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
+    --clang-tsan-preset) CLANG_TSAN_PRESET="${2:-}"; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -34,8 +36,13 @@ case "${COMPILER}" in
 esac
 
 echo "Using preset: ${PRESET}"
-cmake -B "${BUILD_DIR}" --preset "${PRESET}"
-cmake --build "${BUILD_DIR}" --preset "${PRESET}"
+cmake --preset "${PRESET}"
+cmake --build --preset "${PRESET}"
+
+# Keep ctest test-dir aligned with preset binaryDir.
+if [[ "${PRESET}" == "${CLANG_DEBUG_PRESET}" || "${PRESET}" == "${GCC_DEBUG_PRESET}" ]]; then
+  BUILD_DIR="build"
+fi
 
 (cd "${BUILD_DIR}" && ctest -C "${BUILD_TYPE}" --verbose --extra-verbose --debug -T test --output-on-failure --output-junit "${WORKSPACE_DIR}/docs/test_results.xml")
 
@@ -47,12 +54,12 @@ if [[ "${COMPILER}" == "clang" ]]; then
   fi
 
   echo "=== Running additional build with TSan ==="
-  TSAN_PRESET="${CLANG_DEBUG_PRESET}-tsan"
-  TSAN_BUILD_DIR="${BUILD_DIR}_tsan"
+  TSAN_PRESET="${CLANG_TSAN_PRESET}"
+  TSAN_BUILD_DIR="build_tsan"
   
   echo "Using preset: ${TSAN_PRESET}"
-  cmake -B "${TSAN_BUILD_DIR}" --preset "${TSAN_PRESET}"
-  cmake --build "${TSAN_BUILD_DIR}" --preset "${TSAN_PRESET}"
+  cmake --preset "${TSAN_PRESET}"
+  cmake --build --preset "${TSAN_PRESET}"
   
   (cd "${TSAN_BUILD_DIR}" && ctest -C "${BUILD_TYPE}" --verbose --extra-verbose --debug -T test --output-on-failure --output-junit "${WORKSPACE_DIR}/docs/test_results_tsan.xml")
 else
