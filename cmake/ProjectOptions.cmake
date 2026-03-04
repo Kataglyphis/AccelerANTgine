@@ -306,10 +306,7 @@ macro(myproject_local_options)
     myproject_enable_cache()
   endif()
 
-  if(NOT
-     CMAKE_BUILD_TYPE
-     STREQUAL
-     "Release")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     include(cmake/StaticAnalyzers.cmake)
     if(myproject_ENABLE_CLANG_TIDY)
       myproject_enable_clang_tidy(myproject_options ${myproject_WARNINGS_AS_ERRORS})
