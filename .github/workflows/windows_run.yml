@@ -50,7 +50,7 @@ jobs:
             --mount "type=bind,source=${{ github.workspace }},target=C:\workspace" `
             -w "C:\workspace" `
             "${{ env.GHCR_IMAGE_WIN }}" `
-            powershell -NoProfile -ExecutionPolicy Bypass -File "C:\workspace\scripts\windows\Windows-Build.ps1" `
+            powershell -NoProfile -ExecutionPolicy Bypass -File "C:\workspace\scripts\windows\Build-Windows.ps1" `
               -WorkspaceDir "C:\workspace" `
               -BuildDir "${{ env.BUILD_DIR }}" `
               -BuildDirRelease "${{ env.BUILD_DIR_RELEASE }}" `
