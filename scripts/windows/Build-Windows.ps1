@@ -566,7 +566,7 @@ try {
             
             Push-Location $buildDirMsvcFull
             try {
-                Invoke-External -File "ctest"
+                Invoke-External -File "ctest" -Args @("-C", "Debug", "--output-on-failure")
             } finally {
                 Pop-Location
             }
@@ -613,7 +613,7 @@ try {
 
         Push-Location $buildDirClangFull
         try {
-            Invoke-External -File "ctest"
+            Invoke-External -File "ctest" -Args @("-C", "Debug", "--output-on-failure")
         } finally {
             Pop-Location
             $env:PATH = $previousPath
