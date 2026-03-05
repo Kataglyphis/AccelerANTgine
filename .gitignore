@@ -17,7 +17,7 @@ callgrind.out*
 dist
 .mypy_cache
 .conda
-build
+build*/
 build-*/
 *.profraw
 
@@ -67,8 +67,6 @@ Documents/doxygen/*
 # cmake configure file
 Src/GraphicsEngineOpenGL/renderer/VulkanRendererConfig.hpp
 Src/GraphicsEngineVulkan/renderer/OpenGLRendererConfig.hpp
-
-build*
 
 
 #Ignore vscode AI rules
