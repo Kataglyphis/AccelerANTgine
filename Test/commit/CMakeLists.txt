@@ -9,6 +9,7 @@ set(PROJECT_INCLUDE_DIR ${WORKING_DIRECTORY}Src/)
 set(EXTERNAL_LIB_SRC_DIR ${WORKING_DIRECTORY}ExternalLib/)
 
 include(${PROJECT_SRC_DIR}cmake/filters/SetProjectFilters.cmake)
+include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 
 set(COMMIT_TEST_SUITE commitTestSuite)
 
@@ -22,8 +23,6 @@ message("Commit test filter is: ${KataglyphisCppProject_COMMIT_TEST_FILTER}")
 # endif()
 
 add_executable(${COMMIT_TEST_SUITE})
-
-target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
 
 if(RUST_FEATURES)
   target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=1)
@@ -39,7 +38,9 @@ else()
                                                           RELATIVE_INCLUDE_PATH="/../Src/")
 endif()
 
-target_sources(${COMMIT_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
+target_sources(
+  ${COMMIT_TEST_SUITE}
+  PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
 
 target_link_libraries(
   ${COMMIT_TEST_SUITE}
@@ -52,15 +53,10 @@ target_link_libraries(
   PRIVATE gtest
           gtest_main
           GSL
-          spdlog
-          ${PROJECT_NAME})
+      spdlog
+      ${PROJECT_NAME})
 
-if(NOT WINDOWS_CI)
-  message(STATUS "WINDOWS_CI is OFF or not defined.")
-  gtest_discover_tests(${COMMIT_TEST_SUITE} DISCOVERY_TIMEOUT 300)
-else()
-  message(STATUS "WINDOWS_CI is OFF or not defined.")
-endif()
+kataglyphis_configure_gtest_discovery(${COMMIT_TEST_SUITE})
 
 if(RUST_FEATURES)
   target_link_libraries(${COMMIT_TEST_SUITE} PUBLIC rusty_code)

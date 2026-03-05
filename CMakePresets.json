@@ -211,15 +211,15 @@
       "name": "x64-MSVC-Windows-Debug",
       "description": "Windows and standard MSVC - Debug",
       "generator": "Visual Studio 18 2026",
-      "binaryDir": "${sourceDir}/build/",
-      "installDir": "${sourceDir}/build/",
+      "binaryDir": "${sourceDir}/build-msvc-debug/",
+      "installDir": "${sourceDir}/build-msvc-debug/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
         "CMAKE_BUILD_TYPE": "Debug",
         "RUST_FEATURES": "ON",
-        "COMPILER_CACHE": "",
+        "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -236,15 +236,15 @@
       "name": "x64-MSVC-Windows-Release",
       "description": "Windows and standard MSVC - Release",
       "generator": "Visual Studio 18 2026",
-      "binaryDir": "${sourceDir}/build/",
-      "installDir": "${sourceDir}/build/",
+      "binaryDir": "${sourceDir}/build-msvc-release/",
+      "installDir": "${sourceDir}/build-msvc-release/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
         "RUST_FEATURES": "ON",
         "CMAKE_BUILD_TYPE": "Release",
-        "COMPILER_CACHE": "",
+        "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -261,8 +261,8 @@
       "name": "x64-ClangCL-Windows-RelWithDebInfo",
       "description": "Windows and Clang",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-release/",
-      "installDir": "${sourceDir}/build-release/",
+      "binaryDir": "${sourceDir}/build-clangcl-relwithdebinfo/",
+      "installDir": "${sourceDir}/build-clangcl-relwithdebinfo/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
@@ -270,7 +270,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "COMPILER_CACHE": "",
+        "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -283,8 +283,8 @@
       "name": "x64-ClangCL-Windows-Profile",
       "description": "Windows and Clang",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-release/",
-      "installDir": "${sourceDir}/build-release/",
+      "binaryDir": "${sourceDir}/build-clangcl-profile/",
+      "installDir": "${sourceDir}/build-clangcl-profile/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
@@ -292,7 +292,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "COMPILER_CACHE": "",
+        "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -305,8 +305,8 @@
       "name": "x64-ClangCL-Windows-Debug",
       "description": "Windows and Clang",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/",
-      "installDir": "${sourceDir}/build/",
+      "binaryDir": "${sourceDir}/build-clangcl-debug/",
+      "installDir": "${sourceDir}/build-clangcl-debug/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
@@ -314,8 +314,33 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
-        "COMPILER_CACHE": "",
+        "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "TRUE"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "x64-ClangCL-Windows-Debug-TSan",
+      "description": "Windows and Clang with ThreadSanitizer",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-clangcl-tsan/",
+      "installDir": "${sourceDir}/build-clangcl-tsan/",
+      "cacheVariables": {
+        "CMAKE_VERBOSE_MAKEFILE": "ON",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
+        "RUST_FEATURES": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "COMPILER_CACHE": "sccache",
+        "BUILD_TESTING": "TRUE",
+        "myproject_ENABLE_SANITIZER_THREAD": "ON",
+        "myproject_ENABLE_SANITIZER_ADDRESS": "OFF",
+        "myproject_ENABLE_SANITIZER_UNDEFINED": "OFF"
       },
       "condition": {
         "type": "equals",
@@ -327,8 +352,8 @@
       "name": "x64-ClangCL-Windows-Release",
       "description": "Windows and Clang",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-release/",
-      "installDir": "${sourceDir}/build-release/",
+      "binaryDir": "${sourceDir}/build-clangcl-release/",
+      "installDir": "${sourceDir}/build-clangcl-release/",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
@@ -336,7 +361,7 @@
         "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Release",
-        "COMPILER_CACHE": "",
+        "COMPILER_CACHE": "sccache",
         "BUILD_TESTING": "FALSE"
       },
       "condition": {
@@ -513,6 +538,12 @@
       "name": "x64-ClangCL-Windows-Debug",
       "jobs": 0,
       "configurePreset": "x64-ClangCL-Windows-Debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "x64-ClangCL-Windows-Debug-TSan",
+      "jobs": 0,
+      "configurePreset": "x64-ClangCL-Windows-Debug-TSan",
       "configuration": "Debug"
     },
     {

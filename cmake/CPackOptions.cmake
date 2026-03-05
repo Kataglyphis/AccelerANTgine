@@ -52,6 +52,9 @@ set(ENABLE_WIX_PACKAGING
 
 # Windows (egal ob MSVC oder Clang/clang-cl) -> NSIS + WIX Binaries erzeugen
 if(WIN32)
+  # Keep Windows package paths short enough for NSIS in deep workspace trees.
+  set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_BUILD_TYPE}-${_ARCH_PKG}")
+
   # Standard: NSIS + ZIP. WiX kann optional über ENABLE_WIX_PACKAGING aktiviert werden.
   set(CPACK_GENERATOR "NSIS;ZIP")
   if(ENABLE_WIX_PACKAGING)
@@ -83,14 +86,14 @@ if(WIN32)
   # This ensures the shortcut has the correct working directory
   set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
       "
-    SetOutPath \"$INSTDIR\\bin\"
-    CreateShortCut \"$DESKTOP\\${PROJECT_NAME}.lnk\" \"$INSTDIR\\bin\\${PROJECT_NAME}.exe\" \"\" \"$INSTDIR\\bin\\${PROJECT_NAME}.exe\" 0 SW_SHOWNORMAL \"\" \"${PROJECT_NAME}\"
+    SetOutPath \\\"$INSTDIR\\\\bin\\\"
+    CreateShortCut \\\"$DESKTOP\\\\${PROJECT_NAME}.lnk\\\" \\\"$INSTDIR\\\\bin\\\\${PROJECT_NAME}.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\${PROJECT_NAME}.exe\\\" 0 SW_SHOWNORMAL \\\"\\\" \\\"${PROJECT_NAME}\\\"
   ")
 
   # Optional: Remove the desktop shortcut on uninstall
   set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
       "
-    Delete \"$DESKTOP\\${PROJECT_NAME}.lnk\"
+    Delete \\\"$DESKTOP\\\\${PROJECT_NAME}.lnk\\\"
   ")
 
   if(ENABLE_WIX_PACKAGING)
