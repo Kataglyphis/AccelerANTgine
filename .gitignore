@@ -9,6 +9,9 @@ docs/source/api
 
 *.log
 
+logs/
+log/
+
 docs/source/_static/*.svg
 callgrind.out*
 dist

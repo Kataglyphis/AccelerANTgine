@@ -324,31 +324,6 @@
       }
     },
     {
-      "name": "x64-ClangCL-Windows-Debug-TSan",
-      "description": "Windows and Clang with ThreadSanitizer",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-clangcl-tsan/",
-      "installDir": "${sourceDir}/build-clangcl-tsan/",
-      "cacheVariables": {
-        "CMAKE_VERBOSE_MAKEFILE": "ON",
-        "CMAKE_C_COMPILER": "clang-cl",
-        "CMAKE_CXX_COMPILER": "clang-cl",
-        "RUST_FEATURES": "ON",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_BUILD_TYPE": "Debug",
-        "COMPILER_CACHE": "sccache",
-        "BUILD_TESTING": "TRUE",
-        "myproject_ENABLE_SANITIZER_THREAD": "ON",
-        "myproject_ENABLE_SANITIZER_ADDRESS": "OFF",
-        "myproject_ENABLE_SANITIZER_UNDEFINED": "OFF"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
       "name": "x64-ClangCL-Windows-Release",
       "description": "Windows and Clang",
       "generator": "Ninja",
@@ -538,12 +513,6 @@
       "name": "x64-ClangCL-Windows-Debug",
       "jobs": 0,
       "configurePreset": "x64-ClangCL-Windows-Debug",
-      "configuration": "Debug"
-    },
-    {
-      "name": "x64-ClangCL-Windows-Debug-TSan",
-      "jobs": 0,
-      "configurePreset": "x64-ClangCL-Windows-Debug-TSan",
       "configuration": "Debug"
     },
     {
