@@ -155,6 +155,19 @@ target_link_libraries(
 
 if(RUST_FEATURES)
   target_link_libraries(${PROJECT_NAME} PUBLIC rusty_code)
+
+  if(UNIX AND NOT APPLE)
+    # Rust staticlibs may require explicit native runtime libs depending on toolchain/link order.
+    target_link_libraries(${PROJECT_NAME} PRIVATE m rt)
+  endif()
+
+  if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*")
+    # Mixed Rust+C++ builds can fail at link-time with IPO/LTO enabled on Linux CI.
+    set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION OFF)
+    if(TARGET ${PROJECT_NAME}_cli)
+      set_property(TARGET ${PROJECT_NAME}_cli PROPERTY INTERPROCEDURAL_OPTIMIZATION OFF)
+    endif()
+  endif()
 endif()
 
 if(TARGET ${PROJECT_NAME}_cli)
