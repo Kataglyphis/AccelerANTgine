@@ -94,6 +94,10 @@ add_subdirectory(NLOHMANN_JSON)
 
 if(RUST_FEATURES)
 
+  set(CXXBRIDGE_CMD_VERSION
+      "1.0.191"
+      CACHE STRING "Pinned cxxbridge-cmd version to keep bridge generator compatible with the cxx crate")
+
   FetchContent_Declare(
     Corrosion
     GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
@@ -102,12 +106,12 @@ if(RUST_FEATURES)
 
   find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")
   if(CXXBRIDGE STREQUAL "CXXBRIDGE-NOTFOUND")
-    message("Could not find cxxbridge, trying to install with `cargo install cxxbridge-cmd'")
+    message("Could not find cxxbridge, trying to install with `cargo install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION}`")
     find_program(CARGO cargo PATHS "$ENV{HOME}/.cargo/bin/")
     if(CARGO STREQUAL "CARGO-NOTFOUND")
       message(FATAL_ERROR "Requires cargo available in path, install via rustup https://rustup.rs/")
     endif()
-    execute_process(COMMAND ${CARGO} install cxxbridge-cmd)
+    execute_process(COMMAND ${CARGO} install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION} --locked)
     find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")
   endif()
 
