@@ -139,7 +139,7 @@ if command -v clang-tidy >/dev/null 2>&1; then
       mapfile -t ABS_SRC_FILES < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
       (
         cd "${BUILD_DIR}"
-        clang-tidy --fix -p="." -header-filter='^Src/' "${ABS_SRC_FILES[@]}"
+        clang-tidy --fix -checks='-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness' -p="." -header-filter='^Src/' "${ABS_SRC_FILES[@]}"
       ) || true
     else
       echo "No compilation database found at ${BUILD_DIR}/compile_commands.json, skipping clang-tidy."

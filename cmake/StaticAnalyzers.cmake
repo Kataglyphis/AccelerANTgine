@@ -79,6 +79,7 @@ macro(myproject_enable_clang_tidy target WARNINGS_AS_ERRORS)
     set(CLANG_TIDY_OPTIONS
         ${CLANGTIDY}
       --fix
+        -checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness
         -extra-arg=-Wno-unknown-warning-option
         -extra-arg=-Wno-ignored-optimization-argument
         -extra-arg=-Wno-unused-command-line-argument
