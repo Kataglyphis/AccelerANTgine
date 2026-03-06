@@ -668,7 +668,7 @@ try {
             if (-not (Test-Path $compileCommands)) {
                 throw "compile_commands.json not found: $compileCommands"
             }
-            Invoke-External -File "clang-tidy" -Args (@("-p=$compileCommands") + $sourceFiles) -IgnoreExitCode
+            Invoke-External -File "clang-tidy" -Args (@("--fix", "-p=$compileCommands") + $sourceFiles) -IgnoreExitCode
         }
     } else {
         Skip-Step -StepName "clang-tidy Analysis" -Reason "SkipClangTidy flag set"
