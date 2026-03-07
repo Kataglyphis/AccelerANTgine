@@ -267,10 +267,11 @@ macro(myproject_global_options)
        OR myproject_ENABLE_SANITIZER_UNDEFINED
        OR myproject_ENABLE_SANITIZER_ADDRESS
        OR myproject_ENABLE_SANITIZER_THREAD
-       OR myproject_ENABLE_SANITIZER_LEAK)
+       OR myproject_ENABLE_SANITIZER_LEAK
+       OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
       set(ENABLE_UBSAN_MINIMAL_RUNTIME FALSE)
     else()
-      set(ENABLE_UBSAN_MINIMAL_RUNTIME FALSE)
+      set(ENABLE_UBSAN_MINIMAL_RUNTIME TRUE)
     endif()
     message("${myproject_ENABLE_HARDENING} ${ENABLE_UBSAN_MINIMAL_RUNTIME} ${myproject_ENABLE_SANITIZER_UNDEFINED}")
     myproject_enable_hardening(myproject_options ON ${ENABLE_UBSAN_MINIMAL_RUNTIME})
@@ -402,10 +403,11 @@ macro(myproject_local_options)
        OR myproject_ENABLE_SANITIZER_UNDEFINED
        OR myproject_ENABLE_SANITIZER_ADDRESS
        OR myproject_ENABLE_SANITIZER_THREAD
-       OR myproject_ENABLE_SANITIZER_LEAK)
+       OR myproject_ENABLE_SANITIZER_LEAK
+       OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
       set(ENABLE_UBSAN_MINIMAL_RUNTIME FALSE)
     else()
-      set(ENABLE_UBSAN_MINIMAL_RUNTIME FALSE)
+      set(ENABLE_UBSAN_MINIMAL_RUNTIME TRUE)
     endif()
     myproject_enable_hardening(myproject_options OFF ${ENABLE_UBSAN_MINIMAL_RUNTIME})
   endif()
