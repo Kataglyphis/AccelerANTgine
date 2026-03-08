@@ -39,18 +39,18 @@ if(RUST_FEATURES)
       CXXFLAGS=/EHsc)
   else()
     # Native-only corrosion/toolchain setup (no cross-building).
-    if(NOT DEFINED GCC_TOOLCHAIN_PATH)
-      set(GCC_TOOLCHAIN_PATH
+    if(NOT DEFINED MYPROJECT_GCC_TOOLCHAIN_PATH)
+      set(MYPROJECT_GCC_TOOLCHAIN_PATH
           ""
           CACHE PATH "Optional GCC toolchain root")
     endif()
 
     # For Clang, optionally point to a GCC toolchain for libstdc++/headers.
     set(_gcc_toolchain_root "")
-    if(GCC_TOOLCHAIN_PATH AND EXISTS "${GCC_TOOLCHAIN_PATH}")
-      set(_gcc_toolchain_root "${GCC_TOOLCHAIN_PATH}")
-    elseif(DEFINED GCC_TOOLCHAIN_PATH_DEFAULT AND EXISTS "${GCC_TOOLCHAIN_PATH_DEFAULT}")
-      set(_gcc_toolchain_root "${GCC_TOOLCHAIN_PATH_DEFAULT}")
+    if(MYPROJECT_GCC_TOOLCHAIN_PATH AND EXISTS "${MYPROJECT_GCC_TOOLCHAIN_PATH}")
+      set(_gcc_toolchain_root "${MYPROJECT_GCC_TOOLCHAIN_PATH}")
+    elseif(DEFINED MYPROJECT_GCC_TOOLCHAIN_PATH_DEFAULT AND EXISTS "${MYPROJECT_GCC_TOOLCHAIN_PATH_DEFAULT}")
+      set(_gcc_toolchain_root "${MYPROJECT_GCC_TOOLCHAIN_PATH_DEFAULT}")
     endif()
 
     set(RUST_CXXFLAGS "-fexceptions")
