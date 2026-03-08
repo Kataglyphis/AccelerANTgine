@@ -89,7 +89,7 @@ set_target_properties(
              LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
              RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # Enable module scanning on project targets so CMake can generate dyndep/BMI ordering.
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_SCAN_FOR_MODULES ${MYPROJECT_CXX_SCAN_FOR_MODULES})
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_SCAN_FOR_MODULES ON)
 # add_executable(${PROJECT_NAME})
 
 if(PROJECT_IS_TOP_LEVEL)
@@ -97,7 +97,7 @@ if(PROJECT_IS_TOP_LEVEL)
     add_executable(${PROJECT_NAME}_cli cli_main.cpp)
     set_target_properties(${PROJECT_NAME}_cli PROPERTIES OUTPUT_NAME "${PROJECT_NAME}" RUNTIME_OUTPUT_DIRECTORY
                                                "${CMAKE_BINARY_DIR}/bin")
-    set_target_properties(${PROJECT_NAME}_cli PROPERTIES CXX_SCAN_FOR_MODULES ${MYPROJECT_CXX_SCAN_FOR_MODULES})
+    set_target_properties(${PROJECT_NAME}_cli PROPERTIES CXX_SCAN_FOR_MODULES ON)
   else()
     message(STATUS "Skipping ${PROJECT_NAME}_cli: requires C++ modules")
   endif()
