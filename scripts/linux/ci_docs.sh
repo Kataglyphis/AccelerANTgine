@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/ci_common.sh"
+
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
 RUNNER="ubuntu-24.04"
@@ -12,18 +16,20 @@ while [[ $# -gt 0 ]]; do
     --compiler) COMPILER="${2:-}"; shift 2 ;;
     --runner) RUNNER="${2:-}"; shift 2 ;;
     --docs-out) DOCS_OUT="${2:-}"; shift 2 ;;
-    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    *) die "Unknown argument: $1" ;;
   esac
 done
 
 if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-24.04" ]]; then
+  info "Building documentation"
+
   if [[ ! -d ".venv" ]]; then
     uv venv
   fi
   . ".venv/bin/activate"
   uv pip install \
     sphinx \
-    sphinx-rtd-theme \
+    sphinx-book-theme \
     sphinx_design \
     myst-parser \
     pyyaml \
@@ -95,21 +101,21 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-24.04" ]]; then
       fi
     done
 
-    echo "JUnit conversion summary: converted=${converted_count} skipped_non_junit=${skipped_non_junit_count} skipped_empty=${skipped_empty_count}"
+    info "JUnit conversion summary: converted=${converted_count} skipped_non_junit=${skipped_non_junit_count} skipped_empty=${skipped_empty_count}"
   else
-    echo "junit2html not available, skipping"
+    warn "junit2html not available, skipping"
   fi
 
-  if command -v pandoc >/dev/null 2>&1; then
-    :
-  else
-    apt-get update && apt-get install -y pandoc
+  if ! command -v pandoc >/dev/null 2>&1; then
+    info "Installing pandoc via apt"
+    require_sudo
+    apt_install pandoc
   fi
   mkdir -p "${WORKSPACE_DIR}/docs/test-results-md"
   shopt -s globstar nullglob
   html_files=("${WORKSPACE_DIR}"/docs/test-results/*.html)
   if [ ${#html_files[@]} -eq 0 ]; then
-    echo "No HTML files found in docs/test-results. Skipping pandoc conversion."
+    info "No HTML files found in docs/test-results. Skipping pandoc conversion."
   else
     for f in "${html_files[@]}"; do
       pandoc "$f" --verbose -f html -t gfm -o "${WORKSPACE_DIR}/docs/test-results-md/$(basename "$f" .html).md"
@@ -126,4 +132,6 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-24.04" ]]; then
     mkdir -p "$SITE_DIR/test-results"
     cp -r "${WORKSPACE_DIR}/docs/test-results/." "$SITE_DIR/test-results/" || true
   fi
+
+  info "Documentation build complete"
 fi

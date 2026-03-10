@@ -26,16 +26,37 @@ runs:
         RUN_SETUP_SCRIPT="${{ inputs.run-setup-script }}"
         INSTALL_UV="${{ inputs.install-uv }}"
 
+        # --- Source ContainerHub core library for platform helpers ---
+        CONTAINER_HUB_CORE="${GITHUB_WORKSPACE}/ExternalLib/Kataglyphis-ContainerHub/linux/scripts/01-core"
+        if [ -f "${CONTAINER_HUB_CORE}/common.sh" ]; then
+          # shellcheck disable=SC1091
+          source "${CONTAINER_HUB_CORE}/common.sh"
+          echo "[INFO] ContainerHub core library loaded"
+        else
+          # Minimal inline fallbacks
+          info()  { printf '[INFO]  %s\n' "$*"; }
+          warn()  { printf '[WARN]  %s\n' "$*" >&2; }
+          die()   { printf '[ERROR] %s\n' "$*" >&2; exit 1; }
+          arch_oci() {
+            case "$(uname -m)" in
+              x86_64|amd64)   printf 'amd64'   ;;
+              aarch64|arm64)  printf 'arm64'   ;;
+              *)              uname -m         ;;
+            esac
+          }
+          warn "ContainerHub core library not found, using minimal fallbacks"
+        fi
+
         echo "/usr/bin" >> "$GITHUB_PATH"
 
         # Detect where cargo is installed and add that dir to PATH for subsequent steps
         CARGO_BIN_DIR=$(dirname "$(command -v cargo 2>/dev/null || true)")
         if [ -n "$CARGO_BIN_DIR" ]; then
-          echo "Found cargo at: $CARGO_BIN_DIR"
+          info "Found cargo at: $CARGO_BIN_DIR"
           echo "$CARGO_BIN_DIR" >> "$GITHUB_PATH"
           export PATH="$CARGO_BIN_DIR:$PATH"
         else
-          echo "cargo not found in PATH — falling back to \$HOME/.cargo/bin"
+          warn "cargo not found in PATH — falling back to \$HOME/.cargo/bin"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.cargo/bin:$PATH"
         fi
@@ -46,13 +67,13 @@ runs:
             sudo chmod +x Scripts/Linux/setup-dependencies.sh
             sudo ./Scripts/Linux/setup-dependencies.sh "${VULKAN_VERSION}"
           else
-            echo "Warning: Scripts/Linux/setup-dependencies.sh not found, skipping."
+            warn "Scripts/Linux/setup-dependencies.sh not found, skipping."
           fi
         fi
 
         # Optionally install Astral uv package manager
         if [ "$INSTALL_UV" = "true" ]; then
-          echo "Installing Astral uv package manager..."
+          info "Installing Astral uv package manager..."
           curl -LsSf https://astral.sh/uv/install.sh | sh
           
           # Add uv to PATH
@@ -63,11 +84,10 @@ runs:
           
           # Verify installation
           if command -v uv >/dev/null 2>&1; then
-            echo "uv installed successfully"
+            info "uv installed successfully"
             uv --version
           else
-            echo "ERROR: uv installation failed" >&2
-            exit 1
+            die "uv installation failed"
           fi
         fi
 
@@ -83,29 +103,31 @@ runs:
         RUSTC_PATH=$(command -v rustc || true)
         if [ -n "$RUSTC_PATH" ]; then
           echo "Rust_COMPILER=$RUSTC_PATH" >> "$GITHUB_ENV"
-          echo "Found rustc at: $RUSTC_PATH"
+          info "Found rustc at: $RUSTC_PATH"
         else
-          echo "ERROR: rustc still not found after installation" >&2
-          exit 1
+          die "rustc still not found after installation"
         fi
 
-        # Add Vulkan SDK bin dir (auto-detect arch)
-        ARCH=$(uname -m)
-        if [ "$ARCH" = "x86_64" ]; then
-          SDK_ARCH="x86_64"
-        elif [ "$ARCH" = "aarch64" ]; then
-          SDK_ARCH="aarch64"
-        else
-          echo "Unsupported architecture: $ARCH"
-          exit 1
-        fi
+        # Add Vulkan SDK bin dir — use ContainerHub's arch_oci + map to uname-style
+        OCI_ARCH="$(arch_oci)"
+        case "${OCI_ARCH}" in
+          amd64) SDK_ARCH="x86_64"  ;;
+          arm64) SDK_ARCH="aarch64" ;;
+          *)     die "Unsupported architecture: ${OCI_ARCH}" ;;
+        esac
 
         echo "/${VULKAN_VERSION}/${SDK_ARCH}/bin" >> "$GITHUB_PATH"
         
         # quick checks
         command -v cargo || true
         cargo --version || true
-        echo "PATH (this step): $PATH"
+        info "PATH (this step): $PATH"
 
-        sudo apt-get update 
-        sudo apt-get update && sudo apt-get install -y file dpkg-dev fakeroot binutils
+        # Install packaging dependencies via ContainerHub's apt helpers if available
+        if command -v apt_install >/dev/null 2>&1; then
+          require_sudo
+          apt_install file dpkg-dev fakeroot binutils
+        else
+          sudo apt-get update
+          sudo apt-get install -y file dpkg-dev fakeroot binutils
+        fi

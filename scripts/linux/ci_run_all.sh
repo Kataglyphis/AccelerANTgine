@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/ci_common.sh"
+
 COMPILER="clang"
 RUNNER="ubuntu-24.04"
 MATRIX_ARCH="x64"
@@ -40,12 +44,12 @@ while [[ $# -gt 0 ]]; do
 		--release-flatpak) RELEASE_FLATPAK="${2:-}"; shift 2 ;;
 		--release-appimage-out-dir) RELEASE_APPIMAGE_OUT_DIR="${2:-}"; shift 2 ;;
 		--release-flatpak-out-dir) RELEASE_FLATPAK_OUT_DIR="${2:-}"; shift 2 ;;
-		*)
-			echo "Unknown argument: $1" >&2
-			exit 2
-			;;
+		*) die "Unknown argument: $1" ;;
 	esac
 done
+
+info "=== CI Run All ==="
+info "Compiler: ${COMPILER}  Runner: ${RUNNER}  Arch: ${MATRIX_ARCH}"
 
 bash scripts/linux/ci_init.sh \
 	--workspace-dir "$(pwd)" \
@@ -117,3 +121,5 @@ fi
 
 bash scripts/linux/ci_release.sh "${release_args[@]}"
 bash scripts/linux/ci_finalize.sh --workspace-dir "$(pwd)"
+
+info "=== CI Run All complete ==="

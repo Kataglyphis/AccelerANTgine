@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/ci_common.sh"
+
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
 BUILD_DIR="build"
@@ -18,7 +22,7 @@ while [[ $# -gt 0 ]]; do
     --gcc-debug-preset) GCC_DEBUG_PRESET="${2:-}"; shift 2 ;;
     --clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
     --clang-tsan-preset) CLANG_TSAN_PRESET="${2:-}"; shift 2 ;;
-    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    *) die "Unknown argument: $1" ;;
   esac
 done
 
@@ -30,12 +34,16 @@ case "${COMPILER}" in
     PRESET="${CLANG_DEBUG_PRESET}"
     ;;
   *)
-    echo "ERROR: Unsupported COMPILER='${COMPILER}'. Expected 'gcc' or 'clang'." >&2
-    exit 2
+    die "Unsupported COMPILER='${COMPILER}'. Expected 'gcc' or 'clang'."
     ;;
 esac
 
-echo "Using preset: ${PRESET}"
+# Use cgroup-aware parallelism for the build
+JOBS="$(compute_jobs_with_mem_cap)"
+export CMAKE_BUILD_PARALLEL_LEVEL="${JOBS}"
+info "Build parallelism: ${JOBS} jobs (cgroup + memory aware)"
+
+info "Using preset: ${PRESET}"
 cmake --preset "${PRESET}"
 cmake --build --preset "${PRESET}"
 
@@ -50,18 +58,18 @@ if [[ "${COMPILER}" == "clang" ]]; then
   if [[ -x "./${BUILD_DIR}/first_fuzz_test" ]]; then
     "./${BUILD_DIR}/first_fuzz_test"
   else
-    echo "first_fuzz_test not found/executable, skipping"
+    warn "first_fuzz_test not found/executable, skipping"
   fi
 
-  echo "=== Running additional build with TSan ==="
+  info "=== Running additional build with TSan ==="
   TSAN_PRESET="${CLANG_TSAN_PRESET}"
   TSAN_BUILD_DIR="build_tsan"
-  
-  echo "Using preset: ${TSAN_PRESET}"
+
+  info "Using preset: ${TSAN_PRESET}"
   cmake --preset "${TSAN_PRESET}"
   cmake --build --preset "${TSAN_PRESET}"
-  
+
   (cd "${TSAN_BUILD_DIR}" && ctest -C "${BUILD_TYPE}" --verbose --extra-verbose --debug -T test --output-on-failure --output-junit "${WORKSPACE_DIR}/docs/test_results_tsan.xml")
 else
-  echo "Compiled with GCC so no fuzz testing or TSan!"
+  info "Compiled with GCC so no fuzz testing or TSan!"
 fi

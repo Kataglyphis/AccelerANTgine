@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/ci_common.sh"
+
 BUILD_DIR="build"
 COMPILER="clang"
 CLANG_DEBUG_PRESET="linux-debug-clang"
@@ -13,7 +17,7 @@ while [[ $# -gt 0 ]]; do
     --compiler) COMPILER="${2:-}"; shift 2 ;;
     --clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
     --direct-analyze) DIRECT_ANALYZE=1; shift ;;
-    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    *) die "Unknown argument: $1" ;;
   esac
 done
 
@@ -37,7 +41,7 @@ if [[ ${#FORMAT_FILES[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#SRC_FILES[@]} -eq 0 ]]; then
-  echo "No C++ source/module files found under Src/, skipping static analysis." >&2
+  warn "No C++ source/module files found under Src/, skipping static analysis."
   exit 0
 fi
 
@@ -67,7 +71,7 @@ if [[ -f "requirements.txt" ]]; then
         # shellcheck disable=SC1091
         source .venv/bin/activate
       else
-        echo "uv not available, cannot create Python environment for cmake-format" >&2
+        warn "uv not available, cannot create Python environment for cmake-format"
       fi
     fi
   fi
@@ -100,54 +104,59 @@ fi
 
 if command -v cmake-format >/dev/null 2>&1; then
   if [[ ${#CMAKE_FILES[@]} -gt 0 ]]; then
+    info "Running cmake-format on ${#CMAKE_FILES[@]} files"
     cmake-format -i "${CMAKE_FILES[@]}"
   fi
 else
-  echo "cmake-format not available, skipping"
+  warn "cmake-format not available, skipping"
 fi
 
 if command -v clang-format >/dev/null 2>&1; then
   if [[ ${#FORMAT_FILES[@]} -gt 0 ]]; then
+    info "Running clang-format on ${#FORMAT_FILES[@]} files"
     clang-format -i "${FORMAT_FILES[@]}"
   else
-    echo "No C/C++ files found to format under Src/, skipping clang-format."
+    info "No C/C++ files found to format under Src/, skipping clang-format."
   fi
 else
-  echo "clang-format not available, skipping"
+  warn "clang-format not available, skipping"
 fi
 
 if [[ "${COMPILER}" == "clang" ]]; then
   if [[ "${DIRECT_ANALYZE}" == "1" ]]; then
+    info "Running clang++ --analyze"
     clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}" || true
   fi
 
   if command -v scan-build-21 >/dev/null 2>&1; then
     if [[ -d "${BUILD_DIR}" ]]; then
+      info "Running scan-build-21"
       mkdir -p scan-build-reports
       scan-build-21 -o scan-build-reports cmake --build "${BUILD_DIR}"
     else
-      echo "Build directory '${BUILD_DIR}' not found, skipping scan-build."
+      warn "Build directory '${BUILD_DIR}' not found, skipping scan-build."
     fi
   else
-    echo "scan-build-21 not available, skipping"
+    warn "scan-build-21 not available, skipping"
   fi
 fi
 
 if command -v clang-tidy >/dev/null 2>&1; then
   if [[ "${COMPILER}" == "clang" ]]; then
     if [[ -n "${COMPILE_DB_PATH}" ]]; then
+      info "Running clang-tidy on ${#SRC_FILES[@]} source files"
       mapfile -t ABS_SRC_FILES < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
       (
         cd "${BUILD_DIR}"
         clang-tidy --fix -checks='-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness' -p="." -header-filter='^Src/' "${ABS_SRC_FILES[@]}"
       ) || true
     else
-      echo "No compilation database found at ${BUILD_DIR}/compile_commands.json, skipping clang-tidy."
+      warn "No compilation database found at ${BUILD_DIR}/compile_commands.json, skipping clang-tidy."
     fi
   else
-    echo "Skipping clang-tidy for compiler='${COMPILER}'."
-    echo "Reason: current compile_commands.json contains GCC C++ modules flags unsupported by clang-tidy."
+    info "Skipping clang-tidy for compiler='${COMPILER}'."
+    info "Reason: current compile_commands.json contains GCC C++ modules flags unsupported by clang-tidy."
   fi
 else
-  echo "clang-tidy not available, skipping"
+  warn "clang-tidy not available, skipping"
 fi

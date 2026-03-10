@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/ci_common.sh"
+
 PERF_TIMEOUT_SECONDS="180"
 BUILD_DIR="build"
 COMPILER="clang"
@@ -16,7 +20,7 @@ while [[ $# -gt 0 ]]; do
     --compiler) COMPILER="${2:-}"; shift 2 ;;
     --gcc-profile-preset) GCC_PROFILE_PRESET="${2:-}"; shift 2 ;;
     --clang-profile-preset) CLANG_PROFILE_PRESET="${2:-}"; shift 2 ;;
-    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    *) die "Unknown argument: $1" ;;
   esac
 done
 
@@ -32,7 +36,12 @@ else
   PRESET="${CLANG_PROFILE_PRESET}"
 fi
 
-echo "Using profiling preset: ${PRESET}"
+# Use cgroup-aware parallelism for the build
+JOBS="$(compute_jobs_with_mem_cap)"
+export CMAKE_BUILD_PARALLEL_LEVEL="${JOBS}"
+info "Build parallelism: ${JOBS} jobs (cgroup + memory aware)"
+
+info "Using profiling preset: ${PRESET}"
 cmake -B "${BUILD_DIR}" --preset "${PRESET}"
 cmake --build "${BUILD_DIR}" --preset "${PRESET}"
 
@@ -42,11 +51,11 @@ PERF_EXIT=$?
 set -e
 
 if [[ "${PERF_EXIT}" -eq 124 ]]; then
-  echo "perf record timed out after ${PERF_TIMEOUT_SECONDS}s, continuing"
+  warn "perf record timed out after ${PERF_TIMEOUT_SECONDS}s, continuing"
 elif [[ "${PERF_EXIT}" -ne 0 ]]; then
-  echo "perf record exited with code ${PERF_EXIT}, continuing"
+  warn "perf record exited with code ${PERF_EXIT}, continuing"
 fi
 
-echo "CPU profile output path: ${PROFILE_OUTPUT}"
+info "CPU profile output path: ${PROFILE_OUTPUT}"
 
 (cd "${BUILD_DIR}" && ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json)

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/ci_common.sh"
+
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
 
@@ -53,14 +57,6 @@ require_cmd() {
   command -v "$cmd" >/dev/null 2>&1
 }
 
-normalize_arch() {
-  case "$(uname -m)" in
-    x86_64|amd64) echo "x86_64" ;;
-    aarch64|arm64) echo "aarch64" ;;
-    *) echo "$(uname -m)" ;;
-  esac
-}
-
 read_cache_var() {
   local cache_file="$1"
   local key="$2"
@@ -109,17 +105,6 @@ normalize_installed_file() {
   fi
 }
 
-run_privileged_cmd() {
-  if [[ "${EUID}" -eq 0 ]]; then
-    "$@"
-  elif command -v sudo >/dev/null 2>&1; then
-    sudo "$@"
-  else
-    echo "Missing privileges for: $*" >&2
-    return 1
-  fi
-}
-
 ensure_flatpak_tools() {
   local -a missing_cmds=()
   if ! command -v flatpak-builder >/dev/null 2>&1; then
@@ -133,32 +118,23 @@ ensure_flatpak_tools() {
   fi
 
   if [[ "${AUTO_INSTALL_FLATPAK}" != "1" ]]; then
-    echo "Missing required command(s): ${missing_cmds[*]}" >&2
+    warn "Missing required command(s): ${missing_cmds[*]}"
     return 1
   fi
 
   if ! command -v apt-get >/dev/null 2>&1; then
-    echo "Missing required command(s): ${missing_cmds[*]}" >&2
-    echo "Automatic install is only supported with apt-get." >&2
+    warn "Missing required command(s): ${missing_cmds[*]}"
+    warn "Automatic install is only supported with apt-get."
     return 1
   fi
 
-  echo "Missing Flatpak tools (${missing_cmds[*]}). Trying automatic installation via apt..." >&2
+  warn "Missing Flatpak tools (${missing_cmds[*]}). Trying automatic installation via apt..."
 
-  if [[ "${EUID}" -eq 0 ]]; then
-    apt-get update
-    apt-get install -y flatpak flatpak-builder
-  else
-    if ! command -v sudo >/dev/null 2>&1; then
-      echo "sudo is required for automatic installation but was not found." >&2
-      return 1
-    fi
-    sudo apt-get update
-    sudo apt-get install -y flatpak flatpak-builder
-  fi
+  require_sudo
+  apt_install flatpak flatpak-builder
 
   if ! command -v flatpak-builder >/dev/null 2>&1 || ! command -v flatpak >/dev/null 2>&1; then
-    echo "Automatic Flatpak tool installation failed." >&2
+    warn "Automatic Flatpak tool installation failed."
     return 1
   fi
 
@@ -173,7 +149,14 @@ ensure_flatpak_runtime() {
     flatpak_arch="$(flatpak --default-arch 2>/dev/null || true)"
   fi
   if [[ -z "${flatpak_arch}" ]]; then
-    flatpak_arch="$(normalize_arch)"
+    # Use ContainerHub's arch_oci, then map back to uname-style for flatpak
+    local oci_arch
+    oci_arch="$(arch_oci)"
+    case "${oci_arch}" in
+      amd64) flatpak_arch="x86_64" ;;
+      arm64) flatpak_arch="aarch64" ;;
+      *)     flatpak_arch="${oci_arch}" ;;
+    esac
   fi
 
   local runtime_ref="${FLATPAK_RUNTIME}/${flatpak_arch}/${FLATPAK_RUNTIME_VERSION}"
@@ -229,8 +212,7 @@ build_flatpak() {
   source_app_path="$(cd "${source_dir}/app" && pwd)"
 
   if [[ ! -x "${source_dir}/app/bin/${project_name}" ]]; then
-    echo "Flatpak staging failed: expected executable at ${source_dir}/app/bin/${project_name}" >&2
-    return 1
+    die "Flatpak staging failed: expected executable at ${source_dir}/app/bin/${project_name}"
   fi
 
   cat >"${manifest_path}" <<EOF
@@ -262,7 +244,7 @@ EOF
 
   local out_name="${project_name}-${version_suffix}-linux.flatpak"
   flatpak build-bundle "${repo_dir}" "${out_dir}/${out_name}" "${app_id}" "${FLATPAK_BRANCH}"
-  echo "Flatpak bundle written: ${out_dir}/${out_name}"
+  info "Flatpak bundle written: ${out_dir}/${out_name}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -337,17 +319,20 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "Unknown argument: $1" >&2
-      usage
-      exit 1
+      die "Unknown argument: $1"
       ;;
   esac
 done
 
 if [[ "${COMPILER:-}" != "clang" ]]; then
-  echo "Skipping release packaging for compiler '${COMPILER:-unknown}'"
+  info "Skipping release packaging for compiler '${COMPILER:-unknown}'"
   exit 0
 fi
+
+# Use cgroup-aware parallelism for the build
+JOBS="$(compute_jobs_with_mem_cap)"
+export CMAKE_BUILD_PARALLEL_LEVEL="${JOBS}"
+info "Build parallelism: ${JOBS} jobs (cgroup + memory aware)"
 
 rm -rf "${BUILD_RELEASE_DIR}"
 
@@ -356,6 +341,7 @@ if [[ "${DO_APPIMAGE}" -ne 1 ]]; then
   CPACK_APPIMAGE_FLAG="OFF"
 fi
 
+info "Building release with preset: ${CLANG_RELEASE_PRESET}"
 cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}" -DCMAKE_LINK_WHAT_YOU_USE=FALSE -DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}
 cmake --build "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
 cmake --build "${BUILD_RELEASE_DIR}" --target package
@@ -364,11 +350,10 @@ if [[ "${DO_FLATPAK}" -eq 1 ]]; then
   [[ -n "${FLATPAK_OUT_DIR}" ]] || FLATPAK_OUT_DIR="${BUILD_RELEASE_DIR}"
   if ! ensure_flatpak_tools; then
     if [[ "${FLATPAK_EXPLICIT}" -eq 1 ]]; then
-      echo "Flatpak requested but required tools are unavailable." >&2
-      exit 1
+      die "Flatpak requested but required tools are unavailable."
     fi
-    echo "Skipping Flatpak build (required tools are unavailable)." >&2
-    echo "Install flatpak + flatpak-builder or run with --no-flatpak to suppress this warning." >&2
+    warn "Skipping Flatpak build (required tools are unavailable)."
+    warn "Install flatpak + flatpak-builder or run with --no-flatpak to suppress this warning."
   else
     build_flatpak "${BUILD_RELEASE_DIR}" "${FLATPAK_OUT_DIR}"
   fi
@@ -376,7 +361,7 @@ fi
 
 if [[ "${DO_CALLGRIND}" -eq 1 ]]; then
   if ! require_cmd valgrind; then
-    echo "valgrind not found, skipping callgrind." >&2
+    warn "valgrind not found, skipping callgrind."
     exit 0
   fi
   (

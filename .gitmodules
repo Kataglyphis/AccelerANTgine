@@ -10,3 +10,6 @@
 [submodule "ExternalLib/SPDLOG"]
 	path = ExternalLib/SPDLOG
 	url = https://github.com/gabime/spdlog
+[submodule "ExternalLib/Kataglyphis-ContainerHub"]
+	path = ExternalLib/Kataglyphis-ContainerHub
+	url = git@github.com:Kataglyphis/Kataglyphis-ContainerHub.git

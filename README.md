@@ -10,11 +10,11 @@
 
 For the official docs follow this [link](https://hardwareacceleratedai.jonasheinle.de/).
 
-[![Linux run on ARM/GCC/Clang](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_arm.yml/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-CMakeTemplate/actions/workflows/linux_run_arm.yml)
-[![Linux run on x86/GCC/Clang](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_x86.yml/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-CMakeTemplate/actions/workflows/linux_run_x86.yml)
-[![CMake on Windows MSVC x64](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/windows_run.yml/badge.svg?branch=main)](https://github.com/Kataglyphis/Kataglyphis-CMakeTemplate/actions/workflows/windows_run.yml)
-[![CodeQL](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-CMakeTemplate/actions/workflows/github-code-scanning/codeql)
-[![Automatic Dependency Submission](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/dependency-graph/auto-submission/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-CMakeTemplate/actions/workflows/dependency-graph/auto-submission)
+[![Linux run on ARM/GCC/Clang](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_arm.yml/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_arm.yml)
+[![Linux run on x86/GCC/Clang](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_x86.yml/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_x86.yml)
+[![CMake on Windows MSVC x64](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/windows_run.yml/badge.svg?branch=main)](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/windows_run.yml)
+[![CodeQL](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/github-code-scanning/codeql)
+[![Automatic Dependency Submission](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/dependency-graph/auto-submission/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/dependency-graph/auto-submission)
 <!-- [![Linux build](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Linux.yml/badge.svg)](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Linux.yml)
 [![Windows build](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Windows.yml/badge.svg)](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Windows.yml)
 [![TopLang](https://img.shields.io/github/languages/top/Kataglyphis/GraphicsEngineVulkan)]() -->

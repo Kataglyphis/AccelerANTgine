@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_SCRIPT_DIR}/ci_common.sh"
+
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
 RUNNER="ubuntu-24.04"
@@ -12,21 +16,20 @@ while [[ $# -gt 0 ]]; do
     --compiler) COMPILER="${2:-}"; shift 2 ;;
     --runner) RUNNER="${2:-}"; shift 2 ;;
     --arch) MATRIX_ARCH="${2:-}"; shift 2 ;;
-    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    *) die "Unknown argument: $1" ;;
   esac
 done
 
 git config --global --add safe.directory "${WORKSPACE_DIR}" || true
 
-echo "Compiler: ${COMPILER}"
-echo "Runner: ${RUNNER}"
-echo "Arch: ${MATRIX_ARCH}"
+info "Compiler: ${COMPILER}"
+info "Runner: ${RUNNER}"
+info "Arch: ${MATRIX_ARCH}"
 
 if command -v uv >/dev/null 2>&1; then
   uv --version
 else
-  echo "ERROR: uv not found in container" >&2
-  exit 1
+  die "uv not found in container"
 fi
 
 mkdir -p "${WORKSPACE_DIR}/docs/coverage"

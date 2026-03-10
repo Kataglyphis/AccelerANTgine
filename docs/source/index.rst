@@ -1,33 +1,40 @@
-.. Kataglyphis-CMakeTemplate documentation master file, created by
-   sphinx-quickstart on Mon Jun  2 09:39:40 2025.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+KataglyphisCppInference documentation
+======================================
 
-Kataglyphis-CMakeTemplate documentation
-=======================================
+.. rst-class:: hero-section
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+Native C++ inference library with C API bindings and CLI tooling.
 
+- Hardware-accelerated AI inference
+- Cross-platform (Linux x86/ARM, Windows)
+- Doxygen-generated API reference
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-   :titlesonly:
+.. grid:: 2
+   :gutter: 2
 
-   api/library_root
-   graphviz_files
+   .. grid-item-card:: Getting Started
+      :link: getting_started
+      :link-type: doc
 
-Coverage
-========
+      Configure, build, and run the project on your platform.
 
-* `Coverage report <coverage/index.html>`_
+   .. grid-item-card:: API Reference
+      :link: api/library_root
+      :link-type: doc
 
-Test results
-============
+      Auto-generated C++ and C API documentation (Breathe / Exhale).
 
-* `Test results (JUnit XML viewer) <test-results/>`_
+   .. grid-item-card:: Architecture
+      :link: graphviz_files
+      :link-type: doc
+
+      Include-graph diagrams and dependency visualisations.
+
+   .. grid-item-card:: Test Results
+      :link: test-results/index
+      :link-type: doc
+
+      CI test result pages and coverage reports.
 
 .. toctree::
    :maxdepth: 2
@@ -35,6 +42,19 @@ Test results
 
    overview
    getting_started
+   api/library_root
+   graphviz_files
+   test-results/index
+
+Coverage
+--------
+
+* `Coverage report <coverage/index.html>`_
+
+Test results
+------------
+
+* `Test results (JUnit XML viewer) <test-results/>`_
 
 Indices and tables
 ==================
