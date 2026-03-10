@@ -131,7 +131,7 @@ ensure_flatpak_tools() {
   warn "Missing Flatpak tools (${missing_cmds[*]}). Trying automatic installation via apt..."
 
   require_sudo
-  apt_install flatpak flatpak-builder
+  apt_install flatpak flatpak-builder elfutils
 
   if ! command -v flatpak-builder >/dev/null 2>&1 || ! command -v flatpak >/dev/null 2>&1; then
     warn "Automatic Flatpak tool installation failed."
