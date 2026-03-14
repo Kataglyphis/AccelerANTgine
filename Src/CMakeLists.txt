@@ -153,6 +153,27 @@ target_link_libraries(
          myproject_options
   PRIVATE GSL spdlog::spdlog nlohmann_json::nlohmann_json)
 
+# Link GStreamer and ONNX Runtime if available
+if(TARGET gstreamer::gstreamer)
+    target_link_libraries(${PROJECT_NAME} PUBLIC 
+        gstreamer::gstreamer 
+        gstreamer::app 
+        gstreamer::video 
+        gstreamer::analytics
+    )
+    target_include_directories(${PROJECT_NAME} PRIVATE ${GSTREAMER_INCLUDE_DIRS})
+    message(STATUS "GStreamer linked successfully")
+else()
+    message(WARNING "GStreamer not found - inference pipeline features disabled")
+endif()
+
+if(TARGET onnxruntime::onnxruntime)
+    target_link_libraries(${PROJECT_NAME} PUBLIC onnxruntime::onnxruntime)
+    message(STATUS "ONNX Runtime linked successfully")
+else()
+    message(WARNING "ONNX Runtime not found - ONNX inference features disabled")
+endif()
+
 if(RUST_FEATURES)
   target_link_libraries(${PROJECT_NAME} PUBLIC rusty_code)
 endif()
