@@ -16,6 +16,8 @@ import kataglyphis.gstreamer_pipeline;
 
 export namespace kataglyphis::detection {
 
+using OnnxError = inference::OnnxError;
+
 struct BoundingBox {
     float x{0.0f};
     float y{0.0f};
