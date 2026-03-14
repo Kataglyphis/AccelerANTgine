@@ -2,7 +2,9 @@ module;
 
 #include "kataglyphis_export.h"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <expected>
 #include <filesystem>
 #include <numeric>
 
