@@ -3,6 +3,7 @@ module;
 #include "kataglyphis_export.h"
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <numeric>
 
 module kataglyphis.yolo_detector;

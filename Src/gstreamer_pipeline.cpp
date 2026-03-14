@@ -10,6 +10,8 @@ module;
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <mutex>
+#include <string>
+#include <thread>
 
 module kataglyphis.gstreamer_pipeline;
 

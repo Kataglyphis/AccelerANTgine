@@ -1,12 +1,13 @@
 module;
 
 #include "kataglyphis_export.h"
+#include <cstddef>
+#include <expected>
+#include <filesystem>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
-#include <expected>
-#include <filesystem>
 
 export module kataglyphis.onnx_inference;
 

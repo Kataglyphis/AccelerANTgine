@@ -1,12 +1,13 @@
 module;
 
 #include "kataglyphis_export.h"
-#include <memory>
-#include <vector>
-#include <string>
 #include <expected>
 #include <filesystem>
+#include <functional>
+#include <memory>
 #include <span>
+#include <string>
+#include <vector>
 
 export module kataglyphis.yolo_detector;
 

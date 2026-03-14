@@ -1,11 +1,14 @@
 module;
 
 #include "kataglyphis_export.h"
-#include <memory>
-#include <functional>
-#include <string>
+#include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
 export module kataglyphis.gstreamer_pipeline;
 
