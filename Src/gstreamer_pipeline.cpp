@@ -3,6 +3,7 @@ module;
 #include "kataglyphis_export.h"
 #include <atomic>
 #include <cstring>
+#include <expected>
 #include <gst/analytics/analytics.h>
 #include <gst/analytics/gsttensor.h>
 #include <gst/analytics/gsttensormeta.h>
