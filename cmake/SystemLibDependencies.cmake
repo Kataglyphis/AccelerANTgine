@@ -135,17 +135,17 @@ if(GSTREAMER_FOUND)
     add_library(gstreamer::app INTERFACE IMPORTED)
     target_include_directories(gstreamer::app INTERFACE ${GSTREAMER_INCLUDE_DIRS})
     target_link_directories(gstreamer::app INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::app INTERFACE gstreamer-app-1.0)
+    target_link_libraries(gstreamer::app INTERFACE gstapp-1.0)
     
     add_library(gstreamer::video INTERFACE IMPORTED)
     target_include_directories(gstreamer::video INTERFACE ${GSTREAMER_INCLUDE_DIRS})
     target_link_directories(gstreamer::video INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::video INTERFACE gstreamer-video-1.0)
+    target_link_libraries(gstreamer::video INTERFACE gstvideo-1.0)
     
     add_library(gstreamer::analytics INTERFACE IMPORTED)
     target_include_directories(gstreamer::analytics INTERFACE ${GSTREAMER_INCLUDE_DIRS})
     target_link_directories(gstreamer::analytics INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::analytics INTERFACE gstreamer-analytics-1.0)
+    target_link_libraries(gstreamer::analytics INTERFACE gstanalytics-1.0)
 endif()
 
 # Create imported target for ONNX Runtime

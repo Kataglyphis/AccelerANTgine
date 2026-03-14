@@ -6,6 +6,7 @@ module;
 #include <cmath>
 #include <expected>
 #include <filesystem>
+#include <functional>
 #include <numeric>
 
 module kataglyphis.yolo_detector;

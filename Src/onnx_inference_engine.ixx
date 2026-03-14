@@ -25,29 +25,32 @@ enum class OnnxError {
     SessionNotInitialized
 };
 
-struct TensorShape {
+struct TensorShape
+{
     std::vector<std::size_t> dimensions;
-    
-    [[nodiscard]] auto total_elements() const -> std::size_t {
+
+    [[nodiscard]] auto total_elements() const -> std::size_t
+    {
         std::size_t total = 1;
-        for (auto dim : dimensions) {
-            total *= dim;
-        }
+        for (auto dim : dimensions) { total *= dim; }
         return total;
     }
 };
 
-struct TensorData {
+struct TensorData
+{
     std::vector<float> data;
     TensorShape shape;
 };
 
-struct InferenceResult {
+struct InferenceResult
+{
     std::vector<TensorData> outputs;
     double inference_time_ms;
 };
 
-struct SessionConfig {
+struct SessionConfig
+{
     std::filesystem::path model_path;
     int intra_op_num_threads = 4;
     int inter_op_num_threads = 4;
@@ -56,45 +59,38 @@ struct SessionConfig {
     std::string execution_mode = "sequential";
 };
 
-class KATAGLYPHIS_CPP_API OnnxInferenceEngine {
-public:
+class KATAGLYPHIS_CPP_API OnnxInferenceEngine
+{
+  public:
     OnnxInferenceEngine();
     ~OnnxInferenceEngine();
-    
-    OnnxInferenceEngine(const OnnxInferenceEngine&) = delete;
-    OnnxInferenceEngine& operator=(const OnnxInferenceEngine&) = delete;
-    OnnxInferenceEngine(OnnxInferenceEngine&&) noexcept;
-    OnnxInferenceEngine& operator=(OnnxInferenceEngine&&) noexcept;
-    
-    [[nodiscard]] auto initialize(const SessionConfig& config) 
-        -> std::expected<void, OnnxError>;
-    
+
+    OnnxInferenceEngine(const OnnxInferenceEngine &) = delete;
+    OnnxInferenceEngine &operator=(const OnnxInferenceEngine &) = delete;
+    OnnxInferenceEngine(OnnxInferenceEngine &&) noexcept;
+    OnnxInferenceEngine &operator=(OnnxInferenceEngine &&) noexcept;
+
+    [[nodiscard]] auto initialize(const SessionConfig &config) -> std::expected<void, OnnxError>;
+
     [[nodiscard]] auto is_initialized() const -> bool;
-    
-    [[nodiscard]] auto run_inference(
-        std::span<const float> input_data,
-        const TensorShape& input_shape,
-        const std::string& input_name = "input"
-    ) -> std::expected<InferenceResult, OnnxError>;
-    
-    [[nodiscard]] auto run_inference_multi_input(
-        const std::vector<std::pair<std::string, TensorData>>& inputs
-    ) -> std::expected<InferenceResult, OnnxError>;
-    
+
+    [[nodiscard]] auto run_inference(std::span<const float> input_data,
+      const TensorShape &input_shape,
+      const std::string &input_name = "input") -> std::expected<InferenceResult, OnnxError>;
+
+    [[nodiscard]] auto run_inference_multi_input(const std::vector<std::pair<std::string, TensorData>> &inputs)
+      -> std::expected<InferenceResult, OnnxError>;
+
     [[nodiscard]] auto get_input_names() const -> std::vector<std::string>;
     [[nodiscard]] auto get_output_names() const -> std::vector<std::string>;
-    [[nodiscard]] auto get_input_shape(const std::string& name) const 
-        -> std::expected<TensorShape, OnnxError>;
-    [[nodiscard]] auto get_output_shape(const std::string& name) const 
-        -> std::expected<TensorShape, OnnxError>;
+    [[nodiscard]] auto get_input_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>;
+    [[nodiscard]] auto get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>;
 
-private:
+  private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
 
-[[nodiscard]] auto create_default_session_config(
-    const std::filesystem::path& model_path
-) -> SessionConfig;
+[[nodiscard]] auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig;
 
-}
+}// namespace kataglyphis::inference
