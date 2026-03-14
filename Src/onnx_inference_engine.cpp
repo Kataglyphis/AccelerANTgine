@@ -3,6 +3,7 @@ module;
 #include "kataglyphis_export.h"
 #include <algorithm>
 #include <chrono>
+#include <expected>
 #include <filesystem>
 #include <onnxruntime_cxx_api.h>
 #include <stdexcept>
