@@ -8,6 +8,7 @@ module;
 #include <filesystem>
 #include <functional>
 #include <numeric>
+#include <utility>
 
 module kataglyphis.yolo_detector;
 
