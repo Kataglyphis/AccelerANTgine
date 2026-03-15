@@ -30,27 +30,48 @@ pkg_check_modules(GSTREAMER REQUIRED
     gstreamer-app-1.0>=1.24
     gstreamer-video-1.0>=1.24
     gstreamer-analytics-1.0>=1.24
+    gstreamer-webrtc-1.0>=1.24
+    gstreamer-sdp-1.0>=1.24
 )
 
 pkg_check_modules(GLIB REQUIRED glib-2.0>=2.70)
 
 # ONNX Runtime dependencies
 # Check multiple possible installation locations:
-# 1. Container build output: /usr/local/lib/onnxruntime-cpu (from ContainerHub scripts)
-# 2. Source installation: /opt/onnxruntime
-# 3. System installation: /usr
-
-set(ONNXRUNTIME_SEARCH_PATHS
-    "/usr/local/lib/onnxruntime-cpu"
-    "/opt/onnxruntime"
-    "/usr"
-    "/usr/local"
-)
+# Linux:
+#   1. Container build output: /usr/local/lib/onnxruntime-cpu (from ContainerHub scripts)
+#   2. Source installation: /opt/onnxruntime
+#   3. System installation: /usr
+# Windows:
+#   4. Environment variable: ONNXRUNTIME_ROOT
+#   5. Standard Windows locations: C:/onnxruntime, C:/Program Files/onnxruntime
+#   6. vcpkg installed locations
 
 set(ONNXRUNTIME_ROOT "" CACHE PATH "ONNX Runtime installation root")
 
 if(ONNXRUNTIME_ROOT)
     list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "${ONNXRUNTIME_ROOT}")
+elseif(DEFINED ENV{ONNXRUNTIME_ROOT})
+    list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "$ENV{ONNXRUNTIME_ROOT}")
+endif()
+
+# Platform-specific search paths
+if(WIN32)
+    set(ONNXRUNTIME_SEARCH_PATHS
+        "$ENV{ONNXRUNTIME_ROOT}"
+        "C:/onnxruntime"
+        "C:/Program Files/onnxruntime"
+        "C:/Program Files (x86)/onnxruntime"
+        "$ENV{VCPKG_ROOT}/installed/x64-windows"
+        "$ENV{VCPKG_ROOT}/installed/x64-windows-static"
+    )
+else()
+    set(ONNXRUNTIME_SEARCH_PATHS
+        "/usr/local/lib/onnxruntime-cpu"
+        "/opt/onnxruntime"
+        "/usr"
+        "/usr/local"
+    )
 endif()
 
 # Try to find ONNX Runtime in each search path
@@ -59,15 +80,25 @@ set(ONNXRUNTIME_FOUND FALSE)
 foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
     if(EXISTS "${_search_path}")
         # Check for library
-        find_library(_ONNXRUNTIME_LIB
-            NAMES onnxruntime libonnxruntime
-            PATHS 
-                "${_search_path}/lib"
-                "${_search_path}/lib64"
-                "${_search_path}/lib/aarch64-linux-gnu"
-                "${_search_path}/lib/x86_64-linux-gnu"
-            NO_DEFAULT_PATH
-        )
+        if(WIN32)
+            find_library(_ONNXRUNTIME_LIB
+                NAMES onnxruntime
+                PATHS 
+                    "${_search_path}/lib"
+                    "${_search_path}/lib/x64"
+                NO_DEFAULT_PATH
+            )
+        else()
+            find_library(_ONNXRUNTIME_LIB
+                NAMES onnxruntime libonnxruntime
+                PATHS 
+                    "${_search_path}/lib"
+                    "${_search_path}/lib64"
+                    "${_search_path}/lib/aarch64-linux-gnu"
+                    "${_search_path}/lib/x86_64-linux-gnu"
+                NO_DEFAULT_PATH
+            )
+        endif()
         
         # Check for headers
         find_path(_ONNXRUNTIME_INCLUDE_DIR
@@ -107,8 +138,8 @@ foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
     endif()
 endforeach()
 
-# Fallback to pkg-config
-if(NOT ONNXRUNTIME_FOUND)
+# Fallback to pkg-config (Linux only)
+if(NOT ONNXRUNTIME_FOUND AND NOT WIN32)
     pkg_check_modules(_ONNXRUNTIME_PKG libonnxruntime onnxruntime)
     if(_ONNXRUNTIME_PKG_FOUND)
         set(ONNXRUNTIME_FOUND TRUE)
@@ -119,10 +150,17 @@ if(NOT ONNXRUNTIME_FOUND)
 endif()
 
 if(NOT ONNXRUNTIME_FOUND)
-    message(WARNING "ONNX Runtime not found. Install via:")
-    message(WARNING "  - Container: /usr/local/lib/onnxruntime-cpu")
-    message(WARNING "  - Source: /opt/onnxruntime")
-    message(WARNING "  - Package: apt install libonnxruntime-dev")
+    if(WIN32)
+        message(WARNING "ONNX Runtime not found. Install via:")
+        message(WARNING "  - Download from: https://github.com/microsoft/onnxruntime/releases")
+        message(WARNING "  - Extract to C:/onnxruntime or set ONNXRUNTIME_ROOT env variable")
+        message(WARNING "  - vcpkg: vcpkg install onnxruntime")
+    else()
+        message(WARNING "ONNX Runtime not found. Install via:")
+        message(WARNING "  - Container: /usr/local/lib/onnxruntime-cpu")
+        message(WARNING "  - Source: /opt/onnxruntime")
+        message(WARNING "  - Package: apt install libonnxruntime-dev")
+    endif()
 endif()
 
 # Create imported targets for GStreamer
@@ -146,6 +184,16 @@ if(GSTREAMER_FOUND)
     target_include_directories(gstreamer::analytics INTERFACE ${GSTREAMER_INCLUDE_DIRS})
     target_link_directories(gstreamer::analytics INTERFACE ${GSTREAMER_LIBRARY_DIRS})
     target_link_libraries(gstreamer::analytics INTERFACE gstanalytics-1.0)
+    
+    add_library(gstreamer::webrtc INTERFACE IMPORTED)
+    target_include_directories(gstreamer::webrtc INTERFACE ${GSTREAMER_INCLUDE_DIRS})
+    target_link_directories(gstreamer::webrtc INTERFACE ${GSTREAMER_LIBRARY_DIRS})
+    target_link_libraries(gstreamer::webrtc INTERFACE gstwebrtc-1.0)
+    
+    add_library(gstreamer::sdp INTERFACE IMPORTED)
+    target_include_directories(gstreamer::sdp INTERFACE ${GSTREAMER_INCLUDE_DIRS})
+    target_link_directories(gstreamer::sdp INTERFACE ${GSTREAMER_LIBRARY_DIRS})
+    target_link_libraries(gstreamer::sdp INTERFACE gstsdp-1.0)
 endif()
 
 # Create imported target for ONNX Runtime

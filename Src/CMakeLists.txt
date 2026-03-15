@@ -11,6 +11,21 @@ file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
 list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
 
+# Conditionally exclude ONNX inference sources if ONNX Runtime is not available
+# This is handled after SystemLibDependencies.cmake determines ONNXRUNTIME_FOUND
+if(NOT ONNXRUNTIME_FOUND)
+    message(STATUS "Excluding ONNX inference sources (ONNX Runtime not found)")
+    list(REMOVE_ITEM KataglyphisCppProject_SOURCES 
+        "${CMAKE_CURRENT_SOURCE_DIR}/onnx_inference_engine.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/inference_demo.cpp"
+    )
+    list(REMOVE_ITEM KataglyphisCppProject_MODULES 
+        "${CMAKE_CURRENT_SOURCE_DIR}/onnx_inference_engine.ixx"
+        "${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.ixx"
+    )
+endif()
+
 set(KataglyphisCppProjectConfig_MODULE_IN
   "${CMAKE_CURRENT_SOURCE_DIR}/KataglyphisCppProjectConfig.ixx.in")
 set(KataglyphisCppProjectConfig_MODULE_OUT
@@ -160,18 +175,24 @@ if(TARGET gstreamer::gstreamer)
         gstreamer::app 
         gstreamer::video 
         gstreamer::analytics
+        gstreamer::webrtc
+        gstreamer::sdp
     )
     target_include_directories(${PROJECT_NAME} PRIVATE ${GSTREAMER_INCLUDE_DIRS})
-    message(STATUS "GStreamer linked successfully")
+    target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_GSTREAMER_WEBRTC=1)
+    message(STATUS "GStreamer linked successfully (with WebRTC support)")
 else()
     message(WARNING "GStreamer not found - inference pipeline features disabled")
+    target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_GSTREAMER_WEBRTC=0)
 endif()
 
 if(TARGET onnxruntime::onnxruntime)
     target_link_libraries(${PROJECT_NAME} PUBLIC onnxruntime::onnxruntime)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_ONNXRUNTIME=1)
     message(STATUS "ONNX Runtime linked successfully")
 else()
     message(WARNING "ONNX Runtime not found - ONNX inference features disabled")
+    target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_ONNXRUNTIME=0)
 endif()
 
 if(RUST_FEATURES)
