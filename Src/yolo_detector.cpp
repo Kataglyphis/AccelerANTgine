@@ -298,7 +298,7 @@ auto YoloDetector::calculate_iou(const BoundingBox &a, const BoundingBox &b) -> 
 
 auto YoloDetector::get_coco_class_name(int class_id) -> std::string
 {
-    if (class_id >= 0 && class_id < static_cast<int>(COCO_CLASSES.size())) { return COCO_CLASSES[class_id]; }
+    if (class_id >= 0 && std::cmp_less(class_id, COCO_CLASSES.size())) { return COCO_CLASSES[class_id]; }
     return "unknown";
 }
 

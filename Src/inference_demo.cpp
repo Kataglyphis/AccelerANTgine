@@ -157,7 +157,7 @@ int run_gstreamer_pipeline_example()
     }
 
     std::cout << "Stopping pipeline...\n";
-    pipeline.stop();
+    (void)pipeline.stop();
 
     gstreamer::GStreamerPipeline::deinitialize_gstreamer();
     std::cout << "GStreamer example completed!\n";
@@ -233,7 +233,7 @@ int run_video_detection_example(const std::string &model_path)
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    pipeline_result->stop();
+    (void)pipeline_result->stop();
     std::cout << "Video detection completed!\n";
 
     return 0;
