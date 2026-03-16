@@ -45,7 +45,7 @@ struct StreamConfig {
     VideoSource source{ VideoSource::Libcamera };
     VideoEncoder encoder{ VideoEncoder::H264_Hardware };
     
-    std::string signalling_server_uri{ "ws://127.0.0.1:8443" };
+    std::string signalling_server_uri{ "ws://himbeere2:8443" };
     std::string peer_id;                 // Target peer ID (empty = produce stream)
     std::string producer_id;             // Our producer ID for the stream
     
