@@ -7,7 +7,7 @@
 
   <h4>This C++ inference project gives me a good starting point for hardware accelerated AI inference 🚀 </h4>
 </div>
-
+  
 For the official docs follow this [link](https://hardwareacceleratedai.jonasheinle.de/).
 
 [![Linux run on ARM/GCC/Clang](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_arm.yml/badge.svg)](https://github.com/Kataglyphis/Kataglyphis-Cpp-Inference/actions/workflows/linux_run_arm.yml)
