@@ -13,6 +13,7 @@ module;
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 module kataglyphis.gstreamer_pipeline;
 
@@ -114,7 +115,9 @@ struct GStreamerPipeline::Impl
         }
     }
 
-    static GstPadProbeReturn on_pad_probe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
+    static GstPadProbeReturn on_pad_probe([[maybe_unused]] GstPad *pad,
+      [[maybe_unused]] GstPadProbeInfo *info,
+      [[maybe_unused]] gpointer user_data)
     {
         return GST_PAD_PROBE_OK;
     }
@@ -297,7 +300,8 @@ auto GStreamerPipeline::set_buffer_callback(BufferCallback callback) -> void
     }
 }
 
-auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms) -> std::expected<BufferInfo, GStreamerError>
+auto GStreamerPipeline::pull_sample([[maybe_unused]] std::uint32_t timeout_ms)
+  -> std::expected<BufferInfo, GStreamerError>
 {
 
     if (!impl_->appsink) { return std::unexpected(GStreamerError::ElementCreationFailed); }

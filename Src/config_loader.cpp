@@ -29,7 +29,7 @@ auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRT
         return j[key].template get<std::string>();
     };
 
-    auto safe_get_uint = [&j](const auto &obj, const std::string &key) -> std::expected<std::uint32_t, ConfigError> {
+    auto safe_get_uint = [](const auto &obj, const std::string &key) -> std::expected<std::uint32_t, ConfigError> {
         if (!obj.contains(key) || !obj[key].is_number_unsigned()) { return std::unexpected(ConfigError::InvalidValue); }
         return obj[key].template get<std::uint32_t>();
     };
