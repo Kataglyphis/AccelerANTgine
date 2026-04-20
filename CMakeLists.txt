@@ -70,6 +70,17 @@ myproject_setup_options()
 
 myproject_global_options()
 
+option(KATAGLYPHIS_ENABLE_TIME_TRACE "Enable Clang -ftime-trace for build profiling" OFF)
+if(KATAGLYPHIS_ENABLE_TIME_TRACE AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+  message(STATUS "=== ENABLING CLANG TIME TRACE PROFILING ===")
+  message(STATUS "Look for .json trace files next to the compiled objects.")
+  if(MSVC)
+    add_compile_options("/clang:-ftime-trace")
+  else()
+    add_compile_options("-ftime-trace")
+  endif()
+endif()
+
 message(STATUS "About to call the local options function.")
 myproject_local_options()
 
