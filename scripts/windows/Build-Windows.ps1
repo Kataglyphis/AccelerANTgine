@@ -197,7 +197,7 @@ try {
                 $sourceFiles = Get-ChildItem -Path $srcDir -Recurse -Include @('*.cpp', '*.cc') | ForEach-Object { $_.FullName }
                 $compileCommands = Join-Path $fastBuildClangFull "compile_commands.json"
                 if ((Test-Path $compileCommands) -and $sourceFiles.Count -gt 0) {
-                    Invoke-BuildExternal -Context $Context -File "clang-tidy" -Parameters (@("--fix", "-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness,-google-explicit-constructor,-hicpp-explicit-conversions", "-p=$compileCommands") + $sourceFiles) -IgnoreExitCode
+                    Invoke-BuildExternal -Context $Context -File "clang-tidy" -Parameters (@("--fix", "-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness,-google-explicit-constructor,-hicpp-explicit-conversions", "--header-filter=Src/.*\.h(pp)?$|Src/.*\.ixx$", "-p=$compileCommands") + $sourceFiles) -IgnoreExitCode
                 }
             }
         }

@@ -1,39 +1,14 @@
 module;
 
 #include <expected>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <sstream>
 
-#include <nlohmann/json_fwd.hpp>
-
-NLOHMANN_JSON_NAMESPACE_BEGIN
-namespace detail {
-    template <typename... Args>
-    static inline void concat_into(std::string& out, char arg, Args&&... rest);
-    
-    static inline void concat_into(std::string& out, char arg);
-}
-NLOHMANN_JSON_NAMESPACE_END
-
-#include <nlohmann/json.hpp>
-
-// Define the workaround after json.hpp so it can see json.hpp's templates for recursion
-NLOHMANN_JSON_NAMESPACE_BEGIN
-namespace detail {
-    template <typename... Args>
-    inline void concat_into(std::string& out, char arg, Args&&... rest) {
-        out += arg;
-        concat_into(out, std::forward<Args>(rest)...);
-    }
-    
-    inline void concat_into(std::string& out, char arg) {
-        out += arg;
-    }
-}  // namespace detail
-NLOHMANN_JSON_NAMESPACE_END
-
 module kataglyphis.config_loader;
+
+import nlohmann.json;
 
 namespace kataglyphis::config {
 

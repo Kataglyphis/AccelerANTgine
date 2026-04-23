@@ -27,4 +27,5 @@ Checks: -*,
         readability-*,
         -zircon-*,
         -clang-diagnostic-error
+HeaderFilterRegex: '^Src/.*\.h(pp)?$|^Src/.*\.ixx$'
 FormatStyle:     none

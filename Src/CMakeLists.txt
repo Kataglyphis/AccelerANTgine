@@ -160,13 +160,16 @@ target_sources(
 
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC ${CMAKE_DL_LIBS}
-         Threads::Threads
-         # enable compiler warnings
-         myproject_warnings
-         # enable sanitizers
-         myproject_options
-  PRIVATE GSL spdlog::spdlog nlohmann_json::nlohmann_json)
+  PUBLIC
+    ${CMAKE_DL_LIBS}
+    Threads::Threads
+    myproject_warnings
+    myproject_options
+    nlohmann_json_modules
+  PRIVATE
+    GSL
+    spdlog::spdlog
+)
 
 # Link GStreamer and ONNX Runtime if available
 if(TARGET gstreamer::gstreamer)

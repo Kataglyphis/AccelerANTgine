@@ -90,7 +90,22 @@ set(SPDLOG_FMT_EXTERNAL
 
 add_subdirectory(SPDLOG)
 
+set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "" FORCE)
 add_subdirectory(NLOHMANN_JSON)
+
+if(TARGET nlohmann_json_modules)
+    # Ensure the module BMI is compiled with flags compatible with the project.
+    # myproject_options propagates exception settings (/EHs- or -fno-exceptions),
+    # sanitizer flags, etc. Without this, the BMI is built with exceptions enabled
+    # while the project disables them, causing configuration-mismatch errors.
+    if(TARGET myproject_options)
+        target_link_libraries(nlohmann_json_modules PUBLIC myproject_options)
+    endif()
+    if(myproject_DISABLE_EXCEPTIONS)
+        target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NOEXCEPTION)
+    endif()
+    target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
+endif()
 
 if(RUST_FEATURES)
 
