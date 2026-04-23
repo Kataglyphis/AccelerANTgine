@@ -20,11 +20,11 @@ using OnnxError = inference::OnnxError;
 
 struct BoundingBox
 {
-    float x{ 0.0f };
-    float y{ 0.0f };
-    float width{ 0.0f };
-    float height{ 0.0f };
-    float confidence{ 0.0f };
+    float x{ 0.0F };
+    float y{ 0.0F };
+    float width{ 0.0F };
+    float height{ 0.0F };
+    float confidence{ 0.0F };
     int class_id{ -1 };
     std::string class_name;
 };
@@ -41,8 +41,8 @@ struct DetectionResult
 struct YoloConfig
 {
     std::filesystem::path model_path;
-    float confidence_threshold{ 0.25f };
-    float nms_threshold{ 0.45f };
+    float confidence_threshold{ 0.25F };
+    float nms_threshold{ 0.45F };
     std::uint32_t input_width{ 640 };
     std::uint32_t input_height{ 640 };
     int num_classes{ 80 };
@@ -55,9 +55,9 @@ class KATAGLYPHIS_CPP_API YoloDetector
     ~YoloDetector();
 
     YoloDetector(const YoloDetector &) = delete;
-    YoloDetector &operator=(const YoloDetector &) = delete;
-    YoloDetector(YoloDetector &&) noexcept;
-    YoloDetector &operator=(YoloDetector &&) noexcept;
+    auto operator=(const YoloDetector &) -> YoloDetector & = delete;
+    YoloDetector(YoloDetector && /*other*/) noexcept;
+    auto operator=(YoloDetector && /*other*/) noexcept -> YoloDetector &;
 
     [[nodiscard]] auto initialize(const YoloConfig &config) -> std::expected<void, OnnxError>;
 
@@ -100,9 +100,9 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
     ~VideoDetectorPipeline();
 
     VideoDetectorPipeline(const VideoDetectorPipeline &) = delete;
-    VideoDetectorPipeline &operator=(const VideoDetectorPipeline &) = delete;
-    VideoDetectorPipeline(VideoDetectorPipeline &&) noexcept;
-    VideoDetectorPipeline &operator=(VideoDetectorPipeline &&) noexcept;
+    auto operator=(const VideoDetectorPipeline &) -> VideoDetectorPipeline & = delete;
+    VideoDetectorPipeline(VideoDetectorPipeline && /*other*/) noexcept;
+    auto operator=(VideoDetectorPipeline && /*other*/) noexcept -> VideoDetectorPipeline &;
 
     [[nodiscard]] auto initialize(const VideoDetectionConfig &config) -> std::expected<void, OnnxError>;
 

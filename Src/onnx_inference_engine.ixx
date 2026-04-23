@@ -46,7 +46,7 @@ struct TensorData
 struct InferenceResult
 {
     std::vector<TensorData> outputs;
-    double inference_time_ms;
+    double inference_time_ms{};
 };
 
 struct SessionConfig
@@ -66,9 +66,9 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
     ~OnnxInferenceEngine();
 
     OnnxInferenceEngine(const OnnxInferenceEngine &) = delete;
-    OnnxInferenceEngine &operator=(const OnnxInferenceEngine &) = delete;
-    OnnxInferenceEngine(OnnxInferenceEngine &&) noexcept;
-    OnnxInferenceEngine &operator=(OnnxInferenceEngine &&) noexcept;
+    auto operator=(const OnnxInferenceEngine &) -> OnnxInferenceEngine & = delete;
+    OnnxInferenceEngine(OnnxInferenceEngine && /*other*/) noexcept;
+    auto operator=(OnnxInferenceEngine && /*other*/) noexcept -> OnnxInferenceEngine &;
 
     [[nodiscard]] auto initialize(const SessionConfig &config) -> std::expected<void, OnnxError>;
 

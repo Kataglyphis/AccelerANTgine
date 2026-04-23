@@ -41,7 +41,7 @@ OnnxInferenceEngine::~OnnxInferenceEngine() = default;
 
 OnnxInferenceEngine::OnnxInferenceEngine(OnnxInferenceEngine &&other) noexcept : impl_(std::move(other.impl_)) {}
 
-OnnxInferenceEngine &OnnxInferenceEngine::operator=(OnnxInferenceEngine &&other) noexcept
+auto OnnxInferenceEngine::operator=(OnnxInferenceEngine &&other) noexcept -> OnnxInferenceEngine &
 {
     if (this != &other) { impl_ = std::move(other.impl_); }
     return *this;
@@ -73,7 +73,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     }
 
     impl_->session =
-      std::make_unique<Ort::Session>(*impl_->env, config.model_path.string().c_str(), *impl_->session_options);
+      std::make_unique<Ort::Session>(*impl_->env, config.model_path.c_str(), *impl_->session_options);
 
     Ort::AllocatorWithDefaultOptions allocator;
 
@@ -83,7 +83,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
 
     for (size_t i = 0; i < num_inputs; ++i) {
         auto name = impl_->session->GetInputNameAllocated(i, allocator);
-        impl_->input_names_cache.push_back(name.get());
+        impl_->input_names_cache.emplace_back(name.get());
         impl_->input_name_ptrs.push_back(impl_->input_names_cache.back().c_str());
     }
 
@@ -93,7 +93,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
 
     for (size_t i = 0; i < num_outputs; ++i) {
         auto name = impl_->session->GetOutputNameAllocated(i, allocator);
-        impl_->output_names_cache.push_back(name.get());
+        impl_->output_names_cache.emplace_back(name.get());
         impl_->output_name_ptrs.push_back(impl_->output_names_cache.back().c_str());
     }
 
@@ -146,7 +146,7 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
         for (const auto dim : shape) { tensor_data.shape.dimensions.push_back(static_cast<std::size_t>(dim)); }
 
         const auto total_elements = type_info.GetElementCount();
-        const float *tensor_data_ptr = tensor.GetTensorData<float>();
+        const auto *tensor_data_ptr = tensor.GetTensorData<float>();
 
         tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
         result.outputs.push_back(std::move(tensor_data));
@@ -202,7 +202,7 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
         for (const auto dim : shape) { tensor_data.shape.dimensions.push_back(static_cast<std::size_t>(dim)); }
 
         const auto total_elements = type_info.GetElementCount();
-        const float *tensor_data_ptr = tensor.GetTensorData<float>();
+        const auto *tensor_data_ptr = tensor.GetTensorData<float>();
 
         tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
         result.outputs.push_back(std::move(tensor_data));

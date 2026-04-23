@@ -85,9 +85,9 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer {
     ~WebRTCStreamer();
 
     WebRTCStreamer(const WebRTCStreamer&) = delete;
-    WebRTCStreamer& operator=(const WebRTCStreamer&) = delete;
-    WebRTCStreamer(WebRTCStreamer&&) noexcept;
-    WebRTCStreamer& operator=(WebRTCStreamer&&) noexcept;
+    auto operator=(const WebRTCStreamer&) -> WebRTCStreamer& = delete;
+    WebRTCStreamer(WebRTCStreamer&& /*other*/) noexcept;
+    auto operator=(WebRTCStreamer&& /*other*/) noexcept -> WebRTCStreamer&;
 
     // Initialize GStreamer (call once before creating streamers)
     [[nodiscard]] static auto initialize(int* argc = nullptr, char*** argv = nullptr)

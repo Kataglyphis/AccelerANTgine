@@ -43,8 +43,8 @@ pkg_check_modules(GLIB REQUIRED glib-2.0>=2.70)
 #   2. Source installation: /opt/onnxruntime
 #   3. System installation: /usr
 # Windows:
-#   4. Environment variable: ONNXRUNTIME_ROOT
-#   5. Standard Windows locations: C:/onnxruntime, C:/Program Files/onnxruntime
+#   4. Environment variable: ONNXRUNTIME_ROOT or ONNX_ROOT (ContainerHub)
+#   5. Standard Windows locations: C:/onnxruntime, C:/onnx, C:/Program Files/onnxruntime
 #   6. vcpkg installed locations
 
 set(ONNXRUNTIME_ROOT "" CACHE PATH "ONNX Runtime installation root")
@@ -53,13 +53,18 @@ if(ONNXRUNTIME_ROOT)
     list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "${ONNXRUNTIME_ROOT}")
 elseif(DEFINED ENV{ONNXRUNTIME_ROOT})
     list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "$ENV{ONNXRUNTIME_ROOT}")
+elseif(DEFINED ENV{ONNX_ROOT})
+    list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "$ENV{ONNX_ROOT}")
 endif()
 
 # Platform-specific search paths
 if(WIN32)
     set(ONNXRUNTIME_SEARCH_PATHS
+        ${ONNXRUNTIME_SEARCH_PATHS}
         "$ENV{ONNXRUNTIME_ROOT}"
+        "$ENV{ONNX_ROOT}"
         "C:/onnxruntime"
+        "C:/onnx"
         "C:/Program Files/onnxruntime"
         "C:/Program Files (x86)/onnxruntime"
         "$ENV{VCPKG_ROOT}/installed/x64-windows"
@@ -77,9 +82,33 @@ endif()
 # Try to find ONNX Runtime in each search path
 set(ONNXRUNTIME_FOUND FALSE)
 
-foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
-    if(EXISTS "${_search_path}")
-        # Check for library
+# If ENV variables ONNX_LIB and ONNX_INCLUDE are explicitly set (e.g. by Docker container)
+if(DEFINED ENV{ONNX_LIB} AND DEFINED ENV{ONNX_INCLUDE})
+    find_library(_ONNXRUNTIME_LIB
+        NAMES onnxruntime
+        PATHS "$ENV{ONNX_LIB}"
+        NO_DEFAULT_PATH
+    )
+    find_path(_ONNXRUNTIME_INCLUDE_DIR
+        NAMES onnxruntime_cxx_api.h
+        PATHS "$ENV{ONNX_INCLUDE}"
+        NO_DEFAULT_PATH
+    )
+    if(_ONNXRUNTIME_LIB AND _ONNXRUNTIME_INCLUDE_DIR)
+        set(ONNXRUNTIME_FOUND TRUE)
+        set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
+        set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
+        set(ONNXRUNTIME_ROOT "$ENV{ONNX_ROOT}")
+        message(STATUS "Found ONNX Runtime via ONNX_LIB and ONNX_INCLUDE")
+        message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
+        message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
+    endif()
+endif()
+
+if(NOT ONNXRUNTIME_FOUND)
+    foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
+        if(EXISTS "${_search_path}")
+            # Check for library
         if(WIN32)
             find_library(_ONNXRUNTIME_LIB
                 NAMES onnxruntime
@@ -137,6 +166,7 @@ foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
         unset(_ONNXRUNTIME_INCLUDE_DIR CACHE)
     endif()
 endforeach()
+endif()
 
 # Fallback to pkg-config (Linux only)
 if(NOT ONNXRUNTIME_FOUND AND NOT WIN32)
@@ -198,7 +228,7 @@ endif()
 
 # Create imported target for ONNX Runtime
 if(ONNXRUNTIME_FOUND AND ONNXRUNTIME_LIBRARY)
-    add_library(onnxruntime::onnxruntime SHARED IMPORTED)
+    add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
     set_target_properties(onnxruntime::onnxruntime PROPERTIES
         IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
         INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}"

@@ -2,12 +2,14 @@ module;
 
 #include "kataglyphis_export.h"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <expected>
 #include <filesystem>
 #include <functional>
 #include <numeric>
+#include <span>
 #include <utility>
 
 module kataglyphis.yolo_detector;
@@ -99,7 +101,7 @@ namespace {
         "teddy bear",
         "hair drier",
         "toothbrush" };
-}
+}  // namespace
 
 struct YoloDetector::Impl
 {
@@ -114,7 +116,7 @@ YoloDetector::~YoloDetector() = default;
 
 YoloDetector::YoloDetector(YoloDetector &&other) noexcept : impl_(std::move(other.impl_)) {}
 
-YoloDetector &YoloDetector::operator=(YoloDetector &&other) noexcept
+auto YoloDetector::operator=(YoloDetector &&other) noexcept -> YoloDetector &
 {
     if (this != &other) { impl_ = std::move(other.impl_); }
     return *this;
@@ -167,7 +169,7 @@ auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline,
     if (!buffer_result) { return std::unexpected(OnnxError::InputAllocationFailed); }
 
     const auto &buffer_info = buffer_result.value();
-    const float *data = static_cast<const float *>(buffer_info.data);
+    const auto *data = static_cast<const float *>(buffer_info.data);
     std::size_t size = buffer_info.size / sizeof(float);
 
     return detect(std::span<const float>(data, size), buffer_info.metadata.width, buffer_info.metadata.height);
@@ -215,7 +217,7 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
         if (obj_conf < impl_->config.confidence_threshold) { continue; }
 
         int best_class = 0;
-        float best_class_conf = 0.0f;
+        float best_class_conf = 0.0F;
 
         if (values_per_detection > 5) {
             for (int c = 0; c < impl_->config.num_classes; ++c) {
@@ -233,8 +235,8 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
         if (final_conf < impl_->config.confidence_threshold) { continue; }
 
         BoundingBox box;
-        box.x = (cx - w / 2.0f) * scale_x;
-        box.y = (cy - h / 2.0f) * scale_y;
+        box.x = (cx - (w / 2.0F)) * scale_x;
+        box.y = (cy - (h / 2.0F)) * scale_y;
         box.width = w * scale_x;
         box.height = h * scale_y;
         box.confidence = final_conf;
@@ -253,17 +255,19 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
 auto YoloDetector::apply_nms(std::vector<BoundingBox> &boxes, float nms_threshold) -> void
 {
 
-    std::sort(boxes.begin(), boxes.end(), [](const BoundingBox &a, const BoundingBox &b) {
+    std::ranges::sort(boxes, [](const BoundingBox &a, const BoundingBox &b) -> bool {
         return a.confidence > b.confidence;
     });
 
     std::vector<bool> suppressed(boxes.size(), false);
 
     for (std::size_t i = 0; i < boxes.size(); ++i) {
-        if (suppressed[i]) continue;
+        if (suppressed[i]) { continue;
+}
 
         for (std::size_t j = i + 1; j < boxes.size(); ++j) {
-            if (suppressed[j]) continue;
+            if (suppressed[j]) { continue;
+}
 
             if (boxes[i].class_id == boxes[j].class_id) {
                 float iou = calculate_iou(boxes[i], boxes[j]);
@@ -287,7 +291,7 @@ auto YoloDetector::calculate_iou(const BoundingBox &a, const BoundingBox &b) -> 
     float x2 = std::min(a.x + a.width, b.x + b.width);
     float y2 = std::min(a.y + a.height, b.y + b.height);
 
-    if (x2 <= x1 || y2 <= y1) { return 0.0f; }
+    if (x2 <= x1 || y2 <= y1) { return 0.0F; }
 
     float intersection = (x2 - x1) * (y2 - y1);
     float area_a = a.width * a.height;
@@ -333,7 +337,7 @@ VideoDetectorPipeline::~VideoDetectorPipeline() = default;
 
 VideoDetectorPipeline::VideoDetectorPipeline(VideoDetectorPipeline &&other) noexcept : impl_(std::move(other.impl_)) {}
 
-VideoDetectorPipeline &VideoDetectorPipeline::operator=(VideoDetectorPipeline &&other) noexcept
+auto VideoDetectorPipeline::operator=(VideoDetectorPipeline &&other) noexcept -> VideoDetectorPipeline &
 {
     if (this != &other) { impl_ = std::move(other.impl_); }
     return *this;
@@ -354,7 +358,7 @@ auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config) -> st
     if (!pipeline_result) { return std::unexpected(OnnxError::SessionCreationFailed); }
 
     impl_->pipeline.set_buffer_callback(
-      [this](const gstreamer::BufferInfo &buffer) { impl_->on_frame_received(buffer); });
+      [this](const gstreamer::BufferInfo &buffer) -> void { impl_->on_frame_received(buffer); });
 
     return {};
 }
@@ -435,7 +439,7 @@ auto create_video_detection_pipeline(const std::string &video_source,
 
     std::string pipeline_desc;
 
-    if (video_source.find("://") != std::string::npos) {
+    if (video_source.contains("://")) {
         pipeline_desc = "uridecodebin uri=" + video_source + " ! ";
     } else {
         pipeline_desc = "filesrc location=" + video_source + " ! decodebin ! ";

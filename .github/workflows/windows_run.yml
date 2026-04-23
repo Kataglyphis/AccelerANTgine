@@ -46,15 +46,14 @@ jobs:
 
       - name: Build + test + analyze + package in container (MSVC + ClangCL)
         run: |
-          docker run --rm `
+          docker run --rm --cpus 4 `
             --mount "type=bind,source=${{ github.workspace }},target=C:\workspace" `
             -w "C:\workspace" `
             "${{ env.GHCR_IMAGE_WIN }}" `
             powershell -NoProfile -ExecutionPolicy Bypass -File "C:\workspace\scripts\windows\Build-Windows.ps1" `
               -WorkspaceDir "C:\workspace" `
-              -BuildDir "${{ env.BUILD_DIR }}" `
-              -BuildDirRelease "${{ env.BUILD_DIR_RELEASE }}" `
-              -ClangProfilePreset "${{ env.CLANG_PROFILE_PRESET }}"
+              -BuildTargets "clangcl-debug,clangcl-profile,clangcl-release" `
+              -BuildDirClangRelease "${{ env.BUILD_DIR_RELEASE }}"
 
       - name: Upload Installers & Zip (container build)
         uses: actions/upload-artifact@v6.0.0

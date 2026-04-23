@@ -13,7 +13,7 @@ import kataglyphis.config_loader;
 namespace {
     volatile std::sig_atomic_t g_running = 1;
     
-    void signal_handler(int signal) {
+    void signal_handler(int /*signal*/) {
         g_running = 0;
     }
     
@@ -52,7 +52,7 @@ namespace {
         }
         return "Unknown";
     }
-}
+}  // namespace
 
 auto main(int argc, char** argv) -> int
 {
@@ -177,13 +177,13 @@ auto main(int argc, char** argv) -> int
     
     // Set up callbacks
     streamer.set_state_callback([](kataglyphis::webrtc::StreamState old_state, 
-                                   kataglyphis::webrtc::StreamState new_state) {
+                                   kataglyphis::webrtc::StreamState new_state) -> void {
         std::cout << "State: " << state_to_string(old_state) 
                   << " -> " << state_to_string(new_state) << '\n';
     });
     
-    streamer.set_error_callback([](kataglyphis::webrtc::WebRTCError error, 
-                                   const std::string& message) {
+    streamer.set_error_callback([](kataglyphis::webrtc::WebRTCError /*error*/, 
+                                   const std::string& message) -> void {
         std::cerr << "Error: " << message << '\n';
     });
     
@@ -206,13 +206,13 @@ auto main(int argc, char** argv) -> int
     }
     
     // Set up signal handler for graceful shutdown
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
+    (void)std::signal(SIGINT, signal_handler);
+    (void)std::signal(SIGTERM, signal_handler);
     
     std::cout << "Streaming... Press Ctrl+C to stop.\n";
     
     // Main loop - wait for signal
-    while (g_running) {
+    while (g_running != 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         
         // Check if still streaming
@@ -225,7 +225,7 @@ auto main(int argc, char** argv) -> int
     }
     
     std::cout << "\nStopping stream...\n";
-    streamer.stop();
+    (void)streamer.stop();
     
     kataglyphis::webrtc::WebRTCStreamer::deinitialize();
     

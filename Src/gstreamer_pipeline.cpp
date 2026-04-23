@@ -44,12 +44,12 @@ struct GStreamerPipeline::Impl
 
     void cleanup()
     {
-        if (pipeline) {
+        if (pipeline != nullptr) {
             gst_element_set_state(pipeline, GST_STATE_NULL);
             gst_object_unref(pipeline);
             pipeline = nullptr;
         }
-        if (main_loop) {
+        if (main_loop != nullptr) {
             g_main_loop_quit(main_loop);
             if (main_loop_thread.joinable()) { main_loop_thread.join(); }
             g_main_loop_unref(main_loop);
@@ -62,12 +62,12 @@ struct GStreamerPipeline::Impl
         GstSample *sample = nullptr;
         g_signal_emit_by_name(sink, "pull-sample", &sample);
 
-        if (sample) {
+        if (sample != nullptr) {
             GstBuffer *buffer = gst_sample_get_buffer(sample);
             GstCaps *caps = gst_sample_get_caps(sample);
             GstMapInfo map_info;
 
-            if (buffer && gst_buffer_map(buffer, &map_info, GST_MAP_READ)) {
+            if ((buffer != nullptr) && (gst_buffer_map(buffer, &map_info, GST_MAP_READ) != 0)) {
                 BufferInfo buffer_info;
                 buffer_info.data = map_info.data;
                 buffer_info.size = map_info.size;
@@ -82,26 +82,27 @@ struct GStreamerPipeline::Impl
                         tm.data_type = static_cast<int>(tensor->data_type);
 
                         gsize num_dims = 0;
-                        auto dims = gst_tensor_get_dims(const_cast<GstTensor *>(tensor), &num_dims);
+                        auto *dims = gst_tensor_get_dims(const_cast<GstTensor *>(tensor), &num_dims);
                         for (gsize j = 0; j < num_dims; ++j) { tm.dimensions.push_back(dims[j]); }
                         buffer_info.tensors.push_back(std::move(tm));
                     }
                 }
 
                 GstStructure *structure = gst_caps_get_structure(caps, 0);
-                if (structure) {
+                if (structure != nullptr) {
                     gst_structure_get_uint(structure, "width", &buffer_info.metadata.width);
                     gst_structure_get_uint(structure, "height", &buffer_info.metadata.height);
 
-                    guint fps_n, fps_d;
+                    guint fps_n = 0;
+                    guint fps_d = 0;
                     if (gst_structure_get_fraction(
-                          structure, "framerate", reinterpret_cast<gint *>(&fps_n), reinterpret_cast<gint *>(&fps_d))) {
+                          structure, "framerate", reinterpret_cast<gint *>(&fps_n), reinterpret_cast<gint *>(&fps_d)) != 0) {
                         buffer_info.metadata.fps_n = fps_n;
                         buffer_info.metadata.fps_d = fps_d;
                     }
 
                     const gchar *format = gst_structure_get_string(structure, "format");
-                    if (format) { buffer_info.metadata.format = format; }
+                    if (format != nullptr) { buffer_info.metadata.format = format; }
                 }
 
                 buffer_info.metadata.timestamp_ns = GST_BUFFER_PTS(buffer);
@@ -115,9 +116,9 @@ struct GStreamerPipeline::Impl
         }
     }
 
-    static GstPadProbeReturn on_pad_probe([[maybe_unused]] GstPad *pad,
+    static auto on_pad_probe([[maybe_unused]] GstPad *pad,
       [[maybe_unused]] GstPadProbeInfo *info,
-      [[maybe_unused]] gpointer user_data)
+      [[maybe_unused]] gpointer user_data) -> GstPadProbeReturn
     {
         return GST_PAD_PROBE_OK;
     }
@@ -129,7 +130,7 @@ GStreamerPipeline::~GStreamerPipeline() = default;
 
 GStreamerPipeline::GStreamerPipeline(GStreamerPipeline &&other) noexcept : impl_(std::move(other.impl_)) {}
 
-GStreamerPipeline &GStreamerPipeline::operator=(GStreamerPipeline &&other) noexcept
+auto GStreamerPipeline::operator=(GStreamerPipeline &&other) noexcept -> GStreamerPipeline &
 {
     if (this != &other) { impl_ = std::move(other.impl_); }
     return *this;
@@ -138,13 +139,13 @@ GStreamerPipeline &GStreamerPipeline::operator=(GStreamerPipeline &&other) noexc
 auto GStreamerPipeline::initialize_gstreamer(int *argc, char ***argv) -> std::expected<void, GStreamerError>
 {
 
-    std::lock_guard<std::mutex> lock(g_gstreamer_mutex);
+    std::scoped_lock lock(g_gstreamer_mutex);
 
     if (g_gstreamer_initialized.load()) { return {}; }
 
     GError *error = nullptr;
-    if (!gst_init_check(argc, argv, &error)) {
-        if (error) { g_error_free(error); }
+    if (gst_init_check(argc, argv, &error) == 0) {
+        if (error != nullptr) { g_error_free(error); }
         return std::unexpected(GStreamerError::InitializationFailed);
     }
 
@@ -154,7 +155,7 @@ auto GStreamerPipeline::initialize_gstreamer(int *argc, char ***argv) -> std::ex
 
 auto GStreamerPipeline::deinitialize_gstreamer() -> void
 {
-    std::lock_guard<std::mutex> lock(g_gstreamer_mutex);
+    std::scoped_lock lock(g_gstreamer_mutex);
     if (g_gstreamer_initialized.load()) {
         gst_deinit();
         g_gstreamer_initialized.store(false);
@@ -171,12 +172,12 @@ auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::ex
     GError *error = nullptr;
     impl_->pipeline = gst_parse_launch(config.pipeline_description.c_str(), &error);
 
-    if (error) {
+    if (error != nullptr) {
         g_error_free(error);
         return std::unexpected(GStreamerError::PipelineCreationFailed);
     }
 
-    if (!impl_->pipeline) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
 
     if (config.enable_tensor_meta) {}
 
@@ -203,15 +204,16 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
 
     std::string shape_str;
     for (std::size_t i = 0; i < input_shape.size(); ++i) {
-        if (i > 0) shape_str += ",";
+        if (i > 0) { shape_str += ",";
+}
         shape_str += std::to_string(input_shape[i]);
     }
 
     std::string pipeline_desc;
 
-    if (input_source.find("://") != std::string::npos) {
+    if (input_source.contains("://")) {
         pipeline_desc = "uridecodebin uri=" + input_source + " ! ";
-    } else if (input_source.find("/dev/video") == 0) {
+    } else if (input_source.starts_with("/dev/video")) {
         pipeline_desc = "v4l2src device=" + input_source + " ! ";
     } else {
         pipeline_desc = "filesrc location=" + input_source + " ! decodebin ! ";
@@ -232,15 +234,15 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
     GError *error = nullptr;
     impl_->pipeline = gst_parse_launch(pipeline_desc.c_str(), &error);
 
-    if (error) {
+    if (error != nullptr) {
         g_error_free(error);
         return std::unexpected(GStreamerError::PipelineCreationFailed);
     }
 
-    if (!impl_->pipeline) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
 
     impl_->appsink = gst_bin_get_by_name(GST_BIN(impl_->pipeline), "sink");
-    if (!impl_->appsink) { return std::unexpected(GStreamerError::ElementCreationFailed); }
+    if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
 
     g_object_set(impl_->appsink, "emit-signals", TRUE, nullptr);
 
@@ -249,7 +251,7 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
 
 auto GStreamerPipeline::start() -> std::expected<void, GStreamerError>
 {
-    if (!impl_->pipeline) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_PLAYING);
 
@@ -262,7 +264,7 @@ auto GStreamerPipeline::start() -> std::expected<void, GStreamerError>
 
 auto GStreamerPipeline::stop() -> std::expected<void, GStreamerError>
 {
-    if (!impl_->pipeline) { return {}; }
+    if (impl_->pipeline == nullptr) { return {}; }
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_NULL);
 
@@ -275,7 +277,7 @@ auto GStreamerPipeline::stop() -> std::expected<void, GStreamerError>
 
 auto GStreamerPipeline::pause() -> std::expected<void, GStreamerError>
 {
-    if (!impl_->pipeline) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_PAUSED);
 
@@ -295,7 +297,7 @@ auto GStreamerPipeline::set_buffer_callback(BufferCallback callback) -> void
 {
     impl_->buffer_callback = std::move(callback);
 
-    if (impl_->appsink) {
+    if (impl_->appsink != nullptr) {
         g_signal_connect(impl_->appsink, "new-sample", G_CALLBACK(&Impl::on_new_sample), impl_.get());
     }
 }
@@ -304,12 +306,12 @@ auto GStreamerPipeline::pull_sample([[maybe_unused]] std::uint32_t timeout_ms)
   -> std::expected<BufferInfo, GStreamerError>
 {
 
-    if (!impl_->appsink) { return std::unexpected(GStreamerError::ElementCreationFailed); }
+    if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
 
     GstSample *sample = nullptr;
     g_signal_emit_by_name(impl_->appsink, "pull-sample", &sample);
 
-    if (!sample) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
+    if (sample == nullptr) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
 
     GstBuffer *buffer = gst_sample_get_buffer(sample);
     GstCaps *caps = gst_sample_get_caps(sample);
@@ -317,18 +319,18 @@ auto GStreamerPipeline::pull_sample([[maybe_unused]] std::uint32_t timeout_ms)
 
     BufferInfo buffer_info;
 
-    if (buffer && gst_buffer_map(buffer, &map_info, GST_MAP_READ)) {
+    if ((buffer != nullptr) && (gst_buffer_map(buffer, &map_info, GST_MAP_READ) != 0)) {
         buffer_info.data = map_info.data;
         buffer_info.size = map_info.size;
 
-        if (caps) {
+        if (caps != nullptr) {
             GstStructure *structure = gst_caps_get_structure(caps, 0);
-            if (structure) {
+            if (structure != nullptr) {
                 gst_structure_get_uint(structure, "width", &buffer_info.metadata.width);
                 gst_structure_get_uint(structure, "height", &buffer_info.metadata.height);
 
                 const gchar *format = gst_structure_get_string(structure, "format");
-                if (format) { buffer_info.metadata.format = format; }
+                if (format != nullptr) { buffer_info.metadata.format = format; }
             }
         }
 
@@ -341,7 +343,7 @@ auto GStreamerPipeline::pull_sample([[maybe_unused]] std::uint32_t timeout_ms)
                 tm.data_type = static_cast<int>(tensor->data_type);
 
                 gsize num_dims = 0;
-                auto dims = gst_tensor_get_dims(const_cast<GstTensor *>(tensor), &num_dims);
+                auto *dims = gst_tensor_get_dims(const_cast<GstTensor *>(tensor), &num_dims);
                 for (gsize j = 0; j < num_dims; ++j) { tm.dimensions.push_back(dims[j]); }
                 buffer_info.tensors.push_back(std::move(tm));
             }
@@ -358,13 +360,13 @@ auto GStreamerPipeline::push_buffer(void *data, std::size_t size, const FrameMet
   -> std::expected<void, GStreamerError>
 {
 
-    if (!impl_->appsrc) { return std::unexpected(GStreamerError::ElementCreationFailed); }
+    if (impl_->appsrc == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
 
     GstBuffer *buffer = gst_buffer_new_allocate(nullptr, size, nullptr);
-    if (!buffer) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
+    if (buffer == nullptr) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
 
     GstMapInfo map_info;
-    if (!gst_buffer_map(buffer, &map_info, GST_MAP_WRITE)) {
+    if (gst_buffer_map(buffer, &map_info, GST_MAP_WRITE) == 0) {
         gst_buffer_unref(buffer);
         return std::unexpected(GStreamerError::BufferAllocationFailed);
     }
@@ -386,10 +388,10 @@ auto GStreamerPipeline::push_buffer(void *data, std::size_t size, const FrameMet
 
 auto GStreamerPipeline::get_position_ns() const -> std::expected<std::uint64_t, GStreamerError>
 {
-    if (!impl_->pipeline) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
 
-    gint64 position;
-    if (!gst_element_query_position(impl_->pipeline, GST_FORMAT_TIME, &position)) {
+    gint64 position = 0;
+    if (gst_element_query_position(impl_->pipeline, GST_FORMAT_TIME, &position) == 0) {
         return std::unexpected(GStreamerError::ResourceNotFound);
     }
 
@@ -398,10 +400,10 @@ auto GStreamerPipeline::get_position_ns() const -> std::expected<std::uint64_t, 
 
 auto GStreamerPipeline::get_duration_ns() const -> std::expected<std::uint64_t, GStreamerError>
 {
-    if (!impl_->pipeline) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
 
-    gint64 duration;
-    if (!gst_element_query_duration(impl_->pipeline, GST_FORMAT_TIME, &duration)) {
+    gint64 duration = 0;
+    if (gst_element_query_duration(impl_->pipeline, GST_FORMAT_TIME, &duration) == 0) {
         return std::unexpected(GStreamerError::ResourceNotFound);
     }
 
@@ -410,12 +412,12 @@ auto GStreamerPipeline::get_duration_ns() const -> std::expected<std::uint64_t, 
 
 auto GStreamerPipeline::seek(std::uint64_t timestamp_ns) -> std::expected<void, GStreamerError>
 {
-    if (!impl_->pipeline) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
 
-    if (!gst_element_seek_simple(impl_->pipeline,
+    if (gst_element_seek_simple(impl_->pipeline,
           GST_FORMAT_TIME,
           static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
-          static_cast<gint64>(timestamp_ns))) {
+          static_cast<gint64>(timestamp_ns)) == 0) {
         return std::unexpected(GStreamerError::ResourceNotFound);
     }
 
@@ -426,7 +428,7 @@ auto GStreamerPipeline::get_caps_string() const -> std::string { return impl_->c
 
 auto GStreamerPipeline::get_current_state() const -> int
 {
-    if (!impl_->pipeline) { return GST_STATE_NULL; }
+    if (impl_->pipeline == nullptr) { return GST_STATE_NULL; }
 
     GstState state;
     gst_element_get_state(impl_->pipeline, &state, nullptr, 0);
@@ -447,7 +449,7 @@ auto create_video_inference_pipeline(const std::string &video_source,
 
     std::string pipeline_desc;
 
-    if (video_source.find("://") != std::string::npos) {
+    if (video_source.contains("://")) {
         pipeline_desc = "uridecodebin uri=" + video_source + " ! ";
     } else {
         pipeline_desc = "filesrc location=" + video_source + " ! decodebin ! ";

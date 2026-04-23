@@ -15,7 +15,7 @@ namespace inference = kataglyphis::inference;
 namespace gstreamer = kataglyphis::gstreamer;
 namespace detection = kataglyphis::detection;
 
-void print_detection_results(const detection::DetectionResult &result)
+static void print_detection_results(const detection::DetectionResult &result)
 {
     std::cout << "Detection Results:\n";
     std::cout << "  Inference time: " << result.inference_time_ms << " ms\n";
@@ -23,13 +23,13 @@ void print_detection_results(const detection::DetectionResult &result)
     std::cout << "  Objects detected: " << result.boxes.size() << "\n\n";
 
     for (const auto &box : result.boxes) {
-        std::cout << "  - " << box.class_name << " (confidence: " << (box.confidence * 100.0f) << "%)\n"
+        std::cout << "  - " << box.class_name << " (confidence: " << (box.confidence * 100.0F) << "%)\n"
                   << "    Position: (" << box.x << ", " << box.y << ")\n"
                   << "    Size: " << box.width << "x" << box.height << "\n\n";
     }
 }
 
-int run_onnx_inference_example(const std::string &model_path)
+static auto run_onnx_inference_example(const std::string &model_path) -> int
 {
     std::cout << "=== ONNX Runtime Inference Example ===\n\n";
 
@@ -58,7 +58,8 @@ int run_onnx_inference_example(const std::string &model_path)
         if (shape) {
             std::cout << "  " << name << ": [";
             for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
-                if (i > 0) std::cout << ", ";
+                if (i > 0) { std::cout << ", ";
+}
                 std::cout << shape->dimensions[i];
             }
             std::cout << "]\n";
@@ -71,7 +72,8 @@ int run_onnx_inference_example(const std::string &model_path)
         if (shape) {
             std::cout << "  " << name << ": [";
             for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
-                if (i > 0) std::cout << ", ";
+                if (i > 0) { std::cout << ", ";
+}
                 std::cout << shape->dimensions[i];
             }
             std::cout << "]\n";
@@ -84,7 +86,7 @@ int run_onnx_inference_example(const std::string &model_path)
     input_shape.dimensions = { 1, 3, 640, 640 };
     std::size_t total_elements = input_shape.total_elements();
 
-    std::vector<float> dummy_input(total_elements, 0.5f);
+    std::vector<float> dummy_input(total_elements, 0.5F);
 
     auto result = engine.run_inference(dummy_input, input_shape, input_names[0]);
     if (!result) {
@@ -100,7 +102,8 @@ int run_onnx_inference_example(const std::string &model_path)
         const auto &output = result->outputs[i];
         std::cout << "  Output " << i << " shape: [";
         for (std::size_t j = 0; j < output.shape.dimensions.size(); ++j) {
-            if (j > 0) std::cout << ", ";
+            if (j > 0) { std::cout << ", ";
+}
             std::cout << output.shape.dimensions[j];
         }
         std::cout << "] (" << output.data.size() << " elements)\n";
@@ -109,7 +112,7 @@ int run_onnx_inference_example(const std::string &model_path)
     return 0;
 }
 
-int run_gstreamer_pipeline_example()
+static auto run_gstreamer_pipeline_example() -> int
 {
     std::cout << "\n=== GStreamer Pipeline Example ===\n\n";
 
@@ -137,7 +140,7 @@ int run_gstreamer_pipeline_example()
         return 1;
     }
 
-    pipeline.set_buffer_callback([](const gstreamer::BufferInfo &buffer) {
+    pipeline.set_buffer_callback([](const gstreamer::BufferInfo &buffer) -> void {
         std::cout << "Received buffer: " << buffer.size << " bytes, " << buffer.metadata.width << "x"
                   << buffer.metadata.height << "\n";
     });
@@ -165,7 +168,7 @@ int run_gstreamer_pipeline_example()
     return 0;
 }
 
-int run_yolo_detection_example(const std::string &model_path)
+static auto run_yolo_detection_example(const std::string &model_path) -> int
 {
     std::cout << "\n=== YOLO Detection Example ===\n\n";
 
@@ -175,8 +178,8 @@ int run_yolo_detection_example(const std::string &model_path)
     config.model_path = model_path;
     config.input_width = 640;
     config.input_height = 640;
-    config.confidence_threshold = 0.25f;
-    config.nms_threshold = 0.45f;
+    config.confidence_threshold = 0.25F;
+    config.nms_threshold = 0.45F;
     config.num_classes = 80;
 
     std::cout << "Initializing YOLO detector with model: " << model_path << "\n";
@@ -192,7 +195,7 @@ int run_yolo_detection_example(const std::string &model_path)
     std::cout << "Performing detection on dummy image data...\n";
 
     std::size_t input_size = 3 * 640 * 640;
-    std::vector<float> dummy_image(input_size, 0.5f);
+    std::vector<float> dummy_image(input_size, 0.5F);
 
     auto result = detector.detect(dummy_image, 640, 480);
     if (!result) {
@@ -205,7 +208,7 @@ int run_yolo_detection_example(const std::string &model_path)
     return 0;
 }
 
-int run_video_detection_example(const std::string &model_path)
+static auto run_video_detection_example(const std::string &model_path) -> int
 {
     std::cout << "\n=== Video Detection Pipeline Example ===\n\n";
 
@@ -218,7 +221,7 @@ int run_video_detection_example(const std::string &model_path)
     }
 
     pipeline_result->set_detection_callback(
-      [](const detection::DetectionResult &result, const gstreamer::BufferInfo &buffer) {
+      [](const detection::DetectionResult &result, const gstreamer::BufferInfo &buffer) -> void {
           std::cout << "Frame " << buffer.metadata.timestamp_ns << ": " << result.boxes.size() << " objects detected\n";
       });
 
@@ -239,7 +242,7 @@ int run_video_detection_example(const std::string &model_path)
     return 0;
 }
 
-void print_usage(const char *program_name)
+static void print_usage(const char *program_name)
 {
     std::cout << "Usage: " << program_name << " [options]\n\n"
               << "Options:\n"
@@ -254,7 +257,7 @@ void print_usage(const char *program_name)
               << "  " << program_name << " --onnx-only\n";
 }
 
-int main(int argc, char *argv[])
+auto main(int argc, char *argv[]) -> int
 {
     std::string model_path = "models/yolo26n.onnx";
     bool run_onnx = false;

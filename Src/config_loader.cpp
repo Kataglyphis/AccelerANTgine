@@ -2,8 +2,36 @@ module;
 
 #include <expected>
 #include <fstream>
-#include <nlohmann/json.hpp>
+#include <string>
 #include <sstream>
+
+#include <nlohmann/json_fwd.hpp>
+
+NLOHMANN_JSON_NAMESPACE_BEGIN
+namespace detail {
+    template <typename... Args>
+    static inline void concat_into(std::string& out, char arg, Args&&... rest);
+    
+    static inline void concat_into(std::string& out, char arg);
+}
+NLOHMANN_JSON_NAMESPACE_END
+
+#include <nlohmann/json.hpp>
+
+// Define the workaround after json.hpp so it can see json.hpp's templates for recursion
+NLOHMANN_JSON_NAMESPACE_BEGIN
+namespace detail {
+    template <typename... Args>
+    inline void concat_into(std::string& out, char arg, Args&&... rest) {
+        out += arg;
+        concat_into(out, std::forward<Args>(rest)...);
+    }
+    
+    inline void concat_into(std::string& out, char arg) {
+        out += arg;
+    }
+}  // namespace detail
+NLOHMANN_JSON_NAMESPACE_END
 
 module kataglyphis.config_loader;
 
@@ -14,7 +42,7 @@ using json = nlohmann::json;
 auto get_default_webrtc_config() -> WebRTCConfig
 {
     WebRTCConfig config;
-    config.stun_servers.push_back("stun:stun.l.google.com:19302");
+    config.stun_servers.emplace_back("stun:stun.l.google.com:19302");
     return config;
 }
 

@@ -71,9 +71,9 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     ~GStreamerPipeline();
 
     GStreamerPipeline(const GStreamerPipeline &) = delete;
-    GStreamerPipeline &operator=(const GStreamerPipeline &) = delete;
-    GStreamerPipeline(GStreamerPipeline &&) noexcept;
-    GStreamerPipeline &operator=(GStreamerPipeline &&) noexcept;
+    auto operator=(const GStreamerPipeline &) -> GStreamerPipeline & = delete;
+    GStreamerPipeline(GStreamerPipeline && /*other*/) noexcept;
+    auto operator=(GStreamerPipeline && /*other*/) noexcept -> GStreamerPipeline &;
 
     [[nodiscard]] static auto initialize_gstreamer(int *argc = nullptr, char ***argv = nullptr)
       -> std::expected<void, GStreamerError>;
