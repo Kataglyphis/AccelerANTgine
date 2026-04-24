@@ -5,7 +5,7 @@ module;
 
 export module kataglyphis.inference;
 
-export namespace mylib {
+export namespace kataglyphis::inference {
 
 class KATAGLYPHIS_CPP_API MyCalculator
 {
@@ -15,4 +15,4 @@ class KATAGLYPHIS_CPP_API MyCalculator
     [[nodiscard]] auto version() const -> std::string;
 };
 
-}// namespace mylib
+}// namespace kataglyphis::inference

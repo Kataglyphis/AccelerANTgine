@@ -5,5 +5,17 @@ repos:
         name: clang-format
         entry: clang-format -i
         language: system
-        files: \.(c|cc|cpp|cxx|h|hh|hpp)$
+        files: \.(c|cc|cpp|cxx|h|hh|hpp|ixx)$
+        pass_filenames: true
+      - id: clang-tidy
+        name: clang-tidy
+        entry: clang-tidy
+        language: system
+        files: \.(c|cc|cpp|cxx|h|hh|hpp|ixx)$
+        pass_filenames: true
+      - id: cmake-format
+        name: cmake-format
+        entry: cmake-format -i
+        language: system
+        files: \.cmake$
         pass_filenames: true

@@ -23,9 +23,9 @@ auto get_default_webrtc_config() -> WebRTCConfig
 
 auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRTCConfig, ConfigError>
 {
-    if (!json::accept(json_content)) { return std::unexpected(ConfigError::ParseError); }
+    auto j = json::parse(json_content, nullptr, false);
+    if (j.is_discarded()) { return std::unexpected(ConfigError::ParseError); }
 
-    auto j = json::parse(json_content);
     WebRTCConfig config;
     auto safe_get_string = [&j](const std::string &key) -> std::expected<std::string, ConfigError> {
         if (!j.contains(key) || !j[key].is_string()) { return std::unexpected(ConfigError::InvalidValue); }

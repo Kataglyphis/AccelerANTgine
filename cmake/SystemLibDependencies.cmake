@@ -25,7 +25,7 @@ endif()
 
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(GSTREAMER REQUIRED 
+pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET
     gstreamer-1.0>=1.24
     gstreamer-app-1.0>=1.24
     gstreamer-video-1.0>=1.24
@@ -34,7 +34,7 @@ pkg_check_modules(GSTREAMER REQUIRED
     gstreamer-sdp-1.0>=1.24
 )
 
-pkg_check_modules(GLIB REQUIRED glib-2.0>=2.70)
+pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0>=2.70)
 
 # ONNX Runtime dependencies
 # Check multiple possible installation locations:
@@ -164,8 +164,8 @@ if(NOT ONNXRUNTIME_FOUND)
         # Clear cache for next iteration
         unset(_ONNXRUNTIME_LIB CACHE)
         unset(_ONNXRUNTIME_INCLUDE_DIR CACHE)
-    endif()
-endforeach()
+        endif()
+    endforeach()
 endif()
 
 # Fallback to pkg-config (Linux only)
@@ -193,38 +193,7 @@ if(NOT ONNXRUNTIME_FOUND)
     endif()
 endif()
 
-# Create imported targets for GStreamer
-if(GSTREAMER_FOUND)
-    add_library(gstreamer::gstreamer INTERFACE IMPORTED)
-    target_include_directories(gstreamer::gstreamer INTERFACE ${GSTREAMER_INCLUDE_DIRS})
-    target_link_directories(gstreamer::gstreamer INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::gstreamer INTERFACE ${GSTREAMER_LIBRARIES})
-    
-    add_library(gstreamer::app INTERFACE IMPORTED)
-    target_include_directories(gstreamer::app INTERFACE ${GSTREAMER_INCLUDE_DIRS})
-    target_link_directories(gstreamer::app INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::app INTERFACE gstapp-1.0)
-    
-    add_library(gstreamer::video INTERFACE IMPORTED)
-    target_include_directories(gstreamer::video INTERFACE ${GSTREAMER_INCLUDE_DIRS})
-    target_link_directories(gstreamer::video INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::video INTERFACE gstvideo-1.0)
-    
-    add_library(gstreamer::analytics INTERFACE IMPORTED)
-    target_include_directories(gstreamer::analytics INTERFACE ${GSTREAMER_INCLUDE_DIRS})
-    target_link_directories(gstreamer::analytics INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::analytics INTERFACE gstanalytics-1.0)
-    
-    add_library(gstreamer::webrtc INTERFACE IMPORTED)
-    target_include_directories(gstreamer::webrtc INTERFACE ${GSTREAMER_INCLUDE_DIRS})
-    target_link_directories(gstreamer::webrtc INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::webrtc INTERFACE gstwebrtc-1.0)
-    
-    add_library(gstreamer::sdp INTERFACE IMPORTED)
-    target_include_directories(gstreamer::sdp INTERFACE ${GSTREAMER_INCLUDE_DIRS})
-    target_link_directories(gstreamer::sdp INTERFACE ${GSTREAMER_LIBRARY_DIRS})
-    target_link_libraries(gstreamer::sdp INTERFACE gstsdp-1.0)
-endif()
+# GStreamer and ONNX Runtime are now linked via IMPORTED_TARGET in Src/CMakeLists.txt
 
 # Create imported target for ONNX Runtime
 if(ONNXRUNTIME_FOUND AND ONNXRUNTIME_LIBRARY)

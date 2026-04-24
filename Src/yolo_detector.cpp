@@ -132,7 +132,7 @@ auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, O
     session_config.intra_op_num_threads = 4;
     session_config.inter_op_num_threads = 4;
     session_config.enable_cuda = false;
-    session_config.execution_mode = "sequential";
+    session_config.execution_mode = inference::ExecutionMode::Sequential;
 
     auto result = impl_->engine.initialize(session_config);
     if (!result) { return std::unexpected(result.error()); }
@@ -169,10 +169,17 @@ auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline,
     if (!buffer_result) { return std::unexpected(OnnxError::InputAllocationFailed); }
 
     const auto &buffer_info = buffer_result.value();
-    const auto *data = static_cast<const float *>(buffer_info.data);
-    std::size_t size = buffer_info.size / sizeof(float);
+    if (buffer_info.data.empty()) { return std::unexpected(OnnxError::InputAllocationFailed); }
 
-    return detect(std::span<const float>(data, size), buffer_info.metadata.width, buffer_info.metadata.height);
+    if (buffer_info.size % sizeof(float) != 0) { return std::unexpected(OnnxError::InvalidInputShape); }
+
+    if (buffer_info.data.size() < buffer_info.size) { return std::unexpected(OnnxError::InputAllocationFailed); }
+
+    std::size_t num_floats = buffer_info.size / sizeof(float);
+    std::vector<float> float_data(num_floats);
+    std::memcpy(float_data.data(), buffer_info.data.data(), buffer_info.size);
+
+    return detect(std::span<const float>(float_data.data(), num_floats), buffer_info.metadata.width, buffer_info.metadata.height);
 }
 
 auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
@@ -199,14 +206,20 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
     }
 
     const float *data = output.data.data();
+    auto data_size = static_cast<std::size_t>(output.data.size());
+
+    if (dims.empty()) { return result; }
 
     float scale_x = static_cast<float>(original_width) / static_cast<float>(impl_->config.input_width);
     float scale_y = static_cast<float>(original_height) / static_cast<float>(impl_->config.input_height);
 
     std::vector<BoundingBox> all_boxes;
+    all_boxes.reserve(num_detections);
 
     for (std::size_t i = 0; i < num_detections; ++i) {
         std::size_t offset = i * values_per_detection;
+
+        if (offset + 4 >= data_size) { break; }
 
         float cx = data[offset + 0];
         float cy = data[offset + 1];
@@ -221,6 +234,7 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
 
         if (values_per_detection > 5) {
             for (int c = 0; c < impl_->config.num_classes; ++c) {
+                if (offset + 5 + static_cast<std::size_t>(c) >= data_size) { break; }
                 float class_conf = data[offset + 5 + c];
                 if (class_conf > best_class_conf) {
                     best_class_conf = class_conf;
@@ -301,7 +315,7 @@ auto YoloDetector::calculate_iou(const BoundingBox &a, const BoundingBox &b) -> 
     return intersection / union_area;
 }
 
-auto YoloDetector::get_coco_class_name(int class_id) -> std::string
+auto YoloDetector::get_coco_class_name(int class_id) -> std::string_view
 {
     if (class_id >= 0 && std::cmp_less(class_id, COCO_CLASSES.size())) { return COCO_CLASSES[class_id]; }
     return "unknown";
@@ -321,8 +335,16 @@ struct VideoDetectorPipeline::Impl
         if (frame_callback) { frame_callback(buffer); }
 
         if (detector.is_initialized()) {
+            if (buffer.data.empty() || buffer.size % sizeof(float) != 0) { return; }
+
+            if (buffer.data.size() < buffer.size) { return; }
+
+            std::size_t num_floats = buffer.size / sizeof(float);
+            std::vector<float> float_data(num_floats);
+            std::memcpy(float_data.data(), buffer.data.data(), buffer.size);
+
             auto detection = detector.detect(
-              std::span<const float>(static_cast<const float *>(buffer.data), buffer.size / sizeof(float)),
+              std::span<const float>(float_data.data(), num_floats),
               buffer.metadata.width,
               buffer.metadata.height);
 

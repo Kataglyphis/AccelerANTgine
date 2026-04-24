@@ -22,7 +22,8 @@ enum class OnnxError {
     InvalidInputShape,
     InvalidInputType,
     MemoryAllocationError,
-    SessionNotInitialized
+    SessionNotInitialized,
+    OutputNotFound
 };
 
 struct TensorShape
@@ -49,6 +50,11 @@ struct InferenceResult
     double inference_time_ms{};
 };
 
+enum class ExecutionMode {
+    Sequential,
+    Parallel
+};
+
 struct SessionConfig
 {
     std::filesystem::path model_path;
@@ -56,7 +62,7 @@ struct SessionConfig
     int inter_op_num_threads = 4;
     bool enable_cuda = false;
     bool enable_memory_pattern = true;
-    std::string execution_mode = "sequential";
+    ExecutionMode execution_mode{ ExecutionMode::Sequential };
 };
 
 class KATAGLYPHIS_CPP_API OnnxInferenceEngine

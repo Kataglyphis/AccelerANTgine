@@ -58,7 +58,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     impl_->session_options->SetIntraOpNumThreads(config.intra_op_num_threads);
     impl_->session_options->SetInterOpNumThreads(config.inter_op_num_threads);
 
-    if (config.execution_mode == "parallel") {
+    if (config.execution_mode == ExecutionMode::Parallel) {
         impl_->session_options->SetExecutionMode(ORT_PARALLEL);
     } else {
         impl_->session_options->SetExecutionMode(ORT_SEQUENTIAL);
@@ -98,6 +98,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     }
 
     impl_->initialized = true;
+
     return {};
 }
 
@@ -117,10 +118,12 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
     input_dims.reserve(input_shape.dimensions.size());
     for (const auto dim : input_shape.dimensions) { input_dims.push_back(static_cast<int64_t>(dim)); }
 
+    std::vector<float> mutable_input(input_data.begin(), input_data.end());
+
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
     Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-      memory_info, const_cast<float *>(input_data.data()), input_data.size(), input_dims.data(), input_dims.size());
+      memory_info, mutable_input.data(), mutable_input.size(), input_dims.data(), input_dims.size());
 
     const char *input_name_ptr = input_name.c_str();
 
@@ -173,8 +176,10 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
         dims.reserve(tensor_data.shape.dimensions.size());
         for (const auto dim : tensor_data.shape.dimensions) { dims.push_back(static_cast<int64_t>(dim)); }
 
+        std::vector<float> mutable_data(tensor_data.data.begin(), tensor_data.data.end());
+
         auto input_tensor = Ort::Value::CreateTensor<float>(
-          memory_info, const_cast<float *>(tensor_data.data.data()), tensor_data.data.size(), dims.data(), dims.size());
+          memory_info, mutable_data.data(), mutable_data.size(), dims.data(), dims.size());
 
         input_tensors.push_back(std::move(input_tensor));
         input_names.push_back(name.c_str());
@@ -228,7 +233,7 @@ auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std:
             return result;
         }
     }
-    return std::unexpected(OnnxError::InvalidInputShape);
+    return std::unexpected(OnnxError::OutputNotFound);
 }
 
 auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
@@ -244,7 +249,7 @@ auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std
             return result;
         }
     }
-    return std::unexpected(OnnxError::InvalidInputShape);
+    return std::unexpected(OnnxError::OutputNotFound);
 }
 
 auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig
@@ -255,7 +260,7 @@ auto create_default_session_config(const std::filesystem::path &model_path) -> S
     config.inter_op_num_threads = 4;
     config.enable_cuda = false;
     config.enable_memory_pattern = true;
-    config.execution_mode = "sequential";
+    config.execution_mode = ExecutionMode::Sequential;
     return config;
 }
 

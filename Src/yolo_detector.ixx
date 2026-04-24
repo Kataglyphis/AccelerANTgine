@@ -7,6 +7,7 @@ module;
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 export module kataglyphis.yolo_detector;
@@ -69,7 +70,7 @@ class KATAGLYPHIS_CPP_API YoloDetector
     [[nodiscard]] auto detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline, std::uint32_t timeout_ms = 5000)
       -> std::expected<DetectionResult, OnnxError>;
 
-    static auto get_coco_class_name(int class_id) -> std::string;
+    static auto get_coco_class_name(int class_id) -> std::string_view;
 
   private:
     struct Impl;

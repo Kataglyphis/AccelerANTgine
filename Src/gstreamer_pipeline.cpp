@@ -33,6 +33,7 @@ struct GStreamerPipeline::Impl
     GstElement *appsrc{ nullptr };
 
     BufferCallback buffer_callback;
+    std::mutex callback_mutex;
     std::atomic<bool> is_playing{ false };
     std::atomic<bool> is_paused{ false };
     std::string caps_string;
@@ -44,16 +45,16 @@ struct GStreamerPipeline::Impl
 
     void cleanup()
     {
-        if (pipeline != nullptr) {
-            gst_element_set_state(pipeline, GST_STATE_NULL);
-            gst_object_unref(pipeline);
-            pipeline = nullptr;
-        }
         if (main_loop != nullptr) {
             g_main_loop_quit(main_loop);
             if (main_loop_thread.joinable()) { main_loop_thread.join(); }
             g_main_loop_unref(main_loop);
             main_loop = nullptr;
+        }
+        if (pipeline != nullptr) {
+            gst_element_set_state(pipeline, GST_STATE_NULL);
+            gst_object_unref(pipeline);
+            pipeline = nullptr;
         }
     }
 
@@ -67,10 +68,11 @@ struct GStreamerPipeline::Impl
             GstCaps *caps = gst_sample_get_caps(sample);
             GstMapInfo map_info;
 
-            if ((buffer != nullptr) && (gst_buffer_map(buffer, &map_info, GST_MAP_READ) != 0)) {
+if ((buffer != nullptr) && (gst_buffer_map(buffer, &map_info, GST_MAP_READ) != 0)) {
                 BufferInfo buffer_info;
-                buffer_info.data = map_info.data;
                 buffer_info.size = map_info.size;
+                buffer_info.data.resize(map_info.size);
+                std::memcpy(buffer_info.data.data(), map_info.data, map_info.size);
 
                 if (auto *meta = gst_buffer_get_tensor_meta(buffer)) {
                     buffer_info.tensors.reserve(meta->num_tensors);
@@ -108,9 +110,12 @@ struct GStreamerPipeline::Impl
                 buffer_info.metadata.timestamp_ns = GST_BUFFER_PTS(buffer);
                 buffer_info.metadata.duration_ns = GST_BUFFER_DURATION(buffer);
 
-                if (self->buffer_callback) { self->buffer_callback(buffer_info); }
-
                 gst_buffer_unmap(buffer, &map_info);
+
+                {
+                    std::scoped_lock lock(self->callback_mutex);
+                    if (self->buffer_callback) { self->buffer_callback(buffer_info); }
+                }
             }
             gst_sample_unref(sample);
         }
@@ -173,13 +178,18 @@ auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::ex
     impl_->pipeline = gst_parse_launch(config.pipeline_description.c_str(), &error);
 
     if (error != nullptr) {
+        std::string error_msg = error->message;
+        g_printerr("Pipeline creation failed: %s\n", error_msg.c_str());
         g_error_free(error);
         return std::unexpected(GStreamerError::PipelineCreationFailed);
     }
 
-    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) {
+        g_printerr("Pipeline creation returned null\n");
+        return std::unexpected(GStreamerError::PipelineCreationFailed);
+    }
 
-    if (config.enable_tensor_meta) {}
+    // Tensor metadata support will be implemented in a future release.
 
     return {};
 }
@@ -235,11 +245,16 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
     impl_->pipeline = gst_parse_launch(pipeline_desc.c_str(), &error);
 
     if (error != nullptr) {
+        std::string error_msg = error->message;
+        g_printerr("Inference pipeline creation failed: %s\n", error_msg.c_str());
         g_error_free(error);
         return std::unexpected(GStreamerError::PipelineCreationFailed);
     }
 
-    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+    if (impl_->pipeline == nullptr) {
+        g_printerr("Inference pipeline creation returned null\n");
+        return std::unexpected(GStreamerError::PipelineCreationFailed);
+    }
 
     impl_->appsink = gst_bin_get_by_name(GST_BIN(impl_->pipeline), "sink");
     if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
@@ -295,21 +310,30 @@ auto GStreamerPipeline::is_paused() const -> bool { return impl_->is_paused.load
 
 auto GStreamerPipeline::set_buffer_callback(BufferCallback callback) -> void
 {
-    impl_->buffer_callback = std::move(callback);
+    {
+        std::scoped_lock lock(impl_->callback_mutex);
+        impl_->buffer_callback = std::move(callback);
+    }
 
     if (impl_->appsink != nullptr) {
         g_signal_connect(impl_->appsink, "new-sample", G_CALLBACK(&Impl::on_new_sample), impl_.get());
     }
 }
 
-auto GStreamerPipeline::pull_sample([[maybe_unused]] std::uint32_t timeout_ms)
+auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms)
   -> std::expected<BufferInfo, GStreamerError>
 {
 
     if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
 
     GstSample *sample = nullptr;
-    g_signal_emit_by_name(impl_->appsink, "pull-sample", &sample);
+
+    if (timeout_ms == 0) {
+        g_signal_emit_by_name(impl_->appsink, "pull-sample", &sample);
+    } else {
+        GstClockTime timeout = static_cast<GstClockTime>(timeout_ms) * GST_MSECOND;
+        sample = gst_app_sink_try_pull_sample(GST_APP_SINK(impl_->appsink), timeout);
+    }
 
     if (sample == nullptr) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
 
@@ -320,8 +344,9 @@ auto GStreamerPipeline::pull_sample([[maybe_unused]] std::uint32_t timeout_ms)
     BufferInfo buffer_info;
 
     if ((buffer != nullptr) && (gst_buffer_map(buffer, &map_info, GST_MAP_READ) != 0)) {
-        buffer_info.data = map_info.data;
         buffer_info.size = map_info.size;
+        buffer_info.data.resize(map_info.size);
+        std::memcpy(buffer_info.data.data(), map_info.data, map_info.size);
 
         if (caps != nullptr) {
             GstStructure *structure = gst_caps_get_structure(caps, 0);

@@ -64,7 +64,16 @@ function(
   if(LIST_OF_SANITIZERS)
     if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang" AND MSVC)
       set(_CLANGCL_COMPILE_SAN_FLAGS "")
-      set(_CLANGCL_LINK_SAN_FLAGS "")
+
+      # Detect clang resource directory early; needed for explicit runtime linking
+      # because lld-link does not understand -fsanitize= flags.
+      execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} --print-resource-dir
+        OUTPUT_VARIABLE _CLANG_RESOURCE_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+      if(_CLANG_RESOURCE_DIR)
+        set(_CLANG_RUNTIME_DIR "${_CLANG_RESOURCE_DIR}/lib/windows")
+      endif()
 
       if("address" IN_LIST SANITIZERS)
         list(APPEND _CLANGCL_COMPILE_SAN_FLAGS /fsanitize=address)
@@ -72,7 +81,19 @@ function(
 
       if("undefined" IN_LIST SANITIZERS)
         list(APPEND _CLANGCL_COMPILE_SAN_FLAGS -fsanitize=undefined)
-        list(APPEND _CLANGCL_LINK_SAN_FLAGS -fsanitize=undefined)
+        # lld-link does not understand -fsanitize= flags; link the UBSan runtime explicitly.
+        # When ASan is also enabled, the ASan runtime already provides UBSan support,
+        # so we only need the standalone UBSan runtime when ASan is absent.
+        if(NOT "address" IN_LIST SANITIZERS)
+          if(_CLANG_RUNTIME_DIR AND EXISTS "${_CLANG_RUNTIME_DIR}/clang_rt.ubsan_standalone-x86_64.lib")
+            target_link_directories(${project_name} INTERFACE "${_CLANG_RUNTIME_DIR}")
+            target_link_libraries(
+              ${project_name} INTERFACE clang_rt.ubsan_standalone-x86_64
+            )
+          else()
+            message(WARNING "clang-cl UBSan standalone runtime not found")
+          endif()
+        endif()
       endif()
 
       if("thread" IN_LIST SANITIZERS)
@@ -90,23 +111,14 @@ function(
       endif()
 
       if(_CLANGCL_COMPILE_SAN_FLAGS)
-        target_compile_options(${project_name} INTERFACE ${_CLANGCL_COMPILE_SAN_FLAGS} /Zi /INCREMENTAL:NO)
-        target_link_options(
-          ${project_name}
-          INTERFACE
-          /INCREMENTAL:NO
-          ${_CLANGCL_LINK_SAN_FLAGS})
+        target_compile_options(${project_name} INTERFACE ${_CLANGCL_COMPILE_SAN_FLAGS} /Zi)
+        target_link_options(${project_name} INTERFACE /INCREMENTAL:NO)
       endif()
 
       if("address" IN_LIST SANITIZERS)
         target_compile_definitions(${project_name} INTERFACE _DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION)
 
-        execute_process(
-          COMMAND ${CMAKE_CXX_COMPILER} --print-resource-dir
-          OUTPUT_VARIABLE _CLANG_RESOURCE_DIR
-          OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-        if(_CLANG_RESOURCE_DIR)
-          set(_CLANG_RUNTIME_DIR "${_CLANG_RESOURCE_DIR}/lib/windows")
+        if(_CLANG_RUNTIME_DIR)
           set(_ASAN_DYNAMIC_LIB "${_CLANG_RUNTIME_DIR}/clang_rt.asan_dynamic-x86_64.lib")
           set(_ASAN_THUNK_LIB "${_CLANG_RUNTIME_DIR}/clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")
           if(EXISTS "${_ASAN_DYNAMIC_LIB}" AND EXISTS "${_ASAN_THUNK_LIB}")

@@ -48,7 +48,7 @@ struct FrameMetadata
 
 struct BufferInfo
 {
-    void *data{ nullptr };
+    std::vector<std::byte> data;
     std::size_t size{ 0 };
     FrameMetadata metadata;
     std::vector<TensorMeta> tensors;

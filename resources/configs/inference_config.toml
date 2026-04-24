@@ -2,7 +2,7 @@
 # See: kataglyphis.toml_config module
 
 [model]
-model_path = "models/yolov8n.onnx"
+model_path = "models/yolo26n.onnx"
 framework = "onnx"
 input_width = 640
 input_height = 640

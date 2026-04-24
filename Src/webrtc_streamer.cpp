@@ -75,19 +75,18 @@ struct WebRTCStreamer::Impl
 
     void cleanup()
     {
-        if (pipeline != nullptr) {
-            gst_element_set_state(pipeline, GST_STATE_NULL);
-            gst_object_unref(pipeline);
-            pipeline = nullptr;
-        }
-        webrtcsink = nullptr;
-
         if (main_loop != nullptr) {
             g_main_loop_quit(main_loop);
             if (main_loop_thread.joinable()) { main_loop_thread.join(); }
             g_main_loop_unref(main_loop);
             main_loop = nullptr;
         }
+        if (pipeline != nullptr) {
+            gst_element_set_state(pipeline, GST_STATE_NULL);
+            gst_object_unref(pipeline);
+            pipeline = nullptr;
+        }
+        webrtcsink = nullptr;
     }
 
     void set_state(StreamState new_state)
@@ -208,10 +207,9 @@ struct WebRTCStreamer::Impl
 
         if (GST_MESSAGE_SRC(msg) != GST_OBJECT(impl->pipeline)) { return TRUE; }
 
-        GstState old_state;
+GstState old_state;
         GstState new_state;
-        GstState pending;
-        gst_message_parse_state_changed(msg, &old_state, &new_state, &pending);
+        gst_message_parse_state_changed(msg, &old_state, &new_state, nullptr);
 
         g_print(
           "Pipeline state: %s -> %s\n", gst_element_state_get_name(old_state), gst_element_state_get_name(new_state));
@@ -428,15 +426,20 @@ auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_NULL);
 
-    impl_->set_state(StreamState::Idle);
-
-    // Stop main loop
+    // Stop main loop and join thread before pipeline cleanup
     if (impl_->main_loop != nullptr) {
         g_main_loop_quit(impl_->main_loop);
         if (impl_->main_loop_thread.joinable()) { impl_->main_loop_thread.join(); }
         g_main_loop_unref(impl_->main_loop);
         impl_->main_loop = nullptr;
     }
+
+    // Pipeline refs are now safe to release (no callbacks running)
+    gst_object_unref(impl_->pipeline);
+    impl_->pipeline = nullptr;
+    impl_->webrtcsink = nullptr;
+
+    impl_->set_state(StreamState::Idle);
 
     if (ret == GST_STATE_CHANGE_FAILURE) { return std::unexpected(WebRTCError::StateChangeFailed); }
 
@@ -487,7 +490,9 @@ auto WebRTCStreamer::set_error_callback(ErrorCallback callback) -> void
 auto WebRTCStreamer::set_bitrate(std::uint32_t bitrate_kbps) -> std::expected<void, WebRTCError>
 {
     impl_->config.bitrate_kbps = bitrate_kbps;
-    // Note: Runtime bitrate changes would require encoder element access
+    // NOTE: This only stores the config value. Runtime bitrate changes require
+    // accessing the encoder element via gst_bin_get_by_name() and setting the
+    // "bitrate" property while the pipeline is in PLAYING state.
     return {};
 }
 

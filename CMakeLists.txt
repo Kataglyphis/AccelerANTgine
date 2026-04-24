@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.31.6)
 project(
   KataglyphisCppInference
   VERSION 0.0.1
-  DESCRIPTION "Lore ipsum"
+  DESCRIPTION "C++23 ONNX inference engine with GStreamer and WebRTC support"
   HOMEPAGE_URL "https://jonasheinle.de/"
   LANGUAGES CXX C)
 
@@ -109,9 +109,31 @@ if(myproject_ENABLE_COVERAGE
        "Release"
    AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 
-  add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
-
-  add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+  if(MSVC)
+    # clang-cl on Windows: -fprofile-instr-generate/-fcoverage-mapping are not
+    # understood by lld-link.  Use /clang: prefix for compile flags and link the
+    # profile runtime explicitly.
+    add_compile_options(/clang:-fprofile-instr-generate /clang:-fcoverage-mapping)
+    execute_process(
+      COMMAND ${CMAKE_CXX_COMPILER} --print-resource-dir
+      OUTPUT_VARIABLE _GLOBAL_CLANG_RESOURCE_DIR
+      OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(_GLOBAL_CLANG_RESOURCE_DIR)
+      set(_GLOBAL_RUNTIME_DIR "${_GLOBAL_CLANG_RESOURCE_DIR}/lib/windows")
+      set(_GLOBAL_PROFILE_LIB "${_GLOBAL_RUNTIME_DIR}/clang_rt.profile-x86_64.lib")
+      if(EXISTS "${_GLOBAL_PROFILE_LIB}")
+        add_link_options("/LIBPATH:${_GLOBAL_RUNTIME_DIR}")
+        link_libraries(clang_rt.profile-x86_64)
+      else()
+        message(WARNING "clang-cl profile runtime not found at ${_GLOBAL_PROFILE_LIB}")
+      endif()
+    else()
+      message(WARNING "Unable to detect clang resource directory for coverage runtime linkage")
+    endif()
+  else()
+    add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+  endif()
 
 endif()
 

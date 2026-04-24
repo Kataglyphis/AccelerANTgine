@@ -250,6 +250,7 @@ static void print_usage(const char *program_name)
               << "  --onnx-only        Run only ONNX inference example\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
               << "  --yolo-only        Run only YOLO detection example\n"
+              << "  --video-only       Run only video detection example\n"
               << "  --all              Run all examples\n"
               << "  --help             Show this help message\n\n"
               << "Examples:\n"
@@ -263,6 +264,7 @@ auto main(int argc, char *argv[]) -> int
     bool run_onnx = false;
     bool run_gstreamer = false;
     bool run_yolo = false;
+    bool run_video = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -275,17 +277,20 @@ auto main(int argc, char *argv[]) -> int
             run_gstreamer = true;
         } else if (arg == "--yolo-only") {
             run_yolo = true;
+        } else if (arg == "--video-only") {
+            run_video = true;
         } else if (arg == "--all") {
             run_onnx = true;
             run_gstreamer = true;
             run_yolo = true;
+            run_video = true;
         } else if (arg == "--help") {
             print_usage(argv[0]);
             return 0;
         }
     }
 
-    if (!run_onnx && !run_gstreamer && !run_yolo) {
+    if (!run_onnx && !run_gstreamer && !run_yolo && !run_video) {
         run_onnx = true;
         run_yolo = true;
     }
@@ -316,6 +321,14 @@ auto main(int argc, char *argv[]) -> int
         result = run_yolo_detection_example(model_path);
         if (result != 0) {
             std::cerr << "YOLO detection example failed!\n";
+            return result;
+        }
+    }
+
+    if (run_video) {
+        result = run_video_detection_example(model_path);
+        if (result != 0) {
+            std::cerr << "Video detection example failed!\n";
             return result;
         }
     }

@@ -7,7 +7,7 @@ module;
 module kataglyphis.inference;
 import kataglyphis.project_config;
 
-namespace mylib {
+namespace kataglyphis::inference {
 
 KATAGLYPHIS_CPP_API auto MyCalculator::add(int lhs, int rhs) const -> int { return lhs + rhs; }
 
@@ -17,4 +17,4 @@ KATAGLYPHIS_CPP_API auto MyCalculator::version() const -> std::string
       "{}.{}", kataglyphis::project_config::project_version_major, kataglyphis::project_config::project_version_minor);
 }
 
-}// namespace mylib
+}// namespace kataglyphis::inference

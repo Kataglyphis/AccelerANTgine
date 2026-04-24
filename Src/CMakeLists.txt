@@ -170,22 +170,15 @@ target_link_libraries(
   PRIVATE
     GSL
     spdlog::spdlog
-    absl::flags_parse
 )
 
 # Link GStreamer and ONNX Runtime if available
-if(TARGET gstreamer::gstreamer)
+if(TARGET PkgConfig::GSTREAMER)
     target_link_libraries(${PROJECT_NAME} PUBLIC 
-        gstreamer::gstreamer 
-        gstreamer::app 
-        gstreamer::video 
-        gstreamer::analytics
-        gstreamer::webrtc
-        gstreamer::sdp
+        PkgConfig::GSTREAMER
     )
-    target_include_directories(${PROJECT_NAME} PRIVATE ${GSTREAMER_INCLUDE_DIRS})
     target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_GSTREAMER_WEBRTC=1)
-    message(STATUS "GStreamer linked successfully (with WebRTC support)")
+    message(STATUS "GStreamer linked successfully (with WebRTC support via pkg-config)")
 else()
     message(WARNING "GStreamer not found - inference pipeline features disabled")
     target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_GSTREAMER_WEBRTC=0)
