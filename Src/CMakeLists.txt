@@ -166,9 +166,11 @@ target_link_libraries(
     myproject_warnings
     myproject_options
     nlohmann_json_modules
+    tomlplusplus_modules
   PRIVATE
     GSL
     spdlog::spdlog
+    absl::flags_parse
 )
 
 # Link GStreamer and ONNX Runtime if available
@@ -203,7 +205,7 @@ if(RUST_FEATURES)
 endif()
 
 if(TARGET ${PROJECT_NAME}_cli)
-  target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME})
+  target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME} absl::flags_parse)
 endif()
 
 if(UNIX AND NOT APPLE)

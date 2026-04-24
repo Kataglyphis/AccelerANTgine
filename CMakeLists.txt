@@ -8,8 +8,6 @@ project(
   HOMEPAGE_URL "https://jonasheinle.de/"
   LANGUAGES CXX C)
 
-include(cmake/ClangClModules.cmake)
-
 include(GNUInstallDirs)
 
 set(AUTHOR "Jonas Heinle")
@@ -89,7 +87,7 @@ if(myproject_ENABLE_SANITIZER_ADDRESS)
   if(MSVC)
     # Keep STL annotation settings consistent for all targets (including gtest)
     # to avoid LNK2038 mismatches with AddressSanitizer builds.
-    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION)
+    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION _ITERATOR_DEBUG_LEVEL=0)
     if(NOT
        CMAKE_CXX_COMPILER_ID
        STREQUAL

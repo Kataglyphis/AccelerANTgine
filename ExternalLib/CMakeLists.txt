@@ -3,6 +3,40 @@ set(CMAKE_C_CLANG_TIDY "")
 
 include(FetchContent)
 
+FetchContent_Declare(
+  abseil-cpp
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG 20240722.0)
+
+set(ABSL_USE_CXX_EXCEPTIONS
+    OFF
+    CACHE BOOL "Disable exceptions in Abseil." FORCE)
+
+set(ABSL_PROPAGATE_CXX_STD
+    ON
+    CACHE BOOL "Use C++ standard from Abseil." FORCE)
+
+if(myproject_ENABLE_SANITIZER_ADDRESS
+   AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+   AND MSVC)
+  add_compile_options(/MD)
+endif()
+
+FetchContent_MakeAvailable(abseil-cpp)
+
+if(myproject_ENABLE_SANITIZER_ADDRESS
+   AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+   AND MSVC)
+  get_cmake_property(_absl_targets BUILDSYSTEM_TARGETS)
+  foreach(_absl_target ${_absl_targets})
+    string(FIND "${_absl_target}" "absl" _absl_pos)
+    if(NOT _absl_pos LESS 0)
+      set_property(TARGET ${_absl_target}
+                   PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    endif()
+  endforeach()
+endif()
+
 # include google test to project
 if(BUILD_TESTING)
   FetchContent_Declare(googletest
@@ -105,6 +139,28 @@ if(TARGET nlohmann_json_modules)
         target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NOEXCEPTION)
     endif()
     target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
+endif()
+
+if(myproject_DISABLE_EXCEPTIONS)
+  set(TOML_EXCEPTIONS
+      OFF
+      CACHE BOOL "Disable exceptions in tomlplusplus." FORCE)
+endif()
+
+set(TOMLPLUSPLUS_BUILD_MODULES
+    ON
+    CACHE BOOL "Enable C++ module support in tomlplusplus." FORCE)
+
+add_subdirectory(tomlplusplus)
+
+if(TARGET tomlplusplus_modules)
+    if(TARGET myproject_options)
+        target_link_libraries(tomlplusplus_modules PUBLIC myproject_options)
+    endif()
+    if(myproject_DISABLE_EXCEPTIONS)
+        target_compile_definitions(tomlplusplus_modules PUBLIC TOML_EXCEPTIONS=0)
+    endif()
+    target_compile_features(tomlplusplus_modules PUBLIC cxx_std_23)
 endif()
 
 if(RUST_FEATURES)
