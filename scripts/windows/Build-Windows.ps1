@@ -24,6 +24,7 @@ param(
     [switch]$SkipStaticAnalysis,
     [switch]$SkipScanBuild,
     [switch]$SkipPGO,
+    [switch]$SkipMSIX,
     [switch]$ContinueOnError,
     [switch]$StopOnError
 )
@@ -42,6 +43,8 @@ if (-not (Test-Path $buildModule)) {
 Import-Module $buildModule -Force
 Import-Module (Join-Path $modulesPath "WindowsCMake.Common.psm1") -Force
 Import-Module (Join-Path $modulesPath "WindowsLogging.Common.psm1") -Force
+Import-Module (Join-Path $modulesPath "WindowsMsix.Common.psm1") -Force
+Import-Module (Join-Path $modulesPath "WindowsMsix.Signing.psm1") -Force
 
 # Resolve workspace
 try {
@@ -250,7 +253,7 @@ try {
     if ($doRelease) {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Release Build" -Critical -Script {
             Remove-BuildRoot -Context $Context -Path $fastBuildReleaseDirFull | Out-Null
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildReleaseDirFull, "--preset", "x64-ClangCL-Windows-Release", "-S", $Workspace, "-Dmyproject_ENABLE_CPPCHECK=OFF")
+            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildReleaseDirFull, "--preset", "x64-ClangCL-Windows-Release", "-S", $Workspace, "-Dmyproject_ENABLE_CPPCHECK=OFF", "-DENABLE_WIX_PACKAGING=ON")
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull)
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
@@ -258,6 +261,79 @@ try {
         # Sync Release Artifacts
         Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Release Artifacts" -Script {
             Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $BuildDirClangRelease) -ExcludeCommonRustAndCppCache
+        }
+
+        # MSIX Packaging
+        if (-not $SkipMSIX) {
+            Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Script {
+                $msixWorkspace = Join-Path $Workspace "packaging\msix"
+                $msixTemplate = Join-Path $msixWorkspace "AppxManifest.template.xml"
+                $msixAssets = Join-Path $msixWorkspace "Assets"
+                $msixOutput = Join-Path $Workspace "dist\msix"
+                $stagingRoot = Join-Path $msixOutput "staging"
+
+                $exePath = Join-Path $fastBuildReleaseDirFull "bin\KataglyphisCppInference.exe"
+                $dllPath = Join-Path $fastBuildReleaseDirFull "bin\KataglyphisCppInference.dll"
+                $logoSource = Join-Path $Workspace "images\logo.png"
+
+                $makeappx = Resolve-WindowsSdkToolPath -ToolName "makeappx.exe"
+                if (-not $makeappx) {
+                    Write-BuildLogWarning -Context $Context -Message "makeappx.exe not found. Skipping MSIX packaging."
+                    return
+                }
+
+                if (-not (Test-Path $msixTemplate)) {
+                    Write-BuildLogWarning -Context $Context -Message "MSIX manifest template not found: $msixTemplate. Skipping."
+                    return
+                }
+
+                if (-not (Test-Path $logoSource)) {
+                    Write-BuildLogWarning -Context $Context -Message "Logo not found: $logoSource. Skipping MSIX."
+                    return
+                }
+
+                if (Test-Path $stagingRoot) { Remove-Item $stagingRoot -Recurse -Force }
+                New-Item -ItemType Directory -Path (Join-Path $stagingRoot "Assets") -Force | Out-Null
+
+                Write-BuildLog -Context $Context -Message "Copying binaries..."
+                Copy-Item $exePath -Destination $stagingRoot -Force
+                if (Test-Path $dllPath) { Copy-Item $dllPath -Destination $stagingRoot -Force }
+
+                Write-BuildLog -Context $Context -Message "Copying logos..."
+                $logoDestArgs = @(
+                    @{Dest="StoreLogo.png"},
+                    @{Dest="Square44x44Logo.png"},
+                    @{Dest="Square150x150Logo.png"},
+                    @{Dest="Wide310x150Logo.png"},
+                    @{Dest="SmallTile.png"},
+                    @{Dest="LargeTile.png"},
+                    @{Dest="SplashScreen.png"}
+                )
+                foreach ($arg in $logoDestArgs) {
+                    Copy-Item $logoSource -Destination (Join-Path $stagingRoot "Assets\$($arg.Dest)") -Force
+                }
+
+                Write-BuildLog -Context $Context -Message "Generating AppxManifest.xml..."
+                $manifestContent = Get-Content $msixTemplate -Raw
+                $manifestContent = $manifestContent.Replace("__PACKAGE_NAME__", "KataglyphisCppInference")
+                $manifestContent = $manifestContent.Replace("__PUBLISHER__", "CN=Kataglyphis")
+                $manifestContent = $manifestContent.Replace("__VERSION__", "0.0.1.0")
+                $manifestContent = $manifestContent.Replace("__DISPLAY_NAME__", "Kataglyphis C++ Inference")
+                $manifestContent = $manifestContent.Replace("__PUBLISHER_DISPLAY_NAME__", "Kataglyphis")
+                $manifestContent = $manifestContent.Replace("__DESCRIPTION__", "High-performance C++ inference engine with ONNXRuntime and WebRTC streaming")
+                $manifestContent = $manifestContent.Replace("__EXECUTABLE__", "KataglyphisCppInference.exe")
+                Set-Content -Path (Join-Path $stagingRoot "AppxManifest.xml") -Value $manifestContent -Encoding utf8
+
+                New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
+                $msixFile = Join-Path $msixOutput "KataglyphisCppInference_0.0.1.0_x64.msix"
+
+                Write-BuildLog -Context $Context -Message "Creating MSIX package..."
+                Invoke-BuildExternal -Context $Context -File $makeappx -Parameters @("pack", "/d", $stagingRoot, "/p", $msixFile, "/o") | Out-Null
+
+                Write-BuildLog -Context $Context -Message "MSIX package created: $msixFile"
+
+                Invoke-MsixSign -Context $Context -WorkspacePath $Workspace -MsixOutPath $msixFile
+            }
         }
     }
 

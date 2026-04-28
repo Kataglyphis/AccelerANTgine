@@ -19,7 +19,7 @@ set(ABSL_PROPAGATE_CXX_STD
 if(myproject_ENABLE_SANITIZER_ADDRESS
    AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
    AND MSVC)
-  add_compile_options(/MD)
+  add_compile_options(/MT)
 endif()
 
 FetchContent_MakeAvailable(abseil-cpp)
@@ -32,7 +32,7 @@ if(myproject_ENABLE_SANITIZER_ADDRESS
     string(FIND "${_absl_target}" "absl" _absl_pos)
     if(NOT _absl_pos LESS 0)
       set_property(TARGET ${_absl_target}
-                   PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+                   PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
     endif()
   endforeach()
 endif()
@@ -128,6 +128,11 @@ set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "" FORCE)
 add_subdirectory(NLOHMANN_JSON)
 
 if(TARGET nlohmann_json_modules)
+    if(myproject_ENABLE_SANITIZER_ADDRESS
+       AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+       AND MSVC)
+      set_property(TARGET nlohmann_json_modules PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+    endif()
     # Ensure the module BMI is compiled with flags compatible with the project.
     # myproject_options propagates exception settings (/EHs- or -fno-exceptions),
     # sanitizer flags, etc. Without this, the BMI is built with exceptions enabled
@@ -154,6 +159,11 @@ set(TOMLPLUSPLUS_BUILD_MODULES
 add_subdirectory(tomlplusplus)
 
 if(TARGET tomlplusplus_modules)
+    if(myproject_ENABLE_SANITIZER_ADDRESS
+       AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+       AND MSVC)
+      set_property(TARGET tomlplusplus_modules PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+    endif()
     if(TARGET myproject_options)
         target_link_libraries(tomlplusplus_modules PUBLIC myproject_options)
     endif()

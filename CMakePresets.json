@@ -260,7 +260,7 @@
       "binaryDir": "${sourceDir}/build-clangcl-profile/",
       "installDir": "${sourceDir}/build-clangcl-profile/",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Profile",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "BUILD_TESTING": "TRUE"
       }
     },
@@ -319,7 +319,7 @@
       "binaryDir": "${sourceDir}/build/",
       "installDir": "${sourceDir}/build/",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Profile"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     }
   ],

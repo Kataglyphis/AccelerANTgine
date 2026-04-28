@@ -237,20 +237,25 @@ macro(myproject_global_options)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
-if((CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC
-        AND CMAKE_BUILD_TYPE STREQUAL "Debug"
-        AND myproject_ENABLE_SANITIZER_ADDRESS)
-     OR (MSVC
-         AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-         AND CMAKE_BUILD_TYPE STREQUAL "Debug"))
-    set(CMAKE_MSVC_RUNTIME_LIBRARY
-        "MultiThreadedDLL"
-        CACHE STRING "MSVC runtime library" FORCE)
-  elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_MSVC_RUNTIME_LIBRARY
-        "MultiThreadedDebugDLL"
-        CACHE STRING "MSVC runtime library" FORCE)
-  endif()
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC
+          AND CMAKE_BUILD_TYPE STREQUAL "Debug"
+          AND myproject_ENABLE_SANITIZER_ADDRESS)
+     set(CMAKE_MSVC_RUNTIME_LIBRARY
+         "MultiThreadedDLL"
+         CACHE STRING "MSVC runtime library" FORCE)
+   elseif((CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC
+          AND myproject_ENABLE_SANITIZER_ADDRESS)
+      OR (MSVC
+          AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+          AND CMAKE_BUILD_TYPE STREQUAL "Debug"))
+     set(CMAKE_MSVC_RUNTIME_LIBRARY
+         "MultiThreadedDLL"
+         CACHE STRING "MSVC runtime library" FORCE)
+   elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+     set(CMAKE_MSVC_RUNTIME_LIBRARY
+         "MultiThreadedDebugDLL"
+         CACHE STRING "MSVC runtime library" FORCE)
+   endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_LINK_WHAT_YOU_USE FALSE)

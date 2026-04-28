@@ -85,8 +85,6 @@ myproject_local_options()
 include(cmake/SystemLibDependencies.cmake)
 if(myproject_ENABLE_SANITIZER_ADDRESS)
   if(MSVC)
-    # Keep STL annotation settings consistent for all targets (including gtest)
-    # to avoid LNK2038 mismatches with AddressSanitizer builds.
     add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION _ITERATOR_DEBUG_LEVEL=0)
     if(NOT
        CMAKE_CXX_COMPILER_ID
@@ -94,12 +92,13 @@ if(myproject_ENABLE_SANITIZER_ADDRESS)
        "Clang")
       add_compile_options(/fsanitize=address /Zi)
       add_link_options(/INCREMENTAL:NO)
+    else()
+      set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "" FORCE)
     endif()
   else()
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
   endif()
-
 endif()
 
 if(myproject_ENABLE_COVERAGE
