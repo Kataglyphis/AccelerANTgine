@@ -1,2 +1,0 @@
-@echo off
-docker run --rm --cpus 32 --memory 48g -v "D:/GitHub/Kataglyphis-Cpp-Inference:/workspace" -w C:\workspace ghcr.io/kataglyphis/kataglyphis_beschleuniger:winamd64 powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\workspace\scripts\windows\Build-Windows.ps1 -Configurations "clangcl-debug,clangcl-profile,clangcl-release" -SkipFormat > build.log 2>&1
