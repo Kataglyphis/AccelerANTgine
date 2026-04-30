@@ -418,10 +418,7 @@ auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
 
     // Wait briefly for EOS to propagate
     GstBus *bus = gst_element_get_bus(impl_->pipeline);
-    GstMessage *msg = gst_bus_timed_pop_filtered(bus, GST_SECOND, GST_MESSAGE_EOS);
-    if (msg != nullptr) {
-        gst_message_unref(msg);
-    }
+    (void)gst_bus_timed_pop_filtered(bus, GST_SECOND, GST_MESSAGE_EOS);
     gst_object_unref(bus);
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_NULL);
