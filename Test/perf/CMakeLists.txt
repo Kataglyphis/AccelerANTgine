@@ -8,6 +8,7 @@ set(EXTERNAL_LIB_SRC_DIR ${WORKING_DIRECTORY}ExternalLib/)
 include(${PROJECT_SRC_DIR}cmake/filters/SetProjectFilters.cmake)
 
 include(cmake/SetTestFilters.cmake)
+include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 
 set(PERF_TEST_SUITE perfTestSuite)
 
@@ -20,19 +21,14 @@ add_executable(${PERF_TEST_SUITE})
 
 target_compile_definitions(${PERF_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
 
-if(RUST_FEATURES)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=1)
-else()
-  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=0)
+set(_perf_resource_path "/../Resources/")
+set(_perf_include_path "/../Src/")
+if(WIN32 AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC))
+  set(_perf_resource_path "/../../Resources/")
+  set(_perf_include_path "/../../Src/")
 endif()
 
-if(WIN32 AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC))
-  target_compile_definitions(${PERF_TEST_SUITE} PRIVATE RELATIVE_RESOURCE_PATH="/../../Resources/"
-                                                        RELATIVE_INCLUDE_PATH="/../../Src/")
-else()
-  target_compile_definitions(${PERF_TEST_SUITE} PRIVATE RELATIVE_RESOURCE_PATH="/../Resources/"
-                                                        RELATIVE_INCLUDE_PATH="/../Src/")
-endif()
+kataglyphis_configure_common_test_target(${PERF_TEST_SUITE} "${_perf_resource_path}" "${_perf_include_path}")
 
 target_sources(${PERF_TEST_SUITE} PRIVATE ${PERF_TEST_FILTER})
 
@@ -48,15 +44,4 @@ target_link_libraries(
           spdlog
           ${PROJECT_NAME})
 
-if(RUST_FEATURES)
-  target_link_libraries(${PERF_TEST_SUITE} PUBLIC rusty_code)
-endif()
-
-# disable all warnings for our test suite
-if(MSVC)
-  target_compile_options(${PERF_TEST_SUITE} INTERFACE /w)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  target_compile_options(${PERF_TEST_SUITE} INTERFACE -w)
-else()
-  target_compile_options(${PERF_TEST_SUITE} INTERFACE -w)
-endif()
+kataglyphis_link_rust_target_if_enabled(${PERF_TEST_SUITE})

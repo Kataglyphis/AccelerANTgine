@@ -24,19 +24,15 @@ message("Commit test filter is: ${KataglyphisCppProject_COMMIT_TEST_FILTER}")
 
 add_executable(${COMMIT_TEST_SUITE})
 
-if(RUST_FEATURES)
-  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=1)
+set(_commit_resource_path "/../../../Resources/")
+set(_commit_include_path "/../../../Src/")
+if(NOT MSVC)
 else()
-  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE USE_RUST=0)
+  set(_commit_resource_path "/../Resources/")
+  set(_commit_include_path "/../Src/")
 endif()
 
-if(NOT MSVC)
-  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE RELATIVE_RESOURCE_PATH="/../../../Resources/"
-                                                          RELATIVE_INCLUDE_PATH="/../../../Src/")
-else()
-  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE RELATIVE_RESOURCE_PATH="/../Resources/"
-                                                          RELATIVE_INCLUDE_PATH="/../Src/")
-endif()
+kataglyphis_configure_common_test_target(${COMMIT_TEST_SUITE} "${_commit_resource_path}" "${_commit_include_path}")
 
 target_sources(
   ${COMMIT_TEST_SUITE}
@@ -58,15 +54,4 @@ target_link_libraries(
 
 kataglyphis_configure_gtest_discovery(${COMMIT_TEST_SUITE})
 
-if(RUST_FEATURES)
-  target_link_libraries(${COMMIT_TEST_SUITE} PUBLIC rusty_code)
-endif()
-
-# disable all warnings for our test suite
-if(MSVC)
-  target_compile_options(${COMMIT_TEST_SUITE} INTERFACE /w)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  target_compile_options(${COMMIT_TEST_SUITE} INTERFACE -w)
-else()
-  target_compile_options(${COMMIT_TEST_SUITE} INTERFACE -w)
-endif()
+kataglyphis_link_rust_target_if_enabled(${COMMIT_TEST_SUITE})

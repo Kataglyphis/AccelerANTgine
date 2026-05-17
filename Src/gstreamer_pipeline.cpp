@@ -24,6 +24,93 @@ namespace kataglyphis::gstreamer {
 namespace {
     std::atomic<bool> g_gstreamer_initialized{ false };
     std::mutex g_gstreamer_mutex;
+
+    auto parse_pipeline_description(const std::string &pipeline_description, const char *failure_context)
+      -> std::expected<GstElement *, GStreamerError>
+    {
+        GError *error = nullptr;
+        GstElement *pipeline = gst_parse_launch(pipeline_description.c_str(), &error);
+
+        if (error != nullptr) {
+            g_printerr("%s: %s\n", failure_context, error->message);
+            g_error_free(error);
+            return std::unexpected(GStreamerError::PipelineCreationFailed);
+        }
+
+        if (pipeline == nullptr) {
+            g_printerr("%s returned null\n", failure_context);
+            return std::unexpected(GStreamerError::PipelineCreationFailed);
+        }
+
+        return pipeline;
+    }
+
+    void append_tensor_metadata(GstBuffer *buffer, BufferInfo &buffer_info)
+    {
+        if (auto *meta = gst_buffer_get_tensor_meta(buffer)) {
+            buffer_info.tensors.reserve(meta->num_tensors);
+            for (gsize i = 0; i < meta->num_tensors; ++i) {
+                const GstTensor *tensor = gst_tensor_meta_get(meta, i);
+                TensorMeta tensor_meta;
+                tensor_meta.tensor_index = i;
+                tensor_meta.num_tensors = meta->num_tensors;
+                tensor_meta.data_type = static_cast<int>(tensor->data_type);
+
+                gsize num_dims = 0;
+                auto *dims = gst_tensor_get_dims(const_cast<GstTensor *>(tensor), &num_dims);
+                tensor_meta.dimensions.reserve(num_dims);
+                for (gsize j = 0; j < num_dims; ++j) { tensor_meta.dimensions.push_back(dims[j]); }
+                buffer_info.tensors.push_back(std::move(tensor_meta));
+            }
+        }
+    }
+
+    void append_frame_metadata(GstCaps *caps, GstBuffer *buffer, BufferInfo &buffer_info)
+    {
+        if (caps != nullptr) {
+            GstStructure *structure = gst_caps_get_structure(caps, 0);
+            if (structure != nullptr) {
+                gst_structure_get_uint(structure, "width", &buffer_info.metadata.width);
+                gst_structure_get_uint(structure, "height", &buffer_info.metadata.height);
+
+                guint fps_n = 0;
+                guint fps_d = 0;
+                if (gst_structure_get_fraction(
+                      structure, "framerate", reinterpret_cast<gint *>(&fps_n), reinterpret_cast<gint *>(&fps_d)) != 0) {
+                    buffer_info.metadata.fps_n = fps_n;
+                    buffer_info.metadata.fps_d = fps_d;
+                }
+
+                const gchar *format = gst_structure_get_string(structure, "format");
+                if (format != nullptr) { buffer_info.metadata.format = format; }
+            }
+        }
+
+        buffer_info.metadata.timestamp_ns = GST_BUFFER_PTS(buffer);
+        buffer_info.metadata.duration_ns = GST_BUFFER_DURATION(buffer);
+    }
+
+    auto extract_buffer_info(GstSample *sample) -> std::expected<BufferInfo, GStreamerError>
+    {
+        GstBuffer *buffer = gst_sample_get_buffer(sample);
+        if (buffer == nullptr) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
+
+        GstMapInfo map_info;
+        if (gst_buffer_map(buffer, &map_info, GST_MAP_READ) == 0) {
+            return std::unexpected(GStreamerError::BufferAllocationFailed);
+        }
+
+        BufferInfo buffer_info;
+        buffer_info.size = map_info.size;
+        buffer_info.data.resize(map_info.size);
+        std::memcpy(buffer_info.data.data(), map_info.data, map_info.size);
+
+        append_tensor_metadata(buffer, buffer_info);
+        append_frame_metadata(gst_sample_get_caps(sample), buffer, buffer_info);
+
+        gst_buffer_unmap(buffer, &map_info);
+        return buffer_info;
+    }
 }// namespace
 
 struct GStreamerPipeline::Impl
@@ -64,58 +151,10 @@ struct GStreamerPipeline::Impl
         g_signal_emit_by_name(sink, "pull-sample", &sample);
 
         if (sample != nullptr) {
-            GstBuffer *buffer = gst_sample_get_buffer(sample);
-            GstCaps *caps = gst_sample_get_caps(sample);
-            GstMapInfo map_info;
-
-if ((buffer != nullptr) && (gst_buffer_map(buffer, &map_info, GST_MAP_READ) != 0)) {
-                BufferInfo buffer_info;
-                buffer_info.size = map_info.size;
-                buffer_info.data.resize(map_info.size);
-                std::memcpy(buffer_info.data.data(), map_info.data, map_info.size);
-
-                if (auto *meta = gst_buffer_get_tensor_meta(buffer)) {
-                    buffer_info.tensors.reserve(meta->num_tensors);
-                    for (gsize i = 0; i < meta->num_tensors; ++i) {
-                        const GstTensor *tensor = gst_tensor_meta_get(meta, i);
-                        TensorMeta tm;
-                        tm.tensor_index = i;
-                        tm.num_tensors = meta->num_tensors;
-                        tm.data_type = static_cast<int>(tensor->data_type);
-
-                        gsize num_dims = 0;
-                        auto *dims = gst_tensor_get_dims(const_cast<GstTensor *>(tensor), &num_dims);
-                        for (gsize j = 0; j < num_dims; ++j) { tm.dimensions.push_back(dims[j]); }
-                        buffer_info.tensors.push_back(std::move(tm));
-                    }
-                }
-
-                GstStructure *structure = gst_caps_get_structure(caps, 0);
-                if (structure != nullptr) {
-                    gst_structure_get_uint(structure, "width", &buffer_info.metadata.width);
-                    gst_structure_get_uint(structure, "height", &buffer_info.metadata.height);
-
-                    guint fps_n = 0;
-                    guint fps_d = 0;
-                    if (gst_structure_get_fraction(
-                          structure, "framerate", reinterpret_cast<gint *>(&fps_n), reinterpret_cast<gint *>(&fps_d)) != 0) {
-                        buffer_info.metadata.fps_n = fps_n;
-                        buffer_info.metadata.fps_d = fps_d;
-                    }
-
-                    const gchar *format = gst_structure_get_string(structure, "format");
-                    if (format != nullptr) { buffer_info.metadata.format = format; }
-                }
-
-                buffer_info.metadata.timestamp_ns = GST_BUFFER_PTS(buffer);
-                buffer_info.metadata.duration_ns = GST_BUFFER_DURATION(buffer);
-
-                gst_buffer_unmap(buffer, &map_info);
-
-                {
-                    std::scoped_lock lock(self->callback_mutex);
-                    if (self->buffer_callback) { self->buffer_callback(buffer_info); }
-                }
+            auto buffer_info = extract_buffer_info(sample);
+            if (buffer_info) {
+                std::scoped_lock lock(self->callback_mutex);
+                if (self->buffer_callback) { self->buffer_callback(*buffer_info); }
             }
             gst_sample_unref(sample);
         }
@@ -133,13 +172,9 @@ GStreamerPipeline::GStreamerPipeline() : impl_(std::make_unique<Impl>()) {}
 
 GStreamerPipeline::~GStreamerPipeline() = default;
 
-GStreamerPipeline::GStreamerPipeline(GStreamerPipeline &&other) noexcept : impl_(std::move(other.impl_)) {}
+GStreamerPipeline::GStreamerPipeline(GStreamerPipeline &&) noexcept = default;
 
-auto GStreamerPipeline::operator=(GStreamerPipeline &&other) noexcept -> GStreamerPipeline &
-{
-    if (this != &other) { impl_ = std::move(other.impl_); }
-    return *this;
-}
+auto GStreamerPipeline::operator=(GStreamerPipeline &&) noexcept -> GStreamerPipeline & = default;
 
 auto GStreamerPipeline::initialize_gstreamer(int *argc, char ***argv) -> std::expected<void, GStreamerError>
 {
@@ -174,20 +209,9 @@ auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::ex
 
     impl_->cleanup();
 
-    GError *error = nullptr;
-    impl_->pipeline = gst_parse_launch(config.pipeline_description.c_str(), &error);
-
-    if (error != nullptr) {
-        std::string error_msg = error->message;
-        g_printerr("Pipeline creation failed: %s\n", error_msg.c_str());
-        g_error_free(error);
-        return std::unexpected(GStreamerError::PipelineCreationFailed);
-    }
-
-    if (impl_->pipeline == nullptr) {
-        g_printerr("Pipeline creation returned null\n");
-        return std::unexpected(GStreamerError::PipelineCreationFailed);
-    }
+    auto pipeline = parse_pipeline_description(config.pipeline_description, "Pipeline creation failed");
+    if (!pipeline) { return std::unexpected(pipeline.error()); }
+    impl_->pipeline = *pipeline;
 
     // Tensor metadata support will be implemented in a future release.
 
@@ -212,13 +236,6 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
 
     impl_->cleanup();
 
-    std::string shape_str;
-    for (std::size_t i = 0; i < input_shape.size(); ++i) {
-        if (i > 0) { shape_str += ",";
-}
-        shape_str += std::to_string(input_shape[i]);
-    }
-
     std::string pipeline_desc;
 
     if (input_source.contains("://")) {
@@ -241,20 +258,9 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
 
     pipeline_desc += " ! appsink name=sink emit-signals=true";
 
-    GError *error = nullptr;
-    impl_->pipeline = gst_parse_launch(pipeline_desc.c_str(), &error);
-
-    if (error != nullptr) {
-        std::string error_msg = error->message;
-        g_printerr("Inference pipeline creation failed: %s\n", error_msg.c_str());
-        g_error_free(error);
-        return std::unexpected(GStreamerError::PipelineCreationFailed);
-    }
-
-    if (impl_->pipeline == nullptr) {
-        g_printerr("Inference pipeline creation returned null\n");
-        return std::unexpected(GStreamerError::PipelineCreationFailed);
-    }
+    auto pipeline = parse_pipeline_description(pipeline_desc, "Inference pipeline creation failed");
+    if (!pipeline) { return std::unexpected(pipeline.error()); }
+    impl_->pipeline = *pipeline;
 
     impl_->appsink = gst_bin_get_by_name(GST_BIN(impl_->pipeline), "sink");
     if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
@@ -337,46 +343,7 @@ auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms)
 
     if (sample == nullptr) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
 
-    GstBuffer *buffer = gst_sample_get_buffer(sample);
-    GstCaps *caps = gst_sample_get_caps(sample);
-    GstMapInfo map_info;
-
-    BufferInfo buffer_info;
-
-    if ((buffer != nullptr) && (gst_buffer_map(buffer, &map_info, GST_MAP_READ) != 0)) {
-        buffer_info.size = map_info.size;
-        buffer_info.data.resize(map_info.size);
-        std::memcpy(buffer_info.data.data(), map_info.data, map_info.size);
-
-        if (caps != nullptr) {
-            GstStructure *structure = gst_caps_get_structure(caps, 0);
-            if (structure != nullptr) {
-                gst_structure_get_uint(structure, "width", &buffer_info.metadata.width);
-                gst_structure_get_uint(structure, "height", &buffer_info.metadata.height);
-
-                const gchar *format = gst_structure_get_string(structure, "format");
-                if (format != nullptr) { buffer_info.metadata.format = format; }
-            }
-        }
-
-        if (auto *meta = gst_buffer_get_tensor_meta(buffer)) {
-            for (gsize i = 0; i < meta->num_tensors; ++i) {
-                const GstTensor *tensor = gst_tensor_meta_get(meta, i);
-                TensorMeta tm;
-                tm.tensor_index = i;
-                tm.num_tensors = meta->num_tensors;
-                tm.data_type = static_cast<int>(tensor->data_type);
-
-                gsize num_dims = 0;
-                auto *dims = gst_tensor_get_dims(const_cast<GstTensor *>(tensor), &num_dims);
-                for (gsize j = 0; j < num_dims; ++j) { tm.dimensions.push_back(dims[j]); }
-                buffer_info.tensors.push_back(std::move(tm));
-            }
-        }
-
-        gst_buffer_unmap(buffer, &map_info);
-    }
-
+    auto buffer_info = extract_buffer_info(sample);
     gst_sample_unref(sample);
     return buffer_info;
 }

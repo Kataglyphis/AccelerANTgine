@@ -5,6 +5,7 @@ module;
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstring>
 #include <expected>
 #include <filesystem>
 #include <functional>
@@ -101,6 +102,52 @@ namespace {
         "teddy bear",
         "hair drier",
         "toothbrush" };
+
+    auto copy_buffer_to_float_data(const gstreamer::BufferInfo &buffer)
+      -> std::expected<std::vector<float>, OnnxError>
+    {
+        if (buffer.data.empty()) { return std::unexpected(OnnxError::InputAllocationFailed); }
+        if (buffer.size % sizeof(float) != 0) { return std::unexpected(OnnxError::InvalidInputShape); }
+        if (buffer.data.size() < buffer.size) { return std::unexpected(OnnxError::InputAllocationFailed); }
+
+        const std::size_t num_floats = buffer.size / sizeof(float);
+        std::vector<float> float_data(num_floats);
+        std::memcpy(float_data.data(), buffer.data.data(), buffer.size);
+        return float_data;
+    }
+
+    auto build_camera_detection_pipeline_description(const std::string &device,
+      std::uint32_t width,
+      std::uint32_t height,
+      std::uint32_t fps) -> std::string
+    {
+        return "v4l2src device=" + device + " ! "
+               "video/x-raw,width="
+               + std::to_string(width) + ",height=" + std::to_string(height) + ",framerate="
+               + std::to_string(fps)
+               + "/1 ! "
+                 "videoconvert ! video/x-raw,format=RGB ! "
+                 "appsink name=detector_sink emit-signals=true sync=false";
+    }
+
+    auto build_video_detection_pipeline_description(const std::string &video_source,
+      std::uint32_t width,
+      std::uint32_t height) -> std::string
+    {
+        std::string pipeline_desc;
+
+        if (video_source.contains("://")) {
+            pipeline_desc = "uridecodebin uri=" + video_source + " ! ";
+        } else {
+            pipeline_desc = "filesrc location=" + video_source + " ! decodebin ! ";
+        }
+
+        pipeline_desc += "videoconvert ! videoscale ! "
+                         "video/x-raw,format=RGB,width="
+                         + std::to_string(width) + ",height=" + std::to_string(height)
+                         + " ! appsink name=detector_sink emit-signals=true sync=false";
+        return pipeline_desc;
+    }
 }  // namespace
 
 struct YoloDetector::Impl
@@ -114,25 +161,16 @@ YoloDetector::YoloDetector() : impl_(std::make_unique<Impl>()) {}
 
 YoloDetector::~YoloDetector() = default;
 
-YoloDetector::YoloDetector(YoloDetector &&other) noexcept : impl_(std::move(other.impl_)) {}
+YoloDetector::YoloDetector(YoloDetector &&) noexcept = default;
 
-auto YoloDetector::operator=(YoloDetector &&other) noexcept -> YoloDetector &
-{
-    if (this != &other) { impl_ = std::move(other.impl_); }
-    return *this;
-}
+auto YoloDetector::operator=(YoloDetector &&) noexcept -> YoloDetector & = default;
 
 auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, OnnxError>
 {
 
     impl_->config = config;
 
-    inference::SessionConfig session_config;
-    session_config.model_path = config.model_path;
-    session_config.intra_op_num_threads = 4;
-    session_config.inter_op_num_threads = 4;
-    session_config.enable_cuda = false;
-    session_config.execution_mode = inference::ExecutionMode::Sequential;
+    auto session_config = inference::create_default_session_config(config.model_path);
 
     auto result = impl_->engine.initialize(session_config);
     if (!result) { return std::unexpected(result.error()); }
@@ -169,17 +207,12 @@ auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline,
     if (!buffer_result) { return std::unexpected(OnnxError::InputAllocationFailed); }
 
     const auto &buffer_info = buffer_result.value();
-    if (buffer_info.data.empty()) { return std::unexpected(OnnxError::InputAllocationFailed); }
+    auto float_data = copy_buffer_to_float_data(buffer_info);
+    if (!float_data) { return std::unexpected(float_data.error()); }
 
-    if (buffer_info.size % sizeof(float) != 0) { return std::unexpected(OnnxError::InvalidInputShape); }
-
-    if (buffer_info.data.size() < buffer_info.size) { return std::unexpected(OnnxError::InputAllocationFailed); }
-
-    std::size_t num_floats = buffer_info.size / sizeof(float);
-    std::vector<float> float_data(num_floats);
-    std::memcpy(float_data.data(), buffer_info.data.data(), buffer_info.size);
-
-    return detect(std::span<const float>(float_data.data(), num_floats), buffer_info.metadata.width, buffer_info.metadata.height);
+    return detect(std::span<const float>(float_data->data(), float_data->size()),
+      buffer_info.metadata.width,
+      buffer_info.metadata.height);
 }
 
 auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
@@ -335,16 +368,11 @@ struct VideoDetectorPipeline::Impl
         if (frame_callback) { frame_callback(buffer); }
 
         if (detector.is_initialized()) {
-            if (buffer.data.empty() || buffer.size % sizeof(float) != 0) { return; }
-
-            if (buffer.data.size() < buffer.size) { return; }
-
-            std::size_t num_floats = buffer.size / sizeof(float);
-            std::vector<float> float_data(num_floats);
-            std::memcpy(float_data.data(), buffer.data.data(), buffer.size);
+            auto float_data = copy_buffer_to_float_data(buffer);
+            if (!float_data) { return; }
 
             auto detection = detector.detect(
-              std::span<const float>(float_data.data(), num_floats),
+              std::span<const float>(float_data->data(), float_data->size()),
               buffer.metadata.width,
               buffer.metadata.height);
 
@@ -357,13 +385,9 @@ VideoDetectorPipeline::VideoDetectorPipeline() : impl_(std::make_unique<Impl>())
 
 VideoDetectorPipeline::~VideoDetectorPipeline() = default;
 
-VideoDetectorPipeline::VideoDetectorPipeline(VideoDetectorPipeline &&other) noexcept : impl_(std::move(other.impl_)) {}
+VideoDetectorPipeline::VideoDetectorPipeline(VideoDetectorPipeline &&) noexcept = default;
 
-auto VideoDetectorPipeline::operator=(VideoDetectorPipeline &&other) noexcept -> VideoDetectorPipeline &
-{
-    if (this != &other) { impl_ = std::move(other.impl_); }
-    return *this;
-}
+auto VideoDetectorPipeline::operator=(VideoDetectorPipeline &&) noexcept -> VideoDetectorPipeline & = default;
 
 auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config) -> std::expected<void, OnnxError>
 {
@@ -430,13 +454,7 @@ auto create_camera_detection_pipeline(const std::string &device,
     config.yolo_config.input_width = width;
     config.yolo_config.input_height = height;
 
-    config.gstreamer_config.pipeline_description = 
-        "v4l2src device=" + device + " ! "
-        "video/x-raw,width=" + std::to_string(width) + 
-        ",height=" + std::to_string(height) +
-        ",framerate=" + std::to_string(fps) + "/1 ! "
-        "videoconvert ! video/x-raw,format=RGB ! "
-        "appsink name=detector_sink emit-signals=true sync=false";
+    config.gstreamer_config.pipeline_description = build_camera_detection_pipeline_description(device, width, height, fps);
 
     config.gstreamer_config.enable_tensor_meta = true;
 
@@ -459,21 +477,7 @@ auto create_video_detection_pipeline(const std::string &video_source,
     config.yolo_config.input_width = width;
     config.yolo_config.input_height = height;
 
-    std::string pipeline_desc;
-
-    if (video_source.contains("://")) {
-        pipeline_desc = "uridecodebin uri=" + video_source + " ! ";
-    } else {
-        pipeline_desc = "filesrc location=" + video_source + " ! decodebin ! ";
-    }
-
-    pipeline_desc += 
-        "videoconvert ! videoscale ! "
-        "video/x-raw,format=RGB,width=" + std::to_string(width) + 
-        ",height=" + std::to_string(height) + " ! "
-        "appsink name=detector_sink emit-signals=true sync=false";
-
-    config.gstreamer_config.pipeline_description = pipeline_desc;
+    config.gstreamer_config.pipeline_description = build_video_detection_pipeline_description(video_source, width, height);
     config.gstreamer_config.enable_tensor_meta = true;
 
     auto result = pipeline.initialize(config);

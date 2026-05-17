@@ -18,8 +18,11 @@ import kataglyphis.project_config;
 ABSL_FLAG(bool, webrtc, false, "Start WebRTC streaming");
 ABSL_FLAG(std::string, config, "", "Load settings from JSON config file");
 ABSL_FLAG(std::string, server, "", "Signalling server URI (overrides config file default)");
-ABSL_FLAG(std::string, source, "libcamera", "Video source: libcamera, v4l2, test");
+ABSL_FLAG(std::string, source, "libcamera", "Video source: libcamera, v4l2, test, file, uri");
 ABSL_FLAG(std::string, device, "/dev/video0", "V4L2 device path");
+ABSL_FLAG(std::string, camera_id, "", "Libcamera camera name");
+ABSL_FLAG(std::string, input_path, "", "Local media file path for --source file");
+ABSL_FLAG(std::string, input_uri, "", "Media URI for --source uri");
 ABSL_FLAG(std::uint32_t, width, 0, "Video width in pixels (0 = use config default)");
 ABSL_FLAG(std::uint32_t, height, 0, "Video height in pixels (0 = use config default)");
 ABSL_FLAG(std::uint32_t, fps, 0, "Framerate (0 = use config default)");
@@ -27,22 +30,74 @@ ABSL_FLAG(std::string, encoder, "h264-hw", "Encoder: h264-hw, h264-sw, vp8, vp9"
 ABSL_FLAG(std::uint32_t, bitrate, 0, "Bitrate in kbps (0 = use config default)");
 
 namespace {
-    std::atomic<bool> g_running{true};
+    std::atomic<bool> g_running{ true };
 
-    void signal_handler(int /*signal*/) {
+    struct CliOverrideFlags {
+        bool server{ false };
+        bool source{ false };
+        bool device{ false };
+        bool camera_id{ false };
+        bool input_path{ false };
+        bool input_uri{ false };
+        bool width{ false };
+        bool height{ false };
+        bool fps{ false };
+        bool encoder{ false };
+        bool bitrate{ false };
+    };
+
+    void signal_handler(int /*signal*/)
+    {
         g_running.store(false);
     }
 
-    auto parse_video_source(std::string_view name) -> kataglyphis::webrtc::VideoSource {
+    auto was_flag_provided(std::string_view argument, std::string_view flag_name) -> bool
+    {
+        const std::string long_flag = "--" + std::string(flag_name);
+        const std::string short_flag = "-" + std::string(flag_name);
+        return argument == long_flag || argument.starts_with(long_flag + "=") || argument == short_flag ||
+               argument.starts_with(short_flag + "=");
+    }
+
+    auto detect_cli_override_flags(int argc, char **argv) -> CliOverrideFlags
+    {
+        CliOverrideFlags flags;
+
+        for (int index = 1; index < argc; ++index) {
+            const std::string_view argument = argv[index];
+            flags.server = flags.server || was_flag_provided(argument, "server");
+            flags.source = flags.source || was_flag_provided(argument, "source");
+            flags.device = flags.device || was_flag_provided(argument, "device");
+            flags.camera_id = flags.camera_id || was_flag_provided(argument, "camera_id") ||
+                              was_flag_provided(argument, "camera-id");
+            flags.input_path = flags.input_path || was_flag_provided(argument, "input_path") ||
+                               was_flag_provided(argument, "input-path");
+            flags.input_uri = flags.input_uri || was_flag_provided(argument, "input_uri") ||
+                              was_flag_provided(argument, "input-uri");
+            flags.width = flags.width || was_flag_provided(argument, "width");
+            flags.height = flags.height || was_flag_provided(argument, "height");
+            flags.fps = flags.fps || was_flag_provided(argument, "fps");
+            flags.encoder = flags.encoder || was_flag_provided(argument, "encoder");
+            flags.bitrate = flags.bitrate || was_flag_provided(argument, "bitrate");
+        }
+
+        return flags;
+    }
+
+    auto parse_video_source(std::string_view name) -> kataglyphis::webrtc::VideoSource
+    {
         if (name == "v4l2") { return kataglyphis::webrtc::VideoSource::V4L2; }
         if (name == "test") { return kataglyphis::webrtc::VideoSource::TestPattern; }
+        if (name == "file") { return kataglyphis::webrtc::VideoSource::File; }
+        if (name == "uri") { return kataglyphis::webrtc::VideoSource::Uri; }
         if (name != "libcamera") {
             std::cerr << "Warning: unknown source '" << name << "', falling back to libcamera\n";
         }
         return kataglyphis::webrtc::VideoSource::Libcamera;
     }
 
-    auto parse_video_encoder(std::string_view name) -> kataglyphis::webrtc::VideoEncoder {
+    auto parse_video_encoder(std::string_view name) -> kataglyphis::webrtc::VideoEncoder
+    {
         if (name == "h264-sw") { return kataglyphis::webrtc::VideoEncoder::H264_Software; }
         if (name == "vp8") { return kataglyphis::webrtc::VideoEncoder::VP8; }
         if (name == "vp9") { return kataglyphis::webrtc::VideoEncoder::VP9; }
@@ -52,29 +107,60 @@ namespace {
         return kataglyphis::webrtc::VideoEncoder::H264_Hardware;
     }
 
-    auto state_to_string(kataglyphis::webrtc::StreamState state) -> const char* {
+    auto state_to_string(kataglyphis::webrtc::StreamState state) -> const char *
+    {
         using kataglyphis::webrtc::StreamState;
         switch (state) {
-            case StreamState::Idle: return "Idle";
-            case StreamState::Connecting: return "Connecting";
-            case StreamState::Negotiating: return "Negotiating";
-            case StreamState::Streaming: return "Streaming";
-            case StreamState::Paused: return "Paused";
-            case StreamState::Error: return "Error";
-            case StreamState::Disconnected: return "Disconnected";
+        case StreamState::Idle:
+            return "Idle";
+        case StreamState::Connecting:
+            return "Connecting";
+        case StreamState::Negotiating:
+            return "Negotiating";
+        case StreamState::Streaming:
+            return "Streaming";
+        case StreamState::Paused:
+            return "Paused";
+        case StreamState::Error:
+            return "Error";
+        case StreamState::Disconnected:
+            return "Disconnected";
         }
         return "Unknown";
+    }
+
+    auto apply_cli_overrides(kataglyphis::webrtc::StreamConfig &config, const CliOverrideFlags &override_flags) -> void
+    {
+        if (override_flags.server) {
+            const auto cli_server = absl::GetFlag(FLAGS_server);
+            config.signalling_server_uri = cli_server;
+        }
+        if (override_flags.device) { config.v4l2_device = absl::GetFlag(FLAGS_device); }
+        if (override_flags.camera_id) { config.camera_id = absl::GetFlag(FLAGS_camera_id); }
+        if (override_flags.input_path) { config.input_path = absl::GetFlag(FLAGS_input_path); }
+        if (override_flags.input_uri) { config.input_uri = absl::GetFlag(FLAGS_input_uri); }
+        if (override_flags.width) { config.width = absl::GetFlag(FLAGS_width); }
+        if (override_flags.height) { config.height = absl::GetFlag(FLAGS_height); }
+        if (override_flags.fps) { config.framerate = absl::GetFlag(FLAGS_fps); }
+        if (override_flags.bitrate) {
+            const auto cli_bitrate = absl::GetFlag(FLAGS_bitrate);
+            config.bitrate_kbps = cli_bitrate;
+        }
     }
 }  // namespace
 
 auto main(int argc, char** argv) -> int
 {
+    const auto override_flags = detect_cli_override_flags(argc, argv);
+
     absl::SetProgramUsageMessage(
         "KataglyphisCppInference — WebRTC streaming and inference engine\n\n"
         "Examples:\n"
         "  --webrtc --config /path/to/webrtc_settings.json\n"
         "  --webrtc --server ws://192.168.1.100:8443\n"
         "  --webrtc --source v4l2 --device /dev/video0\n"
+        "  --webrtc --source file --input_path /path/to/video.mp4\n"
+        "  --webrtc --source uri --input_uri rtsp://camera.example/stream\n"
         "  --webrtc --source test   # For testing without camera");
 
     absl::ParseCommandLine(argc, argv);
@@ -88,44 +174,36 @@ auto main(int argc, char** argv) -> int
         return 0;
     }
 
-    kataglyphis::webrtc::StreamConfig config;
-    config.source = parse_video_source(absl::GetFlag(FLAGS_source));
-    config.encoder = parse_video_encoder(absl::GetFlag(FLAGS_encoder));
-    config.v4l2_device = absl::GetFlag(FLAGS_device);
+    const auto source = parse_video_source(absl::GetFlag(FLAGS_source));
+    const auto encoder = parse_video_encoder(absl::GetFlag(FLAGS_encoder));
+    const auto source_override_mode = override_flags.source ? kataglyphis::webrtc::ConfigOverrideMode::Override
+                                                            : kataglyphis::webrtc::ConfigOverrideMode::UseConfig;
+    const auto encoder_override_mode = override_flags.encoder ? kataglyphis::webrtc::ConfigOverrideMode::Override
+                                                              : kataglyphis::webrtc::ConfigOverrideMode::UseConfig;
+    auto webrtc_config = kataglyphis::config::get_default_webrtc_config();
 
     const std::string config_file_path = absl::GetFlag(FLAGS_config);
-
-    kataglyphis::config::WebRTCConfig webrtc_config;
 
     if (!config_file_path.empty()) {
         std::cout << "Loading configuration from: " << config_file_path << '\n';
         auto result = kataglyphis::config::load_webrtc_config(config_file_path);
         if (result) {
             webrtc_config = *result;
-            config.signalling_server_uri = webrtc_config.signaling_server_url;
-            config.width = webrtc_config.video.default_width;
-            config.height = webrtc_config.video.default_height;
-            config.framerate = webrtc_config.video.default_framerate;
-            config.bitrate_kbps = webrtc_config.video.default_bitrate_kbps;
-            config.stun_servers = webrtc_config.stun_servers;
-            config.turn_servers = webrtc_config.turn_servers;
             std::cout << "Configuration loaded successfully\n";
         } else {
             std::cerr << "Warning: Failed to load config file, using defaults\n";
         }
     }
 
-    const std::string cli_server = absl::GetFlag(FLAGS_server);
-    const std::uint32_t cli_width = absl::GetFlag(FLAGS_width);
-    const std::uint32_t cli_height = absl::GetFlag(FLAGS_height);
-    const std::uint32_t cli_fps = absl::GetFlag(FLAGS_fps);
-    const std::uint32_t cli_bitrate = absl::GetFlag(FLAGS_bitrate);
+    auto config = kataglyphis::webrtc::create_stream_config_from_webrtc_config(
+        webrtc_config,
+        source,
+        encoder,
+        source_override_mode,
+        encoder_override_mode
+    );
 
-    if (!cli_server.empty()) { config.signalling_server_uri = cli_server; }
-    if (cli_width != 0) { config.width = cli_width; }
-    if (cli_height != 0) { config.height = cli_height; }
-    if (cli_fps != 0) { config.framerate = cli_fps; }
-    if (cli_bitrate != 0) { config.bitrate_kbps = cli_bitrate; }
+    apply_cli_overrides(config, override_flags);
 
     std::cout << "Initializing WebRTC streaming...\n";
 

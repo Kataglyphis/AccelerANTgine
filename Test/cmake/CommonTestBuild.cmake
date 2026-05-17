@@ -70,3 +70,28 @@ function(kataglyphis_configure_gtest_discovery test_target)
     endif()
   endif()
 endfunction()
+
+function(kataglyphis_configure_common_test_target target_name resource_path include_path)
+  if(RUST_FEATURES)
+    target_compile_definitions(${target_name} PRIVATE USE_RUST=1)
+  else()
+    target_compile_definitions(${target_name} PRIVATE USE_RUST=0)
+  endif()
+
+  target_compile_definitions(${target_name}
+                             PRIVATE RELATIVE_RESOURCE_PATH="${resource_path}" RELATIVE_INCLUDE_PATH="${include_path}")
+
+  # Test suites intentionally suppress their own warnings to keep signal focused
+  # on library code compiled through the main targets.
+  if(MSVC)
+    target_compile_options(${target_name} PRIVATE /w)
+  else()
+    target_compile_options(${target_name} PRIVATE -w)
+  endif()
+endfunction()
+
+function(kataglyphis_link_rust_target_if_enabled target_name)
+  if(RUST_FEATURES)
+    target_link_libraries(${target_name} PUBLIC rusty_code)
+  endif()
+endfunction()

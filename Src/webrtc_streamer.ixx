@@ -15,6 +15,11 @@ export import kataglyphis.config_loader;
 
 export namespace kataglyphis::webrtc {
 
+enum class ConfigOverrideMode {
+    UseConfig,
+    Override
+};
+
 enum class WebRTCError {
     InitializationFailed,
     SignallingConnectionFailed,
@@ -31,7 +36,9 @@ enum class WebRTCError {
 enum class VideoSource {
     Libcamera,      // Raspberry Pi camera via libcamera
     V4L2,           // USB camera via v4l2src
-    TestPattern     // videotestsrc for testing
+    TestPattern,    // videotestsrc for testing
+    File,           // Local media file via uridecodebin
+    Uri             // Arbitrary URI via uridecodebin
 };
 
 enum class VideoEncoder {
@@ -45,7 +52,7 @@ struct StreamConfig {
     VideoSource source{ VideoSource::Libcamera };
     VideoEncoder encoder{ VideoEncoder::H264_Hardware };
     
-    std::string signalling_server_uri{ "ws://himbeere2:8443" };
+    std::string signalling_server_uri{ "ws://127.0.0.1:8443" };
     std::string peer_id;                 // Target peer ID (empty = produce stream)
     std::string producer_id;             // Our producer ID for the stream
     
@@ -60,7 +67,11 @@ struct StreamConfig {
     
     // V4L2 specific
     std::string v4l2_device{ "/dev/video0" };
-    
+
+    // File/URI specific
+    std::string input_path;
+    std::string input_uri;
+
     // Enable STUN/TURN
     std::vector<std::string> stun_servers;
     std::vector<std::string> turn_servers;
@@ -146,14 +157,18 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer {
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_stream_config_from_webrtc_config(
     const config::WebRTCConfig& webrtc_config,
     VideoSource source = VideoSource::Libcamera,
-    VideoEncoder encoder = VideoEncoder::H264_Hardware
+    VideoEncoder encoder = VideoEncoder::H264_Hardware,
+    ConfigOverrideMode source_override_mode = ConfigOverrideMode::UseConfig,
+    ConfigOverrideMode encoder_override_mode = ConfigOverrideMode::UseConfig
 ) -> StreamConfig;
 
 // Load config from JSON file and create a configured WebRTCStreamer
 [[nodiscard]] auto create_webrtc_stream_from_config(
     const std::filesystem::path& config_path,
     VideoSource source = VideoSource::Libcamera,
-    VideoEncoder encoder = VideoEncoder::H264_Hardware
+    VideoEncoder encoder = VideoEncoder::H264_Hardware,
+    ConfigOverrideMode source_override_mode = ConfigOverrideMode::UseConfig,
+    ConfigOverrideMode encoder_override_mode = ConfigOverrideMode::UseConfig
 ) -> std::expected<WebRTCStreamer, WebRTCError>;
 
 } // namespace kataglyphis::webrtc

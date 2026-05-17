@@ -20,6 +20,87 @@ import kataglyphis.project_config;
 
 namespace kataglyphis::inference {
 
+namespace {
+
+using InferenceClock = std::chrono::high_resolution_clock;
+
+template <typename NameGetter>
+void populate_name_cache(std::size_t count,
+  std::vector<std::string> &name_cache,
+  std::vector<const char *> &name_ptrs,
+  NameGetter &&get_name)
+{
+    name_cache.clear();
+    name_ptrs.clear();
+    name_cache.reserve(count);
+
+    for (std::size_t i = 0; i < count; ++i) {
+        auto name = get_name(i);
+        name_cache.emplace_back(name.get());
+    }
+
+    name_ptrs.reserve(name_cache.size());
+    for (const auto &name : name_cache) { name_ptrs.push_back(name.c_str()); }
+}
+
+auto to_ort_dimensions(const TensorShape &shape) -> std::vector<int64_t>
+{
+    std::vector<int64_t> dims;
+    dims.reserve(shape.dimensions.size());
+    for (const auto dim : shape.dimensions) { dims.push_back(static_cast<int64_t>(dim)); }
+    return dims;
+}
+
+auto to_tensor_shape(std::span<const int64_t> dims) -> TensorShape
+{
+    TensorShape shape;
+    shape.dimensions.reserve(dims.size());
+    for (const auto dim : dims) { shape.dimensions.push_back(static_cast<std::size_t>(dim)); }
+    return shape;
+}
+
+auto to_tensor_data(const Ort::Value &tensor) -> TensorData
+{
+    TensorData tensor_data;
+    const auto type_info = tensor.GetTensorTypeAndShapeInfo();
+    const auto shape = type_info.GetShape();
+
+    tensor_data.shape = to_tensor_shape(shape);
+
+    const auto total_elements = type_info.GetElementCount();
+    const auto *tensor_data_ptr = tensor.GetTensorData<float>();
+
+    tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
+    return tensor_data;
+}
+
+auto make_inference_result(const std::vector<Ort::Value> &output_tensors,
+  const InferenceClock::time_point start_time,
+  const InferenceClock::time_point end_time) -> InferenceResult
+{
+    InferenceResult result;
+    result.inference_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    result.outputs.reserve(output_tensors.size());
+
+    for (const auto &tensor : output_tensors) { result.outputs.push_back(to_tensor_data(tensor)); }
+
+    return result;
+}
+
+template <typename TypeInfoGetter>
+auto get_named_shape(const std::vector<std::string> &names, const std::string &name, TypeInfoGetter &&get_type_info)
+  -> std::expected<TensorShape, OnnxError>
+{
+    const auto it = std::find(names.begin(), names.end(), name);
+    if (it == names.end()) { return std::unexpected(OnnxError::OutputNotFound); }
+
+    const auto index = static_cast<std::size_t>(std::distance(names.begin(), it));
+    const auto type_info = get_type_info(index);
+    return to_tensor_shape(type_info.GetTensorTypeAndShapeInfo().GetShape());
+}
+
+}  // namespace
+
 struct OnnxInferenceEngine::Impl
 {
     std::unique_ptr<Ort::Env> env;
@@ -39,13 +120,9 @@ OnnxInferenceEngine::OnnxInferenceEngine() : impl_(std::make_unique<Impl>()) {}
 
 OnnxInferenceEngine::~OnnxInferenceEngine() = default;
 
-OnnxInferenceEngine::OnnxInferenceEngine(OnnxInferenceEngine &&other) noexcept : impl_(std::move(other.impl_)) {}
+OnnxInferenceEngine::OnnxInferenceEngine(OnnxInferenceEngine &&) noexcept = default;
 
-auto OnnxInferenceEngine::operator=(OnnxInferenceEngine &&other) noexcept -> OnnxInferenceEngine &
-{
-    if (this != &other) { impl_ = std::move(other.impl_); }
-    return *this;
-}
+auto OnnxInferenceEngine::operator=(OnnxInferenceEngine &&) noexcept -> OnnxInferenceEngine & = default;
 
 auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expected<void, OnnxError>
 {
@@ -75,27 +152,15 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     impl_->session =
       std::make_unique<Ort::Session>(*impl_->env, config.model_path.c_str(), *impl_->session_options);
 
-    Ort::AllocatorWithDefaultOptions allocator;
+    populate_name_cache(impl_->session->GetInputCount(),
+      impl_->input_names_cache,
+      impl_->input_name_ptrs,
+      [this](std::size_t index) { return impl_->session->GetInputNameAllocated(index, impl_->allocator); });
 
-    const size_t num_inputs = impl_->session->GetInputCount();
-    impl_->input_names_cache.clear();
-    impl_->input_name_ptrs.clear();
-
-    for (size_t i = 0; i < num_inputs; ++i) {
-        auto name = impl_->session->GetInputNameAllocated(i, allocator);
-        impl_->input_names_cache.emplace_back(name.get());
-        impl_->input_name_ptrs.push_back(impl_->input_names_cache.back().c_str());
-    }
-
-    const size_t num_outputs = impl_->session->GetOutputCount();
-    impl_->output_names_cache.clear();
-    impl_->output_name_ptrs.clear();
-
-    for (size_t i = 0; i < num_outputs; ++i) {
-        auto name = impl_->session->GetOutputNameAllocated(i, allocator);
-        impl_->output_names_cache.emplace_back(name.get());
-        impl_->output_name_ptrs.push_back(impl_->output_names_cache.back().c_str());
-    }
+    populate_name_cache(impl_->session->GetOutputCount(),
+      impl_->output_names_cache,
+      impl_->output_name_ptrs,
+      [this](std::size_t index) { return impl_->session->GetOutputNameAllocated(index, impl_->allocator); });
 
     impl_->initialized = true;
 
@@ -114,10 +179,7 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
     const auto expected_size = input_shape.total_elements();
     if (input_data.size() != expected_size) { return std::unexpected(OnnxError::InvalidInputShape); }
 
-    std::vector<int64_t> input_dims;
-    input_dims.reserve(input_shape.dimensions.size());
-    for (const auto dim : input_shape.dimensions) { input_dims.push_back(static_cast<int64_t>(dim)); }
-
+    const auto input_dims = to_ort_dimensions(input_shape);
     std::vector<float> mutable_input(input_data.begin(), input_data.end());
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -127,35 +189,16 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
 
     const char *input_name_ptr = input_name.c_str();
 
-    auto start_time = std::chrono::high_resolution_clock::now();
+    const auto start_time = InferenceClock::now();
 
-    auto output_tensors = impl_->session->Run(Ort::RunOptions{ nullptr },
+    const auto output_tensors = impl_->session->Run(Ort::RunOptions{ nullptr },
       &input_name_ptr,
       &input_tensor,
       1,
       impl_->output_name_ptrs.data(),
       impl_->output_name_ptrs.size());
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-
-    InferenceResult result;
-    result.inference_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-
-    for (auto &tensor : output_tensors) {
-        TensorData tensor_data;
-        const auto &type_info = tensor.GetTensorTypeAndShapeInfo();
-        const auto shape = type_info.GetShape();
-
-        for (const auto dim : shape) { tensor_data.shape.dimensions.push_back(static_cast<std::size_t>(dim)); }
-
-        const auto total_elements = type_info.GetElementCount();
-        const auto *tensor_data_ptr = tensor.GetTensorData<float>();
-
-        tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
-        result.outputs.push_back(std::move(tensor_data));
-    }
-
-    return result;
+    return make_inference_result(output_tensors, start_time, InferenceClock::now());
 }
 
 auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<std::string, TensorData>> &inputs)
@@ -166,17 +209,25 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
+    // Ort::Value borrows input buffers, so the copied inputs must stay alive
+    // until Session::Run() has completed.
+    std::vector<std::vector<float>> owned_input_data;
+    std::vector<std::vector<int64_t>> input_dims_storage;
     std::vector<Ort::Value> input_tensors;
     std::vector<const char *> input_names;
+
+    owned_input_data.reserve(inputs.size());
+    input_dims_storage.reserve(inputs.size());
     input_tensors.reserve(inputs.size());
     input_names.reserve(inputs.size());
 
     for (const auto &[name, tensor_data] : inputs) {
-        std::vector<int64_t> dims;
-        dims.reserve(tensor_data.shape.dimensions.size());
-        for (const auto dim : tensor_data.shape.dimensions) { dims.push_back(static_cast<int64_t>(dim)); }
+        if (tensor_data.data.size() != tensor_data.shape.total_elements()) {
+            return std::unexpected(OnnxError::InvalidInputShape);
+        }
 
-        std::vector<float> mutable_data(tensor_data.data.begin(), tensor_data.data.end());
+        auto &mutable_data = owned_input_data.emplace_back(tensor_data.data.begin(), tensor_data.data.end());
+        auto &dims = input_dims_storage.emplace_back(to_ort_dimensions(tensor_data.shape));
 
         auto input_tensor = Ort::Value::CreateTensor<float>(
           memory_info, mutable_data.data(), mutable_data.size(), dims.data(), dims.size());
@@ -185,35 +236,16 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
         input_names.push_back(name.c_str());
     }
 
-    auto start_time = std::chrono::high_resolution_clock::now();
+    const auto start_time = InferenceClock::now();
 
-    auto output_tensors = impl_->session->Run(Ort::RunOptions{ nullptr },
+    const auto output_tensors = impl_->session->Run(Ort::RunOptions{ nullptr },
       input_names.data(),
       input_tensors.data(),
       input_tensors.size(),
       impl_->output_name_ptrs.data(),
       impl_->output_name_ptrs.size());
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-
-    InferenceResult result;
-    result.inference_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-
-    for (auto &tensor : output_tensors) {
-        TensorData tensor_data;
-        const auto &type_info = tensor.GetTensorTypeAndShapeInfo();
-        const auto shape = type_info.GetShape();
-
-        for (const auto dim : shape) { tensor_data.shape.dimensions.push_back(static_cast<std::size_t>(dim)); }
-
-        const auto total_elements = type_info.GetElementCount();
-        const auto *tensor_data_ptr = tensor.GetTensorData<float>();
-
-        tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
-        result.outputs.push_back(std::move(tensor_data));
-    }
-
-    return result;
+    return make_inference_result(output_tensors, start_time, InferenceClock::now());
 }
 
 auto OnnxInferenceEngine::get_input_names() const -> std::vector<std::string> { return impl_->input_names_cache; }
@@ -222,34 +254,18 @@ auto OnnxInferenceEngine::get_output_names() const -> std::vector<std::string> {
 
 auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
 {
-    for (size_t i = 0; i < impl_->input_names_cache.size(); ++i) {
-        if (impl_->input_names_cache[i] == name) {
-            const auto type_info = impl_->session->GetInputTypeInfo(i);
-            const auto &shape_info = type_info.GetTensorTypeAndShapeInfo();
-            const auto dims = shape_info.GetShape();
+    if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
-            TensorShape result;
-            for (const auto dim : dims) { result.dimensions.push_back(static_cast<std::size_t>(dim)); }
-            return result;
-        }
-    }
-    return std::unexpected(OnnxError::OutputNotFound);
+    return get_named_shape(
+      impl_->input_names_cache, name, [this](std::size_t index) { return impl_->session->GetInputTypeInfo(index); });
 }
 
 auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
 {
-    for (size_t i = 0; i < impl_->output_names_cache.size(); ++i) {
-        if (impl_->output_names_cache[i] == name) {
-            const auto type_info = impl_->session->GetOutputTypeInfo(i);
-            const auto &shape_info = type_info.GetTensorTypeAndShapeInfo();
-            const auto dims = shape_info.GetShape();
+    if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
-            TensorShape result;
-            for (const auto dim : dims) { result.dimensions.push_back(static_cast<std::size_t>(dim)); }
-            return result;
-        }
-    }
-    return std::unexpected(OnnxError::OutputNotFound);
+    return get_named_shape(
+      impl_->output_names_cache, name, [this](std::size_t index) { return impl_->session->GetOutputTypeInfo(index); });
 }
 
 auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig

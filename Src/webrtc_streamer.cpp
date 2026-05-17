@@ -53,6 +53,73 @@ namespace {
         }
         return "Unknown error";
     }
+
+    auto make_default_producer_id() -> std::string
+    {
+        return "stream-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count() % 100000);
+    }
+
+    auto quote_pipeline_value(const std::string &value) -> std::string
+    {
+        std::string escaped;
+        escaped.reserve(value.size() + 2);
+        escaped.push_back('"');
+        for (const char ch : value) {
+            if (ch == '\\' || ch == '"') { escaped.push_back('\\'); }
+            escaped.push_back(ch);
+        }
+        escaped.push_back('"');
+        return escaped;
+    }
+
+    auto to_file_uri(const std::string &path) -> std::string
+    {
+        const auto absolute_path = std::filesystem::absolute(path);
+        GError *error = nullptr;
+        gchar *uri = gst_filename_to_uri(absolute_path.string().c_str(), &error);
+        if (uri == nullptr) {
+            if (error != nullptr) {
+                g_printerr("Failed to convert file path to URI: %s\n", error->message);
+                g_error_free(error);
+            }
+            return {};
+        }
+
+        std::string result{ uri };
+        g_free(uri);
+        return result;
+    }
+
+    auto parse_configured_source(const std::string &name, VideoSource fallback) -> VideoSource
+    {
+        if (name == "libcamera") { return VideoSource::Libcamera; }
+        if (name == "v4l2") { return VideoSource::V4L2; }
+        if (name == "test") { return VideoSource::TestPattern; }
+        if (name == "file") { return VideoSource::File; }
+        if (name == "uri") { return VideoSource::Uri; }
+        return fallback;
+    }
+
+    auto parse_configured_encoder(const std::string &name, VideoEncoder fallback) -> VideoEncoder
+    {
+        if (name == "h264-hw") { return VideoEncoder::H264_Hardware; }
+        if (name == "h264-sw") { return VideoEncoder::H264_Software; }
+        if (name == "vp8") { return VideoEncoder::VP8; }
+        if (name == "vp9") { return VideoEncoder::VP9; }
+        return fallback;
+    }
+
+    auto create_configured_streamer(StreamConfig config) -> std::expected<WebRTCStreamer, WebRTCError>
+    {
+        auto init_result = WebRTCStreamer::initialize();
+        if (!init_result) { return std::unexpected(init_result.error()); }
+
+        WebRTCStreamer streamer;
+        auto configure_result = streamer.configure(config);
+        if (!configure_result) { return std::unexpected(configure_result.error()); }
+
+        return streamer;
+    }
 }// namespace
 
 struct WebRTCStreamer::Impl
@@ -73,7 +140,7 @@ struct WebRTCStreamer::Impl
 
     ~Impl() { cleanup(); }
 
-    void cleanup()
+    void stop_main_loop()
     {
         if (main_loop != nullptr) {
             g_main_loop_quit(main_loop);
@@ -81,56 +148,89 @@ struct WebRTCStreamer::Impl
             g_main_loop_unref(main_loop);
             main_loop = nullptr;
         }
+    }
+
+    void destroy_pipeline()
+    {
+        if (webrtcsink != nullptr) {
+            gst_object_unref(webrtcsink);
+            webrtcsink = nullptr;
+        }
         if (pipeline != nullptr) {
-            gst_element_set_state(pipeline, GST_STATE_NULL);
             gst_object_unref(pipeline);
             pipeline = nullptr;
         }
-        webrtcsink = nullptr;
+    }
+
+    void cleanup()
+    {
+        stop_main_loop();
+        if (pipeline != nullptr) { gst_element_set_state(pipeline, GST_STATE_NULL); }
+        destroy_pipeline();
     }
 
     void set_state(StreamState new_state)
     {
         StreamState old_state = state.exchange(new_state);
-        if (old_state != new_state && state_callback) {
+        if (old_state != new_state) {
             std::scoped_lock lock(callback_mutex);
-            state_callback(old_state, new_state);
+            if (state_callback) { state_callback(old_state, new_state); }
         }
     }
 
     void report_error(WebRTCError error, const std::string &message = "")
     {
         set_state(StreamState::Error);
-        if (error_callback) {
-            std::scoped_lock lock(callback_mutex);
-            std::string full_message = error_to_string(error);
-            if (!message.empty()) { full_message += ": " + message; }
-            error_callback(error, full_message);
-        }
+
+        std::scoped_lock lock(callback_mutex);
+        if (!error_callback) { return; }
+
+        std::string full_message = error_to_string(error);
+        if (!message.empty()) { full_message += ": " + message; }
+        error_callback(error, full_message);
+    }
+
+    auto build_raw_video_caps() const -> std::string
+    {
+        std::ostringstream ss;
+        ss << "video/x-raw,width=" << config.width << ",height=" << config.height
+           << ",framerate=" << config.framerate << "/1";
+        return ss.str();
     }
 
     auto build_source_element() const -> std::string
     {
         std::ostringstream ss;
+        const auto raw_caps = build_raw_video_caps();
 
         switch (config.source) {
         case VideoSource::Libcamera:
             // libcamerasrc for Raspberry Pi cameras
             ss << "libcamerasrc";
-            if (!config.camera_id.empty()) { ss << " camera-name=\"" << config.camera_id << "\""; }
-            ss << " ! video/x-raw,width=" << config.width << ",height=" << config.height
-               << ",framerate=" << config.framerate << "/1";
+            if (!config.camera_id.empty()) { ss << " camera-name=" << quote_pipeline_value(config.camera_id); }
+            ss << " ! " << raw_caps;
             break;
 
         case VideoSource::V4L2:
-            ss << "v4l2src device=" << config.v4l2_device << " ! video/x-raw,width=" << config.width
-               << ",height=" << config.height << ",framerate=" << config.framerate << "/1";
+            ss << "v4l2src device=" << quote_pipeline_value(config.v4l2_device) << " ! " << raw_caps;
             break;
 
         case VideoSource::TestPattern:
-            ss << "videotestsrc is-live=true pattern=ball"
-               << " ! video/x-raw,width=" << config.width << ",height=" << config.height
-               << ",framerate=" << config.framerate << "/1";
+            ss << "videotestsrc is-live=true pattern=ball ! " << raw_caps;
+            break;
+
+        case VideoSource::File: {
+            const auto uri = to_file_uri(config.input_path);
+            if (uri.empty()) { return {}; }
+
+            ss << "uridecodebin name=src uri=" << quote_pipeline_value(uri)
+               << " src. ! queue ! videoconvert ! videoscale ! videorate ! " << raw_caps;
+            break;
+        }
+
+        case VideoSource::Uri:
+            ss << "uridecodebin name=src uri=" << quote_pipeline_value(config.input_uri)
+               << " src. ! queue ! videoconvert ! videoscale ! videorate ! " << raw_caps;
             break;
         }
 
@@ -151,7 +251,7 @@ struct WebRTCStreamer::Impl
         ss << " ! webrtcsink name=ws";
 
         // Configure signalling server URI
-        ss << " signaller::uri=" << config.signalling_server_uri;
+        ss << " signaller::uri=" << quote_pipeline_value(config.signalling_server_uri);
 
         // Set up video encoding based on encoder preference
         switch (config.encoder) {
@@ -169,9 +269,9 @@ struct WebRTCStreamer::Impl
 
         // Add STUN server
         if (!config.stun_servers.empty()) {
-            ss << " stun-server=" << config.stun_servers[0];
+            ss << " stun-server=" << quote_pipeline_value(config.stun_servers[0]);
         } else {
-            ss << " stun-server=stun://stun.l.google.com:19302";
+            ss << " stun-server=" << quote_pipeline_value("stun://stun.l.google.com:19302");
         }
 
         return ss.str();
@@ -262,13 +362,9 @@ WebRTCStreamer::WebRTCStreamer() : impl_(std::make_unique<Impl>()) {}
 
 WebRTCStreamer::~WebRTCStreamer() = default;
 
-WebRTCStreamer::WebRTCStreamer(WebRTCStreamer &&other) noexcept : impl_(std::move(other.impl_)) {}
+WebRTCStreamer::WebRTCStreamer(WebRTCStreamer &&) noexcept = default;
 
-auto WebRTCStreamer::operator=(WebRTCStreamer &&other) noexcept -> WebRTCStreamer &
-{
-    if (this != &other) { impl_ = std::move(other.impl_); }
-    return *this;
-}
+auto WebRTCStreamer::operator=(WebRTCStreamer &&) noexcept -> WebRTCStreamer & = default;
 
 auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, WebRTCError>
 {
@@ -326,6 +422,15 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
     }
 
     if (config.signalling_server_uri.empty()) { return std::unexpected(WebRTCError::InvalidConfiguration); }
+    if (config.source == VideoSource::V4L2 && config.v4l2_device.empty()) {
+        return std::unexpected(WebRTCError::InvalidConfiguration);
+    }
+    if (config.source == VideoSource::File && config.input_path.empty()) {
+        return std::unexpected(WebRTCError::InvalidConfiguration);
+    }
+    if (config.source == VideoSource::Uri && config.input_uri.empty()) {
+        return std::unexpected(WebRTCError::InvalidConfiguration);
+    }
 
     impl_->cleanup();
     impl_->config = config;
@@ -333,8 +438,7 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
 
     // Generate producer ID if not specified
     if (config.producer_id.empty()) {
-        impl_->producer_id =
-          "stream-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count() % 100000);
+        impl_->producer_id = make_default_producer_id();
     } else {
         impl_->producer_id = config.producer_id;
     }
@@ -424,17 +528,10 @@ auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_NULL);
 
     // Stop main loop and join thread before pipeline cleanup
-    if (impl_->main_loop != nullptr) {
-        g_main_loop_quit(impl_->main_loop);
-        if (impl_->main_loop_thread.joinable()) { impl_->main_loop_thread.join(); }
-        g_main_loop_unref(impl_->main_loop);
-        impl_->main_loop = nullptr;
-    }
+    impl_->stop_main_loop();
 
     // Pipeline refs are now safe to release (no callbacks running)
-    gst_object_unref(impl_->pipeline);
-    impl_->pipeline = nullptr;
-    impl_->webrtcsink = nullptr;
+    impl_->destroy_pipeline();
 
     impl_->set_state(StreamState::Idle);
 
@@ -500,11 +597,6 @@ auto create_libcamera_webrtc_stream(const std::string &signalling_server,
   std::uint32_t height,
   std::uint32_t fps) -> std::expected<WebRTCStreamer, WebRTCError>
 {
-    auto init_result = WebRTCStreamer::initialize();
-    if (!init_result) { return std::unexpected(init_result.error()); }
-
-    WebRTCStreamer streamer;
-
     StreamConfig config;
     config.source = VideoSource::Libcamera;
     config.encoder = VideoEncoder::H264_Hardware;
@@ -513,10 +605,7 @@ auto create_libcamera_webrtc_stream(const std::string &signalling_server,
     config.height = height;
     config.framerate = fps;
 
-    auto configure_result = streamer.configure(config);
-    if (!configure_result) { return std::unexpected(configure_result.error()); }
-
-    return streamer;
+    return create_configured_streamer(std::move(config));
 }
 
 auto create_v4l2_webrtc_stream(const std::string &signalling_server,
@@ -525,11 +614,6 @@ auto create_v4l2_webrtc_stream(const std::string &signalling_server,
   std::uint32_t height,
   std::uint32_t fps) -> std::expected<WebRTCStreamer, WebRTCError>
 {
-    auto init_result = WebRTCStreamer::initialize();
-    if (!init_result) { return std::unexpected(init_result.error()); }
-
-    WebRTCStreamer streamer;
-
     StreamConfig config;
     config.source = VideoSource::V4L2;
     config.encoder = VideoEncoder::H264_Hardware;
@@ -539,19 +623,11 @@ auto create_v4l2_webrtc_stream(const std::string &signalling_server,
     config.height = height;
     config.framerate = fps;
 
-    auto configure_result = streamer.configure(config);
-    if (!configure_result) { return std::unexpected(configure_result.error()); }
-
-    return streamer;
+    return create_configured_streamer(std::move(config));
 }
 
 auto create_test_webrtc_stream(const std::string &signalling_server) -> std::expected<WebRTCStreamer, WebRTCError>
 {
-    auto init_result = WebRTCStreamer::initialize();
-    if (!init_result) { return std::unexpected(init_result.error()); }
-
-    WebRTCStreamer streamer;
-
     StreamConfig config;
     config.source = VideoSource::TestPattern;
     config.encoder = VideoEncoder::H264_Software;
@@ -560,26 +636,35 @@ auto create_test_webrtc_stream(const std::string &signalling_server) -> std::exp
     config.height = 720;
     config.framerate = 30;
 
-    auto configure_result = streamer.configure(config);
-    if (!configure_result) { return std::unexpected(configure_result.error()); }
-
-    return streamer;
+    return create_configured_streamer(std::move(config));
 }
 
 // Helper to create StreamConfig from WebRTCConfig
 auto create_stream_config_from_webrtc_config(const config::WebRTCConfig &webrtc_config,
   VideoSource source,
-  VideoEncoder encoder) -> StreamConfig
+  VideoEncoder encoder,
+  ConfigOverrideMode source_override_mode,
+  ConfigOverrideMode encoder_override_mode) -> StreamConfig
 {
     StreamConfig config;
 
-    config.source = source;
-    config.encoder = encoder;
+    config.source = source_override_mode == ConfigOverrideMode::Override
+                      ? source
+                      : parse_configured_source(webrtc_config.stream.source, source);
+    config.encoder = encoder_override_mode == ConfigOverrideMode::Override
+                       ? encoder
+                       : parse_configured_encoder(webrtc_config.stream.encoder, encoder);
     config.signalling_server_uri = webrtc_config.signaling_server_url;
     config.width = webrtc_config.video.default_width;
     config.height = webrtc_config.video.default_height;
     config.framerate = webrtc_config.video.default_framerate;
     config.bitrate_kbps = webrtc_config.video.default_bitrate_kbps;
+    config.camera_id = webrtc_config.stream.camera_id;
+    config.v4l2_device = webrtc_config.stream.device;
+    config.input_path = webrtc_config.stream.input_path;
+    config.input_uri = webrtc_config.stream.input_uri;
+    config.peer_id = webrtc_config.stream.peer_id;
+    config.producer_id = webrtc_config.stream.producer_id;
     config.stun_servers = webrtc_config.stun_servers;
     config.turn_servers = webrtc_config.turn_servers;
 
@@ -589,29 +674,19 @@ auto create_stream_config_from_webrtc_config(const config::WebRTCConfig &webrtc_
 // Factory function that loads config from JSON file
 auto create_webrtc_stream_from_config(const std::filesystem::path &config_path,
   VideoSource source,
-  VideoEncoder encoder) -> std::expected<WebRTCStreamer, WebRTCError>
+  VideoEncoder encoder,
+  ConfigOverrideMode source_override_mode,
+  ConfigOverrideMode encoder_override_mode) -> std::expected<WebRTCStreamer, WebRTCError>
 {
-    // Initialize GStreamer if not already done
-    auto init_result = WebRTCStreamer::initialize();
-    if (!init_result) { return std::unexpected(init_result.error()); }
-
-    // Load configuration from JSON file
-    auto config_result = config::load_webrtc_config(config_path);
-    if (!config_result) {
+    auto webrtc_config = config::get_default_webrtc_config();
+    if (auto config_result = config::load_webrtc_config(config_path); config_result) {
+        webrtc_config = *config_result;
+    } else {
         g_printerr("Failed to load config from %s, using defaults\n", config_path.string().c_str());
-        // Use default config if loading fails
-        config_result = config::get_default_webrtc_config();
     }
 
-    // Create StreamConfig from WebRTCConfig
-    StreamConfig stream_config = create_stream_config_from_webrtc_config(config_result.value(), source, encoder);
-
-    // Create and configure the streamer
-    WebRTCStreamer streamer;
-    auto configure_result = streamer.configure(stream_config);
-    if (!configure_result) { return std::unexpected(configure_result.error()); }
-
-    return streamer;
+    return create_configured_streamer(create_stream_config_from_webrtc_config(
+      webrtc_config, source, encoder, source_override_mode, encoder_override_mode));
 }
 
 }// namespace kataglyphis::webrtc

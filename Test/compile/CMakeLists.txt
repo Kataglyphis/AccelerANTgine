@@ -18,21 +18,15 @@ message("Compile test filter is: ${KataglyphisCppProject_COMPILE_TEST_FILTER}")
 
 add_executable(${COMPILE_TEST_SUITE})
 
-if(RUST_FEATURES)
-  target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE USE_RUST=1)
+set(_compile_resource_path "/../../../Resources/")
+set(_compile_include_path "/../../../Src/")
+if(NOT MSVC)
 else()
-  target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE USE_RUST=0)
+  set(_compile_resource_path "/../../Resources")
+  set(_compile_include_path "/../../Src/")
 endif()
 
-if(NOT MSVC)
-  target_compile_definitions(${COMPILE_TEST_SUITE} PRIVATE RELATIVE_RESOURCE_PATH="/../../../Resources/"
-                                                           RELATIVE_INCLUDE_PATH="/../../../Src/")
-else()
-  target_compile_definitions(
-    ${COMPILE_TEST_SUITE}
-    PRIVATE RELATIVE_RESOURCE_PATH="/../../Resources"
-    PUBLIC RELATIVE_INCLUDE_PATH="/../../Src/")
-endif()
+kataglyphis_configure_common_test_target(${COMPILE_TEST_SUITE} "${_compile_resource_path}" "${_compile_include_path}")
 
 target_sources(
   ${COMPILE_TEST_SUITE}
@@ -54,15 +48,4 @@ target_link_libraries(
 
 kataglyphis_configure_gtest_discovery(${COMPILE_TEST_SUITE})
 
-if(RUST_FEATURES)
-  target_link_libraries(${COMPILE_TEST_SUITE} PUBLIC rusty_code)
-endif()
-
-# disable all warnings for our test suite
-if(MSVC)
-  target_compile_options(${COMPILE_TEST_SUITE} INTERFACE /w)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  target_compile_options(${COMPILE_TEST_SUITE} INTERFACE -w)
-else()
-  target_compile_options(${COMPILE_TEST_SUITE} INTERFACE -w)
-endif()
+kataglyphis_link_rust_target_if_enabled(${COMPILE_TEST_SUITE})

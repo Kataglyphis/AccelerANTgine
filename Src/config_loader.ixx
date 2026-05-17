@@ -39,6 +39,18 @@ struct AndroidConfig {
     std::uint32_t fps{ 15 };
 };
 
+/// Stream defaults and source-specific settings
+struct StreamSettingsConfig {
+    std::string source{ "libcamera" };
+    std::string encoder{ "h264-hw" };
+    std::string device{ "/dev/video0" };
+    std::string camera_id;
+    std::string input_path;
+    std::string input_uri;
+    std::string peer_id;
+    std::string producer_id;
+};
+
 /// Complete WebRTC configuration loaded from JSON
 struct WebRTCConfig {
     std::string signaling_server_url{ "ws://127.0.0.1:8443" };
@@ -48,6 +60,7 @@ struct WebRTCConfig {
     VideoConfig video;
     TextureConfig texture;
     AndroidConfig android;
+    StreamSettingsConfig stream;
 };
 
 /// Load WebRTC configuration from a JSON file
