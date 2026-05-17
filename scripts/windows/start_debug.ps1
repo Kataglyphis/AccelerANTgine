@@ -21,14 +21,13 @@ if (Test-Path $cliPath) {
     Write-Host "CLI not found at: $cliPath" -ForegroundColor Red
 }
 
-$fuzzerPath = "$buildDir\kataglyphis_libfuzzer.exe"
-if (Test-Path $fuzzerPath) {
-    Write-Host "--- Fuzzer available at: $fuzzerPath ---" -ForegroundColor Yellow
-    Write-Host "Run manually with corpus files:" -ForegroundColor Gray
-    Write-Host "  $fuzzerPath corpus_dir/" -ForegroundColor Gray
+$fuzzTestPath = "$buildDir\first_fuzz_test.exe"
+if (Test-Path $fuzzTestPath) {
+    Write-Host "--- FUZZTEST target available at: $fuzzTestPath ---" -ForegroundColor Yellow
+    Write-Host "Run manually to execute the registered fuzz tests." -ForegroundColor Gray
     Write-Host ""
 } else {
-    Write-Host "Fuzzer not found at: $fuzzerPath" -ForegroundColor Red
+    Write-Host "FUZZTEST target not found at: $fuzzTestPath" -ForegroundColor Red
 }
 
 Write-Host "=== Running Tests ===" -ForegroundColor Cyan

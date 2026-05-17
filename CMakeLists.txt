@@ -85,7 +85,7 @@ myproject_local_options()
 include(cmake/SystemLibDependencies.cmake)
 if(myproject_ENABLE_SANITIZER_ADDRESS)
   if(MSVC)
-    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION _ITERATOR_DEBUG_LEVEL=0)
+    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION _DISABLE_OPTIONAL_ANNOTATION _ITERATOR_DEBUG_LEVEL=0)
     if(NOT
        CMAKE_CXX_COMPILER_ID
        STREQUAL

@@ -75,22 +75,43 @@ endif()
 
 add_subdirectory(GOOGLE_BENCHMARK)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
-   AND BUILD_TESTING
-   AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(BUILD_TESTING
+   AND CMAKE_BUILD_TYPE STREQUAL "Debug"
+   AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang"
+   AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32))
+  message(STATUS "Adding FuzzTest")
 
-  if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-    message("Adding Fuzztest")
-
-
-    # We explicitly turn OFF FUZZTEST_FUZZING_MODE here because if it is ON,
-    # the fuzztest framework adds global coverage flags to itself in its own
-    # CMakeLists.txt, which causes infinite recursion with AddressSanitizer.
-    set(FUZZTEST_FUZZING_MODE
+  # We explicitly turn OFF FUZZTEST_FUZZING_MODE here because if it is ON,
+  # the fuzztest framework adds global coverage flags to itself in its own
+  # CMakeLists.txt, which causes infinite recursion with AddressSanitizer.
+  set(FUZZTEST_FUZZING_MODE
+      OFF
+      CACHE BOOL "" FORCE)
+  set(RE2_INSTALL
+      OFF
+      CACHE BOOL "Disable RE2 install rules for the vendored FuzzTest dependency graph" FORCE)
+  if(WIN32)
+    set(FUZZTEST_BUILD_GRAMMAR_TOOLS
         OFF
-        CACHE BOOL "" FORCE)
+        CACHE BOOL "Disable optional FuzzTest grammar/codegen tools on Windows" FORCE)
+  endif()
 
-    add_subdirectory(FUZZTEST)
+  # FUZZTEST currently expects older Abseil headers/token annotations that are
+  # no longer provided by the pinned top-level Abseil snapshot. Keep the
+  # compatibility layer project-owned instead of editing the submodule.
+  set(_fuzztest_absl_compat_dir "${CMAKE_SOURCE_DIR}/cmake/fuzztest_compat")
+  get_directory_property(_saved_external_include_dirs INCLUDE_DIRECTORIES)
+  include_directories(BEFORE "${_fuzztest_absl_compat_dir}")
+  add_subdirectory(FUZZTEST)
+  set_directory_properties(PROPERTIES INCLUDE_DIRECTORIES "${_saved_external_include_dirs}")
+
+  # FuzzTest public headers still rely on the compatibility overlay, so expose
+  # it to external consumers like our own first_fuzz_test target as well.
+  if(TARGET fuzztest_fuzztest)
+    target_include_directories(fuzztest_fuzztest INTERFACE "${_fuzztest_absl_compat_dir}")
+  endif()
+  if(TARGET fuzztest_fuzztest_core)
+    target_include_directories(fuzztest_fuzztest_core INTERFACE "${_fuzztest_absl_compat_dir}")
   endif()
 endif()
 
