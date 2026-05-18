@@ -45,6 +45,7 @@ Import-Module (Join-Path $modulesPath "WindowsCMake.Common.psm1") -Force
 Import-Module (Join-Path $modulesPath "WindowsLogging.Common.psm1") -Force
 Import-Module (Join-Path $modulesPath "WindowsMsix.Common.psm1") -Force
 Import-Module (Join-Path $modulesPath "WindowsMsix.Signing.psm1") -Force
+Import-Module (Join-Path $modulesPath "WindowsOnnx.Common.psm1") -Force
 
 # Resolve workspace
 try {
@@ -102,6 +103,93 @@ try {
         return Get-ChildItem -Path $clangRoot -Directory -ErrorAction SilentlyContinue |
                ForEach-Object { Join-Path $_.FullName "lib\windows" } |
                Where-Object { Test-Path $_ }
+    }
+
+    function Add-ExistingDirectory {
+        param(
+            [System.Collections.Generic.List[string]]$Directories,
+            [string]$Candidate
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($Candidate) -and (Test-Path $Candidate)) {
+            $resolved = (Resolve-Path $Candidate).Path
+            if (-not $Directories.Contains($resolved)) {
+                $Directories.Add($resolved)
+            }
+        }
+    }
+
+    function Get-RuntimeDependencyDirectories {
+        $directories = New-Object 'System.Collections.Generic.List[string]'
+
+        foreach ($candidate in @(
+            'C:\gstreamer\bin',
+            'C:\gstreamer\1.0\msvc_x86_64\bin',
+            'C:\Program Files\gstreamer\1.0\msvc_x86_64\bin'
+        )) {
+            Add-ExistingDirectory -Directories $directories -Candidate $candidate
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($env:ONNX_ROOT) -and
+            -not [string]::IsNullOrWhiteSpace($env:ONNX_VERSION) -and
+            -not [string]::IsNullOrWhiteSpace($env:ONNX_GENAI_VERSION) -and
+            -not [string]::IsNullOrWhiteSpace($env:ONNX_DIRECTML_VERSION)) {
+            try {
+                $onnxLayout = Get-OnnxPackageLayout `
+                    -OnnxRoot $env:ONNX_ROOT `
+                    -OnnxVersion $env:ONNX_VERSION `
+                    -OnnxGenAiVersion $env:ONNX_GENAI_VERSION `
+                    -OnnxDirectMlVersion $env:ONNX_DIRECTML_VERSION
+
+                foreach ($candidate in @(
+                    $onnxLayout.RuntimeNativeDir,
+                    $onnxLayout.DirectMlNativeDir,
+                    $onnxLayout.CudaNativeDir,
+                    $onnxLayout.GenAiNativeDir,
+                    $onnxLayout.GenAiDirectMlNativeDir,
+                    $onnxLayout.GenAiCudaNativeDir
+                )) {
+                    Add-ExistingDirectory -Directories $directories -Candidate $candidate
+                }
+            } catch {
+                Write-BuildLogWarning -Context $Context -Message "Failed to resolve ONNX runtime layout: $($_.Exception.Message)"
+            }
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($env:ONNX_ROOT) -and (Test-Path $env:ONNX_ROOT)) {
+            Get-ChildItem -Path $env:ONNX_ROOT -Directory -Recurse -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -like '*\runtimes\win-x64\native' } |
+                ForEach-Object { Add-ExistingDirectory -Directories $directories -Candidate $_.FullName }
+        }
+
+        return @($directories)
+    }
+
+    function Stage-RuntimeDependencies {
+        param(
+            [string]$TargetDir
+        )
+
+        if (-not (Test-Path $TargetDir)) {
+            New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+        }
+
+        $runtimeDirs = Get-RuntimeDependencyDirectories
+        if ($runtimeDirs.Count -eq 0) {
+            Write-BuildLogWarning -Context $Context -Message "No external runtime dependency directories found to stage into $TargetDir"
+            return
+        }
+
+        $staged = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($runtimeDir in $runtimeDirs) {
+            Write-BuildLog -Context $Context -Message "Staging runtime DLLs from: $runtimeDir"
+            Get-ChildItem -Path $runtimeDir -Filter '*.dll' -File -ErrorAction SilentlyContinue | ForEach-Object {
+                Copy-Item -Path $_.FullName -Destination (Join-Path $TargetDir $_.Name) -Force
+                $null = $staged.Add($_.Name)
+            }
+        }
+
+        Write-BuildLog -Context $Context -Message "Staged $($staged.Count) runtime DLLs into $TargetDir"
     }
 
     # --- Step 1: Environment Setup ---
@@ -163,6 +251,8 @@ try {
                     Copy-Item -Path $asanRuntime -Destination (Join-Path $clangBinOutput "clang_rt.asan_dynamic-x86_64.dll") -Force
                 }
             }
+
+            Stage-RuntimeDependencies -TargetDir (Join-Path $fastBuildClangFull "bin")
         }
 
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
@@ -216,6 +306,7 @@ try {
         Invoke-BuildStep -Context $Context -StepName "Profile Build Configure" -Script {
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildProfileFull, "--preset", $ClangProfilePreset, "-S", $Workspace, "-Dmyproject_ENABLE_CPPCHECK=OFF", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildProfileFull)
+            Stage-RuntimeDependencies -TargetDir (Join-Path $fastBuildProfileFull "bin")
         }
 
         Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
@@ -233,11 +324,11 @@ try {
             Invoke-BuildStep -Context $Context -StepName "PGO (Profile-Guided Optimization)" -Script {
                 Push-Location $fastBuildProfileFull
                 try {
-                    $mainExe = Join-Path $fastBuildProfileFull "KataglyphisCppProject.exe"
+                    $mainExe = Join-Path $fastBuildProfileFull "bin\KataglyphisCppInference.exe"
                     $dummyProfrawPath = Join-Path $logDirPath "dummy.profraw"
                     if (Test-Path $mainExe) {
                         $env:LLVM_PROFILE_FILE = $dummyProfrawPath
-                        Invoke-BuildExternal -Context $Context -File $mainExe -IgnoreExitCode
+                        Invoke-BuildExternal -Context $Context -File $mainExe -Parameters @() -IgnoreExitCode
                     }
                 } finally { Pop-Location }
             }
@@ -255,6 +346,7 @@ try {
             Remove-BuildRoot -Context $Context -Path $fastBuildReleaseDirFull | Out-Null
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildReleaseDirFull, "--preset", "x64-ClangCL-Windows-Release", "-S", $Workspace, "-Dmyproject_ENABLE_CPPCHECK=OFF", "-DENABLE_WIX_PACKAGING=ON")
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull)
+            Stage-RuntimeDependencies -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
         

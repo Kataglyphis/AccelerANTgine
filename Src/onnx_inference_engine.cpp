@@ -91,7 +91,7 @@ template <typename TypeInfoGetter>
 auto get_named_shape(const std::vector<std::string> &names, const std::string &name, TypeInfoGetter &&get_type_info)
   -> std::expected<TensorShape, OnnxError>
 {
-    const auto it = std::find(names.begin(), names.end(), name);
+    const auto it = std::ranges::find(names, name);
     if (it == names.end()) { return std::unexpected(OnnxError::OutputNotFound); }
 
     const auto index = static_cast<std::size_t>(std::distance(names.begin(), it));
@@ -155,12 +155,12 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     populate_name_cache(impl_->session->GetInputCount(),
       impl_->input_names_cache,
       impl_->input_name_ptrs,
-      [this](std::size_t index) { return impl_->session->GetInputNameAllocated(index, impl_->allocator); });
+      [this](std::size_t index) -> Ort::AllocatedStringPtr { return impl_->session->GetInputNameAllocated(index, impl_->allocator); });
 
     populate_name_cache(impl_->session->GetOutputCount(),
       impl_->output_names_cache,
       impl_->output_name_ptrs,
-      [this](std::size_t index) { return impl_->session->GetOutputNameAllocated(index, impl_->allocator); });
+      [this](std::size_t index) -> Ort::AllocatedStringPtr { return impl_->session->GetOutputNameAllocated(index, impl_->allocator); });
 
     impl_->initialized = true;
 
@@ -257,7 +257,7 @@ auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std:
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     return get_named_shape(
-      impl_->input_names_cache, name, [this](std::size_t index) { return impl_->session->GetInputTypeInfo(index); });
+      impl_->input_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo { return impl_->session->GetInputTypeInfo(index); });
 }
 
 auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
@@ -265,7 +265,7 @@ auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     return get_named_shape(
-      impl_->output_names_cache, name, [this](std::size_t index) { return impl_->session->GetOutputTypeInfo(index); });
+      impl_->output_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo { return impl_->session->GetOutputTypeInfo(index); });
 }
 
 auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig

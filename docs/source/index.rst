@@ -19,10 +19,10 @@ Native C++ inference library with C API bindings and CLI tooling.
       Configure, build, and run the project on your platform.
 
    .. grid-item-card:: API Reference
-      :link: api/library_root
+      :link: api_reference
       :link-type: doc
 
-      Auto-generated C++ and C API documentation (Breathe / Exhale).
+      Auto-generated C++ and C API documentation when Doxygen XML is available.
 
    .. grid-item-card:: Architecture
       :link: graphviz_files
@@ -31,10 +31,22 @@ Native C++ inference library with C API bindings and CLI tooling.
       Include-graph diagrams and dependency visualisations.
 
    .. grid-item-card:: Test Results
-      :link: test-results/index
+      :link: test_results
       :link-type: doc
 
       CI test result pages and coverage reports.
+
+   .. grid-item-card:: Development Workflow
+      :link: development_workflow
+      :link-type: doc
+
+      How features, docs, tests, and refactors are delivered together.
+
+   .. grid-item-card:: Windows Workflow
+      :link: windows_workflow
+      :link-type: doc
+
+      Build in the Windows container, then run on the host via PowerShell.
 
 .. toctree::
    :maxdepth: 2
@@ -42,9 +54,11 @@ Native C++ inference library with C API bindings and CLI tooling.
 
    overview
    getting_started
-   api/library_root
+   development_workflow
+   windows_workflow
+   api_reference
    graphviz_files
-   test-results/index
+   test_results
 
 Coverage
 --------

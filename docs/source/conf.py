@@ -12,6 +12,10 @@ import importlib.util
 import pathlib
 import sys
 
+_DOCS_SOURCE_DIR = pathlib.Path(__file__).resolve().parent
+_REPO_ROOT = _DOCS_SOURCE_DIR.parents[1]
+_DOXYGEN_XML_DIR = _REPO_ROOT / "build" / "build" / "xml"
+
 _TEMPLATE_DIR = (
     pathlib.Path(__file__).resolve().parents[2]  # …/KataglyphisCppInference
     / "ExternalLib"
@@ -45,30 +49,35 @@ release = "0.0.1"
 
 # Start from the shared extensions, then add project-specific ones.
 extensions = list(_conf_base.SPHINX_EXTENSIONS) + [
-    "breathe",
-    "exhale",
     "sphinx.ext.graphviz",
     "sphinx.ext.inheritance_diagram",
 ]
 
-exhale_args = {
-    "containmentFolder": "./api",
-    "rootFileName": "library_root.rst",
-    "rootFileTitle": "Library API",
-    "doxygenStripFromPath": "../..",
-    "createTreeView": True,
-    "contentsDirectives": True,  # Allows nested folder-like structure
-    "exhaleExecutesDoxygen": False,  # (optional) if you already run Doxygen manually
-    "listingExclude": [
-        r"^TEST$",
-        r"^FUZZ_TEST$",
-        r"^BENCHMARK$",
-        r"^BENCHMARK_MAIN$",
-        r"^main$",
-        r"^KATAGLYPHIS_CPP_API$",
-        r"^KATAGLYPHIS_C_API$",
-    ],
-}
+if _DOXYGEN_XML_DIR.exists():
+    extensions += ["breathe", "exhale"]
+    exclude_patterns = []
+else:
+    exclude_patterns = ["api/**"]
+
+if _DOXYGEN_XML_DIR.exists():
+    exhale_args = {
+        "containmentFolder": "./api",
+        "rootFileName": "library_root.rst",
+        "rootFileTitle": "Library API",
+        "doxygenStripFromPath": "../..",
+        "createTreeView": True,
+        "contentsDirectives": True,  # Allows nested folder-like structure
+        "exhaleExecutesDoxygen": False,  # Doxygen already runs in the project pipeline
+        "listingExclude": [
+            r"^TEST$",
+            r"^FUZZ_TEST$",
+            r"^BENCHMARK$",
+            r"^BENCHMARK_MAIN$",
+            r"^main$",
+            r"^KATAGLYPHIS_CPP_API$",
+            r"^KATAGLYPHIS_C_API$",
+        ],
+    }
 
 myst_enable_extensions = [
     "dollarmath",  # Enables dollar-based math syntax
@@ -77,17 +86,15 @@ myst_enable_extensions = [
     "deflist",  # Enables definition lists
 ]
 
-breathe_projects = {"KataglyphisCppInference": "../../build/build/xml"}
-breathe_default_project = "KataglyphisCppInference"
+if _DOXYGEN_XML_DIR.exists():
+    breathe_projects = {"KataglyphisCppInference": str(_DOXYGEN_XML_DIR)}
+    breathe_default_project = "KataglyphisCppInference"
 
 suppress_warnings = [
     "duplicate_declaration.c",
     "docutils",
 ]
-
-
 templates_path = ["_templates"]
-exclude_patterns = []
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -102,9 +109,12 @@ html_theme_options["repository_url"] = (
     "https://github.com/Kataglyphis/KataglyphisCppInference"
 )
 
-# copy coverage and raw html/test files into the built site root
-# these folders must exist in the docs source directory (docs/coverage, docs/test-results)
-html_extra_path = ["coverage", "test-results"]
+# Copy generated coverage and test-result assets into the built site root when available.
+html_extra_path = [
+    extra_dir.name
+    for extra_dir in (_DOCS_SOURCE_DIR / "coverage", _DOCS_SOURCE_DIR / "test-results")
+    if extra_dir.exists()
+]
 
 html_static_path = list(_conf_base.HTML_STATIC_PATH)
 # CSS is loaded from the shared baseline; the file itself is symlinked into

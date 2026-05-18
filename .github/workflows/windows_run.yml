@@ -7,9 +7,7 @@ on:
     branches: ["main"]
 
 env:
-  BUILD_DIR: "build"
-  BUILD_DIR_RELEASE: "build-release"
-  CLANG_PROFILE_PRESET: x64-ClangCL-Windows-Profile
+  BUILD_DIR_RELEASE: "build-clangcl-release"
   GHCR_IMAGE_WIN: ghcr.io/kataglyphis/kataglyphis_beschleuniger:winamd64
 
 defaults:
@@ -42,16 +40,21 @@ jobs:
         run: |
           docker pull "${{ env.GHCR_IMAGE_WIN }}"
 
-      - name: Build + test + analyze + package in container (MSVC + ClangCL)
+      - name: Build in container via wrapper
         run: |
-          docker run --rm --memory 16g --cpus 4 `
-            --mount "type=bind,source=${{ github.workspace }},target=C:\workspace" `
-            -w "C:\workspace" `
-            "${{ env.GHCR_IMAGE_WIN }}" `
-            powershell -NoProfile -ExecutionPolicy Bypass -File "C:\workspace\scripts\windows\Build-Windows.ps1" `
-              -WorkspaceDir "C:\workspace" `
-              -BuildTargets "clangcl-debug,clangcl-profile,clangcl-release" `
-              -BuildDirClangRelease "${{ env.BUILD_DIR_RELEASE }}"
+          .\scripts\windows\start_build.ps1 -ProjectRoot "${{ github.workspace }}" -Image "${{ env.GHCR_IMAGE_WIN }}" -CpuCount "32" -Memory "48g"
+
+      - name: Run debug build on host
+        run: |
+          .\scripts\windows\start_debug.ps1 -ProjectRoot "${{ github.workspace }}"
+
+      - name: Run profile build on host
+        run: |
+          .\scripts\windows\start_profile.ps1 -ProjectRoot "${{ github.workspace }}"
+
+      - name: Run release build on host
+        run: |
+          .\scripts\windows\start_release.ps1 -ProjectRoot "${{ github.workspace }}"
 
       - name: Upload Installers & Zip (container build)
         uses: actions/upload-artifact@v6.0.0

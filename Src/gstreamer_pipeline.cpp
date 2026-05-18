@@ -228,7 +228,7 @@ auto GStreamerPipeline::create_pipeline_from_string(const std::string &descripti
 
 auto GStreamerPipeline::create_inference_pipeline(const std::string &input_source,
   const std::string &model_path,
-  const std::vector<std::size_t> &input_shape,
+  const std::vector<std::size_t> & /*input_shape*/,
   const std::string &output_format) -> std::expected<void, GStreamerError>
 {
 

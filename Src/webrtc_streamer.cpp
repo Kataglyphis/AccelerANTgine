@@ -109,7 +109,7 @@ namespace {
         return fallback;
     }
 
-    auto create_configured_streamer(StreamConfig config) -> std::expected<WebRTCStreamer, WebRTCError>
+    auto create_configured_streamer(const StreamConfig& config) -> std::expected<WebRTCStreamer, WebRTCError>
     {
         auto init_result = WebRTCStreamer::initialize();
         if (!init_result) { return std::unexpected(init_result.error()); }
