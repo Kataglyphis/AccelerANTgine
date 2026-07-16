@@ -76,7 +76,12 @@ function(
       endif()
 
       if("address" IN_LIST SANITIZERS)
-        list(APPEND _CLANGCL_COMPILE_SAN_FLAGS /fsanitize=address)
+        # -shared-libsan: make the compiler emit dynamic-ASAN link directives
+        # (matching the dynamic CRT /MD). Without it clang-cl defaults to the
+        # STATIC ASan runtime and stamps MT_StaticRelease failifmismatch records
+        # into every object, which conflicts with /MD builds (Flutter).
+        list(APPEND _CLANGCL_COMPILE_SAN_FLAGS /fsanitize=address
+             /clang:-shared-libsan)
       endif()
 
       if("undefined" IN_LIST SANITIZERS)
