@@ -80,6 +80,16 @@ if(BUILD_TESTING
     set(FUZZTEST_BUILD_GRAMMAR_TOOLS
         OFF
         CACHE BOOL "Disable optional FuzzTest grammar/codegen tools on Windows" FORCE)
+    # Newer FUZZTEST fetches the ANTLR runtime unconditionally. ANTLR's
+    # WITH_STATIC_CRT defaults ON, which flips CMAKE_MSVC_RUNTIME_LIBRARY to the
+    # static (Debug) CRT and poisons its objects vs our /MD world — keep it on
+    # the dynamic CRT and skip its own gtest-based test executable entirely.
+    set(WITH_STATIC_CRT
+        OFF
+        CACHE BOOL "Use the dynamic CRT for the vendored ANTLR runtime" FORCE)
+    set(ANTLR_BUILD_CPP_TESTS
+        OFF
+        CACHE BOOL "Skip ANTLR runtime's own tests" FORCE)
   endif()
 
   # FUZZTEST currently expects older Abseil headers/token annotations that are
@@ -98,6 +108,11 @@ if(BUILD_TESTING
   foreach(_grammar_target antlr4_static antlr4_shared grammar_domain_code_generator)
     if(TARGET ${_grammar_target})
       set_target_properties(${_grammar_target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+      if(MSVC)
+        # ANTLR's ProfilingATNSimulator.cpp relies on <chrono> arriving
+        # transitively; make it explicit so clang-cl builds are deterministic.
+        target_compile_options(${_grammar_target} PRIVATE /FIchrono)
+      endif()
     endif()
   endforeach()
 
