@@ -91,6 +91,16 @@ if(BUILD_TESTING
   add_subdirectory(FUZZTEST)
   set_directory_properties(PROPERTIES INCLUDE_DIRECTORIES "${_saved_external_include_dirs}")
 
+  # Newer FUZZTEST adds its grammar-codegen tooling unconditionally (the former
+  # FUZZTEST_BUILD_GRAMMAR_TOOLS switch is gone), dragging in an ANTLR runtime
+  # that does not compile under clang-cl. Our fuzz targets do not use grammar
+  # domains, so keep those targets out of the default/install build graph.
+  foreach(_grammar_target antlr4_static antlr4_shared grammar_domain_code_generator)
+    if(TARGET ${_grammar_target})
+      set_target_properties(${_grammar_target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+    endif()
+  endforeach()
+
   # FuzzTest public headers still rely on the compatibility overlay, so expose
   # it to external consumers like our own first_fuzz_test target as well.
   if(TARGET fuzztest_fuzztest)
