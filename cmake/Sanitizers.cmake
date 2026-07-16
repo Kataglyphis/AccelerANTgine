@@ -119,19 +119,59 @@ function(
       if("address" IN_LIST SANITIZERS)
         target_compile_definitions(${project_name} INTERFACE _DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION _DISABLE_OPTIONAL_ANNOTATION)
 
-        if(_CLANG_RUNTIME_DIR)
-          set(_ASAN_DYNAMIC_LIB "${_CLANG_RUNTIME_DIR}/clang_rt.asan_dynamic-x86_64.lib")
-          set(_ASAN_THUNK_LIB "${_CLANG_RUNTIME_DIR}/clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")
+        # Runtime choice matters for a full Flutter app, not just the tests.
+        # LLVM's clang_rt.asan_dynamic loads AFTER ucrtbase in the dependency
+        # graph, so allocations made during CRT/COM startup are unhooked; when
+        # combase/ole32 later free them through ASan's interceptors LLVM's
+        # runtime aborts with an unsuppressible bad-free and the app never
+        # renders a frame. Microsoft's ASan runtime (shipped with VS BuildTools)
+        # tracks Windows heap ownership correctly and passes those foreign frees
+        # through, so the instrumented app runs clean. Both toolchains name the
+        # import lib and thunk identically (clang_rt.asan_dynamic-x86_64.lib,
+        # clang_rt.asan_dynamic_runtime_thunk-x86_64.lib) and the compiler
+        # instrumentation interface is a subset of Microsoft's runtime exports,
+        # so we simply point the link search at Microsoft's lib\x64 while keeping
+        # clang's own instrumentation. Stage the matching
+        # clang_rt.asan_dynamic-x86_64.dll from the same VC\Tools\MSVC\<ver> next
+        # to the app exe at run time (Start-Windows.ps1 does this).
+        set(_ASAN_LINK_DIR "")
+        if(DEFINED ENV{VCToolsInstallDir})
+          file(TO_CMAKE_PATH "$ENV{VCToolsInstallDir}" _VCTOOLS)
+          if(EXISTS "${_VCTOOLS}/lib/x64/clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")
+            set(_ASAN_LINK_DIR "${_VCTOOLS}/lib/x64")
+          endif()
+        endif()
+        if(NOT _ASAN_LINK_DIR)
+          file(GLOB _MSVC_ASAN_LIB_DIRS
+               "C:/Program Files*/Microsoft Visual Studio/*/BuildTools/VC/Tools/MSVC/*/lib/x64")
+          foreach(_d ${_MSVC_ASAN_LIB_DIRS})
+            if(EXISTS "${_d}/clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")
+              set(_ASAN_LINK_DIR "${_d}")
+            endif()
+          endforeach()
+        endif()
+        if(NOT _ASAN_LINK_DIR AND _CLANG_RUNTIME_DIR)
+          # Fallback: LLVM's own runtime (fine for the standalone test/fuzz exes;
+          # will abort a full Flutter app as described above).
+          set(_ASAN_LINK_DIR "${_CLANG_RUNTIME_DIR}")
+          message(WARNING "Microsoft ASan runtime not found; falling back to LLVM's clang_rt "
+                          "(the full Flutter app will abort on startup under this runtime).")
+        endif()
+
+        if(_ASAN_LINK_DIR)
+          set(_ASAN_DYNAMIC_LIB "${_ASAN_LINK_DIR}/clang_rt.asan_dynamic-x86_64.lib")
+          set(_ASAN_THUNK_LIB "${_ASAN_LINK_DIR}/clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")
           if(EXISTS "${_ASAN_DYNAMIC_LIB}" AND EXISTS "${_ASAN_THUNK_LIB}")
-            target_link_directories(${project_name} INTERFACE "${_CLANG_RUNTIME_DIR}")
+            message(STATUS "clang-cl ASan runtime link dir: ${_ASAN_LINK_DIR}")
+            target_link_directories(${project_name} INTERFACE "${_ASAN_LINK_DIR}")
             target_link_libraries(${project_name} INTERFACE clang_rt.asan_dynamic-x86_64
                                                             clang_rt.asan_dynamic_runtime_thunk-x86_64)
             target_link_options(${project_name} INTERFACE /WHOLEARCHIVE:clang_rt.asan_dynamic_runtime_thunk-x86_64.lib)
           else()
-            message(WARNING "clang-cl ASan runtime libraries not found in ${_CLANG_RUNTIME_DIR}")
+            message(WARNING "clang-cl ASan runtime libraries not found in ${_ASAN_LINK_DIR}")
           endif()
         else()
-          message(WARNING "Unable to detect clang resource directory for clang-cl ASan runtime linkage")
+          message(WARNING "Unable to locate a clang-cl ASan runtime for linkage")
         endif()
       endif()
     elseif(MSVC)
