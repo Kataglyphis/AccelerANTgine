@@ -86,18 +86,14 @@ function(
 
       if("undefined" IN_LIST SANITIZERS)
         list(APPEND _CLANGCL_COMPILE_SAN_FLAGS -fsanitize=undefined)
-        # lld-link does not understand -fsanitize= flags; link the UBSan runtime explicitly.
-        # When ASan is also enabled, the ASan runtime already provides UBSan support,
-        # so we only need the standalone UBSan runtime when ASan is absent.
+        # When ASan is also enabled, its (dynamic-CRT) runtime provides the
+        # UBSan handlers and prints rich reports. WITHOUT ASan there is no
+        # dynamic-CRT UBSan runtime on Windows (clang_rt.ubsan_standalone is
+        # built /MT and failifmismatch-es against /MD builds), so use TRAP
+        # mode: no runtime needed, undefined behavior raises an immediate
+        # debugger break / fast-fail at the offending instruction.
         if(NOT "address" IN_LIST SANITIZERS)
-          if(_CLANG_RUNTIME_DIR AND EXISTS "${_CLANG_RUNTIME_DIR}/clang_rt.ubsan_standalone-x86_64.lib")
-            target_link_directories(${project_name} INTERFACE "${_CLANG_RUNTIME_DIR}")
-            target_link_libraries(
-              ${project_name} INTERFACE clang_rt.ubsan_standalone-x86_64
-            )
-          else()
-            message(WARNING "clang-cl UBSan standalone runtime not found")
-          endif()
+          list(APPEND _CLANGCL_COMPILE_SAN_FLAGS -fsanitize-trap=undefined)
         endif()
       endif()
 
