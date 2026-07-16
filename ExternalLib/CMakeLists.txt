@@ -6,7 +6,9 @@ include(FetchContent)
 FetchContent_Declare(
   abseil-cpp
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-  GIT_TAG 20240722.0)
+  # Keep this pinned to the version FUZZTEST's MODULE.bazel declares — the two
+  # MUST move together (mismatch breaks e.g. absl::random_mocking_access).
+  GIT_TAG 20260526.0)
 
 set(ABSL_USE_CXX_EXCEPTIONS
     OFF
@@ -16,26 +18,10 @@ set(ABSL_PROPAGATE_CXX_STD
     ON
     CACHE BOOL "Use C++ standard from Abseil." FORCE)
 
-if(myproject_ENABLE_SANITIZER_ADDRESS
-   AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-   AND MSVC)
-  add_compile_options(/MT)
-endif()
-
+# NOTE: no /MT forcing here — clang-cl ASAN uses clang_rt.asan_dynamic (dynamic
+# CRT compatible), so abseil builds with the same runtime as the rest of the
+# project (MultiThreadedDLL when embedding in Flutter).
 FetchContent_MakeAvailable(abseil-cpp)
-
-if(myproject_ENABLE_SANITIZER_ADDRESS
-   AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-   AND MSVC)
-  get_cmake_property(_absl_targets BUILDSYSTEM_TARGETS)
-  foreach(_absl_target ${_absl_targets})
-    string(FIND "${_absl_target}" "absl" _absl_pos)
-    if(NOT _absl_pos LESS 0)
-      set_property(TARGET ${_absl_target}
-                   PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
-    endif()
-  endforeach()
-endif()
 
 # include google test to project
 if(BUILD_TESTING)

@@ -92,9 +92,11 @@ if(myproject_ENABLE_SANITIZER_ADDRESS)
        "Clang")
       add_compile_options(/fsanitize=address /Zi)
       add_link_options(/INCREMENTAL:NO)
-    else()
-      set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "" FORCE)
     endif()
+    # clang-cl: Sanitizers.cmake links clang_rt.asan_dynamic, which supports the
+    # dynamic CRT — keep CMAKE_MSVC_RUNTIME_LIBRARY as passed in (MultiThreadedDLL
+    # when embedding in Flutter). Forcing the static CRT here poisons every object
+    # with /MT vs /MD failifmismatch records.
   else()
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
