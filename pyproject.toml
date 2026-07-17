@@ -1,0 +1,34 @@
+[build-system]
+requires = ["scikit-build-core>=0.11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "kataglyphis-inference"
+version = "0.0.1"
+description = "Python bindings for the Kataglyphis C++23 ONNX inference engine"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Jonas Heinle" }]
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://jonasheinle.de/"
+
+[tool.scikit-build]
+minimum-version = "0.11"
+cmake.version = ">=3.31.6"
+build.targets = ["kataglyphis_python"]
+install.components = ["python_bindings"]
+wheel.packages = []
+
+[tool.scikit-build.cmake.define]
+KATAGLYPHIS_BUILD_PYTHON_BINDINGS = "ON"
+BUILD_TESTING = "OFF"
+myproject_ENABLE_CPPCHECK = "OFF"
+
+[tool.pytest.ini_options]
+testpaths = ["Test/python"]

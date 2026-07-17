@@ -188,11 +188,13 @@ if(TARGET nlohmann_json_modules)
     target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
 endif()
 
-if(myproject_DISABLE_EXCEPTIONS)
-  set(TOML_EXCEPTIONS
-      OFF
-      CACHE BOOL "Disable exceptions in tomlplusplus." FORCE)
-endif()
+# Src/toml_config.cpp is written against tomlplusplus' result-based
+# (no-exceptions) parse API, which only exists with TOML_EXCEPTIONS=0 — keep it
+# off even when the project itself builds with exceptions enabled (e.g. for the
+# Python bindings).
+set(TOML_EXCEPTIONS
+    OFF
+    CACHE BOOL "Disable exceptions in tomlplusplus." FORCE)
 
 set(TOMLPLUSPLUS_BUILD_MODULES
     ON
@@ -205,10 +207,15 @@ if(TARGET tomlplusplus_modules)
     if(TARGET myproject_options)
         target_link_libraries(tomlplusplus_modules PUBLIC myproject_options)
     endif()
-    if(myproject_DISABLE_EXCEPTIONS)
-        target_compile_definitions(tomlplusplus_modules PUBLIC TOML_EXCEPTIONS=0)
-    endif()
+    target_compile_definitions(tomlplusplus_modules PUBLIC TOML_EXCEPTIONS=0)
     target_compile_features(tomlplusplus_modules PUBLIC cxx_std_23)
+endif()
+
+if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
+  # find_package(Python) happens in the top-level CMakeLists so the Python_*
+  # variables are visible in every directory (nanobind's helper functions read
+  # them from the caller's scope, e.g. in Bindings/python).
+  add_subdirectory(nanobind)
 endif()
 
 if(RUST_FEATURES)

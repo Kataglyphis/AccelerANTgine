@@ -97,6 +97,7 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
     std::unique_ptr<Impl> impl_;
 };
 
-[[nodiscard]] auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig;
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path)
+  -> SessionConfig;
 
 }// namespace kataglyphis::inference

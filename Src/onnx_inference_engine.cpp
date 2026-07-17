@@ -268,7 +268,7 @@ auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std
       impl_->output_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo { return impl_->session->GetOutputTypeInfo(index); });
 }
 
-auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig
+KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig
 {
     SessionConfig config;
     config.model_path = model_path;

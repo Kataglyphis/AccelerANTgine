@@ -61,6 +61,15 @@ else()
     STATUS "Your are going to use a non MSVC/clang-cl compiler on windows. Therefore no rust integration possible.")
 endif()
 
+option(KATAGLYPHIS_BUILD_PYTHON_BINDINGS "Build Python bindings with nanobind" OFF)
+if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
+  # nanobind requires C++ exceptions in the binding TU, and module BMIs re-emit
+  # exception flags into every importer — keep the whole project consistent.
+  set(myproject_DISABLE_EXCEPTIONS
+      OFF
+      CACHE BOOL "Disable C++ exceptions (forced OFF: Python bindings need them)" FORCE)
+endif()
+
 include(cmake/PreventInSourceBuilds.cmake)
 include(cmake/ProjectOptions.cmake)
 
@@ -138,9 +147,17 @@ if(myproject_ENABLE_COVERAGE
 
 endif()
 
+if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
+  find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module)
+endif()
+
 add_subdirectory(ExternalLib)
 
 add_subdirectory(Src)
+
+if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
+  add_subdirectory(Bindings/python)
+endif()
 
 if(NOT WINDOWS_CI AND BUILD_TESTING)
   include(CTest)
