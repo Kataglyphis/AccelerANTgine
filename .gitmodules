@@ -17,3 +17,6 @@
 [submodule "ExternalLib/tomlplusplus"]
 	path = ExternalLib/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
+[submodule "ExternalLib/nanobind"]
+	path = ExternalLib/nanobind
+	url = git@github.com:wjakob/nanobind.git
