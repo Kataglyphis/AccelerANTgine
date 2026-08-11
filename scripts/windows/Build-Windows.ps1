@@ -31,21 +31,27 @@ param(
 
 $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
 
-# Import ContainerHub build framework
-$modulesPath = Join-Path $WorkspaceDir "ExternalLib\Kataglyphis-ContainerHub\windows\scripts\modules"
-$buildModule = Join-Path $modulesPath "WindowsBuild.Common.psm1"
+# ContainerHub build framework, resolved through the shared bootstrap (a
+# verbatim copy of ContainerHub's shared/windows/templates/Resolve-BuildModule.ps1)
+# rather than a hard-coded submodule path: a module that moves upstream is
+# picked up without editing this script, and a missing submodule reports the
+# exact `git submodule update` command instead of a bare path.
+#
+# WindowsLogging.Common is deliberately NOT listed any more: upstream folded it
+# into WindowsBuild.Common (b391a1d), which exports the Write-BuildLog*
+# wrappers this script actually uses. Importing it by name has been a hard
+# failure against any recent ContainerHub.
+. (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
 
-if (-not (Test-Path $buildModule)) {
-    Write-Error "Required module not found: $buildModule. Please ensure ExternalLib is populated."
-    exit 1
-}
-
-Import-Module $buildModule -Force
-Import-Module (Join-Path $modulesPath "WindowsCMake.Common.psm1") -Force
-Import-Module (Join-Path $modulesPath "WindowsLogging.Common.psm1") -Force
-Import-Module (Join-Path $modulesPath "WindowsMsix.Common.psm1") -Force
-Import-Module (Join-Path $modulesPath "WindowsMsix.Signing.psm1") -Force
-Import-Module (Join-Path $modulesPath "WindowsOnnx.Common.psm1") -Force
+# Dependency order: Shared, then Build, then what builds on them.
+Import-BuildModule @(
+    'WindowsScripts.Shared'
+    'WindowsBuild.Common'
+    'WindowsCMake.Common'
+    'WindowsMsix.Common'
+    'WindowsMsix.Signing'
+    'WindowsOnnx.Common'
+)
 
 # Resolve workspace
 try {

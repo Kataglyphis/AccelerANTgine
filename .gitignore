@@ -5,7 +5,6 @@ CMakeUserPresets.json
 *.AppImage
 .cache
 docs/source/api
-.codacy
 
 *.log
 
@@ -69,5 +68,3 @@ Src/GraphicsEngineOpenGL/renderer/VulkanRendererConfig.hpp
 Src/GraphicsEngineVulkan/renderer/OpenGLRendererConfig.hpp
 
 
-#Ignore vscode AI rules
-.github\instructions\codacy.instructions.md
