@@ -69,7 +69,7 @@ jobs:
             -e CXXFLAGS="${{ inputs.compiler == 'clang' && '--gcc-toolchain=/opt/gcc-15.2.0' || '' }}"
             -e LDFLAGS="${{ inputs.compiler == 'clang' && '-L/opt/gcc-15.2.0/lib64 -Wl,-rpath,/opt/gcc-15.2.0/lib64 --gcc-toolchain=/opt/gcc-15.2.0' || '' }}"
           script: >-
-            bash -lc 'set -e; bash scripts/linux/ci_run_all.sh
+            bash -lc 'set -e; bash scripts/linux/ci-run-all.sh
             --compiler "${{ inputs.compiler }}"
             --runner "${{ inputs.runner }}"
             --arch "${{ inputs.arch }}"

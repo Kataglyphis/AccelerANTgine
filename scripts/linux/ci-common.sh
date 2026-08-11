@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci_common.sh - bootstrap shim for CI scripts
+# ci-common.sh - bootstrap shim for CI scripts
 #
 # Sources the Kataglyphis-ContainerHub core library, providing:
 #   Logging    : info, warn, err/die, log
@@ -11,7 +11,7 @@
 # Usage (at the top of every CI script, after set -euo pipefail):
 #   _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #   # shellcheck disable=SC1091
-#   source "${_SCRIPT_DIR}/ci_common.sh"
+#   source "${_SCRIPT_DIR}/ci-common.sh"
 
 [ -n "${_CI_COMMON_SH_LOADED:-}" ] && return 0
 _CI_COMMON_SH_LOADED=1

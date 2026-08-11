@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_static_analysis_format.sh - project wrapper around ContainerHub's generic
+# run-static-analysis-format.sh - project wrapper around ContainerHub's generic
 # code-quality driver (linux/scripts/lib/code-quality.sh).
 #
 # Everything reusable now comes from there: the uv/venv bootstrap for
@@ -17,7 +17,7 @@ set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-source "${_SCRIPT_DIR}/ci_common.sh"
+source "${_SCRIPT_DIR}/ci-common.sh"
 
 CODE_QUALITY_LIB="${_SCRIPT_DIR}/../../ExternalLib/Kataglyphis-ContainerHub/linux/scripts/lib/code-quality.sh"
 if [[ ! -f "${CODE_QUALITY_LIB}" ]]; then

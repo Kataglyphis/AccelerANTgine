@@ -342,7 +342,7 @@
 <section id="build-in-the-container">
 <h2>Build In The Container<a class="headerlink" href="#build-in-the-container" title="Link to this heading">#</a></h2>
 <p>Use the wrapper script:</p>
-<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_build</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-build</span><span class="p">.</span><span class="n">ps1</span>
 </pre></div>
 </div>
 <p>This script runs Docker with the repository mounted into <code class="docutils literal notranslate"><span class="pre">C:\workspace</span></code> and
@@ -375,7 +375,7 @@ run them directly.</p>
 <p>After the build finishes, run the executables outside the container.</p>
 <section id="debug-run">
 <h3>Debug Run<a class="headerlink" href="#debug-run" title="Link to this heading">#</a></h3>
-<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_debug</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-debug</span><span class="p">.</span><span class="n">ps1</span>
 </pre></div>
 </div>
 <p>This script:</p>
@@ -388,13 +388,13 @@ run them directly.</p>
 </ul>
 <p>For a host machine that already has a signalling server running, you can opt into
 the older network-dependent smoke test explicitly:</p>
-<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_debug</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-RunWebRtcSmoke</span> <span class="n">-ServerUri</span> <span class="n">ws</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">8443</span>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-debug</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-RunWebRtcSmoke</span> <span class="n">-ServerUri</span> <span class="n">ws</span><span class="p">://</span><span class="n">localhost</span><span class="p">:</span><span class="n">8443</span>
 </pre></div>
 </div>
 </section>
 <section id="profile-run">
 <h3>Profile Run<a class="headerlink" href="#profile-run" title="Link to this heading">#</a></h3>
-<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_profile</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-profile</span><span class="p">.</span><span class="n">ps1</span>
 </pre></div>
 </div>
 <p>This script runs the profile build executable and then executes
@@ -402,7 +402,7 @@ the older network-dependent smoke test explicitly:</p>
 </section>
 <section id="release-run">
 <h3>Release Run<a class="headerlink" href="#release-run" title="Link to this heading">#</a></h3>
-<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_release</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-release</span><span class="p">.</span><span class="n">ps1</span>
 </pre></div>
 </div>
 <p>This is the lightest validation path for release artifacts and packaged runtime
@@ -426,9 +426,9 @@ output.</p>
 <h2>CI Note<a class="headerlink" href="#ci-note" title="Link to this heading">#</a></h2>
 <p>The Windows GitHub Actions workflow now follows the same model as local usage:</p>
 <ul class="simple">
-<li><p>build inside the Windows container through <code class="docutils literal notranslate"><span class="pre">start_build.ps1</span></code></p></li>
+<li><p>build inside the Windows container through <code class="docutils literal notranslate"><span class="pre">start-build.ps1</span></code></p></li>
 <li><p>request <code class="docutils literal notranslate"><span class="pre">48g</span></code> memory and <code class="docutils literal notranslate"><span class="pre">32</span></code> CPUs for the Docker run</p></li>
-<li><p>execute <code class="docutils literal notranslate"><span class="pre">start_debug.ps1</span></code>, <code class="docutils literal notranslate"><span class="pre">start_profile.ps1</span></code>, and <code class="docutils literal notranslate"><span class="pre">start_release.ps1</span></code>
+<li><p>execute <code class="docutils literal notranslate"><span class="pre">start-debug.ps1</span></code>, <code class="docutils literal notranslate"><span class="pre">start-profile.ps1</span></code>, and <code class="docutils literal notranslate"><span class="pre">start-release.ps1</span></code>
 on the host after the container build completes</p></li>
 </ul>
 <p>Whether the hosted runner can always satisfy those Docker resource requests still

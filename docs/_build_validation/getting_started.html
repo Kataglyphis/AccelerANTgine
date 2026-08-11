@@ -378,7 +378,7 @@ cmake<span class="w"> </span>--build<span class="w"> </span>--preset<span class=
 <span class="nb">cd</span><span class="w"> </span>build<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>ctest<span class="w"> </span>-C<span class="w"> </span>Debug<span class="w"> </span>--output-on-failure
 </pre></div>
 </div>
-<p>The Linux CI path is automated through <code class="docutils literal notranslate"><span class="pre">scripts/linux/ci_run_all.sh</span></code>. That
+<p>The Linux CI path is automated through <code class="docutils literal notranslate"><span class="pre">scripts/linux/ci-run-all.sh</span></code>. That
 script orchestrates:</p>
 <ul class="simple">
 <li><p>initialization and dependency checks</p></li>
@@ -390,7 +390,7 @@ script orchestrates:</p>
 <li><p>release packaging</p></li>
 </ul>
 <p>Example:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/linux/ci_run_all.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/linux/ci-run-all.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--compiler<span class="w"> </span>clang<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--runner<span class="w"> </span>ubuntu-24.04<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--arch<span class="w"> </span>x64<span class="w"> </span><span class="se">\</span>
@@ -403,7 +403,7 @@ script orchestrates:</p>
 <section id="windows-build-in-container">
 <h2>Windows Build In Container<a class="headerlink" href="#windows-build-in-container" title="Link to this heading">#</a></h2>
 <p>The recommended Windows build wrapper is:</p>
-<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_build</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-build</span><span class="p">.</span><span class="n">ps1</span>
 </pre></div>
 </div>
 <p>This launches the Windows container image and runs
@@ -430,13 +430,13 @@ script orchestrates:</p>
 <h2>Run The App On The Windows Host<a class="headerlink" href="#run-the-app-on-the-windows-host" title="Link to this heading">#</a></h2>
 <p>Build in the container, then run outside the container on the Windows host.
 Use the host-side scripts from <code class="docutils literal notranslate"><span class="pre">scripts/windows</span></code>:</p>
-<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_debug</span><span class="p">.</span><span class="n">ps1</span>
-<span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_profile</span><span class="p">.</span><span class="n">ps1</span>
-<span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start_release</span><span class="p">.</span><span class="n">ps1</span>
+<div class="highlight-powershell notranslate"><div class="highlight"><pre><span></span><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-debug</span><span class="p">.</span><span class="n">ps1</span>
+<span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-profile</span><span class="p">.</span><span class="n">ps1</span>
+<span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">windows</span><span class="p">\</span><span class="n">start-release</span><span class="p">.</span><span class="n">ps1</span>
 </pre></div>
 </div>
 <p>These scripts run the built executables from the synchronized build folders.
-<code class="docutils literal notranslate"><span class="pre">start_debug.ps1</span></code> performs a stable CLI check and executes the debug test
+<code class="docutils literal notranslate"><span class="pre">start-debug.ps1</span></code> performs a stable CLI check and executes the debug test
 binaries it finds. If you have a signalling server available, you can opt into
 the WebRTC smoke test with <code class="docutils literal notranslate"><span class="pre">-RunWebRtcSmoke</span></code>.</p>
 </section>
@@ -444,7 +444,7 @@ the WebRTC smoke test with <code class="docutils literal notranslate"><span clas
 <h2>Build Documentation<a class="headerlink" href="#build-documentation" title="Link to this heading">#</a></h2>
 <p>The Sphinx project lives under <code class="docutils literal notranslate"><span class="pre">docs/</span></code>.</p>
 <p>On Linux, the CI docs script installs the required packages and builds the docs:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/linux/ci_docs.sh<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/linux/ci-docs.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--workspace-dir<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--compiler<span class="w"> </span>clang<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--runner<span class="w"> </span>ubuntu-24.04<span class="w"> </span><span class="se">\</span>

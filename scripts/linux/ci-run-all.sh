@@ -3,7 +3,7 @@ set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-source "${_SCRIPT_DIR}/ci_common.sh"
+source "${_SCRIPT_DIR}/ci-common.sh"
 
 COMPILER="clang"
 RUNNER="ubuntu-24.04"
@@ -51,13 +51,13 @@ done
 info "=== CI Run All ==="
 info "Compiler: ${COMPILER}  Runner: ${RUNNER}  Arch: ${MATRIX_ARCH}"
 
-bash scripts/linux/ci_init.sh \
+bash scripts/linux/ci-init.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \
 	--runner "${RUNNER}" \
 	--arch "${MATRIX_ARCH}"
 
-bash scripts/linux/ci_build_and_test.sh \
+bash scripts/linux/ci-build-and-test.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \
 	--build-dir "${BUILD_DIR}" \
@@ -65,24 +65,24 @@ bash scripts/linux/ci_build_and_test.sh \
 	--gcc-debug-preset "${GCC_DEBUG_PRESET}" \
 	--clang-debug-preset "${CLANG_DEBUG_PRESET}"
 
-bash scripts/linux/ci_coverage.sh \
+bash scripts/linux/ci-coverage.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \
 	--build-dir "${BUILD_DIR}" \
 	--coverage-json "${COVERAGE_JSON}"
 
-bash scripts/linux/run_static_analysis_format.sh \
+bash scripts/linux/run-static-analysis-format.sh \
 	--build-dir "${BUILD_DIR}" \
 	--compiler "${COMPILER}" \
 	--clang-debug-preset "${CLANG_DEBUG_PRESET}"
 
-bash scripts/linux/ci_profile_bench.sh \
+bash scripts/linux/ci-profile-bench.sh \
 	--build-dir "${BUILD_DIR}" \
 	--compiler "${COMPILER}" \
 	--gcc-profile-preset "${GCC_PROFILE_PRESET}" \
 	--clang-profile-preset "${CLANG_PROFILE_PRESET}"
 
-bash scripts/linux/ci_docs.sh \
+bash scripts/linux/ci-docs.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \
 	--runner "${RUNNER}" \
@@ -119,7 +119,7 @@ if [[ -n "${RELEASE_FLATPAK_OUT_DIR}" ]]; then
 	release_args+=(--flatpak-out-dir "${RELEASE_FLATPAK_OUT_DIR}")
 fi
 
-bash scripts/linux/ci_release.sh "${release_args[@]}"
-bash scripts/linux/ci_finalize.sh --workspace-dir "$(pwd)"
+bash scripts/linux/ci-release.sh "${release_args[@]}"
+bash scripts/linux/ci-finalize.sh --workspace-dir "$(pwd)"
 
 info "=== CI Run All complete ==="

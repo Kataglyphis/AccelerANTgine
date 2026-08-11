@@ -16,7 +16,7 @@ Recommended path:
 
 .. code-block:: bash
 
-   bash scripts/linux/ci_run_all.sh \
+   bash scripts/linux/ci-run-all.sh \
      --compiler clang \
      --runner ubuntu-24.04 \
      --arch x64 \

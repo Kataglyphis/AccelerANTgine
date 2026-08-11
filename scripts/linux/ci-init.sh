@@ -3,7 +3,7 @@ set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-source "${_SCRIPT_DIR}/ci_common.sh"
+source "${_SCRIPT_DIR}/ci-common.sh"
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"

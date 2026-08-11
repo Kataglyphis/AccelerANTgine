@@ -14,7 +14,7 @@ Use the wrapper script:
 
 .. code-block:: powershell
 
-   .\scripts\windows\start_build.ps1
+   .\scripts\windows\start-build.ps1
 
 This script runs Docker with the repository mounted into ``C:\workspace`` and
 executes ``scripts/windows/Build-Windows.ps1`` inside the container.
@@ -51,7 +51,7 @@ Debug Run
 
 .. code-block:: powershell
 
-   .\scripts\windows\start_debug.ps1
+   .\scripts\windows\start-debug.ps1
 
 This script:
 
@@ -66,14 +66,14 @@ the older network-dependent smoke test explicitly:
 
 .. code-block:: powershell
 
-   .\scripts\windows\start_debug.ps1 -RunWebRtcSmoke -ServerUri ws://localhost:8443
+   .\scripts\windows\start-debug.ps1 -RunWebRtcSmoke -ServerUri ws://localhost:8443
 
 Profile Run
 ^^^^^^^^^^^
 
 .. code-block:: powershell
 
-   .\scripts\windows\start_profile.ps1
+   .\scripts\windows\start-profile.ps1
 
 This script runs the profile build executable and then executes
 ``perfTestSuite.exe`` when available.
@@ -83,7 +83,7 @@ Release Run
 
 .. code-block:: powershell
 
-   .\scripts\windows\start_release.ps1
+   .\scripts\windows\start-release.ps1
 
 This is the lightest validation path for release artifacts and packaged runtime
 output.
@@ -106,9 +106,9 @@ CI Note
 
 The Windows GitHub Actions workflow now follows the same model as local usage:
 
-- build inside the Windows container through ``start_build.ps1``
+- build inside the Windows container through ``start-build.ps1``
 - request ``48g`` memory and ``32`` CPUs for the Docker run
-- execute ``start_debug.ps1``, ``start_profile.ps1``, and ``start_release.ps1``
+- execute ``start-debug.ps1``, ``start-profile.ps1``, and ``start-release.ps1``
   on the host after the container build completes
 
 Whether the hosted runner can always satisfy those Docker resource requests still

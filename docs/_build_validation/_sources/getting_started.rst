@@ -56,7 +56,7 @@ For a direct debug build with presets:
    cmake --build --preset linux-debug-clang
    cd build && ctest -C Debug --output-on-failure
 
-The Linux CI path is automated through ``scripts/linux/ci_run_all.sh``. That
+The Linux CI path is automated through ``scripts/linux/ci-run-all.sh``. That
 script orchestrates:
 
 - initialization and dependency checks
@@ -71,7 +71,7 @@ Example:
 
 .. code-block:: bash
 
-   bash scripts/linux/ci_run_all.sh \
+   bash scripts/linux/ci-run-all.sh \
      --compiler clang \
      --runner ubuntu-24.04 \
      --arch x64 \
@@ -86,7 +86,7 @@ The recommended Windows build wrapper is:
 
 .. code-block:: powershell
 
-   .\scripts\windows\start_build.ps1
+   .\scripts\windows\start-build.ps1
 
 This launches the Windows container image and runs
 ``scripts/windows/Build-Windows.ps1`` inside it with these host-local defaults:
@@ -115,12 +115,12 @@ Use the host-side scripts from ``scripts/windows``:
 
 .. code-block:: powershell
 
-   .\scripts\windows\start_debug.ps1
-   .\scripts\windows\start_profile.ps1
-   .\scripts\windows\start_release.ps1
+   .\scripts\windows\start-debug.ps1
+   .\scripts\windows\start-profile.ps1
+   .\scripts\windows\start-release.ps1
 
 These scripts run the built executables from the synchronized build folders.
-``start_debug.ps1`` performs a stable CLI check and executes the debug test
+``start-debug.ps1`` performs a stable CLI check and executes the debug test
 binaries it finds. If you have a signalling server available, you can opt into
 the WebRTC smoke test with ``-RunWebRtcSmoke``.
 
@@ -133,7 +133,7 @@ On Linux, the CI docs script installs the required packages and builds the docs:
 
 .. code-block:: bash
 
-   bash scripts/linux/ci_docs.sh \
+   bash scripts/linux/ci-docs.sh \
      --workspace-dir "$(pwd)" \
      --compiler clang \
      --runner ubuntu-24.04 \

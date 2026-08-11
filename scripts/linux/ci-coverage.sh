@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci_coverage.sh - project wrapper around ContainerHub's generic coverage driver
+# ci-coverage.sh - project wrapper around ContainerHub's generic coverage driver
 # (linux/scripts/lib/coverage.sh). Both backends - gcovr for GCC, llvm-cov for
 # Clang - previously lived here as hand-written pipelines; only this project's
 # report paths, filters and the name of the instrumented suite remain.
@@ -7,7 +7,7 @@ set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-source "${_SCRIPT_DIR}/ci_common.sh"
+source "${_SCRIPT_DIR}/ci-common.sh"
 
 COVERAGE_LIB="${_SCRIPT_DIR}/../../ExternalLib/Kataglyphis-ContainerHub/linux/scripts/lib/coverage.sh"
 if [[ ! -f "${COVERAGE_LIB}" ]]; then

@@ -19,7 +19,7 @@ Recommended path:
 
 .. code-block:: bash
 
-   bash scripts/linux/ci_docs.sh \
+   bash scripts/linux/ci-docs.sh \
      --workspace-dir "$(pwd)" \
      --compiler clang \
      --runner ubuntu-24.04 \
