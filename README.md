@@ -124,7 +124,9 @@ This enumeration also includes submodules.
    ```
    afterwards.
 3. Optional: Using the newest clang compiler. Install via apt. See [here](https://apt.llvm.org/):
-4. Optional: Run `scripts/setup-dependencies.sh` for preparing important dev tools. 
+4. Optional: Run `ExternalLib/Kataglyphis-ContainerHub/linux/scripts/02-toolchain/setup-dependencies.sh`
+   for preparing important dev tools. The dependency installer is ContainerHub's;
+   this repo does not carry a local copy.
 5. Then build your solution with [CMAKE] (https://cmake.org/) <br />
   Here the recommended way over command line after cloning the repo:<br />
   > **_NOTE:_** Here we use CmakePresets to simplify things. Consider using it too
