@@ -25,6 +25,11 @@ on:
       GHCR_PAT:
         required: true
 
+env:
+  # One place for the image reference; it was hard-coded in both the pull and
+  # the run step. Mirrors GHCR_IMAGE_WIN in windows_run.yml.
+  GHCR_IMAGE_LINUX: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest
+
 jobs:
   build:
     runs-on: ${{ inputs.runner }} # Dynamically use input
@@ -34,74 +39,55 @@ jobs:
 
     steps:
 
-      - name: Free Disk Space on Host
-        uses: jlumbroso/free-disk-space@main
+      # ContainerHub's shared prologue: reclaim runner disk, check out, log in to
+      # ghcr and pull with retries. Replaces four hand-rolled steps including a
+      # copy of the retry loop, so the retry count and per-attempt timeout live
+      # in one place for every repo instead of drifting per workflow.
+      - name: Prepare CI host
+        uses: Kataglyphis/Kataglyphis-ContainerHub/.github/actions/prepare-linux-ci-host@main
         with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: false
-          swap-storage: true
-
-      - uses: actions/checkout@v6.0.2
-        with:
-          fetch-depth: 0
+          image: ${{ env.GHCR_IMAGE_LINUX }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GHCR_PAT }}
+          fetch-depth: '0'
           submodules: recursive
-
-      - name: Login to GitHub Container Registry
-        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Pull container image (retry)
-        run: |
-          for i in 1 2 3; do
-            echo "Attempt $i to pull container..."
-            if timeout 900 docker pull ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest; then
-              echo "Successfully pulled container"
-              exit 0
-            fi
-            echo "Pull failed, waiting before retry..."
-            sleep 30
-          done
-          echo "Failed to pull container after 3 attempts"
-          exit 1
 
       #################################################################################################################
       ######################################## Prepare deps ###########################################################
       #################################################################################################################
+      # run-in-linux-container instead of a hand-rolled `docker run`. extra-args
+      # is substituted verbatim into the action's docker command line, so the
+      # -e values are quoted here rather than passed through a step-level env:
+      # an action's own run block does not inherit the CALLER STEP's env, only
+      # the job's.
       - name: Run build/test/docs/package inside container
-        env:
-          # Conditionally apply the gcc-toolchain flags ONLY if the compiler is clang
-          CONTAINER_CXXFLAGS: ${{ inputs.compiler == 'clang' && '--gcc-toolchain=/opt/gcc-15.2.0' || '' }}
-          CONTAINER_LDFLAGS: ${{ inputs.compiler == 'clang' && '-L/opt/gcc-15.2.0/lib64 -Wl,-rpath,/opt/gcc-15.2.0/lib64 --gcc-toolchain=/opt/gcc-15.2.0' || '' }}
-        run: |
-          docker run --rm --privileged \
-            -e CXXFLAGS="${CONTAINER_CXXFLAGS}" \
-            -e LDFLAGS="${CONTAINER_LDFLAGS}" \
-            --platform ${{ inputs.platform }} \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest \
-            bash -lc 'set -e; bash scripts/linux/ci_run_all.sh \
-              --compiler "${{ inputs.compiler }}" \
-              --runner "${{ inputs.runner }}" \
-              --arch "${{ inputs.arch }}" \
-              --build-type "Debug" \
-              --build-dir "build" \
-              --build-release-dir "build-release" \
-              --gcc-debug-preset "linux-debug-GNU" \
-              --clang-debug-preset "linux-debug-clang" \
-              --gcc-profile-preset "linux-profile-GNU" \
-              --clang-profile-preset "linux-profile-clang" \
-              --clang-release-preset "linux-release-clang" \
-              --coverage-json "coverage.json" \
-              --docs-out "build/build/html" \
-              --release-callgrind "0" \
-              --release-appimage "1" \
-              --release-flatpak "1" \
-              --release-appimage-out-dir "" \
-              --release-flatpak-out-dir ""'
+        uses: Kataglyphis/Kataglyphis-ContainerHub/.github/actions/run-in-linux-container@main
+        with:
+          image: ${{ env.GHCR_IMAGE_LINUX }}
+          extra-args: >-
+            --privileged --platform ${{ inputs.platform }}
+            -e CXXFLAGS="${{ inputs.compiler == 'clang' && '--gcc-toolchain=/opt/gcc-15.2.0' || '' }}"
+            -e LDFLAGS="${{ inputs.compiler == 'clang' && '-L/opt/gcc-15.2.0/lib64 -Wl,-rpath,/opt/gcc-15.2.0/lib64 --gcc-toolchain=/opt/gcc-15.2.0' || '' }}"
+          script: >-
+            bash -lc 'set -e; bash scripts/linux/ci_run_all.sh
+            --compiler "${{ inputs.compiler }}"
+            --runner "${{ inputs.runner }}"
+            --arch "${{ inputs.arch }}"
+            --build-type "Debug"
+            --build-dir "build"
+            --build-release-dir "build-release"
+            --gcc-debug-preset "linux-debug-GNU"
+            --clang-debug-preset "linux-debug-clang"
+            --gcc-profile-preset "linux-profile-GNU"
+            --clang-profile-preset "linux-profile-clang"
+            --clang-release-preset "linux-release-clang"
+            --coverage-json "coverage.json"
+            --docs-out "build/build/html"
+            --release-callgrind "0"
+            --release-appimage "1"
+            --release-flatpak "1"
+            --release-appimage-out-dir ""
+            --release-flatpak-out-dir ""'
 
       - name: Upload Linux Packages (Clang only)
         if: ${{ inputs.compiler == 'clang' }}
