@@ -20,7 +20,15 @@ _CI_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Resolve the ContainerHub core library.
 # Works from both the repo root and an arbitrary working directory.
-_CONTAINER_HUB_CORE="${_CI_COMMON_DIR}/../../ExternalLib/Kataglyphis-ContainerHub/linux/scripts/01-core"
+#
+# CONTAINERHUB_DIR comes from the canonical bootstrap — a verbatim copy of
+# upstream's shared/linux/templates/containerhub.sh — rather than a ../.. literal
+# spelled out here. Six repos each had their own version of that line and they
+# had drifted; see ContainerHub shared/linux/templates/README.md.
+# shellcheck disable=SC1091
+source "${_CI_COMMON_DIR}/lib/containerhub.sh"
+
+_CONTAINER_HUB_CORE="${CONTAINERHUB_DIR}/linux/scripts/01-core"
 
 if [ -f "${_CONTAINER_HUB_CORE}/common.sh" ]; then
   # shellcheck disable=SC1091
