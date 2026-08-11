@@ -14,6 +14,7 @@
 	path = ExternalLib/Kataglyphis-ContainerHub
 	url = git@github.com:Kataglyphis/Kataglyphis-ContainerHub.git
 
+	branch = main
 [submodule "ExternalLib/tomlplusplus"]
 	path = ExternalLib/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
