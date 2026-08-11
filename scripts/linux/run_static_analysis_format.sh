@@ -1,15 +1,35 @@
 #!/usr/bin/env bash
+# run_static_analysis_format.sh - project wrapper around ContainerHub's generic
+# code-quality driver (linux/scripts/lib/code-quality.sh).
+#
+# Everything reusable now comes from there: the uv/venv bootstrap for
+# cmake-format, file discovery, the cmake-format / clang-format runners, the
+# compile_commands.json preparation (including the /workspace -> local path
+# remap that makes a container-generated DB usable on a dev box) and the
+# clang-tidy invocation. Kataglyphis-BeschleunigerBallett has driven the same
+# library for months; this repo had a parallel hand-written implementation.
+#
+# What stays here is genuinely project-specific: the Src/ layout, the module
+# extensions this project compiles (.ixx/.cppm/.mxx), its clang-tidy check
+# disables, and the two extra analyses no other consumer runs
+# (clang++ --analyze and scan-build).
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci_common.sh"
 
+CODE_QUALITY_LIB="${_SCRIPT_DIR}/../../ExternalLib/Kataglyphis-ContainerHub/linux/scripts/lib/code-quality.sh"
+if [[ ! -f "${CODE_QUALITY_LIB}" ]]; then
+  die "Shared code-quality library not found at '${CODE_QUALITY_LIB}'. Initialize the Kataglyphis-ContainerHub submodule first."
+fi
+# shellcheck disable=SC1091
+source "${CODE_QUALITY_LIB}"
+
 BUILD_DIR="build"
 COMPILER="clang"
 CLANG_DEBUG_PRESET="linux-debug-clang"
 DIRECT_ANALYZE=0
-COMPILE_DB_PATH=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -21,107 +41,49 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-SRC_FILES=()
-FORMAT_FILES=()
-while IFS= read -r -d '' file; do
-  case "${file}" in
-    *.cpp|*.cc|*.cxx|*.ixx|*.cppm|*.mxx) SRC_FILES+=("${file}"); FORMAT_FILES+=("${file}") ;;
-    *.h|*.hh|*.hpp|*.hxx|*.ipp|*.inl) FORMAT_FILES+=("${file}") ;;
-  esac
-done < <(find Src -type f -print0)
+# This project compiles C++20 modules, so the module interface extensions have
+# to reach BOTH clang-format and clang-tidy. The library's defaults stop at the
+# classic extensions.
+CODE_QUALITY_CPP_FORMAT_EXTENSIONS=(c cc cpp cxx ixx cppm mxx h hh hpp hxx ipp inl)
+CODE_QUALITY_CLANG_TIDY_EXTENSIONS=(cpp cc cxx ixx cppm mxx)
 
-if [[ ${#SRC_FILES[@]} -gt 0 ]]; then
-  IFS=$'\n' SRC_FILES=($(printf '%s\n' "${SRC_FILES[@]}" | sort))
-  unset IFS
-fi
+# -fix plus this project's disabled checks. Kept here, not upstream: which
+# checks a project tolerates is a project decision.
+CODE_QUALITY_CLANG_TIDY_FIX=true
+CODE_QUALITY_CLANG_TIDY_ARGS=(
+  -checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness
+  -header-filter=^Src/
+)
 
-if [[ ${#FORMAT_FILES[@]} -gt 0 ]]; then
-  IFS=$'\n' FORMAT_FILES=($(printf '%s\n' "${FORMAT_FILES[@]}" | sort))
-  unset IFS
-fi
+mapfile -t FORMAT_FILES < <(code_quality_find_cpp_files Src)
+mapfile -t SRC_FILES    < <(code_quality_find_clang_tidy_files Src)
 
 if [[ ${#SRC_FILES[@]} -eq 0 ]]; then
   warn "No C++ source/module files found under Src/, skipping static analysis."
   exit 0
 fi
 
-if [[ -f "requirements.txt" ]]; then
-  if [[ -z "${VIRTUAL_ENV:-}" ]]; then
-    if [[ -d ".venv" ]]; then
-      # shellcheck disable=SC1091
-      source .venv/bin/activate
-    elif [[ -d "venv" ]]; then
-      # shellcheck disable=SC1091
-      source venv/bin/activate
-    else
-      if command -v uv >/dev/null 2>&1; then
-        UV_VENV_PYTHON=""
-        if [[ -x "/usr/bin/python3" ]]; then
-          UV_VENV_PYTHON="/usr/bin/python3"
-        elif [[ -x "/usr/local/bin/python3" ]]; then
-          UV_VENV_PYTHON="/usr/local/bin/python3"
-        fi
+# cmake-format lives in a Python env; the library owns creating it via uv and
+# falling back cleanly when uv is absent.
+code_quality_ensure_cmake_format || warn "cmake-format environment unavailable, continuing"
 
-        if [[ -n "${UV_VENV_PYTHON}" ]]; then
-          uv venv --python "${UV_VENV_PYTHON}" .venv
-        else
-          uv venv .venv
-        fi
-
-        # shellcheck disable=SC1091
-        source .venv/bin/activate
-      else
-        warn "uv not available, cannot create Python environment for cmake-format"
-      fi
-    fi
-  fi
-
-  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
-    if command -v uv >/dev/null 2>&1; then
-      uv pip install -r requirements.txt
-    else
-      python -m pip install -r requirements.txt
-    fi
-  fi
-fi
-
-mapfile -t CMAKE_FILES < <(
-  find . -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
-    ! -path "./build/*" \
-    ! -path "./ExternalLib/*" \
-    ! -path "./scan-build-reports/*" | sort
-)
-
-if [[ -f "${BUILD_DIR}/compile_commands.json" ]]; then
-  COMPILE_DB_PATH="${BUILD_DIR}/compile_commands.json"
-elif command -v cmake >/dev/null 2>&1 && [[ "${COMPILER}" == "clang" ]]; then
-  # Ensure a compile database exists so clang-tidy can parse C++ modules correctly.
-  cmake --preset "${CLANG_DEBUG_PRESET}" -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
-  if [[ -f "${BUILD_DIR}/compile_commands.json" ]]; then
-    COMPILE_DB_PATH="${BUILD_DIR}/compile_commands.json"
-  fi
-fi
-
+mapfile -t CMAKE_FILES < <(code_quality_find_cmake_files)
 if command -v cmake-format >/dev/null 2>&1; then
-  if [[ ${#CMAKE_FILES[@]} -gt 0 ]]; then
-    info "Running cmake-format on ${#CMAKE_FILES[@]} files"
-    cmake-format -i "${CMAKE_FILES[@]}"
-  fi
+  [[ ${#CMAKE_FILES[@]} -gt 0 ]] && code_quality_run_cmake_format "${CMAKE_FILES[@]}"
 else
   warn "cmake-format not available, skipping"
 fi
 
 if command -v clang-format >/dev/null 2>&1; then
-  if [[ ${#FORMAT_FILES[@]} -gt 0 ]]; then
-    info "Running clang-format on ${#FORMAT_FILES[@]} files"
-    clang-format -i "${FORMAT_FILES[@]}"
-  else
-    info "No C/C++ files found to format under Src/, skipping clang-format."
-  fi
+  [[ ${#FORMAT_FILES[@]} -gt 0 ]] && code_quality_run_clang_format "${FORMAT_FILES[@]}"
 else
   warn "clang-format not available, skipping"
 fi
 
+# ---------------------------------------------------------------------------
+# Project-specific analyses: no other ContainerHub consumer runs these, so they
+# stay local rather than being pushed upstream on a sample size of one.
+# ---------------------------------------------------------------------------
 if [[ "${COMPILER}" == "clang" ]]; then
   if [[ "${DIRECT_ANALYZE}" == "1" ]]; then
     info "Running clang++ --analyze"
@@ -141,22 +103,27 @@ if [[ "${COMPILER}" == "clang" ]]; then
   fi
 fi
 
-if command -v clang-tidy >/dev/null 2>&1; then
-  if [[ "${COMPILER}" == "clang" ]]; then
-    if [[ -n "${COMPILE_DB_PATH}" ]]; then
-      info "Running clang-tidy on ${#SRC_FILES[@]} source files"
-      mapfile -t ABS_SRC_FILES < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
-      (
-        cd "${BUILD_DIR}"
-        clang-tidy --fix -checks='-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness' -p="." -header-filter='^Src/' "${ABS_SRC_FILES[@]}"
-      ) || true
-    else
-      warn "No compilation database found at ${BUILD_DIR}/compile_commands.json, skipping clang-tidy."
-    fi
-  else
-    info "Skipping clang-tidy for compiler='${COMPILER}'."
-    info "Reason: current compile_commands.json contains GCC C++ modules flags unsupported by clang-tidy."
-  fi
-else
+# ---------------------------------------------------------------------------
+# clang-tidy. GCC is skipped deliberately: a GCC-generated compile_commands.json
+# carries C++ module flags clang-tidy cannot parse.
+# ---------------------------------------------------------------------------
+if ! command -v clang-tidy >/dev/null 2>&1; then
   warn "clang-tidy not available, skipping"
+elif [[ "${COMPILER}" != "clang" ]]; then
+  info "Skipping clang-tidy for compiler='${COMPILER}' (GCC module flags are unsupported by clang-tidy)."
+else
+  # Generate the DB if the build tree has not produced one yet.
+  if [[ ! -f "${BUILD_DIR}/compile_commands.json" ]] && command -v cmake >/dev/null 2>&1; then
+    cmake --preset "${CLANG_DEBUG_PRESET}" -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
+  fi
+
+  if code_quality_prepare_compile_db "${BUILD_DIR}"; then
+    # Absolute paths: clang-tidy matches entries in the DB by path, and the DB
+    # records absolute ones.
+    mapfile -t ABS_SRC_FILES < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
+    code_quality_run_clang_tidy "${CODE_QUALITY_COMPILE_DB_DIR}" "${ABS_SRC_FILES[@]}" || true
+    code_quality_cleanup_compile_db
+  else
+    warn "No compilation database available, skipping clang-tidy."
+  fi
 fi
