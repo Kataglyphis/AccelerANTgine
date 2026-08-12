@@ -29,15 +29,18 @@ env:
   # One place for the image reference; it was hard-coded in both the pull and
   # the run step. Mirrors GHCR_IMAGE_WIN in windows_run.yml.
   #
-  # The tag is derived from inputs.arch because it HAS to be. This used to pull
-  # the multi-arch `:latest`, which stopped resolving when that tag's
-  # per-platform children were deleted by the ghcr-cleanup bug (fixed upstream in
-  # b70d3f4); `docker pull` reports only "manifest unknown". `:latest-cross` is
-  # the Linux image to use, but it is amd64-ONLY - a single manifest, not an
-  # index - so the arm64 caller (linux_run_arm.yml) needs the arch-suffixed tag
-  # or it would fail the same way for a different reason.
-  GHCR_IMAGE_LINUX: >-
-    ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest-cross${{ inputs.arch == 'arm64' && '-arm64' || '' }}
+  # One tag for both callers. This was briefly derived from inputs.arch, because
+  # :latest-cross was amd64-ONLY and the arm64 caller (linux_run_arm.yml) would
+  # otherwise have got no matching manifest. Re-verified against GHCR 2026-08-12:
+  # the index now lists linux/amd64, linux/arm64 and linux/riscv64 with all three
+  # children present, so docker picks the platform itself and the architecture no
+  # longer belongs in the tag.
+  #
+  # Do NOT go back to plain `:latest`: its children were deleted by the
+  # ghcr-cleanup bug (fixed upstream in b70d3f4) and are still missing, so the
+  # index resolves while every child 404s and `docker pull` says only
+  # "manifest unknown".
+  GHCR_IMAGE_LINUX: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest-cross
 
 jobs:
   build:
