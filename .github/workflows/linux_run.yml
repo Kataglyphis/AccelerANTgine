@@ -76,8 +76,19 @@ jobs:
         uses: Kataglyphis/Kataglyphis-ContainerHub/.github/actions/run-in-linux-container@main
         with:
           image: ${{ env.GHCR_IMAGE_LINUX }}
+          # CARGO_HOME muss auf einen SCHREIBBAREN Pfad zeigen. Der Image-Default
+          # ist /usr/local/cargo und gehoert root, waehrend der Container als
+          # Nicht-Root laeuft - cxxbridge-cmd scheiterte damit an
+          #   error: failed to create directory
+          #     `/usr/local/cargo/registry/cache/index.crates.io-...`
+          #     Permission denied (os error 13)
+          # Dieselbe Klasse wie UV_PYTHON=/opt/venv auf der Python-Seite: ein
+          # root-eigenes Shared-Verzeichnis als Default, in das ein Nicht-Root-
+          # Build schreiben will. /tmp ist im Container immer schreibbar; der
+          # Registry-Cache ist ohnehin nicht laufuebergreifend persistent.
           extra-args: >-
             --privileged --platform ${{ inputs.platform }}
+            -e CARGO_HOME=/tmp/cargo
             -e CXXFLAGS="${{ inputs.compiler == 'clang' && '--gcc-toolchain=/opt/gcc-15.2.0' || '' }}"
             -e LDFLAGS="${{ inputs.compiler == 'clang' && '-L/opt/gcc-15.2.0/lib64 -Wl,-rpath,/opt/gcc-15.2.0/lib64 --gcc-toolchain=/opt/gcc-15.2.0' || '' }}"
           script: >-
