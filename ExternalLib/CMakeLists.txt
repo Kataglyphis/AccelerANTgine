@@ -224,6 +224,14 @@ if(TARGET tomlplusplus_modules)
         target_link_libraries(tomlplusplus_modules PUBLIC myproject_options)
     endif()
     target_compile_definitions(tomlplusplus_modules PUBLIC TOML_EXCEPTIONS=0)
+    # -pthread, for the same reason as nlohmann_json_modules above — a BMI
+    # records the configuration it was built with and is rejected by importers
+    # that disagree. These are the only two module targets in the tree; both
+    # need every flag the importing TUs carry.
+    if(UNIX AND NOT APPLE)
+        target_compile_options(tomlplusplus_modules PUBLIC -pthread)
+        target_link_options(tomlplusplus_modules PUBLIC -pthread)
+    endif()
     target_compile_features(tomlplusplus_modules PUBLIC cxx_std_23)
 endif()
 
