@@ -185,6 +185,22 @@ if(TARGET nlohmann_json_modules)
     if(myproject_DISABLE_EXCEPTIONS)
         target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NOEXCEPTION)
     endif()
+    # -pthread belongs in this list for exactly the reason the note above gives:
+    # a BMI records the configuration it was built with, and an importer that
+    # disagrees is rejected. Src/CMakeLists.txt adds -pthread PUBLIC to the
+    # library on Unix, but that reaches nlohmann_json_modules' CONSUMERS, not
+    # the module target itself - it is a dependency, compiled first and without
+    # the flag. The Linux lane therefore died with
+    #   error: POSIX thread support was disabled in precompiled file
+    #          '.../nlohmann.json.pcm'
+    #   error: precompiled file '...pcm' cannot be loaded due to a
+    #          configuration mismatch with the current compilation
+    # followed by a wall of "use of undeclared identifier 'nlohmann'" in
+    # config_loader.cpp. Same guard as the consumer side, so the two agree.
+    if(UNIX AND NOT APPLE)
+        target_compile_options(nlohmann_json_modules PUBLIC -pthread)
+        target_link_options(nlohmann_json_modules PUBLIC -pthread)
+    endif()
     target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
 endif()
 
