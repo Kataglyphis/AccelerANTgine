@@ -16,20 +16,16 @@ _DOCS_SOURCE_DIR = pathlib.Path(__file__).resolve().parent
 _REPO_ROOT = _DOCS_SOURCE_DIR.parents[1]
 _DOXYGEN_XML_DIR = _REPO_ROOT / "build" / "build" / "xml"
 
-# The shared Sphinx baseline moved out of ContainerHub on 2026-07-14 (e3e2d6d,
-# "Consume shared docs tooling from Kataglyphis-DocumANTation submodule"), which
-# inverted the ownership: templates, theme and doc-generation scripts now live in
-# Kataglyphis-DocumANTation, which ContainerHub vendors under external/.
-# This path had still pointed at the old ContainerHub location, so the import
-# below has been raising ImportError ever since. (The move also dropped
-# conf_base.py and custom.css entirely; they were restored to DocumANTation on
-# 2026-08-11.)
+# The shared Sphinx baseline moved out of ContainerHub on 2026-07-14 (e3e2d6d),
+# inverting the ownership: templates, theme and doc-generation scripts live in
+# DocumANTation, which ContainerHub vendors. Both directory names changed again
+# on 2026-09-05 — see AGENTS.md.
 _TEMPLATE_DIR = (
-    pathlib.Path(__file__).resolve().parents[2]  # …/KataglyphisCppInference
+    pathlib.Path(__file__).resolve().parents[2]
     / "third_party"
-    / "Kataglyphis-ContainerHub"
-    / "external"
-    / "Kataglyphis-DocumANTation"
+    / "ContainerHub"
+    / "third_party"
+    / "DocumANTation"
     / "docs-tooling"
     / "source_templates"
     / "sphinx-book"
@@ -41,7 +37,7 @@ _spec = importlib.util.spec_from_file_location(
 if _spec is None or _spec.loader is None:
     raise ImportError(
         f"Cannot load shared Sphinx baseline from {_TEMPLATE_DIR / 'conf_base.py'}. "
-        "Ensure the Kataglyphis-ContainerHub submodule is checked out."
+        "Ensure the ContainerHub submodule is checked out."
     )
 _conf_base = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_conf_base)
@@ -116,7 +112,7 @@ html_theme = _conf_base.HTML_THEME
 html_theme_options = dict(_conf_base.HTML_THEME_OPTIONS)
 # Override the repository URL with this project's own repo.
 html_theme_options["repository_url"] = (
-    "https://github.com/Kataglyphis/KataglyphisCppInference"
+    "https://github.com/Kataglyphis/Cpp-Inference"
 )
 
 # Copy generated coverage and test-result assets into the built site root when available.

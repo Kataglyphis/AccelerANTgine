@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Configurable Windows container build script for the Kataglyphis project using the Kataglyphis-ContainerHub build framework.
+  Configurable Windows container build script for the Kataglyphis project using the ContainerHub build framework.
 
 .DESCRIPTION
   Run with defaults or pass parameters to override workspace path and other options.

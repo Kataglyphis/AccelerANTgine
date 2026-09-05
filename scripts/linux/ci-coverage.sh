@@ -11,7 +11,7 @@ source "${_SCRIPT_DIR}/ci-common.sh"
 
 COVERAGE_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/lib/coverage.sh"
 if [[ ! -f "${COVERAGE_LIB}" ]]; then
-  die "Shared coverage library not found at '${COVERAGE_LIB}'. Initialize the Kataglyphis-ContainerHub submodule first."
+  die "Shared coverage library not found at '${COVERAGE_LIB}'. Initialize the ContainerHub submodule first."
 fi
 # shellcheck disable=SC1091
 source "${COVERAGE_LIB}"
