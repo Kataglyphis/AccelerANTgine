@@ -26,7 +26,7 @@ is the single fact that most shapes its tooling.
 
 **This repo is consumed as a nested submodule** by
 `Kataglyphis_NativeInferencePlugin`, which is itself a submodule of
-Kataglyphis-Inference-Engine. A change here has to reach two superprojects
+OmniAccelerANT. A change here has to reach two superprojects
 before an app sees it.
 
 ## 2. What ContainerHub owns — links only
@@ -139,6 +139,6 @@ CI lanes: `linux_run.yml` (containerized), `linux_run_x86.yml`,
 - Sphinx sources in `docs/`; Doxygen via `Doxyfile.in`; coverage config in
   `gcovr.cfg`.
 - `CHANGELOG.md` — and remember a change here surfaces in
-  `Kataglyphis_NativeInferencePlugin` and then Kataglyphis-Inference-Engine, so
+  `Kataglyphis_NativeInferencePlugin` and then OmniAccelerANT, so
   note anything that moves the C ABI.
 - Update docs in the same PR as user-facing behaviour changes.
