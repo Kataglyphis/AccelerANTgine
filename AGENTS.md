@@ -99,7 +99,7 @@ written out rather than linked.
   repo will catch.
 - **Sphinx config pulls its baseline from DocumANTation, via ContainerHub.**
   `docs/source/conf.py` loads `conf_base.py` from
-  `third_party/ContainerHub/external/Kataglyphis-DocumANTation/docs-tooling/source_templates/sphinx-book`.
+  `third_party/ContainerHub/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`.
   It raises a clear error if that path is missing, which in practice means the
   nested submodule was not initialised recursively.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:

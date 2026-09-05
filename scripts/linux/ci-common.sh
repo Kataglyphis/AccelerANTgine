@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ci-common.sh - bootstrap shim for CI scripts
 #
-# Sources the Kataglyphis-ContainerHub core library, providing:
+# Sources the ContainerHub core library, providing:
 #   Logging    : info, warn, err/die, log
 #   Platform   : arch_oci, is_amd64_arch, detect_system, deb_multiarch_triplet
 #   Parallelism: detect_available_cores, compute_jobs, compute_jobs_with_mem_cap
