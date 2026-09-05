@@ -56,7 +56,7 @@ jobs:
       # copy of the retry loop, so the retry count and per-attempt timeout live
       # in one place for every repo instead of drifting per workflow.
       - name: Prepare CI host
-        uses: Kataglyphis/Kataglyphis-ContainerHub/.github/actions/prepare-linux-ci-host@main
+        uses: Kataglyphis/ContainerHub/.github/actions/prepare-linux-ci-host@main
         with:
           image: ${{ env.GHCR_IMAGE_LINUX }}
           registry-username: ${{ github.actor }}
@@ -73,7 +73,7 @@ jobs:
       # an action's own run block does not inherit the CALLER STEP's env, only
       # the job's.
       - name: Run build/test/docs/package inside container
-        uses: Kataglyphis/Kataglyphis-ContainerHub/.github/actions/run-in-linux-container@main
+        uses: Kataglyphis/ContainerHub/.github/actions/run-in-linux-container@main
         with:
           image: ${{ env.GHCR_IMAGE_LINUX }}
           # CARGO_HOME muss auf einen SCHREIBBAREN Pfad zeigen. Der Image-Default
