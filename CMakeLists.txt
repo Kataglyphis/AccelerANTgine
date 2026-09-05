@@ -151,7 +151,7 @@ if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
   find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module)
 endif()
 
-add_subdirectory(ExternalLib)
+add_subdirectory(third_party)
 
 add_subdirectory(Src)
 

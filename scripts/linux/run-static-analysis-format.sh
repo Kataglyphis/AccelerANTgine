@@ -19,7 +19,7 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-CODE_QUALITY_LIB="${_SCRIPT_DIR}/../../ExternalLib/Kataglyphis-ContainerHub/linux/scripts/lib/code-quality.sh"
+CODE_QUALITY_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/lib/code-quality.sh"
 if [[ ! -f "${CODE_QUALITY_LIB}" ]]; then
   die "Shared code-quality library not found at '${CODE_QUALITY_LIB}'. Initialize the Kataglyphis-ContainerHub submodule first."
 fi

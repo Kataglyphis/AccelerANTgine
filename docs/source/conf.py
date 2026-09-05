@@ -26,7 +26,7 @@ _DOXYGEN_XML_DIR = _REPO_ROOT / "build" / "build" / "xml"
 # 2026-08-11.)
 _TEMPLATE_DIR = (
     pathlib.Path(__file__).resolve().parents[2]  # …/KataglyphisCppInference
-    / "ExternalLib"
+    / "third_party"
     / "Kataglyphis-ContainerHub"
     / "external"
     / "Kataglyphis-DocumANTation"
