@@ -4,7 +4,7 @@ Guidance for coding agents (and new contributors) working in
 KataglyphisCppInference.
 
 Laid out per ContainerHub's
-[`shared/templates/AGENTS.md.template`](ExternalLib/Kataglyphis-ContainerHub/shared/templates/README.md).
+[`shared/templates/AGENTS.md.template`](third_party/ContainerHub/shared/templates/README.md).
 The rule that shapes it: *would this still be true in a different project?* If
 yes, ContainerHub owns it and § 2 links to it. If no, it is written out in § 3.
 
@@ -22,7 +22,7 @@ is the single fact that most shapes its tooling.
 | `Test/` | Test sources |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh` |
 | `scripts/windows/` | `Build-Windows.ps1`, `Build-PythonBindings.ps1`, the `start-*.ps1` entry points, and the `Resolve-BuildModule.ps1` bootstrap |
-| `ExternalLib/Kataglyphis-ContainerHub` | The submodule owning every reusable script, module and doc |
+| `third_party/ContainerHub` | The submodule owning every reusable script, module and doc |
 
 **This repo is consumed as a nested submodule** by
 `Kataglyphis_NativeInferencePlugin`, which is itself a submodule of
@@ -32,7 +32,7 @@ before an app sees it.
 ## 2. What ContainerHub owns — links only
 
 **Do not restate these procedures here.** Start at
-[`ExternalLib/Kataglyphis-ContainerHub/docs/INDEX.md`](ExternalLib/Kataglyphis-ContainerHub/docs/INDEX.md),
+[`third_party/ContainerHub/docs/INDEX.md`](third_party/ContainerHub/docs/INDEX.md),
 which maps topic → owning document, so these links survive upstream
 reorganisation.
 
@@ -99,7 +99,7 @@ written out rather than linked.
   repo will catch.
 - **Sphinx config pulls its baseline from DocumANTation, via ContainerHub.**
   `docs/source/conf.py` loads `conf_base.py` from
-  `ExternalLib/Kataglyphis-ContainerHub/external/Kataglyphis-DocumANTation/docs-tooling/source_templates/sphinx-book`.
+  `third_party/ContainerHub/external/Kataglyphis-DocumANTation/docs-tooling/source_templates/sphinx-book`.
   It raises a clear error if that path is missing, which in practice means the
   nested submodule was not initialised recursively.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:

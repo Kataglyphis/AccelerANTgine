@@ -1,6 +1,6 @@
 # Python bindings for KataglyphisCppInference (nanobind).
 # Only entered when KATAGLYPHIS_BUILD_PYTHON_BINDINGS is ON — nanobind and
-# find_package(Python) are set up in ExternalLib/CMakeLists.txt.
+# find_package(Python) are set up in third_party/CMakeLists.txt.
 
 option(KATAGLYPHIS_PYTHON_STUBS "Generate .pyi stubs for the Python bindings" ON)
 

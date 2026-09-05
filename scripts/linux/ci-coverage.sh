@@ -9,7 +9,7 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-COVERAGE_LIB="${_SCRIPT_DIR}/../../ExternalLib/Kataglyphis-ContainerHub/linux/scripts/lib/coverage.sh"
+COVERAGE_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/lib/coverage.sh"
 if [[ ! -f "${COVERAGE_LIB}" ]]; then
   die "Shared coverage library not found at '${COVERAGE_LIB}'. Initialize the Kataglyphis-ContainerHub submodule first."
 fi
@@ -33,7 +33,7 @@ done
 
 # Project-specific: what to leave out of the report. Dependencies, generated
 # _deps trees and the test code itself are not the thing under measurement.
-COVERAGE_LLVM_IGNORE_REGEX=(".*/(ExternalLib|build[^/]*/_deps|_deps|Test|tests|usr/include|usr/lib)/.*")
+COVERAGE_LLVM_IGNORE_REGEX=(".*/(third_party|build[^/]*/_deps|_deps|Test|tests|usr/include|usr/lib)/.*")
 
 if [[ "${COMPILER}" == "gcc" ]]; then
   # gcovr reads .gcda/.gcno from the compile directory, hence the cd; the paths

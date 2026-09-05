@@ -11,7 +11,7 @@ $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 Set-Location $ProjectRoot
 
 # Stevedore's bundled docker.exe is required on this host (nerdctl has broken
-# DNS/NAT on Windows) — see ExternalLib/Kataglyphis-ContainerHub/docs/windows-builds.md.
+# DNS/NAT on Windows) — see third_party/ContainerHub/docs/windows-builds.md.
 $docker = Join-Path $env:ProgramFiles "Stevedore\bin\docker.exe"
 if (-not (Test-Path $docker)) { $docker = "D:\Stevedore\bin\docker.exe" }
 if (-not (Test-Path $docker)) { $docker = "docker" }
@@ -26,7 +26,7 @@ Write-Host "Starting Python bindings build at $(Get-Date) using $docker"
 # CreateComputeSystem. NOTE: if ProjectRoot is on a Dev Drive, bind mounts need
 # `fsutil devdrv setfiltersallowed bindFlt, wcifs` (elevated) + remount first,
 # or stage the tree to a non-Dev-Drive path and pass it as -ProjectRoot.
-# See ExternalLib/Kataglyphis-ContainerHub/docs/windows-builds.md.
+# See third_party/ContainerHub/docs/windows-builds.md.
 $dockerArgs = @(
     "run",
     "--rm",

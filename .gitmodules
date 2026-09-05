@@ -1,23 +1,23 @@
-[submodule "ExternalLib/FUZZTEST"]
-	path = ExternalLib/FUZZTEST
+[submodule "third_party/FUZZTEST"]
+	path = third_party/FUZZTEST
 	url = https://github.com/google/fuzztest
-[submodule "ExternalLib/GOOGLE_BENCHMARK"]
-	path = ExternalLib/GOOGLE_BENCHMARK
+[submodule "third_party/GOOGLE_BENCHMARK"]
+	path = third_party/GOOGLE_BENCHMARK
 	url = https://github.com/google/benchmark
-[submodule "ExternalLib/NLOHMANN_JSON"]
-	path = ExternalLib/NLOHMANN_JSON
+[submodule "third_party/NLOHMANN_JSON"]
+	path = third_party/NLOHMANN_JSON
 	url = https://github.com/nlohmann/json
-[submodule "ExternalLib/SPDLOG"]
-	path = ExternalLib/SPDLOG
+[submodule "third_party/SPDLOG"]
+	path = third_party/SPDLOG
 	url = https://github.com/gabime/spdlog
-[submodule "ExternalLib/Kataglyphis-ContainerHub"]
-	path = ExternalLib/Kataglyphis-ContainerHub
+[submodule "third_party/ContainerHub"]
+	path = third_party/ContainerHub
 	url = git@github.com:Kataglyphis/ContainerHub.git
 
 	branch = main
-[submodule "ExternalLib/tomlplusplus"]
-	path = ExternalLib/tomlplusplus
+[submodule "third_party/tomlplusplus"]
+	path = third_party/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
-[submodule "ExternalLib/nanobind"]
-	path = ExternalLib/nanobind
+[submodule "third_party/nanobind"]
+	path = third_party/nanobind
 	url = git@github.com:wjakob/nanobind.git

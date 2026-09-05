@@ -2,7 +2,7 @@
 # update current positions
 set(PROJECT_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(PROJECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
-set(EXTERNAL_LIB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../ExternalLib/")
+set(EXTERNAL_LIB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/")
 
 include(cmake/filters/SetProjectFilters.cmake)
 include(cmake/SetSourceGroups.cmake)

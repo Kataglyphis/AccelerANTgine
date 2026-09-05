@@ -85,7 +85,7 @@ href="#8a53507b-b51f-4109-b9f1-18623de8fd6b">MyTestSuite.IntegerAdditionCommutes
 
 *Stdout*  
 
-    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/third_party/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
     Note: Google Test filter = HelloTestCommit.BasicAssertions
     [==========] Running 1 test from 1 test suite.
     [----------] Global test environment set-up.
@@ -126,7 +126,7 @@ href="#8a53507b-b51f-4109-b9f1-18623de8fd6b">MyTestSuite.IntegerAdditionCommutes
 
 *Stdout*  
 
-    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/third_party/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
     Note: Google Test filter = Integration.VulkanEngine
     [==========] Running 1 test from 1 test suite.
     [----------] Global test environment set-up.
@@ -167,7 +167,7 @@ href="#8a53507b-b51f-4109-b9f1-18623de8fd6b">MyTestSuite.IntegerAdditionCommutes
 
 *Stdout*  
 
-    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/third_party/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
     Note: Google Test filter = HelloTestCompile.BasicAssertions
     [==========] Running 1 test from 1 test suite.
     [----------] Global test environment set-up.
@@ -208,7 +208,7 @@ href="#8a53507b-b51f-4109-b9f1-18623de8fd6b">MyTestSuite.IntegerAdditionCommutes
 
 *Stdout*  
 
-    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/ExternalLib/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
+    Running main() from /home/jones/GitHub/Kataglyphis-Inference-Engine/third_party/Kataglyphis_NativeInferencePlugin/native/KataglyphisCppInference/build/_deps/googletest-src/googletest/src/gtest_main.cc
     Note: Google Test filter = HelloTestCompile.blob
     [==========] Running 1 test from 1 test suite.
     [----------] Global test environment set-up.
