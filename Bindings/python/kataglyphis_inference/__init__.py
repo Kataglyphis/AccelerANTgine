@@ -2,7 +2,7 @@
 
 import os as _os
 
-# The extension module links against KataglyphisCppInference (and, depending on
+# The extension module links against CppInference (and, depending on
 # the build, ONNX Runtime / GStreamer DLLs). The core DLL ships inside this
 # package; extra runtime DLL directories can be supplied via KATAGLYPHIS_DLL_PATH.
 if hasattr(_os, "add_dll_directory"):

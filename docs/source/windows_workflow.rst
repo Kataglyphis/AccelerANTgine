@@ -55,7 +55,7 @@ Debug Run
 
 This script:
 
-- starts the CLI from ``build-clangcl-debug\bin\KataglyphisCppInference.exe``
+- starts the CLI from ``build-clangcl-debug\bin\CppInference.exe``
 - performs a stable local CLI version check by default
 - runs ``commitTestSuite.exe`` when present
 - runs ``compileTestSuite.exe`` when present

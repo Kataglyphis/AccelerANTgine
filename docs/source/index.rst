@@ -1,4 +1,4 @@
-KataglyphisCppInference documentation
+CppInference documentation
 ======================================
 
 .. rst-class:: hero-section

@@ -37,11 +37,11 @@ $buildDir = "$ProjectRoot\build-clangcl-profile"
 $configName = "RelWithDebInfo (Profile)"
 $missingArtifacts = @()
 
-Write-Host "=== Running KataglyphisCppInference $configName ===" -ForegroundColor Cyan
+Write-Host "=== Running CppInference $configName ===" -ForegroundColor Cyan
 Write-Host "Build directory: $buildDir"
 Write-Host ""
 
-$cliPath = "$buildDir\bin\KataglyphisCppInference.exe"
+$cliPath = "$buildDir\bin\CppInference.exe"
 if (Test-Path $cliPath) {
     Write-Host "--- CLI version check ---" -ForegroundColor Yellow
     Invoke-WithBuildRuntimePath -BuildDir $buildDir -Script {

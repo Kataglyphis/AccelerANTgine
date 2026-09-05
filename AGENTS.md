@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Guidance for coding agents (and new contributors) working in
-KataglyphisCppInference.
+CppInference.
 
 Laid out per ContainerHub's
 [`shared/templates/AGENTS.md.template`](third_party/ContainerHub/shared/templates/README.md).

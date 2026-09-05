@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=CppInference
+Exec=CppInference
+Icon=org.kataglyphis.cppinference
+Terminal=true
+Categories=Development;

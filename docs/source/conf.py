@@ -45,7 +45,7 @@ _spec.loader.exec_module(_conf_base)
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "KataglyphisCppInference"
+project = "CppInference"
 copyright = "2025, Jonas Heinle"
 author = "Jonas Heinle"
 release = "0.0.1"
@@ -93,8 +93,8 @@ myst_enable_extensions = [
 ]
 
 if _DOXYGEN_XML_DIR.exists():
-    breathe_projects = {"KataglyphisCppInference": str(_DOXYGEN_XML_DIR)}
-    breathe_default_project = "KataglyphisCppInference"
+    breathe_projects = {"CppInference": str(_DOXYGEN_XML_DIR)}
+    breathe_default_project = "CppInference"
 
 suppress_warnings = [
     "duplicate_declaration.c",
