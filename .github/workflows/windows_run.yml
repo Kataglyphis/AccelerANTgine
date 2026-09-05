@@ -28,7 +28,7 @@ jobs:
       # latex/awesome-beamer chain, so nothing after it ever ran.
       - name: Prepare Windows container host
         id: prep
-        uses: Kataglyphis/Kataglyphis-ContainerHub/.github/actions/prepare-windows-container-host@main
+        uses: Kataglyphis/ContainerHub/.github/actions/prepare-windows-container-host@main
         with:
           image: ${{ env.GHCR_IMAGE_WIN }}
           registry-username: ${{ github.actor }}
