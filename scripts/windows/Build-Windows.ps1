@@ -330,7 +330,7 @@ try {
             Invoke-BuildStep -Context $Context -StepName "PGO (Profile-Guided Optimization)" -Script {
                 Push-Location $fastBuildProfileFull
                 try {
-                    $mainExe = Join-Path $fastBuildProfileFull "bin\KataglyphisCppInference.exe"
+                    $mainExe = Join-Path $fastBuildProfileFull "bin\CppInference.exe"
                     $dummyProfrawPath = Join-Path $logDirPath "dummy.profraw"
                     if (Test-Path $mainExe) {
                         $env:LLVM_PROFILE_FILE = $dummyProfrawPath
@@ -370,8 +370,8 @@ try {
                 $msixOutput = Join-Path $Workspace "dist\msix"
                 $stagingRoot = Join-Path $msixOutput "staging"
 
-                $exePath = Join-Path $fastBuildReleaseDirFull "bin\KataglyphisCppInference.exe"
-                $dllPath = Join-Path $fastBuildReleaseDirFull "bin\KataglyphisCppInference.dll"
+                $exePath = Join-Path $fastBuildReleaseDirFull "bin\CppInference.exe"
+                $dllPath = Join-Path $fastBuildReleaseDirFull "bin\CppInference.dll"
                 $logoSource = Join-Path $Workspace "images\logo.png"
 
                 $makeappx = Resolve-WindowsSdkToolPath -ToolName "makeappx.exe"
@@ -413,17 +413,17 @@ try {
 
                 Write-BuildLog -Context $Context -Message "Generating AppxManifest.xml..."
                 $manifestContent = Get-Content $msixTemplate -Raw
-                $manifestContent = $manifestContent.Replace("__PACKAGE_NAME__", "KataglyphisCppInference")
+                $manifestContent = $manifestContent.Replace("__PACKAGE_NAME__", "CppInference")
                 $manifestContent = $manifestContent.Replace("__PUBLISHER__", "CN=Kataglyphis")
                 $manifestContent = $manifestContent.Replace("__VERSION__", "0.0.1.0")
                 $manifestContent = $manifestContent.Replace("__DISPLAY_NAME__", "Kataglyphis C++ Inference")
                 $manifestContent = $manifestContent.Replace("__PUBLISHER_DISPLAY_NAME__", "Kataglyphis")
                 $manifestContent = $manifestContent.Replace("__DESCRIPTION__", "High-performance C++ inference engine with ONNXRuntime and WebRTC streaming")
-                $manifestContent = $manifestContent.Replace("__EXECUTABLE__", "KataglyphisCppInference.exe")
+                $manifestContent = $manifestContent.Replace("__EXECUTABLE__", "CppInference.exe")
                 Set-Content -Path (Join-Path $stagingRoot "AppxManifest.xml") -Value $manifestContent -Encoding utf8
 
                 New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
-                $msixFile = Join-Path $msixOutput "KataglyphisCppInference_0.0.1.0_x64.msix"
+                $msixFile = Join-Path $msixOutput "CppInference_0.0.1.0_x64.msix"
 
                 Write-BuildLog -Context $Context -Message "Creating MSIX package..."
                 Invoke-BuildExternal -Context $Context -File $makeappx -Parameters @("pack", "/d", $stagingRoot, "/p", $msixFile, "/o") | Out-Null

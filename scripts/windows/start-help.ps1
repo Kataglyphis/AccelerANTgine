@@ -1,4 +1,4 @@
-Write-Host "=== KataglyphisCppInference Run Scripts ===" -ForegroundColor Cyan
+Write-Host "=== CppInference Run Scripts ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Available scripts:" -ForegroundColor White
 Write-Host "  start-build.ps1   - Build in the Windows container" -ForegroundColor Yellow

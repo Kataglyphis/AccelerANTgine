@@ -3,7 +3,7 @@
     <img src="images/logo.png" alt="logo" width="200" />
   </a>
 
-  <h1>KataglyphisCppInference</h1>
+  <h1>CppInference</h1>
 
   <h4>This C++ inference project gives me a good starting point for hardware accelerated AI inference 🚀 </h4>
 </div>

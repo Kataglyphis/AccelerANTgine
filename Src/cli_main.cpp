@@ -154,7 +154,7 @@ auto main(int argc, char** argv) -> int
     const auto override_flags = detect_cli_override_flags(argc, argv);
 
     absl::SetProgramUsageMessage(
-        "KataglyphisCppInference — WebRTC streaming and inference engine\n\n"
+        "CppInference — WebRTC streaming and inference engine\n\n"
         "Examples:\n"
         "  --webrtc --config /path/to/webrtc_settings.json\n"
         "  --webrtc --server ws://192.168.1.100:8443\n"
@@ -167,7 +167,7 @@ auto main(int argc, char** argv) -> int
 
     const bool start_webrtc = absl::GetFlag(FLAGS_webrtc);
     if (!start_webrtc) {
-        std::cout << "KataglyphisCppInference "
+        std::cout << "CppInference "
                   << kataglyphis::project_config::project_version_major << "."
                   << kataglyphis::project_config::project_version_minor << '\n';
         std::cout << "Use --help for usage information\n";
