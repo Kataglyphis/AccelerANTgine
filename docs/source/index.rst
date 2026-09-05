@@ -1,4 +1,4 @@
-CppInference documentation
+AccelerANTgine documentation
 ======================================
 
 .. rst-class:: hero-section

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AccelerANTgine
+Exec=AccelerANTgine
+Icon=org.kataglyphis.accelerantgine
+Terminal=true
+Categories=Development;

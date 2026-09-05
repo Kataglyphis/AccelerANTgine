@@ -37,11 +37,11 @@ $buildDir = "$ProjectRoot\build-clangcl-release"
 $configName = "Release"
 $missingArtifacts = @()
 
-Write-Host "=== Running CppInference $configName ===" -ForegroundColor Cyan
+Write-Host "=== Running AccelerANTgine $configName ===" -ForegroundColor Cyan
 Write-Host "Build directory: $buildDir"
 Write-Host ""
 
-$cliPath = "$buildDir\bin\CppInference.exe"
+$cliPath = "$buildDir\bin\AccelerANTgine.exe"
 if (Test-Path $cliPath) {
     Write-Host "--- CLI version check ---" -ForegroundColor Yellow
     Invoke-WithBuildRuntimePath -BuildDir $buildDir -Script {

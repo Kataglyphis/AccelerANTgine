@@ -21,7 +21,7 @@ FLATPAK_SDK="org.freedesktop.Sdk"
 FLATPAK_BRANCH="master"
 AUTO_INSTALL_FLATPAK="1"
 FLATPAK_ARCH=""
-APP_ID="org.kataglyphis.cppinference"
+APP_ID="org.kataglyphis.accelerantgine"
 
 usage() {
   cat <<'EOF'
@@ -366,7 +366,7 @@ if [[ "${DO_CALLGRIND}" -eq 1 ]]; then
   fi
   (
     cd "${BUILD_RELEASE_DIR}"
-    ./bin/CppInference >/dev/null 2>&1 || true
-    valgrind --tool=callgrind ./bin/CppInference
+    ./bin/AccelerANTgine >/dev/null 2>&1 || true
+    valgrind --tool=callgrind ./bin/AccelerANTgine
   )
 fi
