@@ -1,7 +1,7 @@
 Overview
 ========
 
-CppInference provides a native C++ inference library, C API bindings,
+AccelerANTgine provides a native C++ inference library, C API bindings,
 and CLI tooling.
 
 The API reference is generated from Doxygen XML via Breathe/Exhale and published

@@ -1,7 +1,7 @@
 Getting Started
 ===============
 
-CppInference supports Linux and Windows builds with CMake presets,
+AccelerANTgine supports Linux and Windows builds with CMake presets,
 containerized CI, and local host-side run scripts.
 
 Prerequisites

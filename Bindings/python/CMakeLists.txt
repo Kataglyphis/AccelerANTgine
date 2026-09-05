@@ -1,4 +1,4 @@
-# Python bindings for CppInference (nanobind).
+# Python bindings for AccelerANTgine (nanobind).
 # Only entered when KATAGLYPHIS_BUILD_PYTHON_BINDINGS is ON — nanobind and
 # find_package(Python) are set up in third_party/CMakeLists.txt.
 
@@ -22,9 +22,9 @@ target_compile_features(kataglyphis_python PRIVATE cxx_std_23)
 
 # NOTE: deliberately no myproject_warnings here — nanobind's headers are not
 # warning-clean under the project's warning set. myproject_options flags still
-# arrive transitively via CppInference's PUBLIC link, which keeps
+# arrive transitively via AccelerANTgine's PUBLIC link, which keeps
 # the BMI-relevant flags (/EHs, sanitizers) consistent with the imported BMIs.
-target_link_libraries(kataglyphis_python PRIVATE CppInference)
+target_link_libraries(kataglyphis_python PRIVATE AccelerANTgine)
 
 # --- Stage an importable package into <build>/python/kataglyphis_inference ---
 set(KATAGLYPHIS_PY_STAGE_DIR "${CMAKE_BINARY_DIR}/python/kataglyphis_inference")
@@ -37,7 +37,7 @@ add_custom_command(
           "${KATAGLYPHIS_PY_STAGE_DIR}/"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
           "${CMAKE_CURRENT_SOURCE_DIR}/kataglyphis_inference/__init__.py" "${KATAGLYPHIS_PY_STAGE_DIR}/"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:CppInference>"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:AccelerANTgine>"
           "${KATAGLYPHIS_PY_STAGE_DIR}/"
   COMMENT "Staging Python package into ${KATAGLYPHIS_PY_STAGE_DIR}")
 
@@ -62,7 +62,7 @@ install(FILES kataglyphis_inference/__init__.py
         DESTINATION kataglyphis_inference
         COMPONENT python_bindings)
 install(
-  TARGETS CppInference
+  TARGETS AccelerANTgine
   RUNTIME DESTINATION kataglyphis_inference COMPONENT python_bindings
   LIBRARY DESTINATION kataglyphis_inference COMPONENT python_bindings
   ARCHIVE DESTINATION lib COMPONENT python_native_dev)

@@ -45,7 +45,7 @@ _spec.loader.exec_module(_conf_base)
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "CppInference"
+project = "AccelerANTgine"
 copyright = "2025, Jonas Heinle"
 author = "Jonas Heinle"
 release = "0.0.1"
@@ -93,8 +93,8 @@ myst_enable_extensions = [
 ]
 
 if _DOXYGEN_XML_DIR.exists():
-    breathe_projects = {"CppInference": str(_DOXYGEN_XML_DIR)}
-    breathe_default_project = "CppInference"
+    breathe_projects = {"AccelerANTgine": str(_DOXYGEN_XML_DIR)}
+    breathe_default_project = "AccelerANTgine"
 
 suppress_warnings = [
     "duplicate_declaration.c",

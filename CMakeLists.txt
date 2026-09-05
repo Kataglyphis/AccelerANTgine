@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.31.6)
 
 # set the project name
 project(
-  CppInference
+  AccelerANTgine
   VERSION 0.0.1
   DESCRIPTION "C++23 ONNX inference engine with GStreamer and WebRTC support"
   HOMEPAGE_URL "https://jonasheinle.de/"
@@ -11,7 +11,7 @@ project(
 include(GNUInstallDirs)
 
 set(AUTHOR "Jonas Heinle")
-set(PROJECT_APP_ID "org.kataglyphis.cppinference")
+set(PROJECT_APP_ID "org.kataglyphis.accelerantgine")
 
 # Set WINDOWS_CI to OFF by default
 # WINDOWS CI is only able to verify successful compiling ... Windows ... lel
