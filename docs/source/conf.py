@@ -112,7 +112,7 @@ html_theme = _conf_base.HTML_THEME
 html_theme_options = dict(_conf_base.HTML_THEME_OPTIONS)
 # Override the repository URL with this project's own repo.
 html_theme_options["repository_url"] = (
-    "https://github.com/Kataglyphis/Cpp-Inference"
+    "https://github.com/Kataglyphis/AccelerANTgine"
 )
 
 # Copy generated coverage and test-result assets into the built site root when available.

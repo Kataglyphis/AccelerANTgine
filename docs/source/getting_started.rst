@@ -18,7 +18,7 @@ Clone The Repository
 
 .. code-block:: bash
 
-   git clone --recurse-submodules git@github.com:Kataglyphis/Cpp-Inference.git
+   git clone --recurse-submodules git@github.com:Kataglyphis/AccelerANTgine.git
 
 If you cloned without submodules:
 
