@@ -86,7 +86,7 @@ The recommended Windows build wrapper is:
 
 .. code-block:: powershell
 
-   .\scripts\windows\start-build.ps1
+   .\scripts\windows\Start-Build.ps1
 
 This launches the Windows container image and runs
 ``scripts/windows/Build-Windows.ps1`` inside it with these host-local defaults:
@@ -115,12 +115,12 @@ Use the host-side scripts from ``scripts/windows``:
 
 .. code-block:: powershell
 
-   .\scripts\windows\start-debug.ps1
-   .\scripts\windows\start-profile.ps1
-   .\scripts\windows\start-release.ps1
+   .\scripts\windows\Start-Debug.ps1
+   .\scripts\windows\Start-Profile.ps1
+   .\scripts\windows\Start-Release.ps1
 
 These scripts run the built executables from the synchronized build folders.
-``start-debug.ps1`` performs a stable CLI check and executes the debug test
+``Start-Debug.ps1`` performs a stable CLI check and executes the debug test
 binaries it finds. If you have a signalling server available, you can opt into
 the WebRTC smoke test with ``-RunWebRtcSmoke``.
 
