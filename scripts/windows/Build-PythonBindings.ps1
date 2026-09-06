@@ -1,3 +1,5 @@
+#requires -Version 7.0
+
 <#
 .SYNOPSIS
   Container-side build script for the Python bindings (nanobind).

@@ -1,3 +1,5 @@
+#requires -Version 7.0
+
 Write-Host "=== AccelerANTgine Run Scripts ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Available scripts:" -ForegroundColor White
