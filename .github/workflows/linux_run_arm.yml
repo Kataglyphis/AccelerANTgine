@@ -11,7 +11,7 @@ jobs:
     uses: ./.github/workflows/linux_run.yml
     with:
       compiler: gcc
-      runner: ubuntu-24.04-arm
+      runner: ubuntu-26.04-arm
       arch: arm64
       platform: linux/arm64
     secrets:
@@ -24,7 +24,7 @@ jobs:
     uses: ./.github/workflows/linux_run.yml
     with:
       compiler: clang
-      runner: ubuntu-24.04-arm
+      runner: ubuntu-26.04-arm
       arch: arm64
       platform: linux/arm64
     secrets:

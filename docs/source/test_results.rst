@@ -18,7 +18,7 @@ Recommended path:
 
    bash scripts/linux/ci-run-all.sh \
      --compiler clang \
-     --runner ubuntu-24.04 \
+     --runner ubuntu-26.04 \
      --arch x64 \
      --build-type Debug \
      --build-dir build \

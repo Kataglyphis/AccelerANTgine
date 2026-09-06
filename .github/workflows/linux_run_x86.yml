@@ -11,7 +11,7 @@ jobs:
     uses: ./.github/workflows/linux_run.yml
     with:
       compiler: gcc
-      runner: ubuntu-24.04
+      runner: ubuntu-26.04
       arch: x64
       platform: linux/amd64
     secrets:
@@ -24,7 +24,7 @@ jobs:
     uses: ./.github/workflows/linux_run.yml
     with:
       compiler: clang
-      runner: ubuntu-24.04
+      runner: ubuntu-26.04
       arch: x64
       platform: linux/amd64
     secrets:

@@ -6,7 +6,7 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_SCRIPT_DIR}/ci-common.sh"
 
 COMPILER="clang"
-RUNNER="ubuntu-24.04"
+RUNNER="ubuntu-26.04"
 MATRIX_ARCH="x64"
 BUILD_TYPE="Debug"
 BUILD_DIR="build"

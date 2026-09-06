@@ -7,7 +7,7 @@ source "${_SCRIPT_DIR}/ci-common.sh"
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
-RUNNER="ubuntu-24.04"
+RUNNER="ubuntu-26.04"
 MATRIX_ARCH="x64"
 
 while [[ $# -gt 0 ]]; do

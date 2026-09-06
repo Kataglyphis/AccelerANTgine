@@ -125,7 +125,7 @@ jobs:
             build-release/*.flatpak
 
       - name: Fix permissions for doc directory
-        if: ${{ inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang' }}
+        if: ${{ inputs.runner == 'ubuntu-26.04' && inputs.compiler == 'clang' }}
         run: |
           if [[ -d "./docs/build/html" ]]; then
             chmod -R 755 ./docs/build/html/
@@ -135,7 +135,7 @@ jobs:
           fi
 
       - name: Sync files to domain
-        if: inputs.runner == 'ubuntu-24.04' && inputs.compiler == 'clang'
+        if: inputs.runner == 'ubuntu-26.04' && inputs.compiler == 'clang'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.SERVER }}
