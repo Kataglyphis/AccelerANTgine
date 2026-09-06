@@ -1,3 +1,5 @@
+#requires -Version 7.0
+
 param(
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$Image = "ghcr.io/kataglyphis/kataglyphis_beschleuniger:winamd64",
