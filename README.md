@@ -201,8 +201,8 @@ source ~/.bashrc  # or source ~/.zshrc
 Run actual profiling and look into results:
 ```bash
 mkdir -p logs
-LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so CPUPROFILE=logs/profile.prof ./build/KataglyphisCppProject
-pprof -http=:8080 ./build/KataglyphisCppProject logs/profile.prof
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so CPUPROFILE=logs/profile.prof ./build/bin/AccelerANTgine
+pprof -http=:8080 ./build/bin/AccelerANTgine logs/profile.prof
 ```
 
 ### valgrind
@@ -210,14 +210,14 @@ pprof -http=:8080 ./build/KataglyphisCppProject logs/profile.prof
 ```bash
 sudo apt install valgrind kcachegrind
 # build in debug for readable information
-valgrind --tool=callgrind ./build/KataglyphisCppProject
+valgrind --tool=callgrind ./build/bin/AccelerANTgine
 ```
 
 ### perf
 
 ```bash
 sudo apt install linux-tools-$(uname -r)
-perf record ./build/KataglyphisCppProject
+perf record ./build/bin/AccelerANTgine
 ```
 
 ## Static Analyzers

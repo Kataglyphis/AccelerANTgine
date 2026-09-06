@@ -21,12 +21,15 @@ is the single fact that most shapes its tooling.
 | `Bindings/`, `build-python/` | Python bindings and their build tree |
 | `Test/` | Test sources |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh` |
-| `scripts/windows/` | `Build-Windows.ps1`, `Build-PythonBindings.ps1`, the `start-*.ps1` entry points, and the `Resolve-BuildModule.ps1` bootstrap |
+| `scripts/windows/` | `Build-Windows.ps1`, `Build-PythonBindings.ps1`, the `Start-*.ps1` entry points, and the `Resolve-BuildModule.ps1` bootstrap |
 | `third_party/ContainerHub` | The submodule owning every reusable script, module and doc |
 
-**This repo is consumed as a nested submodule** by
-`Kataglyphis_NativeInferencePlugin`, which is itself a submodule of
-OmniAccelerANT. A change here has to reach two superprojects
+**This repo is consumed as a direct submodule** of OmniAccelerANT, at
+`third_party/AccelerANTgine`. The Flutter plugin
+`packages/kataglyphis_native_inference` lives in-tree there and links this repo
+as a *sibling*: its `windows/CMakeLists.txt` and `linux/CMakeLists.txt` walk up
+to the superproject root and `add_subdirectory()` the checkout at
+`third_party/AccelerANTgine`. A change here has to reach one superproject
 before an app sees it.
 
 ## 2. What ContainerHub owns — links only
@@ -95,7 +98,7 @@ written out rather than linked.
 - **The C API is the ABI surface.** `Src/kataglyphis_c_api.{h,ixx,cpp}` and
   `kataglyphis_export.h` are what the native plugin links against — including
   `knt_push_frame`, used by the OmniAccelerANT webcam path. Changing a
-  signature here breaks a consumer two superprojects up, which no build in this
+  signature here breaks a consumer one superproject up, which no build in this
   repo will catch.
 - **Sphinx config pulls its baseline from DocumANTation, via ContainerHub.**
   `docs/source/conf.py` loads `conf_base.py` from
@@ -128,8 +131,9 @@ pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1
 pwsh -NoProfile -File .\scripts\windows\Build-PythonBindings.ps1
 ```
 
-`start-{build,debug,release,profile,python-bindings,help}.ps1` are the
-convenience entry points over those.
+`Start-Build.ps1`, `Start-Debug.ps1`, `Start-Release.ps1`, `Start-Profile.ps1`,
+`Start-PythonBindings.ps1` and `Start-Help.ps1` are the convenience entry
+points over those.
 
 CI lanes: `linux_run.yml` (containerized), `linux_run_x86.yml`,
 `linux_run_arm.yml`, `windows_run.yml`.
@@ -138,7 +142,8 @@ CI lanes: `linux_run.yml` (containerized), `linux_run_x86.yml`,
 
 - Sphinx sources in `docs/`; Doxygen via `Doxyfile.in`; coverage config in
   `gcovr.cfg`.
-- `CHANGELOG.md` — and remember a change here surfaces in
-  `Kataglyphis_NativeInferencePlugin` and then OmniAccelerANT, so
-  note anything that moves the C ABI.
+- `CHANGELOG.md` — and remember a change here surfaces in OmniAccelerANT once
+  its `third_party/AccelerANTgine` pin is bumped (and thus in the in-tree
+  `packages/kataglyphis_native_inference`), so note anything that moves the C
+  ABI.
 - Update docs in the same PR as user-facing behaviour changes.
