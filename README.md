@@ -44,8 +44,8 @@ This repo is dedicated to deliver AI inference on steroids.
 Frequently tested under:
 * windows server 2025 x64 *__Clang 21.1.1__* and *__MSVC__*
 * [clang-cl](https://learn.microsoft.com/de-de/cpp/build/clang-support-msbuild?view=msvc-170) to compile the rust crate on windows
-* ubuntu 24.04 x64 *__Clang 21.1.1__*
-* ubuntu 24.04 ARM *__Clang 21.1.1__*
+* ubuntu 26.04 x64 *__Clang 21.1.1__*
+* ubuntu 26.04 ARM *__Clang 21.1.1__*
 
 ### Key Features
 
