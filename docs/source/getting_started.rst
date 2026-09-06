@@ -73,7 +73,7 @@ Example:
 
    bash scripts/linux/ci-run-all.sh \
      --compiler clang \
-     --runner ubuntu-24.04 \
+     --runner ubuntu-26.04 \
      --arch x64 \
      --build-type Debug \
      --build-dir build \
@@ -136,7 +136,7 @@ On Linux, the CI docs script installs the required packages and builds the docs:
    bash scripts/linux/ci-docs.sh \
      --workspace-dir "$(pwd)" \
      --compiler clang \
-     --runner ubuntu-24.04 \
+     --runner ubuntu-26.04 \
      --docs-out build/build/html
 
 For a direct docs build:

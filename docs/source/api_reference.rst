@@ -22,5 +22,5 @@ Recommended path:
    bash scripts/linux/ci-docs.sh \
      --workspace-dir "$(pwd)" \
      --compiler clang \
-     --runner ubuntu-24.04 \
+     --runner ubuntu-26.04 \
      --docs-out build/build/html

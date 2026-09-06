@@ -7,7 +7,7 @@ source "${_SCRIPT_DIR}/ci-common.sh"
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
-RUNNER="ubuntu-24.04"
+RUNNER="ubuntu-26.04"
 DOCS_OUT="build/build/html"
 
 while [[ $# -gt 0 ]]; do
@@ -20,7 +20,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-24.04" ]]; then
+if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   info "Building documentation"
 
   if [[ ! -d ".venv" ]]; then
