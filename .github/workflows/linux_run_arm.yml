@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 jobs:
-  build-ubuntu24_04_gcc-arm:
+  build-ubuntu26_04_gcc-arm:
     uses: ./.github/workflows/linux_run.yml
     with:
       compiler: gcc
@@ -20,7 +20,7 @@ jobs:
       PW: ${{ secrets.PW }}
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
-  build-ubuntu24_04_clang-arm:
+  build-ubuntu26_04_clang-arm:
     uses: ./.github/workflows/linux_run.yml
     with:
       compiler: clang

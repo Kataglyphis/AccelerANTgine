@@ -1,4 +1,4 @@
-name : Build and Test on Ubuntu 24.04 with x86/ARM arch and GCC Clang
+name : Build and Test on Ubuntu 26.04 with x86/ARM arch and GCC Clang
 
 on:
   workflow_call:
