@@ -94,7 +94,7 @@ written out rather than linked.
   shrinks the format and tidy sets rather than failing.
 - **The C API is the ABI surface.** `Src/kataglyphis_c_api.{h,ixx,cpp}` and
   `kataglyphis_export.h` are what the native plugin links against — including
-  `knt_push_frame`, used by the Inference-Engine webcam path. Changing a
+  `knt_push_frame`, used by the OmniAccelerANT webcam path. Changing a
   signature here breaks a consumer two superprojects up, which no build in this
   repo will catch.
 - **Sphinx config pulls its baseline from DocumANTation, via ContainerHub.**
