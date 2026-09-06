@@ -426,9 +426,9 @@ output.</p>
 <h2>CI Note<a class="headerlink" href="#ci-note" title="Link to this heading">#</a></h2>
 <p>The Windows GitHub Actions workflow now follows the same model as local usage:</p>
 <ul class="simple">
-<li><p>build inside the Windows container through <code class="docutils literal notranslate"><span class="pre">start-build.ps1</span></code></p></li>
+<li><p>build inside the Windows container through <code class="docutils literal notranslate"><span class="pre">Start-Build.ps1</span></code></p></li>
 <li><p>request <code class="docutils literal notranslate"><span class="pre">48g</span></code> memory and <code class="docutils literal notranslate"><span class="pre">32</span></code> CPUs for the Docker run</p></li>
-<li><p>execute <code class="docutils literal notranslate"><span class="pre">start-debug.ps1</span></code>, <code class="docutils literal notranslate"><span class="pre">start-profile.ps1</span></code>, and <code class="docutils literal notranslate"><span class="pre">start-release.ps1</span></code>
+<li><p>execute <code class="docutils literal notranslate"><span class="pre">Start-Debug.ps1</span></code>, <code class="docutils literal notranslate"><span class="pre">Start-Profile.ps1</span></code>, and <code class="docutils literal notranslate"><span class="pre">Start-Release.ps1</span></code>
 on the host after the container build completes</p></li>
 </ul>
 <p>Whether the hosted runner can always satisfy those Docker resource requests still
