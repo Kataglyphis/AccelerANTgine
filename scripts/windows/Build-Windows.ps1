@@ -182,7 +182,14 @@ try {
             New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
         }
 
-        $runtimeDirs = Get-RuntimeDependencyDirectories
+        # @(...) at the CALL SITE, not just inside the function: PowerShell unrolls a
+        # returned array into the pipeline, so an empty one yields zero objects and the
+        # assignment lands $null. Under `Set-StrictMode -Version Latest` (set by
+        # Resolve-BuildModule.ps1 and WindowsBuild.Common.psm1) $null.Count then throws
+        # "The property 'Count' cannot be found on this object" and kills this Critical
+        # step AFTER a fully successful compile — which is exactly the case this guard
+        # was written to handle gracefully.
+        $runtimeDirs = @(Get-RuntimeDependencyDirectories)
         if ($runtimeDirs.Count -eq 0) {
             Write-BuildLogWarning -Context $Context -Message "No external runtime dependency directories found to stage into $TargetDir"
             return
