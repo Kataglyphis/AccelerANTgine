@@ -6,7 +6,7 @@
 # cmake-format, file discovery, the cmake-format / clang-format runners, the
 # compile_commands.json preparation (including the /workspace -> local path
 # remap that makes a container-generated DB usable on a dev box) and the
-# clang-tidy invocation. Kataglyphis-BeschleunigerBallett has driven the same
+# clang-tidy invocation. BeschleunigerBallett has driven the same
 # library for months; this repo had a parallel hand-written implementation.
 #
 # What stays here is genuinely project-specific: the Src/ layout, the module

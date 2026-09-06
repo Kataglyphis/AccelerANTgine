@@ -151,7 +151,7 @@ macro(myproject_global_options)
   set(CMAKE_C_STANDARD 17)
   set(CMAKE_C_STANDARD_REQUIRED True)
 
-  # C++ modules configuration (mirrors Kataglyphis-BeschleunigerBallett)
+  # C++ modules configuration (mirrors BeschleunigerBallett)
   set(myproject_CXX_SCAN_FOR_MODULES ON)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
     set(myproject_CXX_SCAN_FOR_MODULES OFF)
