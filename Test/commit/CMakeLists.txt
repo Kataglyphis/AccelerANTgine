@@ -27,6 +27,7 @@ add_executable(${COMMIT_TEST_SUITE})
 set(_commit_resource_path "/../../../Resources/")
 set(_commit_include_path "/../../../Src/")
 if(NOT MSVC)
+
 else()
   set(_commit_resource_path "/../Resources/")
   set(_commit_include_path "/../Src/")
@@ -34,9 +35,7 @@ endif()
 
 kataglyphis_configure_common_test_target(${COMMIT_TEST_SUITE} "${_commit_resource_path}" "${_commit_include_path}")
 
-target_sources(
-  ${COMMIT_TEST_SUITE}
-  PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
+target_sources(${COMMIT_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
 
 target_link_libraries(
   ${COMMIT_TEST_SUITE}
@@ -49,8 +48,8 @@ target_link_libraries(
   PRIVATE gtest
           gtest_main
           GSL
-      spdlog
-      ${PROJECT_NAME})
+          spdlog
+          ${PROJECT_NAME})
 
 kataglyphis_configure_gtest_discovery(${COMMIT_TEST_SUITE})
 

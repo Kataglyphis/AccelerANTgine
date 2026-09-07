@@ -65,6 +65,15 @@ if _DOXYGEN_XML_DIR.exists():
 else:
     exclude_patterns = ["api/**"]
 
+# coverage/index.html is staged by ci-coverage.sh, one lane EARLIER in the
+# ci-run-all chain - linkcheck can never validate it in a docs-only build (the
+# directory is empty then), and the chain is what guarantees it. A named
+# exception for a cross-lane artifact, not a muted failure: every other link
+# stays checked.
+linkcheck_ignore = [
+    r"^coverage/index\.html$",
+]
+
 if _DOXYGEN_XML_DIR.exists():
     exhale_args = {
         "containmentFolder": "./api",

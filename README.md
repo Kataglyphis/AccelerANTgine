@@ -231,11 +231,16 @@ clang-tidy -p=./build/compile_commands.json  $(find Src -name '*.cpp' -o -name '
 
 # Format cmake files
 
+The CI gates (`scripts/linux/run-static-analysis-format.sh` on Linux, the
+`Build-Windows.ps1` cmake-format step on Windows) run this over every
+`CMakeLists.txt`/`*.cmake` outside `third_party/`, the build trees and `.venv/`.
+By hand:
+
 ```bash
 uv venv
 source .venv/bin/activate
-pip install -v -e .
-cmake-format -c ./.cmake-format.yaml -i $(find cmake -name '*.cmake' -o -name 'CMakeLists.txt')
+uv pip install -r requirements.txt
+cmake-format -c ./.cmake-format.yaml -i $(find . -type f \( -name '*.cmake' -o -name 'CMakeLists.txt' \) -not -path './build*/*' -not -path './.venv/*' -not -path './third_party/*')
 ```
 # Format code files 
 

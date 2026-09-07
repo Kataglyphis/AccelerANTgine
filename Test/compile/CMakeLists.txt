@@ -21,6 +21,7 @@ add_executable(${COMPILE_TEST_SUITE})
 set(_compile_resource_path "/../../../Resources/")
 set(_compile_include_path "/../../../Src/")
 if(NOT MSVC)
+
 else()
   set(_compile_resource_path "/../../Resources")
   set(_compile_include_path "/../../Src/")
@@ -28,9 +29,7 @@ endif()
 
 kataglyphis_configure_common_test_target(${COMPILE_TEST_SUITE} "${_compile_resource_path}" "${_compile_include_path}")
 
-target_sources(
-  ${COMPILE_TEST_SUITE}
-  PRIVATE ${KataglyphisCppProject_COMPILE_TEST_FILTER})
+target_sources(${COMPILE_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMPILE_TEST_FILTER})
 
 target_link_libraries(
   ${COMPILE_TEST_SUITE}
@@ -43,8 +42,8 @@ target_link_libraries(
   PRIVATE gtest_main
           gtest
           GSL
-      spdlog
-      ${PROJECT_NAME})
+          spdlog
+          ${PROJECT_NAME})
 
 kataglyphis_configure_gtest_discovery(${COMPILE_TEST_SUITE})
 

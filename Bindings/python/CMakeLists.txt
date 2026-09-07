@@ -33,23 +33,26 @@ add_custom_command(
   TARGET kataglyphis_python
   POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E make_directory "${KATAGLYPHIS_PY_STAGE_DIR}"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:kataglyphis_python>"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:kataglyphis_python>" "${KATAGLYPHIS_PY_STAGE_DIR}/"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/kataglyphis_inference/__init__.py"
           "${KATAGLYPHIS_PY_STAGE_DIR}/"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          "${CMAKE_CURRENT_SOURCE_DIR}/kataglyphis_inference/__init__.py" "${KATAGLYPHIS_PY_STAGE_DIR}/"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:AccelerANTgine>"
-          "${KATAGLYPHIS_PY_STAGE_DIR}/"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:AccelerANTgine>" "${KATAGLYPHIS_PY_STAGE_DIR}/"
   COMMENT "Staging Python package into ${KATAGLYPHIS_PY_STAGE_DIR}")
 
 # --- Type stubs (.pyi) -------------------------------------------------------
 if(KATAGLYPHIS_PYTHON_STUBS)
   nanobind_add_stub(
     kataglyphis_python_stub
-    MODULE kataglyphis_inference._core
-    OUTPUT "${KATAGLYPHIS_PY_STAGE_DIR}/_core.pyi"
-    PYTHON_PATH "${CMAKE_BINARY_DIR}/python"
-    MARKER_FILE "${KATAGLYPHIS_PY_STAGE_DIR}/py.typed"
-    DEPENDS kataglyphis_python)
+    MODULE
+    kataglyphis_inference._core
+    OUTPUT
+    "${KATAGLYPHIS_PY_STAGE_DIR}/_core.pyi"
+    PYTHON_PATH
+    "${CMAKE_BINARY_DIR}/python"
+    MARKER_FILE
+    "${KATAGLYPHIS_PY_STAGE_DIR}/py.typed"
+    DEPENDS
+    kataglyphis_python)
 endif()
 
 # --- Wheel install rules (scikit-build-core selects the python_bindings
@@ -58,18 +61,20 @@ install(
   TARGETS kataglyphis_python
   LIBRARY DESTINATION kataglyphis_inference COMPONENT python_bindings
   RUNTIME DESTINATION kataglyphis_inference COMPONENT python_bindings)
-install(FILES kataglyphis_inference/__init__.py
-        DESTINATION kataglyphis_inference
-        COMPONENT python_bindings)
+install(
+  FILES kataglyphis_inference/__init__.py
+  DESTINATION kataglyphis_inference
+  COMPONENT python_bindings)
 install(
   TARGETS AccelerANTgine
   RUNTIME DESTINATION kataglyphis_inference COMPONENT python_bindings
   LIBRARY DESTINATION kataglyphis_inference COMPONENT python_bindings
   ARCHIVE DESTINATION lib COMPONENT python_native_dev)
 if(KATAGLYPHIS_PYTHON_STUBS)
-  install(FILES "${KATAGLYPHIS_PY_STAGE_DIR}/_core.pyi" "${KATAGLYPHIS_PY_STAGE_DIR}/py.typed"
-          DESTINATION kataglyphis_inference
-          COMPONENT python_bindings)
+  install(
+    FILES "${KATAGLYPHIS_PY_STAGE_DIR}/_core.pyi" "${KATAGLYPHIS_PY_STAGE_DIR}/py.typed"
+    DESTINATION kataglyphis_inference
+    COMPONENT python_bindings)
 endif()
 
 # --- CTest hook (only active in configurations that enable testing) ----------
@@ -79,10 +84,8 @@ if(BUILD_TESTING)
     RESULT_VARIABLE _pytest_missing
     OUTPUT_QUIET ERROR_QUIET)
   if(_pytest_missing EQUAL 0)
-    add_test(NAME python_bindings COMMAND "${Python_EXECUTABLE}" -m pytest
-                                          "${CMAKE_SOURCE_DIR}/Test/python" -v)
-    set_tests_properties(python_bindings PROPERTIES ENVIRONMENT
-                                                    "PYTHONPATH=${CMAKE_BINARY_DIR}/python")
+    add_test(NAME python_bindings COMMAND "${Python_EXECUTABLE}" -m pytest "${CMAKE_SOURCE_DIR}/Test/python" -v)
+    set_tests_properties(python_bindings PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/python")
   else()
     message(STATUS "pytest not available in ${Python_EXECUTABLE} — skipping python_bindings ctest registration")
   endif()

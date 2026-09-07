@@ -1084,7 +1084,13 @@ EXCLUDE_PATTERNS       =
 # wildcard * is used, a substring. Examples: ANamespace, AClass,
 # ANamespace::AClass, ANamespace::*Test
 
-EXCLUDE_SYMBOLS        =
+# *::Impl: the Pimpl bodies (WebRTCStreamer::Impl and friends). With
+# EXTRACT_ALL + EXTRACT_PRIVATE they got documented twice - inside the parent
+# class page AND as exhale-generated standalone struct pages - which is exactly
+# the 62 "Duplicate C++ declaration" warnings that turned fatal when the docs
+# build adopted Sphinx -W (2026-09-06). Private implementation detail does not
+# belong in the API reference, so the right fix is exclusion, not muting -W.
+EXCLUDE_SYMBOLS        = *::Impl
 
 # The EXAMPLE_PATH tag can be used to specify one or more files or directories
 # that contain example code fragments that are included (see the \include

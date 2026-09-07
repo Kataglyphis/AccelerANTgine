@@ -216,13 +216,12 @@ macro(myproject_global_options)
     # clang-cl accepts -W... style options. These prevent unknown -W... options
     # (or their escalation to errors) from breaking the build when deps inject GCC-only flags.
     set(_CLANG_CL_SAFE_WARNINGS
-      "-fcolor-diagnostics -Wno-error=unused-command-line-argument -Wno-error=character-conversion -Wno-unknown-warning-option -Wno-error=unknown-warning-option"
+        "-fcolor-diagnostics -Wno-error=unused-command-line-argument -Wno-error=character-conversion -Wno-unknown-warning-option -Wno-error=unknown-warning-option"
     )
     # Apply to both C and C++ flags (some deps add to C flags)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od ${_CLANG_CL_SAFE_WARNINGS}")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 -DNDEBUG ${_CLANG_CL_SAFE_WARNINGS}")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-      "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 -DNDEBUG ${_CLANG_CL_SAFE_WARNINGS}")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 -DNDEBUG ${_CLANG_CL_SAFE_WARNINGS}")
     # https://clang.llvm.org/docs/ClangCommandLineReference.html
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -ggdb -fcolor-diagnostics") # -std=c++2a
@@ -237,25 +236,32 @@ macro(myproject_global_options)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC
-          AND CMAKE_BUILD_TYPE STREQUAL "Debug"
-          AND myproject_ENABLE_SANITIZER_ADDRESS)
-     set(CMAKE_MSVC_RUNTIME_LIBRARY
-         "MultiThreadedDLL"
-         CACHE STRING "MSVC runtime library" FORCE)
-   elseif((CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC
-          AND myproject_ENABLE_SANITIZER_ADDRESS)
-      OR (MSVC
-          AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-          AND CMAKE_BUILD_TYPE STREQUAL "Debug"))
-     set(CMAKE_MSVC_RUNTIME_LIBRARY
-         "MultiThreadedDLL"
-         CACHE STRING "MSVC runtime library" FORCE)
-   elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
-     set(CMAKE_MSVC_RUNTIME_LIBRARY
-         "MultiThreadedDebugDLL"
-         CACHE STRING "MSVC runtime library" FORCE)
-   endif()
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+     AND MSVC
+     AND CMAKE_BUILD_TYPE STREQUAL "Debug"
+     AND myproject_ENABLE_SANITIZER_ADDRESS)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY
+        "MultiThreadedDLL"
+        CACHE STRING "MSVC runtime library" FORCE)
+  elseif(
+    (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+     AND MSVC
+     AND myproject_ENABLE_SANITIZER_ADDRESS)
+    OR (MSVC
+        AND NOT
+            CMAKE_CXX_COMPILER_ID
+            STREQUAL
+            "Clang"
+        AND CMAKE_BUILD_TYPE STREQUAL "Debug"
+       ))
+    set(CMAKE_MSVC_RUNTIME_LIBRARY
+        "MultiThreadedDLL"
+        CACHE STRING "MSVC runtime library" FORCE)
+  elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY
+        "MultiThreadedDebugDLL"
+        CACHE STRING "MSVC runtime library" FORCE)
+  endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_LINK_WHAT_YOU_USE FALSE)
@@ -264,7 +270,7 @@ macro(myproject_global_options)
   endif()
 
   if(myproject_ENABLE_IPO)
-    include(cmake/InterproceduralOptimization.cmake)
+    include(InterproceduralOptimization)
     if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
       myproject_enable_ipo()
     endif()
@@ -273,7 +279,7 @@ macro(myproject_global_options)
   myproject_supports_sanitizers()
 
   if(myproject_ENABLE_HARDENING AND myproject_ENABLE_GLOBAL_HARDENING)
-    include(cmake/Hardening.cmake)
+    include(Hardening)
     if(NOT SUPPORTS_UBSAN
        OR myproject_ENABLE_SANITIZER_UNDEFINED
        OR myproject_ENABLE_SANITIZER_ADDRESS
@@ -291,7 +297,7 @@ endmacro()
 
 macro(myproject_local_options)
   if(PROJECT_IS_TOP_LEVEL)
-    include(cmake/StandardProjectSettings.cmake)
+    include(StandardProjectSettings)
   endif()
 
   add_library(myproject_warnings INTERFACE)
@@ -299,7 +305,7 @@ macro(myproject_local_options)
 
   target_compile_features(myproject_options INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
 
-  include(cmake/CompilerWarnings.cmake)
+  include(CompilerWarnings)
   myproject_set_project_warnings(
     myproject_warnings
     ${myproject_WARNINGS_AS_ERRORS}
@@ -357,7 +363,7 @@ macro(myproject_local_options)
      CMAKE_BUILD_TYPE
      STREQUAL
      "Release")
-    include(cmake/Sanitizers.cmake)
+    include(Sanitizers)
     myproject_enable_sanitizers(
       myproject_options
       ${myproject_ENABLE_SANITIZER_ADDRESS}
@@ -379,14 +385,16 @@ macro(myproject_local_options)
   endif()
 
   if(myproject_ENABLE_CACHE)
-    include(cmake/Cache.cmake)
+    include(Cache)
     myproject_enable_cache()
   endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    include(cmake/StaticAnalyzers.cmake)
+    include(StaticAnalyzers)
     if(myproject_ENABLE_CLANG_TIDY)
-      myproject_enable_clang_tidy(myproject_options ${myproject_WARNINGS_AS_ERRORS})
+      # Src/.* scopes build-gate clang-tidy to this repo's sources (the retired local
+      # StaticAnalyzers override hard-coded it; upstream now takes it as an argument).
+      myproject_enable_clang_tidy(myproject_options ${myproject_WARNINGS_AS_ERRORS} "Src/.*")
     endif()
 
     if(myproject_ENABLE_CPPCHECK)
@@ -395,7 +403,7 @@ macro(myproject_local_options)
     endif()
 
     if(myproject_ENABLE_COVERAGE)
-      include(cmake/Tests.cmake)
+      include(Tests)
       myproject_enable_coverage(myproject_options)
     endif()
   endif()
@@ -409,7 +417,7 @@ macro(myproject_local_options)
   endif()
 
   if(myproject_ENABLE_HARDENING AND NOT myproject_ENABLE_GLOBAL_HARDENING)
-    include(cmake/Hardening.cmake)
+    include(Hardening)
     if(NOT SUPPORTS_UBSAN
        OR myproject_ENABLE_SANITIZER_UNDEFINED
        OR myproject_ENABLE_SANITIZER_ADDRESS
@@ -439,7 +447,7 @@ macro(myproject_local_options)
       endif()
     endif()
 
-    include(cmake/Doxygen.cmake)
+    include(Doxygen)
     enable_doxygen()
 
     if(myproject_ENABLE_STATIC_ANALYZER)
@@ -459,6 +467,6 @@ macro(myproject_local_options)
     endif()
   endif()
 
-  include(cmake/Speedup.cmake)
+  include(Speedup)
 
 endmacro()
