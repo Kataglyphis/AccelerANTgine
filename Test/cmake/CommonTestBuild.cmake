@@ -44,7 +44,9 @@ function(kataglyphis_configure_gtest_discovery test_target)
 
   # clang-cl ASan/UBSan executables can fail during gtest discovery on Windows
   # with loader errors (0xc0000135). Fall back to a plain add_test registration.
-  if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
+  if(WIN32
+     AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+     AND MSVC)
     set(KATAGLYPHIS_ENABLE_GTEST_DISCOVERY OFF)
   endif()
 
@@ -65,21 +67,29 @@ function(kataglyphis_configure_gtest_discovery test_target)
       get_filename_component(_kataglyphis_compiler_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
       set_tests_properties(
         ${test_target}
-        PROPERTIES WORKING_DIRECTORY "$<TARGET_FILE_DIR:${test_target}>"
-                   ENVIRONMENT "PATH=$<TARGET_FILE_DIR:${test_target}>;${CMAKE_BINARY_DIR}/bin;${CMAKE_BINARY_DIR}/lib;${_kataglyphis_compiler_dir};$ENV{PATH}")
+        PROPERTIES
+          WORKING_DIRECTORY
+          "$<TARGET_FILE_DIR:${test_target}>"
+          ENVIRONMENT
+          "PATH=$<TARGET_FILE_DIR:${test_target}>;${CMAKE_BINARY_DIR}/bin;${CMAKE_BINARY_DIR}/lib;${_kataglyphis_compiler_dir};$ENV{PATH}"
+      )
     endif()
   endif()
 endfunction()
 
-function(kataglyphis_configure_common_test_target target_name resource_path include_path)
+function(
+  kataglyphis_configure_common_test_target
+  target_name
+  resource_path
+  include_path)
   if(RUST_FEATURES)
     target_compile_definitions(${target_name} PRIVATE USE_RUST=1)
   else()
     target_compile_definitions(${target_name} PRIVATE USE_RUST=0)
   endif()
 
-  target_compile_definitions(${target_name}
-                             PRIVATE RELATIVE_RESOURCE_PATH="${resource_path}" RELATIVE_INCLUDE_PATH="${include_path}")
+  target_compile_definitions(${target_name} PRIVATE RELATIVE_RESOURCE_PATH="${resource_path}"
+                                                    RELATIVE_INCLUDE_PATH="${include_path}")
 
   # Test suites intentionally suppress their own warnings to keep signal focused
   # on library code compiled through the main targets.

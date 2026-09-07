@@ -70,8 +70,36 @@ if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
       CACHE BOOL "Disable C++ exceptions (forced OFF: Python bindings need them)" FORCE)
 endif()
 
-include(cmake/PreventInSourceBuilds.cmake)
-include(cmake/ProjectOptions.cmake)
+# Reusable CMake modules live upstream in the ContainerHub submodule so every
+# consumer gets the same ones (AGENTS.md section 2, "CMake modules:
+# ContainerHub-first, local override wins"); this repo's own cmake/ keeps only
+# what encodes THIS project's choices.
+# Both dirs go on CMAKE_MODULE_PATH so every module is included by NAME -
+# `include(Sanitizers)`, not `include(cmake/Sanitizers.cmake)` - which is what
+# lets a module live in either directory without its callers caring.
+#
+# Local first: a project that needs to override an upstream module drops a
+# same-named file in cmake/ and wins, without editing ContainerHub. No local
+# override remains today: Cache, Tests, Sanitizers and StaticAnalyzers were all
+# reconciled upstream 2026-09-06 and their local copies are gone.
+set(KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ContainerHub/cmake")
+# Probe CompilerWarnings.cmake, not just the directory: it is one of the modules
+# this repo now has NO local copy of, so its absence is exactly the failure an
+# uninitialised submodule causes - a confusing "Could not find a module" from
+# deep inside ProjectOptions instead of a message naming the real cause.
+if(NOT EXISTS "${KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR}/CompilerWarnings.cmake")
+  message(
+    FATAL_ERROR "ContainerHub submodule not checked out: ${KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR} has no CMake modules. "
+                "Run: git submodule update --init --recursive")
+endif()
+list(
+  APPEND
+  CMAKE_MODULE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
+  "${KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR}")
+
+include(PreventInSourceBuilds)
+include(ProjectOptions)
 
 myproject_setup_options()
 
@@ -91,10 +119,14 @@ endif()
 message(STATUS "About to call the local options function.")
 myproject_local_options()
 
-include(cmake/SystemLibDependencies.cmake)
+include(SystemLibDependencies)
 if(myproject_ENABLE_SANITIZER_ADDRESS)
   if(MSVC)
-    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _DISABLE_STRING_ANNOTATION _DISABLE_OPTIONAL_ANNOTATION _ITERATOR_DEBUG_LEVEL=0)
+    add_compile_definitions(
+      _DISABLE_VECTOR_ANNOTATION
+      _DISABLE_STRING_ANNOTATION
+      _DISABLE_OPTIONAL_ANNOTATION
+      _ITERATOR_DEBUG_LEVEL=0)
     if(NOT
        CMAKE_CXX_COMPILER_ID
        STREQUAL
@@ -126,20 +158,27 @@ if(myproject_ENABLE_COVERAGE
     add_compile_options(/clang:-fprofile-instr-generate /clang:-fcoverage-mapping)
     execute_process(
       COMMAND ${CMAKE_CXX_COMPILER} --print-resource-dir
+      RESULT_VARIABLE _GLOBAL_RESOURCE_DIR_RC
       OUTPUT_VARIABLE _GLOBAL_CLANG_RESOURCE_DIR
-      OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-    if(_GLOBAL_CLANG_RESOURCE_DIR)
-      set(_GLOBAL_RUNTIME_DIR "${_GLOBAL_CLANG_RESOURCE_DIR}/lib/windows")
-      set(_GLOBAL_PROFILE_LIB "${_GLOBAL_RUNTIME_DIR}/clang_rt.profile-x86_64.lib")
-      if(EXISTS "${_GLOBAL_PROFILE_LIB}")
-        add_link_options("/LIBPATH:${_GLOBAL_RUNTIME_DIR}")
-        link_libraries(clang_rt.profile-x86_64)
-      else()
-        message(WARNING "clang-cl profile runtime not found at ${_GLOBAL_PROFILE_LIB}")
-      endif()
-    else()
-      message(WARNING "Unable to detect clang resource directory for coverage runtime linkage")
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    # A build explicitly asked for coverage must instrument or fail loud here -
+    # a WARNING-and-continue silently produced uninstrumented "coverage" builds.
+    if(NOT
+       _GLOBAL_RESOURCE_DIR_RC
+       EQUAL
+       0
+       OR "${_GLOBAL_CLANG_RESOURCE_DIR}" STREQUAL "")
+      message(FATAL_ERROR "Coverage was requested, but '${CMAKE_CXX_COMPILER} --print-resource-dir' failed "
+                          "(exit ${_GLOBAL_RESOURCE_DIR_RC}); cannot locate the clang profile runtime to link.")
     endif()
+    set(_GLOBAL_RUNTIME_DIR "${_GLOBAL_CLANG_RESOURCE_DIR}/lib/windows")
+    set(_GLOBAL_PROFILE_LIB "${_GLOBAL_RUNTIME_DIR}/clang_rt.profile-x86_64.lib")
+    if(NOT EXISTS "${_GLOBAL_PROFILE_LIB}")
+      message(FATAL_ERROR "Coverage was requested, but the clang-cl profile runtime is missing: "
+                          "${_GLOBAL_PROFILE_LIB}")
+    endif()
+    add_link_options("/LIBPATH:${_GLOBAL_RUNTIME_DIR}")
+    link_libraries(clang_rt.profile-x86_64)
   else()
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
     add_link_options(-fprofile-instr-generate -fcoverage-mapping)
@@ -220,4 +259,4 @@ endif()
 # we keep the relative paths in the install dir
 # keep in mind that install dir will be in front of this relative path ...
 
-include(cmake/CPackOptions.cmake)
+include(CPackOptions)

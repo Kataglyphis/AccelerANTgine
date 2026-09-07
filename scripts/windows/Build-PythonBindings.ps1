@@ -11,7 +11,9 @@
 #>
 
 param(
-    [string]$WorkspaceDir = "C:\workspace",
+    # Same default as Build-Windows.ps1: the caller's tree. The old image-baked
+    # C:\workspace default was the mount-over footgun the wrappers moved off.
+    [string]$WorkspaceDir = $PWD.Path,
     [string]$BuildDir = "C:\pybuild",
     [string]$Preset = "x64-ClangCL-Windows-RelWithDebInfo",
     [string]$OutDir = "build-python"

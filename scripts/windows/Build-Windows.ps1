@@ -21,6 +21,7 @@ param(
     [string]$ClangProfilePreset = "x64-ClangCL-Windows-Profile",
     [string]$LLVMBinPath = "C:\Program Files\LLVM\bin",
     [string]$LogDir = "logs",
+    [switch]$SkipFormat,
     [switch]$SkipMSVC,
     [switch]$SkipClangTidy,
     [switch]$SkipStaticAnalysis,
@@ -49,6 +50,8 @@ $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
 Import-BuildModule @(
     'WindowsScripts.Shared'
     'WindowsBuild.Common'
+    'WindowsUv.Common'
+    'WindowsFormatting.Common'
     'WindowsCMake.Common'
     'WindowsMsix.Common'
     'WindowsMsix.Signing'
@@ -231,6 +234,16 @@ try {
     Invoke-BuildStep -Context $Context -StepName "Environment Check" -Script {
         Invoke-BuildExternal -Context $Context -File "clang" -Parameters @("--version") -IgnoreExitCode
         Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--version") -IgnoreExitCode
+    }
+
+    # --- Step 3: cmake-format ---
+    # Mirrors the Linux lane's cmake-format gate. Upstream Invoke-CmakeFormatStep
+    # creates/heals the uv venv itself and installs requirements.txt, so no
+    # separate venv step is needed; it throws when uv or cmake-format is missing.
+    if (-not $SkipFormat) {
+        Invoke-BuildStep -Context $Context -StepName "Python tooling + cmake-format" -Critical -Script {
+            Invoke-CmakeFormatStep -Context $Context -WorkspacePath $Workspace
+        }
     }
 
     # --- MSVC Debug Build ---

@@ -26,6 +26,13 @@ fi
 # shellcheck disable=SC1091
 source "${CODE_QUALITY_LIB}"
 
+PYTHON_UV_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/01-core/python_uv.sh"
+if [[ ! -f "${PYTHON_UV_LIB}" ]]; then
+  die "Shared uv helpers not found at '${PYTHON_UV_LIB}'. Initialize the ContainerHub submodule first."
+fi
+# shellcheck disable=SC1091
+source "${PYTHON_UV_LIB}"
+
 BUILD_DIR="build"
 COMPILER="clang"
 CLANG_DEBUG_PRESET="linux-debug-clang"
@@ -55,6 +62,29 @@ CODE_QUALITY_CLANG_TIDY_ARGS=(
   -header-filter=^Src/
 )
 
+# cmake-format inputs: the repo config, and discovery over the whole tree minus
+# vendored submodules, every build-*/build_* tree the presets create, and the
+# bootstrap venv. Without the excludes the walk reformats ContainerHub itself.
+CODE_QUALITY_CMAKE_FORMAT_CONFIG=".cmake-format.yaml"
+CODE_QUALITY_CMAKE_SEARCH_ROOT="."
+CODE_QUALITY_CMAKE_EXCLUDE_PATHS=('./build*/*' './.venv/*' './third_party/*')
+
+# The library takes the uv venv bootstrap as two *executable* helper paths, but
+# this repo is developed with core.filemode=false: a committed helper would
+# reach the Linux container as 100644 and die "Permission denied" (the ci-docs.sh
+# header documents the incident). Bash runs a function name wherever it expects
+# a command, so the helpers are functions over upstream python_uv.sh instead.
+cmake_format_uv_venv_create() {
+  # Empty python version on purpose: let uv resolve the interpreter
+  # (honouring the container's UV_PYTHON) instead of pinning a default.
+  uv_venv_create .venv ""
+}
+cmake_format_uv_install_requirements() {
+  uv_pip_install_requirements .venv requirements.txt
+}
+CODE_QUALITY_UV_VENV_CREATE_SCRIPT=cmake_format_uv_venv_create
+CODE_QUALITY_UV_INSTALL_REQUIREMENTS_SCRIPT=cmake_format_uv_install_requirements
+
 mapfile -t FORMAT_FILES < <(code_quality_find_cpp_files Src)
 mapfile -t SRC_FILES    < <(code_quality_find_clang_tidy_files Src)
 
@@ -63,16 +93,16 @@ if [[ ${#SRC_FILES[@]} -eq 0 ]]; then
   exit 0
 fi
 
-# cmake-format lives in a Python env; the library owns creating it via uv and
-# falling back cleanly when uv is absent.
-code_quality_ensure_cmake_format || warn "cmake-format environment unavailable, continuing"
+# cmake-format lives in a Python env; the library bootstraps it via uv and errs
+# loudly when it cannot. A quality lane without its tool is red, not "continuing".
+code_quality_ensure_cmake_format
 
 mapfile -t CMAKE_FILES < <(code_quality_find_cmake_files)
-if command -v cmake-format >/dev/null 2>&1; then
-  [[ ${#CMAKE_FILES[@]} -gt 0 ]] && code_quality_run_cmake_format "${CMAKE_FILES[@]}"
-else
-  warn "cmake-format not available, skipping"
+if [[ ${#CMAKE_FILES[@]} -eq 0 ]]; then
+  # The root CMakeLists.txt always exists, so an empty set is a discovery bug.
+  die "cmake-format discovery found no CMake files - check CODE_QUALITY_CMAKE_SEARCH_ROOT/excludes."
 fi
+code_quality_run_cmake_format "${CMAKE_FILES[@]}"
 
 if command -v clang-format >/dev/null 2>&1; then
   [[ ${#FORMAT_FILES[@]} -gt 0 ]] && code_quality_run_clang_format "${FORMAT_FILES[@]}"

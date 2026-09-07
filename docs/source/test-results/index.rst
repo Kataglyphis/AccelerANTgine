@@ -1,3 +1,5 @@
+:orphan:
+
 Test Results
 ============
 
@@ -8,5 +10,4 @@ documentation build and will be listed below.
    :maxdepth: 1
    :glob:
 
-   *.md
-   *.rst
+   *

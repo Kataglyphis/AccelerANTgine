@@ -16,13 +16,15 @@ Use the wrapper script:
 
    .\scripts\windows\Start-Build.ps1
 
-This script runs Docker with the repository mounted into ``C:\workspace`` and
-executes ``scripts/windows/Build-Windows.ps1`` inside the container.
+This script delegates to ContainerHub's ``Invoke-ContainerBuild``
+(``WindowsContainerBuild.Reuse``): the sources travel by tar-pipe into a
+reusable container at the family workspace path ``C:\ws`` and
+``scripts/windows/Build-Windows.ps1`` runs inside it. Bind mounting is the
+measured-slower opt-in (``-UseBindMount``); ``-FreshContainer`` discards the
+reused build tree.
 
-Local resource settings in the wrapper are:
-
-- ``--cpus 32``
-- ``--memory 48g``
+Resource settings: ``--isolation process`` gives the container every host CPU;
+``-CpuCount``/``-MemoryGb`` apply only under ``-Isolation hyperv``.
 
 The container build currently targets:
 
@@ -107,7 +109,9 @@ CI Note
 The Windows GitHub Actions workflow now follows the same model as local usage:
 
 - build inside the Windows container through ``Start-Build.ps1``
-- request ``48g`` memory and ``32`` CPUs for the Docker run
+- pass ``-CpuCount 32 -MemoryGb 48`` — effective only under ``-Isolation
+  hyperv``; the default ``process`` isolation gives the container every host
+  CPU regardless
 - execute ``Start-Debug.ps1``, ``Start-Profile.ps1``, and ``Start-Release.ps1``
   on the host after the container build completes
 

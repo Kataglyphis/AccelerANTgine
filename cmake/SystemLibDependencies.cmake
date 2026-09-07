@@ -13,28 +13,38 @@ find_package(Threads REQUIRED)
 # set(OpenGL_GL_PREFERENCE GLVND)
 
 # GStreamer dependencies
-set(GSTREAMER_ROOT "/opt/gstreamer" CACHE PATH "GStreamer installation root")
+set(GSTREAMER_ROOT
+    "/opt/gstreamer"
+    CACHE PATH "GStreamer installation root")
 
 if(EXISTS "${GSTREAMER_ROOT}")
-    set(PKG_CONFIG_PATH "${GSTREAMER_ROOT}/lib/aarch64-linux-gnu/pkgconfig:${GSTREAMER_ROOT}/lib/pkgconfig:${PKG_CONFIG_PATH}"
-        CACHE INTERNAL "GStreamer pkg-config path")
-    set(CMAKE_PREFIX_PATH "${GSTREAMER_ROOT};${CMAKE_PREFIX_PATH}")
-    
-    set(ENV{PKG_CONFIG_PATH} "${GSTREAMER_ROOT}/lib/aarch64-linux-gnu/pkgconfig:${GSTREAMER_ROOT}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+  set(PKG_CONFIG_PATH
+      "${GSTREAMER_ROOT}/lib/aarch64-linux-gnu/pkgconfig:${GSTREAMER_ROOT}/lib/pkgconfig:${PKG_CONFIG_PATH}"
+      CACHE INTERNAL "GStreamer pkg-config path")
+  set(CMAKE_PREFIX_PATH "${GSTREAMER_ROOT};${CMAKE_PREFIX_PATH}")
+
+  set(ENV{PKG_CONFIG_PATH}
+      "${GSTREAMER_ROOT}/lib/aarch64-linux-gnu/pkgconfig:${GSTREAMER_ROOT}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 endif()
 
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET
-    gstreamer-1.0>=1.24
-    gstreamer-app-1.0>=1.24
-    gstreamer-video-1.0>=1.24
-    gstreamer-analytics-1.0>=1.24
-    gstreamer-webrtc-1.0>=1.24
-    gstreamer-sdp-1.0>=1.24
-)
+pkg_check_modules(
+  GSTREAMER
+  REQUIRED
+  IMPORTED_TARGET
+  gstreamer-1.0>=1.24
+  gstreamer-app-1.0>=1.24
+  gstreamer-video-1.0>=1.24
+  gstreamer-analytics-1.0>=1.24
+  gstreamer-webrtc-1.0>=1.24
+  gstreamer-sdp-1.0>=1.24)
 
-pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0>=2.70)
+pkg_check_modules(
+  GLIB
+  REQUIRED
+  IMPORTED_TARGET
+  glib-2.0>=2.70)
 
 # ONNX Runtime dependencies
 # Check multiple possible installation locations:
@@ -47,36 +57,48 @@ pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0>=2.70)
 #   5. Standard Windows locations: C:/onnxruntime, C:/onnx, C:/Program Files/onnxruntime
 #   6. vcpkg installed locations
 
-set(ONNXRUNTIME_ROOT "" CACHE PATH "ONNX Runtime installation root")
+set(ONNXRUNTIME_ROOT
+    ""
+    CACHE PATH "ONNX Runtime installation root")
 
 if(ONNXRUNTIME_ROOT)
-    list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "${ONNXRUNTIME_ROOT}")
+  list(
+    INSERT
+    ONNXRUNTIME_SEARCH_PATHS
+    0
+    "${ONNXRUNTIME_ROOT}")
 elseif(DEFINED ENV{ONNXRUNTIME_ROOT})
-    list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "$ENV{ONNXRUNTIME_ROOT}")
+  list(
+    INSERT
+    ONNXRUNTIME_SEARCH_PATHS
+    0
+    "$ENV{ONNXRUNTIME_ROOT}")
 elseif(DEFINED ENV{ONNX_ROOT})
-    list(INSERT ONNXRUNTIME_SEARCH_PATHS 0 "$ENV{ONNX_ROOT}")
+  list(
+    INSERT
+    ONNXRUNTIME_SEARCH_PATHS
+    0
+    "$ENV{ONNX_ROOT}")
 endif()
 
 # Platform-specific search paths
 if(WIN32)
-    set(ONNXRUNTIME_SEARCH_PATHS
-        ${ONNXRUNTIME_SEARCH_PATHS}
-        "$ENV{ONNXRUNTIME_ROOT}"
-        "$ENV{ONNX_ROOT}"
-        "C:/onnxruntime"
-        "C:/onnx"
-        "C:/Program Files/onnxruntime"
-        "C:/Program Files (x86)/onnxruntime"
-        "$ENV{VCPKG_ROOT}/installed/x64-windows"
-        "$ENV{VCPKG_ROOT}/installed/x64-windows-static"
-    )
+  set(ONNXRUNTIME_SEARCH_PATHS
+      ${ONNXRUNTIME_SEARCH_PATHS}
+      "$ENV{ONNXRUNTIME_ROOT}"
+      "$ENV{ONNX_ROOT}"
+      "C:/onnxruntime"
+      "C:/onnx"
+      "C:/Program Files/onnxruntime"
+      "C:/Program Files (x86)/onnxruntime"
+      "$ENV{VCPKG_ROOT}/installed/x64-windows"
+      "$ENV{VCPKG_ROOT}/installed/x64-windows-static")
 else()
-    set(ONNXRUNTIME_SEARCH_PATHS
-        "/usr/local/lib/onnxruntime-cpu"
-        "/opt/onnxruntime"
-        "/usr"
-        "/usr/local"
-    )
+  set(ONNXRUNTIME_SEARCH_PATHS
+      "/usr/local/lib/onnxruntime-cpu"
+      "/opt/onnxruntime"
+      "/usr"
+      "/usr/local")
 endif()
 
 # Try to find ONNX Runtime in each search path
@@ -84,134 +106,123 @@ set(ONNXRUNTIME_FOUND FALSE)
 
 # If ENV variables ONNX_LIB and ONNX_INCLUDE are explicitly set (e.g. by Docker container)
 if(DEFINED ENV{ONNX_LIB} AND DEFINED ENV{ONNX_INCLUDE})
-    find_library(_ONNXRUNTIME_LIB
-        NAMES onnxruntime
-        PATHS "$ENV{ONNX_LIB}"
-        NO_DEFAULT_PATH
-    )
-    find_path(_ONNXRUNTIME_INCLUDE_DIR
-        NAMES onnxruntime_cxx_api.h
-        PATHS "$ENV{ONNX_INCLUDE}"
-        NO_DEFAULT_PATH
-    )
-    if(_ONNXRUNTIME_LIB AND _ONNXRUNTIME_INCLUDE_DIR)
-        set(ONNXRUNTIME_FOUND TRUE)
-        set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
-        set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
-        set(ONNXRUNTIME_ROOT "$ENV{ONNX_ROOT}")
-        message(STATUS "Found ONNX Runtime via ONNX_LIB and ONNX_INCLUDE")
-        message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
-        message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
-    endif()
+  find_library(
+    _ONNXRUNTIME_LIB
+    NAMES onnxruntime
+    PATHS "$ENV{ONNX_LIB}"
+    NO_DEFAULT_PATH)
+  find_path(
+    _ONNXRUNTIME_INCLUDE_DIR
+    NAMES onnxruntime_cxx_api.h
+    PATHS "$ENV{ONNX_INCLUDE}"
+    NO_DEFAULT_PATH)
+  if(_ONNXRUNTIME_LIB AND _ONNXRUNTIME_INCLUDE_DIR)
+    set(ONNXRUNTIME_FOUND TRUE)
+    set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
+    set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
+    set(ONNXRUNTIME_ROOT "$ENV{ONNX_ROOT}")
+    message(STATUS "Found ONNX Runtime via ONNX_LIB and ONNX_INCLUDE")
+    message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
+    message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
+  endif()
 endif()
 
 if(NOT ONNXRUNTIME_FOUND)
-    foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
-        if(EXISTS "${_search_path}")
-            # Check for library
-        if(WIN32)
-            find_library(_ONNXRUNTIME_LIB
-                NAMES onnxruntime
-                PATHS 
-                    "${_search_path}/lib"
-                    "${_search_path}/lib/x64"
-                NO_DEFAULT_PATH
-            )
-        else()
-            find_library(_ONNXRUNTIME_LIB
-                NAMES onnxruntime libonnxruntime
-                PATHS 
-                    "${_search_path}/lib"
-                    "${_search_path}/lib64"
-                    "${_search_path}/lib/aarch64-linux-gnu"
-                    "${_search_path}/lib/x86_64-linux-gnu"
-                NO_DEFAULT_PATH
-            )
-        endif()
-        
-        # Check for headers
-        find_path(_ONNXRUNTIME_INCLUDE_DIR
-            NAMES onnxruntime_cxx_api.h
-            PATHS
-                "${_search_path}/include"
-                "${_search_path}/include/onnxruntime"
-                "${_search_path}/include/onnxruntime/core/session"
-            NO_DEFAULT_PATH
-        )
-        
-        # Also check for headers in nested structure
-        if(NOT _ONNXRUNTIME_INCLUDE_DIR)
-            find_path(_ONNXRUNTIME_INCLUDE_DIR
-                NAMES onnxruntime_c_api.h
-                PATHS
-                    "${_search_path}/include"
-                    "${_search_path}/include/onnxruntime"
-                NO_DEFAULT_PATH
-            )
-        endif()
-        
-        if(_ONNXRUNTIME_LIB AND _ONNXRUNTIME_INCLUDE_DIR)
-            set(ONNXRUNTIME_FOUND TRUE)
-            set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
-            set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
-            set(ONNXRUNTIME_ROOT "${_search_path}")
-            message(STATUS "Found ONNX Runtime at: ${_search_path}")
-            message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
-            message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
-            break()
-        endif()
-        
-        # Clear cache for next iteration
-        unset(_ONNXRUNTIME_LIB CACHE)
-        unset(_ONNXRUNTIME_INCLUDE_DIR CACHE)
-        endif()
-    endforeach()
+  foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
+    if(EXISTS "${_search_path}")
+      # Check for library
+      if(WIN32)
+        find_library(
+          _ONNXRUNTIME_LIB
+          NAMES onnxruntime
+          PATHS "${_search_path}/lib" "${_search_path}/lib/x64"
+          NO_DEFAULT_PATH)
+      else()
+        find_library(
+          _ONNXRUNTIME_LIB
+          NAMES onnxruntime libonnxruntime
+          PATHS "${_search_path}/lib"
+                "${_search_path}/lib64"
+                "${_search_path}/lib/aarch64-linux-gnu"
+                "${_search_path}/lib/x86_64-linux-gnu"
+          NO_DEFAULT_PATH)
+      endif()
+
+      # Check for headers
+      find_path(
+        _ONNXRUNTIME_INCLUDE_DIR
+        NAMES onnxruntime_cxx_api.h
+        PATHS "${_search_path}/include" "${_search_path}/include/onnxruntime"
+              "${_search_path}/include/onnxruntime/core/session"
+        NO_DEFAULT_PATH)
+
+      # Also check for headers in nested structure
+      if(NOT _ONNXRUNTIME_INCLUDE_DIR)
+        find_path(
+          _ONNXRUNTIME_INCLUDE_DIR
+          NAMES onnxruntime_c_api.h
+          PATHS "${_search_path}/include" "${_search_path}/include/onnxruntime"
+          NO_DEFAULT_PATH)
+      endif()
+
+      if(_ONNXRUNTIME_LIB AND _ONNXRUNTIME_INCLUDE_DIR)
+        set(ONNXRUNTIME_FOUND TRUE)
+        set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
+        set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
+        set(ONNXRUNTIME_ROOT "${_search_path}")
+        message(STATUS "Found ONNX Runtime at: ${_search_path}")
+        message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
+        message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
+        break()
+      endif()
+
+      # Clear cache for next iteration
+      unset(_ONNXRUNTIME_LIB CACHE)
+      unset(_ONNXRUNTIME_INCLUDE_DIR CACHE)
+    endif()
+  endforeach()
 endif()
 
 # Fallback to pkg-config (Linux only)
 if(NOT ONNXRUNTIME_FOUND AND NOT WIN32)
-    pkg_check_modules(_ONNXRUNTIME_PKG libonnxruntime onnxruntime)
-    if(_ONNXRUNTIME_PKG_FOUND)
-        set(ONNXRUNTIME_FOUND TRUE)
-        set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_PKG_LINK_LIBRARIES}")
-        set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_PKG_INCLUDE_DIRS}")
-        message(STATUS "Found ONNX Runtime via pkg-config")
-    endif()
+  pkg_check_modules(_ONNXRUNTIME_PKG libonnxruntime onnxruntime)
+  if(_ONNXRUNTIME_PKG_FOUND)
+    set(ONNXRUNTIME_FOUND TRUE)
+    set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_PKG_LINK_LIBRARIES}")
+    set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_PKG_INCLUDE_DIRS}")
+    message(STATUS "Found ONNX Runtime via pkg-config")
+  endif()
 endif()
 
 if(NOT ONNXRUNTIME_FOUND)
-    if(WIN32)
-        message(WARNING "ONNX Runtime not found. Install via:")
-        message(WARNING "  - Download from: https://github.com/microsoft/onnxruntime/releases")
-        message(WARNING "  - Extract to C:/onnxruntime or set ONNXRUNTIME_ROOT env variable")
-        message(WARNING "  - vcpkg: vcpkg install onnxruntime")
-    else()
-        message(WARNING "ONNX Runtime not found. Install via:")
-        message(WARNING "  - Container: /usr/local/lib/onnxruntime-cpu")
-        message(WARNING "  - Source: /opt/onnxruntime")
-        message(WARNING "  - Package: apt install libonnxruntime-dev")
-    endif()
+  if(WIN32)
+    message(WARNING "ONNX Runtime not found. Install via:")
+    message(WARNING "  - Download from: https://github.com/microsoft/onnxruntime/releases")
+    message(WARNING "  - Extract to C:/onnxruntime or set ONNXRUNTIME_ROOT env variable")
+    message(WARNING "  - vcpkg: vcpkg install onnxruntime")
+  else()
+    message(WARNING "ONNX Runtime not found. Install via:")
+    message(WARNING "  - Container: /usr/local/lib/onnxruntime-cpu")
+    message(WARNING "  - Source: /opt/onnxruntime")
+    message(WARNING "  - Package: apt install libonnxruntime-dev")
+  endif()
 endif()
 
 # GStreamer and ONNX Runtime are now linked via IMPORTED_TARGET in Src/CMakeLists.txt
 
 # Create imported target for ONNX Runtime
 if(ONNXRUNTIME_FOUND AND ONNXRUNTIME_LIBRARY)
-    add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
-    set_target_properties(onnxruntime::onnxruntime PROPERTIES
-        IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}"
-    )
-    # Add additional include directories for nested header structure
-    if(EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/session")
-        target_include_directories(onnxruntime::onnxruntime INTERFACE
-            "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/session"
-        )
-    endif()
-    if(EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/providers/cpu")
-        target_include_directories(onnxruntime::onnxruntime INTERFACE
-            "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/providers/cpu"
-        )
-    endif()
-    message(STATUS "ONNX Runtime imported target created successfully")
+  add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
+  set_target_properties(onnxruntime::onnxruntime PROPERTIES IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
+                                                            INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}")
+  # Add additional include directories for nested header structure
+  if(EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/session")
+    target_include_directories(onnxruntime::onnxruntime
+                               INTERFACE "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/session")
+  endif()
+  if(EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/providers/cpu")
+    target_include_directories(onnxruntime::onnxruntime
+                               INTERFACE "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/providers/cpu")
+  endif()
+  message(STATUS "ONNX Runtime imported target created successfully")
 endif()

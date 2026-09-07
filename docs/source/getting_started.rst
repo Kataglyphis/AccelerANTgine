@@ -88,12 +88,16 @@ The recommended Windows build wrapper is:
 
    .\scripts\windows\Start-Build.ps1
 
-This launches the Windows container image and runs
-``scripts/windows/Build-Windows.ps1`` inside it with these host-local defaults:
+This hands the build to ContainerHub's ``Invoke-ContainerBuild`` (module
+``WindowsContainerBuild.Reuse``), which runs
+``scripts/windows/Build-Windows.ps1`` inside a REUSABLE container with these
+defaults:
 
-- ``--cpus 32``
-- ``--memory 48g``
-- bind mount of the repository to ``C:\workspace`` inside the container
+- tar-pipe transport into the family workspace path ``C:\ws`` (bind mount only
+  via ``-UseBindMount``; a fresh container via ``-FreshContainer``)
+- ``--isolation process`` — resource caps apply only under ``-Isolation
+  hyperv`` (``-CpuCount``/``-MemoryGb`` knobs)
+- artifact delivery back to ``build-<target>`` on the host, verified per lane
 
 The wrapper builds these targets:
 

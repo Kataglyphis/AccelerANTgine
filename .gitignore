@@ -70,3 +70,7 @@ Src/GraphicsEngineOpenGL/renderer/VulkanRendererConfig.hpp
 Src/GraphicsEngineVulkan/renderer/OpenGLRendererConfig.hpp
 
 
+
+# uv-managed Python env for the docs/quality tooling (repo-local, never tracked;
+# BeschleunigerBallett ignores the same path)
+.venv/

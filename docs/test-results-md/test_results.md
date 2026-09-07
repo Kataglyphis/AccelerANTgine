@@ -8,7 +8,7 @@
 <col style="width: 50%" />
 </colgroup>
 <tbody>
-<tr class="odd">
+<tr>
 <td><ul>
 <li>HelloTestCommit.BasicAssertions
 <ul>
@@ -41,7 +41,7 @@ href="#40a952a7-d677-4b8d-adaf-dead551914d6">MyTestSuite.OnePlustTwoIsTwoPlusOne
 href="#8a53507b-b51f-4109-b9f1-18623de8fd6b">MyTestSuite.IntegerAdditionCommutes</a></li>
 </ul></li>
 </ul></td>
-<td class="failure-index"><ul>
+<td class="failure-index"><ul class="task-list">
 </ul></td>
 </tr>
 </tbody>

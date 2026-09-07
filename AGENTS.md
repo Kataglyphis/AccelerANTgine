@@ -57,10 +57,37 @@ not here:
 | --- | --- |
 | `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism) |
 | `scripts/linux/ci-coverage.sh` | `linux/scripts/lib/coverage.sh` — gcovr for GCC, llvm-cov for clang |
-| `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh` |
+| `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh` — the cmake-format gate fails loud (no tool, no green lane) and hands the library its uv venv bootstrap as shell functions over `01-core/python_uv.sh`, not helper scripts, for the same exec-bit filemode reason as `ci-docs.sh` |
+| `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |
+| `scripts/linux/ci-profile-bench.sh` | `linux/scripts/lib/cmake-build.sh` — the perf/benchmark run itself stays local |
+| `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` + `linux/scripts/01-core/python_uv.sh` for the venv — calls the library steps individually, not `docs_build_main` (the script header says why: the venv bootstrap must run via `bash`, not rely on an exec bit filemode drops) |
 
 CI jobs use ContainerHub's composite actions (`prepare-linux-ci-host`,
 `run-in-linux-container`) rather than hand-written `docker run` blocks.
+
+**CMake modules: ContainerHub-first, local override wins.** `CMakeLists.txt`
+puts this repo's `cmake/` ahead of `third_party/ContainerHub/cmake/` on
+`CMAKE_MODULE_PATH` and includes every module by name. All eleven reusable
+modules now exist only upstream (CompilerWarnings, Doxygen, Hardening,
+InterproceduralOptimization, PreventInSourceBuilds, Speedup,
+StandardProjectSettings, and — reconciled upstream 2026-09-06 — Cache, Tests,
+Sanitizers and StaticAnalyzers; Tests and Sanitizers carried this repo's
+clang-cl coverage path and its ASan/UBSan runtime hand-work with them, and
+StaticAnalyzers' clang-tidy gained an optional header-filter argument that
+`ProjectOptions.cmake` fills with this repo's `Src/.*`). `cmake/` keeps only
+this project's own policy — `ProjectOptions.cmake`, `CPackOptions.cmake`,
+`SystemLibDependencies.cmake`, `fuzztest_compat/`. The old local
+StaticAnalyzers copy's clang-tidy `--fix` and three check-disables stay
+autofix-lane-only in `scripts/`; the report-only build gate now surfaces
+those checks. The upstream Tests, Sanitizers and StaticAnalyzers merges only
+reach this repo on the next ContainerHub submodule bump; until then
+`include(Tests)` and `include(Sanitizers)` resolve to the pinned upstream
+copies, which predate the clang-cl coverage path and the ASan/UBSan runtime
+hand-work — so do not run a clang-cl Debug ASan build before that bump lands
+(ContainerHub's `docs/windows-clang-cl-sanitizers.md` has the merged story) —
+and `include(StaticAnalyzers)` resolves to the pinned copy, whose
+two-parameter macro ignores the surplus header-filter argument, so clang-tidy
+falls back to `.clang-tidy`'s `HeaderFilterRegex`.
 
 Two upstream facts repeated here only because they bite before you reach a doc:
 
@@ -73,10 +100,13 @@ Two upstream facts repeated here only because they bite before you reach a doc:
 **This repo's glue:** `scripts/windows/Resolve-BuildModule.ps1` — the one file
 that cannot live upstream, because it is what *finds* the submodule.
 `Build-Windows.ps1` imports `WindowsScripts.Shared`, `WindowsBuild.Common`,
-`WindowsCMake.Common`, `WindowsMsix.Common`, `WindowsMsix.Signing` and
-`WindowsOnnx.Common` from it. Nested imports inside a `.psm1` are
-**module-private**, so every module you call into must be named in that list
-explicitly.
+`WindowsUv.Common`, `WindowsFormatting.Common`, `WindowsCMake.Common`,
+`WindowsMsix.Common`, `WindowsMsix.Signing` and `WindowsOnnx.Common` from it.
+Nested imports inside a `.psm1` are **module-private**, so every module you
+call into must be named in that list explicitly. Its Step 3 runs upstream
+`Invoke-CmakeFormatStep` — uv venv plus `requirements.txt`, then in-place
+cmake-format with `.cmake-format.yaml` — mirroring the Linux lane's gate; it
+throws when uv or cmake-format is missing, and `-SkipFormat` opts out.
 
 ## 3. Pitfalls specific to this project
 
@@ -133,7 +163,16 @@ pwsh -NoProfile -File .\scripts\windows\Build-PythonBindings.ps1
 
 `Start-Build.ps1`, `Start-Debug.ps1`, `Start-Release.ps1`, `Start-Profile.ps1`,
 `Start-PythonBindings.ps1` and `Start-Help.ps1` are the convenience entry
-points over those.
+points over those. `Start-Build.ps1` and `Start-PythonBindings.ps1` run their
+`Build-*.ps1` inside the ContainerHub Windows image via `Invoke-ContainerBuild`
+(`WindowsContainerBuild.Reuse`, imported through `Resolve-BuildModule.ps1`):
+tar-pipe transport into a reusable per-lane build container at `C:\ws` by
+default, `-UseBindMount` to opt into a bind mount, `-FreshContainer` to reset,
+`-WhatIf` to print the assembled in-container command without building. Build
+output goes to the console and `logs/` — the old root-level `build*.log`
+redirect files are gone, as is the image-baked `C:\workspace` mount target
+(mounting over an image dir fails at CreateComputeSystem on host/image
+OS-build skew).
 
 CI lanes: `linux_run.yml` (containerized), `linux_run_x86.yml`,
 `linux_run_arm.yml`, `windows_run.yml`.
