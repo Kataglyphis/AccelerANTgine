@@ -19,19 +19,12 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-CODE_QUALITY_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/lib/code-quality.sh"
-if [[ ! -f "${CODE_QUALITY_LIB}" ]]; then
-  die "Shared code-quality library not found at '${CODE_QUALITY_LIB}'. Initialize the ContainerHub submodule first."
-fi
-# shellcheck disable=SC1091
-source "${CODE_QUALITY_LIB}"
-
-PYTHON_UV_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/01-core/python_uv.sh"
-if [[ ! -f "${PYTHON_UV_LIB}" ]]; then
-  die "Shared uv helpers not found at '${PYTHON_UV_LIB}'. Initialize the ContainerHub submodule first."
-fi
-# shellcheck disable=SC1091
-source "${PYTHON_UV_LIB}"
+# containerhub_source, not a "${_SCRIPT_DIR}/../../third_party/ContainerHub/..."
+# literal: it resolves under CONTAINERHUB_DIR (which the literal ignored, so the
+# bootstrap's environment override did nothing) and fails naming the probed path
+# and the fix. In scope because ci-common.sh sources lib/containerhub.sh.
+containerhub_source linux/scripts/lib/code-quality.sh
+containerhub_source linux/scripts/01-core/python_uv.sh
 
 BUILD_DIR="build"
 COMPILER="clang"
