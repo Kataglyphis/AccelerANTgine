@@ -1,6 +1,38 @@
+# This project's build POLICY: which options exist, what they default to, and
+# how the reusable modules are composed.
+#
+# The shared mechanism - the core option list and the per-target dispatch that
+# this file and BeschleunigerBallett/cmake/ProjectOptions.cmake had drifted into
+# near-copies of - was hoisted to ContainerHub on 2026-09-09 as
+# ProjectOptionsCommon and is included by name off CMAKE_MODULE_PATH (see the
+# top of the root CMakeLists.txt).
+#
+# What stays here is what another project would NOT want copied: the sanitizer
+# default policy (Debug-only UBSan, the ThreadSanitizer override), exceptions
+# behind myproject_DISABLE_EXCEPTIONS because the Python bindings need them,
+# C++23, C++ modules mandatory, and this project's build-type gating - static
+# analysis only in Debug, sanitizers and IWYU only outside Release.
+
 include(CMakeDependentOption)
 include(CheckCXXCompilerFlag)
 
+include(ProjectOptionsCommon)
+
+# include() above already fails hard when the module is not on CMAKE_MODULE_PATH.
+# This catches the other, quieter failure: a STALE same-named file in this repo's
+# own cmake/ directory, which is first on CMAKE_MODULE_PATH and would therefore
+# win - loading fine and then leaving every macro below undefined.
+if(NOT COMMAND myproject_define_core_options
+   OR NOT DEFINED MYPROJECT_PROJECT_OPTIONS_COMMON_VERSION
+   OR MYPROJECT_PROJECT_OPTIONS_COMMON_VERSION LESS 1)
+  message(FATAL_ERROR "ProjectOptionsCommon resolved to a file that does not provide "
+                      "myproject_define_core_options (version >= 1). CMAKE_MODULE_PATH is: ${CMAKE_MODULE_PATH}")
+endif()
+
+# Deliberately NOT ContainerHub's SanitizerSupport::myproject_supports_sanitizers:
+# that one carries a GCC-15 UBSan carve-out and a different ASan matrix. Adopting
+# it would change this project's Debug sanitizer defaults, which is a separate
+# decision from hoisting the option list.
 macro(myproject_supports_sanitizers)
   if((CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*" OR CMAKE_CXX_COMPILER_ID MATCHES ".*GNU.*") AND NOT WIN32)
     set(SUPPORTS_UBSAN ON)
@@ -13,23 +45,6 @@ macro(myproject_supports_sanitizers)
   else()
     set(SUPPORTS_ASAN ON)
   endif()
-endmacro()
-
-macro(myproject_define_common_options DEFAULT_ASAN DEFAULT_UBSAN)
-  option(myproject_ENABLE_IPO "Enable IPO/LTO" ON)
-  option(myproject_ENABLE_STATIC_ANALYZER "Enable Static Analyzer" OFF)
-  option(myproject_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
-  option(myproject_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${DEFAULT_ASAN})
-  option(myproject_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
-  option(myproject_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${DEFAULT_UBSAN})
-  option(myproject_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
-  option(myproject_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
-  option(myproject_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
-  option(myproject_ENABLE_CLANG_TIDY "Enable clang-tidy" OFF)
-  option(myproject_ENABLE_CPPCHECK "Enable cpp-check analysis" OFF)
-  option(myproject_ENABLE_PCH "Enable precompiled headers" OFF)
-  option(myproject_ENABLE_CACHE "Enable ccache" ON)
-  option(myproject_ENABLE_IWYU "Enable IWYU" ON)
 endmacro()
 
 macro(myproject_setup_options)
@@ -94,20 +109,16 @@ macro(myproject_setup_options)
     set(DEFAULT_TSAN OFF)
   endif()
 
-  option(myproject_ENABLE_IPO "Enable IPO/LTO" ON)
-  option(myproject_ENABLE_STATIC_ANALYZER "Enable Static Analyzer" OFF)
-  option(myproject_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
-  option(myproject_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${DEFAULT_ASAN})
-  option(myproject_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
-  option(myproject_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${DEFAULT_UBSAN})
-  option(myproject_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" ${DEFAULT_TSAN})
-  option(myproject_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
-  option(myproject_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
-  option(myproject_ENABLE_CLANG_TIDY "Enable clang-tidy" OFF)
-  option(myproject_ENABLE_CPPCHECK "Enable cpp-check analysis" OFF)
-  option(myproject_ENABLE_PCH "Enable precompiled headers" OFF)
-  option(myproject_ENABLE_CACHE "Enable ccache" ON)
-  option(myproject_ENABLE_IWYU "Enable IWYU" ON)
+  # cppcheck OFF is this project's own call; BeschleunigerBallett keeps it ON.
+  myproject_define_core_options(
+    ASAN_DEFAULT
+    ${DEFAULT_ASAN}
+    UBSAN_DEFAULT
+    ${DEFAULT_UBSAN}
+    TSAN_DEFAULT
+    ${DEFAULT_TSAN}
+    CPPCHECK_DEFAULT
+    OFF)
 
   if(NOT
      CMAKE_BUILD_TYPE
@@ -121,24 +132,7 @@ macro(myproject_setup_options)
         CACHE BOOL "Enable undefined sanitizer" FORCE)
   endif()
 
-  if(NOT PROJECT_IS_TOP_LEVEL)
-    mark_as_advanced(
-      myproject_ENABLE_IPO
-      myproject_ENABLE_STATIC_ANALYZER
-      myproject_WARNINGS_AS_ERRORS
-      myproject_ENABLE_SANITIZER_ADDRESS
-      myproject_ENABLE_SANITIZER_LEAK
-      myproject_ENABLE_SANITIZER_UNDEFINED
-      myproject_ENABLE_SANITIZER_THREAD
-      myproject_ENABLE_SANITIZER_MEMORY
-      myproject_ENABLE_UNITY_BUILD
-      myproject_ENABLE_CLANG_TIDY
-      myproject_ENABLE_CPPCHECK
-      myproject_ENABLE_COVERAGE
-      myproject_ENABLE_PCH
-      myproject_ENABLE_CACHE
-      myproject_DISABLE_EXCEPTIONS)
-  endif()
+  myproject_mark_core_options_advanced(myproject_DISABLE_EXCEPTIONS)
 
 endmacro()
 
@@ -164,27 +158,10 @@ macro(myproject_global_options)
       ${myproject_CXX_SCAN_FOR_MODULES}
       CACHE INTERNAL "Global C++ module scan switch for project targets")
 
-  set(myproject_CPP_MODULES_SUPPORTED OFF)
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
-    # Clang family (incl. AppleClang, clang-cl)
-    if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*")
-      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 17)
-        set(myproject_CPP_MODULES_SUPPORTED ON)
-      endif()
-      # MSVC (excluding clang-cl which is handled above)
-    elseif(MSVC)
-      if(MSVC_VERSION GREATER_EQUAL 1934)
-        set(myproject_CPP_MODULES_SUPPORTED ON)
-      endif()
-      # GCC
-    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-      # CMake's module scanning support for GCC is still evolving; keep a conservative floor.
-      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
-        set(myproject_CPP_MODULES_SUPPORTED ON)
-      endif()
-    endif()
-  endif()
+  myproject_cpp_modules_supported()
 
+  # Policy, not mechanism: this project has no header-based fallback, so an
+  # unsupported toolchain is a hard stop rather than a degraded build.
   if(NOT myproject_CPP_MODULES_SUPPORTED)
     message(
       FATAL_ERROR
@@ -230,11 +207,7 @@ macro(myproject_global_options)
     )# -std=c++2a
   endif()
 
-  # control where the static and shared libraries are built so that on windows
-  # we don't need to tinker with the path to run the executable
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+  myproject_set_output_directories()
 
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
      AND MSVC
@@ -263,18 +236,7 @@ macro(myproject_global_options)
         CACHE STRING "MSVC runtime library" FORCE)
   endif()
 
-  if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(CMAKE_LINK_WHAT_YOU_USE FALSE)
-  else()
-    set(CMAKE_LINK_WHAT_YOU_USE TRUE)
-  endif()
-
-  if(myproject_ENABLE_IPO)
-    include(InterproceduralOptimization)
-    if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
-      myproject_enable_ipo()
-    endif()
-  endif()
+  myproject_configure_lwyu_and_ipo()
 
   myproject_supports_sanitizers()
 
@@ -296,45 +258,9 @@ macro(myproject_global_options)
 endmacro()
 
 macro(myproject_local_options)
-  if(PROJECT_IS_TOP_LEVEL)
-    include(StandardProjectSettings)
-  endif()
+  myproject_create_option_targets()
 
-  add_library(myproject_warnings INTERFACE)
-  add_library(myproject_options INTERFACE)
-
-  target_compile_features(myproject_options INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
-
-  include(CompilerWarnings)
-  myproject_set_project_warnings(
-    myproject_warnings
-    ${myproject_WARNINGS_AS_ERRORS}
-    ""
-    ""
-    ""
-    "")
-
-  # Only when building with -DCMAKE_BUILD_TYPE=RelWithDebInfo,
-  # on non-Windows and using GCC or Clang
-  if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"
-     AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-     AND NOT WIN32)
-
-    find_library(PROFILER_LIB profiler)
-
-    if(PROFILER_LIB)
-      message(STATUS "Enabling CPU profiling with gperftools (libprofiler)")
-      message(STATUS "Found libprofiler: ${PROFILER_LIB}")
-      target_link_libraries(myproject_options INTERFACE -lprofiler)
-    else()
-      message(WARNING "libprofiler not found, falling back to gprof (-pg)")
-      target_compile_options(myproject_options INTERFACE -pg)
-      target_link_libraries(myproject_options INTERFACE -pg)
-    endif()
-
-  elseif(myproject_ENABLE_GPROF)
-    message(STATUS "GProf should only be used with GCC on Linux using -DCMAKE_BUILD_TYPE=RelWithDebInfo")
-  endif()
+  myproject_enable_profiling(myproject_options)
 
   if(myproject_DISABLE_EXCEPTIONS)
     if(MSVC AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
@@ -363,58 +289,18 @@ macro(myproject_local_options)
      CMAKE_BUILD_TYPE
      STREQUAL
      "Release")
-    include(Sanitizers)
-    myproject_enable_sanitizers(
-      myproject_options
-      ${myproject_ENABLE_SANITIZER_ADDRESS}
-      ${myproject_ENABLE_SANITIZER_LEAK}
-      ${myproject_ENABLE_SANITIZER_UNDEFINED}
-      ${myproject_ENABLE_SANITIZER_THREAD}
-      ${myproject_ENABLE_SANITIZER_MEMORY})
+    myproject_apply_sanitizers(myproject_options)
   endif()
 
-  set_target_properties(myproject_options PROPERTIES UNITY_BUILD ${myproject_ENABLE_UNITY_BUILD})
-
-  if(myproject_ENABLE_PCH)
-    target_precompile_headers(
-      myproject_options
-      INTERFACE
-      <vector>
-      <string>
-      <utility>)
-  endif()
-
-  if(myproject_ENABLE_CACHE)
-    include(Cache)
-    myproject_enable_cache()
-  endif()
+  myproject_apply_unity_pch_cache(myproject_options)
 
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    include(StaticAnalyzers)
-    if(myproject_ENABLE_CLANG_TIDY)
-      # Src/.* scopes build-gate clang-tidy to this repo's sources (the retired local
-      # StaticAnalyzers override hard-coded it; upstream now takes it as an argument).
-      myproject_enable_clang_tidy(myproject_options ${myproject_WARNINGS_AS_ERRORS} "Src/.*")
-    endif()
-
-    if(myproject_ENABLE_CPPCHECK)
-      myproject_enable_cppcheck(${myproject_WARNINGS_AS_ERRORS} "" # override cppcheck options
-      )
-    endif()
-
-    if(myproject_ENABLE_COVERAGE)
-      include(Tests)
-      myproject_enable_coverage(myproject_options)
-    endif()
+    # Src/.* scopes build-gate clang-tidy to this repo's sources (the retired local
+    # StaticAnalyzers override hard-coded it; upstream now takes it as an argument).
+    myproject_apply_static_analysis(myproject_options "Src/.*")
   endif()
 
-  if(myproject_WARNINGS_AS_ERRORS)
-    check_cxx_compiler_flag("-Wl,--fatal-warnings" LINKER_FATAL_WARNINGS)
-    if(LINKER_FATAL_WARNINGS)
-      # This is not working consistently, so disabling for now
-      # target_link_options(myproject_options INTERFACE -Wl,--fatal-warnings)
-    endif()
-  endif()
+  myproject_apply_warnings_as_errors_linker_check()
 
   if(myproject_ENABLE_HARDENING AND NOT myproject_ENABLE_GLOBAL_HARDENING)
     include(Hardening)
@@ -435,36 +321,12 @@ macro(myproject_local_options)
      CMAKE_BUILD_TYPE
      STREQUAL
      "Release")
-    if(myproject_ENABLE_IWYU)
-      if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        find_program(IWYU_PATH NAMES include-what-you-use iwyu)
-        if(IWYU_PATH)
-          set_target_properties(myproject_options PROPERTIES CXX_INCLUDE_WHAT_YOU_USE "${IWYU_PATH}")
-          message(STATUS "Include-What-You-Use found: ${IWYU_PATH}")
-        else()
-          message(STATUS "Include-What-You-Use not found!")
-        endif()
-      endif()
-    endif()
+    myproject_apply_iwyu(myproject_options)
 
     include(Doxygen)
     enable_doxygen()
 
-    if(myproject_ENABLE_STATIC_ANALYZER)
-      if(MSVC)
-        target_compile_options(myproject_options INTERFACE /analyze)
-      elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        target_compile_options(myproject_options INTERFACE -fanalyzer)
-        # https://clang.llvm.org/docs/UsersManual.html
-      elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
-        #target_compile_options(myproject_options INTERFACE --analyze)
-        #target_link_libraries(myproject_options INTERFACE --analyze)
-        # https://clang.llvm.org/docs/ClangCommandLineReference.html
-      elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        #target_compile_options(myproject_options INTERFACE --analyze --analyzer-output html)
-        #target_link_libraries(myproject_options INTERFACE --analyze --analyzer-output html)
-      endif()
-    endif()
+    myproject_apply_static_analyzer_flags(myproject_options)
   endif()
 
   include(Speedup)

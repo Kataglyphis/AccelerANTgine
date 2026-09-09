@@ -1,0 +1,39 @@
+# What this repo takes from ContainerHub. One row per asset: the id from
+# third_party/ContainerHub/shared/config/shared-assets.manifest, and a path only
+# when the copy does not sit at that registry row's default.
+#
+# Checked by:
+#   bash third_party/ContainerHub/shared/config/sync-shared-config.sh --repo-root . --check
+#
+# THE THREE DELIBERATE OVERRIDES. This repo carries all five shared configs but
+# takes only two of them. The other three are this project's own answer to a
+# real problem and are NOT drift; leaving them out of this file is how that is
+# declared, and this comment is the record of why. Re-adding a row below would
+# make the gate demand the canonical file and erase the reason.
+#
+#   .clang-tidy              adds `-clang-diagnostic-error` and a
+#                            HeaderFilterRegex ('^Src/.*\.h(pp)?$|^Src/.*\.ixx$').
+#                            Both answer clang-tidy seeing an `import` without
+#                            the BMIs on the command line. BeschleunigerBallett
+#                            answers the same question by skipping module TUs
+#                            instead (Test-IsCxxModuleTranslationUnit). Two valid
+#                            strategies; forcing either on the other weakens it.
+#   gcovr.cfg                the coverage excludes follow THIS layout -
+#                            third_party, .*_deps, resources (lower-case here),
+#                            plus an `exclude` regex the canonical file has no
+#                            equivalent of.
+#   .pre-commit-config.yaml  runs an extra local `clang-tidy` hook on commit.
+#                            Which hooks a project runs locally is a workflow
+#                            choice. NOTE: its cmake-format hook still matches
+#                            `\.cmake$` only, so CMakeLists.txt is not formatted
+#                            on commit here - the canonical hook was widened on
+#                            2026-09-06 and this copy predates it. That half is
+#                            staleness rather than intent; see shared/config/README.md.
+#
+# `.clang-format` is NOT an override: it was ahead of canonical, and canonical
+# was corrected to match on 2026-08-11.
+
+clang-format
+cmake-format
+containerhub-sh
+resolve-build-module
