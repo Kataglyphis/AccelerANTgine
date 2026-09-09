@@ -9,12 +9,11 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-COVERAGE_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/lib/coverage.sh"
-if [[ ! -f "${COVERAGE_LIB}" ]]; then
-  die "Shared coverage library not found at '${COVERAGE_LIB}'. Initialize the ContainerHub submodule first."
-fi
-# shellcheck disable=SC1091
-source "${COVERAGE_LIB}"
+# containerhub_source, not a "${_SCRIPT_DIR}/../../third_party/ContainerHub/..."
+# literal: it resolves under CONTAINERHUB_DIR (which the literal ignored, so the
+# bootstrap's environment override did nothing) and fails naming the probed path
+# and the fix. In scope because ci-common.sh sources lib/containerhub.sh.
+containerhub_source linux/scripts/lib/coverage.sh
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"

@@ -1,0 +1,72 @@
+name: Lint gates - shell, workflows, secrets, python
+
+# THIS JOB RUNS THE SAME COMMAND A DEVELOPER RUNS LOCALLY, and that identity is
+# the whole reason the lane is one line of `run:`:
+#
+#   bash scripts/linux/run-lint-gates.sh
+#
+# ContainerHub's linux/scripts/run-lint-gates.sh owns the four gates (shell
+# lint, actionlint + CI image refs, gitleaks, ruff), their pinned bootstraps
+# (shellcheck, actionlint and gitleaks additionally SHA256-verified; ruff is
+# version-pinned and fetched through uvx, which verifies against PyPI rather
+# than a digest recorded here), the git-ls-files scope construction, the
+# empty-scope refusals and the secret gate's self-test. This repo's wrapper only
+# passes the consumer root, which upstream refuses to infer - its own half lives
+# inside third_party/ContainerHub, so a self-derived root would grade
+# ContainerHub's tree and report green over the wrong repository.
+#
+# BEFORE THIS FILE THE REPO HAD NO LINT GATE OF ANY KIND. Not over its 12
+# tracked *.sh, not over these 4 workflows, not over its 4 first-party *.py -
+# and no secret scan, while linux_run.yml below deploys over FTP with three
+# repository secrets. The scripts under scripts/linux/ already carried ~11
+# "disable" directives naming codes for a linter that had never run.
+#
+# A STANDALONE WORKFLOW, not a job inside linux_run.yml: that file is a
+# reusable workflow called once per (arch x compiler) by linux_run_x86.yml and
+# linux_run_arm.yml, so a gate placed there would grade the same tree four
+# times. The tree is architecture-independent and so is its verdict.
+#
+# NO CONTAINER IMAGE IS NAMED HERE, unlike every other Linux lane in this repo,
+# and that is correct rather than an oversight: the four gate binaries are
+# bootstrapped from ContainerHub's own versions.env at pinned, SHA256-verified
+# versions, so the verdict does not depend on what kataglyphis_beschleuniger
+# happens to ship - and skipping the GHCR login and the multi-gigabyte pull is
+# what makes this the first lane to finish.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# Read-only: this lane reports a verdict and writes nothing. The other
+# workflows here predate the default-permissions tightening and still run on
+# the repository default.
+permissions:
+  contents: read
+
+jobs:
+  lint-gates:
+    name: shellcheck + actionlint + gitleaks + ruff
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+
+    steps:
+      # submodules: true, NOT recursive. ContainerHub is a top-level submodule
+      # and it is the one these gates execute - all four lint scripts and the
+      # aggregator that drives them live inside it. The other six top-level
+      # submodules (FUZZTEST, GOOGLE_BENCHMARK, NLOHMANN_JSON, SPDLOG,
+      # tomlplusplus, nanobind) come along at depth 1 and nothing below grades
+      # them: every scope drops third_party/. Recursing into their trees would
+      # cost minutes and change no verdict.
+      #
+      # fetch-depth: 1 is enough - every scope is built from `git ls-files`,
+      # never from history.
+      - name: Check out
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - name: Lint gates
+        run: bash scripts/linux/run-lint-gates.sh

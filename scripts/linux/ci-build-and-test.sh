@@ -33,19 +33,15 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-CMAKE_BUILD_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/lib/cmake-build.sh"
-if [[ ! -f "${CMAKE_BUILD_LIB}" ]]; then
-  die "Shared cmake-build library not found at '${CMAKE_BUILD_LIB}'. Initialize the ContainerHub submodule first."
-fi
-# shellcheck disable=SC1091
-source "${CMAKE_BUILD_LIB}"
-
-CTEST_RUN_LIB="${_SCRIPT_DIR}/../../third_party/ContainerHub/linux/scripts/lib/ctest-run.sh"
-if [[ ! -f "${CTEST_RUN_LIB}" ]]; then
-  die "Shared ctest-run library not found at '${CTEST_RUN_LIB}'. Initialize the ContainerHub submodule first."
-fi
-# shellcheck disable=SC1091
-source "${CTEST_RUN_LIB}"
+# The hub path is no longer spelled out here. containerhub_source - in scope
+# because ci-common.sh sources lib/containerhub.sh - resolves it under
+# CONTAINERHUB_DIR and fails naming both the probed path and the fix. The
+# "${_SCRIPT_DIR}/../../third_party/ContainerHub/..." literal this replaces
+# ignored that variable, so the CONTAINERHUB_DIR override the bootstrap exists
+# to provide did nothing here; the same block appeared eight times across five
+# scripts, each with its own wording of the same die message.
+containerhub_source linux/scripts/lib/cmake-build.sh
+containerhub_source linux/scripts/lib/ctest-run.sh
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
