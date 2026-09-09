@@ -1,0 +1,10 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "AccelerANTgine's Renovate config. Everything shared lives in the preset at ContainerHub's repository root (default.json); the `extends` line below is the whole adoption, exactly as in the four top-level consumers.",
+    "The part this repo cannot get any other way is the git-submodules manager, which Renovate DISABLES by default. third_party/ContainerHub is where this repo's code-quality and coverage libraries come from, and it had drifted 54 commits behind before 2026-09-09 with nothing to notice -- no gate in the family checks gitlink freshness.",
+    "This repo had NO dependency bot of any kind before this file: no renovate.json and no dependabot.yml. So unlike the other consumers there is no hand-over to sequence and nothing to delete afterwards; this is a pure addition.",
+    "Renovate resolves `github>Kataglyphis/ContainerHub` from ContainerHub's DEFAULT BRANCH, not from the pin in third_party/ContainerHub, so a preset change reaches this repo only after it is merged there. And this file stays inert until the Renovate GitHub App is installed on this repository -- no bot has ever authored a commit here. Until then the local CLI reads it: third_party/ContainerHub/docs/dependency-updates.md."
+  ],
+  "extends": ["github>Kataglyphis/ContainerHub"]
+}
