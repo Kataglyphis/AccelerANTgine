@@ -8,6 +8,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
   # Keep this pinned to the version FUZZTEST's MODULE.bazel declares — the two
   # MUST move together (mismatch breaks e.g. absl::random_mocking_access).
+  # renovate: datasource=github-tags depName=abseil/abseil-cpp versioning=loose
   GIT_TAG 20260526.0)
 
 set(ABSL_USE_CXX_EXCEPTIONS
@@ -141,6 +142,7 @@ endif()
 FetchContent_Declare(
   GSL
   GIT_REPOSITORY "https://github.com/microsoft/GSL"
+  # renovate: datasource=github-tags depName=microsoft/GSL
   GIT_TAG "v4.2.1")
 FetchContent_MakeAvailable(GSL)
 
@@ -244,9 +246,19 @@ endif()
 
 if(RUST_FEATURES)
 
+  # This is a LOWER BOUND, not a pin, and the docstring used to claim otherwise.
+  # `cargo install --version <v>` takes a VersionReq, so a bare 1.0.191 means
+  # ^1.0.191 and the newest 1.x is what lands (1.0.200 on crates.io today).
+  # The cxx crate it has to match is itself not one number: Src/rusty_code's
+  # Cargo.lock resolves cxx 1.0.194, OxidANT's resolves 1.0.198. So no single
+  # value here can match both, and a true pin would need BOTH
+  # `--version =${CXXBRIDGE_CMD_VERSION}` below AND one agreed version across
+  # the two locks. Left as it is deliberately; the annotation makes the drift
+  # visible instead of silent.
   set(CXXBRIDGE_CMD_VERSION
+      # renovate: datasource=crate depName=cxxbridge-cmd versioning=semver
       "1.0.191"
-      CACHE STRING "Pinned cxxbridge-cmd version to keep bridge generator compatible with the cxx crate")
+      CACHE STRING "Lower bound for cxxbridge-cmd; cargo install resolves it as a caret range")
 
   FetchContent_Declare(
     Corrosion

@@ -6,5 +6,26 @@
     "This repo had NO dependency bot of any kind before this file: no renovate.json and no dependabot.yml. So unlike the other consumers there is no hand-over to sequence and nothing to delete afterwards; this is a pure addition.",
     "Renovate resolves `github>Kataglyphis/ContainerHub` from ContainerHub's DEFAULT BRANCH, not from the pin in third_party/ContainerHub, so a preset change reaches this repo only after it is merged there. And the Renovate GitHub App is NOT installed on this repository and will not be (owner decision, 2026-09-09) -- no bot will ever author a commit here. That does not make this file idle: the local CLI reads exactly it. See third_party/ContainerHub/docs/dependency-updates.md."
   ],
-  "extends": ["github>Kataglyphis/ContainerHub"]
+  "extends": ["github>Kataglyphis/ContainerHub"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": [
+        "third_party/CMakeLists.txt pulls four dependencies with FetchContent and pins a fifth crate by version, and Renovate has NO manager that reads CMake -- abseil-cpp, googletest, microsoft/GSL, Corrosion and cxxbridge-cmd have never had an update proposed by anything. Measured 2026-09-10 before this block existed: with enabledManagers=custom.regex this repo extracted 0 package files and 0 dependencies.",
+        "THREE of the five carry a real version and are annotated directly above their pin. abseil-cpp uses abseil's LTS date format (20260526.0), which is not semver -- the default parser cannot order it, hence versioning=loose. microsoft/GSL is plain semver and needs no override, which is why the versioning group is optional and one matchString serves both. cxxbridge-cmd is a crates.io package that `cargo install` fetches, so it takes datasource=crate, and versioning=semver rather than the crate datasource's default of cargo. That override is deliberate and was measured both ways: under versioning=cargo Renovate reads `1.0.191` as the CARET RANGE ^1.0.191, resolves it to currentVersion 1.0.200 and proposes nothing, forever. That is a faithful model of the build -- `cargo install --version 1.0.191` takes a VersionReq, and a bare version there means ^1.0.191, so this \"Pinned\" value is not actually a pin and the toolchain already floats to the newest 1.x. But modelling it that way leaves the dependency extracted and permanently silent, which is the one outcome this whole block exists to remove. The value is a single exact version by intent, so semver is what matches the intent. If the owner wants the docstring to become true, the fix is in the CMake and not here: `--version =${CXXBRIDGE_CMD_VERSION}`.",
+        "The other TWO are deliberately NOT annotated, and that is the finding rather than an omission. googletest is pinned to an archive of commit 56efe398 -- a digest, not a version, and there is no ordering to follow; making it visible would mean repointing the URL at a release tag, which changes the dependency and is the owner's call. Corrosion is pinned to `master`: that is not a version at all, so this build is not reproducible from its sources, and pinning it is an owner decision this manager must not paper over.",
+        "READ THE COMMENT ABOVE THE ABSEIL PIN BEFORE TAKING ITS BUMP. It is coupled to the version FUZZTEST's MODULE.bazel declares and the two must move together; a mismatch breaks e.g. absl::random_mocking_access. Renovate will surface the newer LTS on its own -- deciding to take it is a human step, and it is not a step this manager makes for you.",
+        "Two matchStrings, because this file has two pin SHAPES. The first reads a GIT_TAG inside a FetchContent_Declare, quoted or bare. The second reads a value on its own line inside a multi-line set(), which is how CXXBRIDGE_CMD_VERSION is written -- joining that call onto one line would exceed .cmake-format.yaml's line_width of 120 and be wrapped straight back, so the annotation goes directly above the VALUE instead. They cannot both match the same pin: `\\s*` after the newline matches only whitespace, so it can never skip over the literal `GIT_TAG` to reach a quote.",
+        "BeschleunigerBallett carries a near-identical manager for its own third_party/CMakeLists.txt, plus a third shape this repo does not have (`set(<NAME>_TAG <value>)` on one line). The two should be merged into ContainerHub's shared preset as one manager with the union of the matchStrings; that is a hub edit and is deliberately not made from here.",
+        "The file pattern uses character classes rather than escapes, because the delimiters of a Renovate regex string are slashes and an inner one would end it early."
+      ],
+      "managerFilePatterns": [
+        "/^third_party[/]CMakeLists[.]txt$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s*\\n\\s*GIT_TAG \"?(?<currentValue>[^)\"\\s]+)\"?",
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s*\\n\\s*\"(?<currentValue>[^\"\\s]+)\""
+      ]
+    }
+  ]
 }
