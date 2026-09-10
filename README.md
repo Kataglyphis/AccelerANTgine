@@ -29,6 +29,7 @@ For the official docs follow this [link](https://hardwareacceleratedai.jonashein
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
+  - [Upgrades](#upgrades)
 - [Tests](#tests)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
@@ -159,6 +160,29 @@ scripts/windows/Build-Windows.ps1 -BuildDir C:\b\kcpp\dbg -BuildDirRelease C:\b\
 ```
 
 ### Upgrades
+
+#### What is behind: Renovate as a local CLI
+
+```bash
+bash scripts/linux/renovate-local.sh                     # report (default: git-submodules)
+bash scripts/linux/renovate-local.sh --managers pep621   # the pyproject pins
+bash scripts/linux/renovate-local.sh --apply --dry-run   # the plan
+bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
+```
+
+Run it from WSL; it bootstraps a pinned, checksum-verified Node and Renovate on
+first use. This repository has no dependency bot of any kind — the Renovate
+GitHub App is installed on no repo in this family and will not be, and there is
+no `dependabot.yml` here — so this wrapper is the only thing that reads
+`.github/renovate.json` and the only thing watching the seven submodule pins.
+
+`--apply` moves **gitlinks only**, and only for submodules that declare a
+`branch =` in `.gitmodules`; today that is `third_party/ContainerHub` alone. The
+other six are reported and explicitly **refused** rather than walked to their
+remote's default branch. Nothing is staged or committed. The Python, Rust and
+pre-commit sides are report-only. See
+[`third_party/ContainerHub/docs/dependency-updates.md`](third_party/ContainerHub/docs/dependency-updates.md).
+
 #### Rusty things:
 1. Do not forget to upgrade the cxxbridge from time to time:
 ```bash

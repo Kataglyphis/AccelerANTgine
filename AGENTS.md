@@ -60,6 +60,7 @@ not here:
 | `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh` — the cmake-format gate fails loud (no tool, no green lane) and hands the library its uv venv bootstrap as shell functions over `01-core/python_uv.sh`, not helper scripts, for the same exec-bit filemode reason as `ci-docs.sh` |
 | `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |
 | `scripts/linux/ci-profile-bench.sh` | `linux/scripts/lib/cmake-build.sh` — the perf/benchmark run itself stays local |
+| `scripts/linux/renovate-local.sh` | `linux/scripts/renovate-local.sh` — Renovate as a local CLI, plus the git half that applies what it can only detect (passes this repo's root) |
 | `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` + `linux/scripts/01-core/python_uv.sh` for the venv — calls the library steps individually, not `docs_build_main` (the script header says why: the venv bootstrap must run via `bash`, not rely on an exec bit filemode drops) |
 
 CI jobs use ContainerHub's composite actions (`prepare-linux-ci-host`,
@@ -177,7 +178,48 @@ OS-build skew).
 CI lanes: `linux_run.yml` (containerized), `linux_run_x86.yml`,
 `linux_run_arm.yml`, `windows_run.yml`.
 
-## 5. Docs owned by this repo
+## 5. Dependency upgrades
+
+Renovate, run as a **local CLI** — never by hand, and never by a bot. The
+Renovate GitHub App is installed on no repo in this family and will not be, and
+this repo has no `.github/dependabot.yml` either, so this wrapper is the **only**
+dependency watch it has. It is not a gate: no workflow runs it, it blocks no
+commit, and it stages and commits nothing.
+
+```bash
+bash scripts/linux/renovate-local.sh                     # report (default: git-submodules)
+bash scripts/linux/renovate-local.sh --managers pep621   # the pyproject pins
+bash scripts/linux/renovate-local.sh --apply --dry-run   # the plan
+bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
+```
+
+Run it from **WSL** — it bootstraps a pinned, checksum-verified Node, and there
+is none on the Windows host.
+
+**What `--apply` will and will not do here is the thing to know.** It moves
+gitlinks only, by explicit path, and only for submodules that declare a
+`branch =`. Of the seven in `.gitmodules` exactly one does —
+`third_party/ContainerHub` (`branch = main`). Measured 2026-09-09,
+`--apply --dry-run` found five behind (`FUZZTEST`, `GOOGLE_BENCHMARK`,
+`NLOHMANN_JSON`, `SPDLOG`, `nanobind`), printed all five as **REFUSED** because
+they name no branch, and ended in "nothing to apply" with `git status`
+unchanged. That refusal is the feature: an unset branch does not disarm
+`git submodule update --remote`, it makes it walk to the remote's *default*
+branch. Move those by hand, deliberately.
+
+The Python, Rust and pre-commit sides are **report-only** — `pep621`,
+`pip_requirements`, `cargo`, `pre-commit`. The same day, all four together
+returned two rows, both from `Src/rusty_code/Cargo.toml` and both printing
+`1.0 → 1.0`: the report shows the *manifest* value, and the range already covers
+the new release (the JSON behind it says 1.0.194 → 1.0.200, updateType patch —
+a lock move). That run also warned `Rate limit exceeded for api.github.com`;
+the variable that clears it under `--platform=local` is `GITHUB_COM_TOKEN`, not
+`RENOVATE_TOKEN`.
+
+Full rationale:
+[`third_party/ContainerHub/docs/dependency-updates.md`](third_party/ContainerHub/docs/dependency-updates.md).
+
+## 6. Docs owned by this repo
 
 - Sphinx sources in `docs/`; Doxygen via `Doxyfile.in`; coverage config in
   `gcovr.cfg`.
