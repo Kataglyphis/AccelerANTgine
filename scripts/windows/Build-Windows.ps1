@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-  Configurable Windows container build script for the Kataglyphis project using the ContainerHub build framework.
+  Configurable Windows container build script for the Kataglyphis project using the ANTfrastructure build framework.
 
 .DESCRIPTION
   Run with defaults or pass parameters to override workspace path and other options.
@@ -34,8 +34,8 @@ param(
 
 $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
 
-# ContainerHub build framework, resolved through the shared bootstrap (a
-# verbatim copy of ContainerHub's shared/windows/templates/Resolve-BuildModule.ps1)
+# ANTfrastructure build framework, resolved through the shared bootstrap (a
+# verbatim copy of ANTfrastructure's shared/windows/templates/Resolve-BuildModule.ps1)
 # rather than a hard-coded submodule path: a module that moves upstream is
 # picked up without editing this script, and a missing submodule reports the
 # exact `git submodule update` command instead of a bare path.
@@ -43,7 +43,7 @@ $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
 # WindowsLogging.Common is deliberately NOT listed any more: upstream folded it
 # into WindowsBuild.Common (b391a1d), which exports the Write-BuildLog*
 # wrappers this script actually uses. Importing it by name has been a hard
-# failure against any recent ContainerHub.
+# failure against any recent ANTfrastructure.
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
 
 # Dependency order: Shared, then Build, then what builds on them.

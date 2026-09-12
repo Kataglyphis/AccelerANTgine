@@ -3,7 +3,7 @@
 #
 # The shared mechanism - the core option list and the per-target dispatch that
 # this file and BeschleunigerBallett/cmake/ProjectOptions.cmake had drifted into
-# near-copies of - was hoisted to ContainerHub on 2026-09-09 as
+# near-copies of - was hoisted to ANTfrastructure on 2026-09-09 as
 # ProjectOptionsCommon and is included by name off CMAKE_MODULE_PATH (see the
 # top of the root CMakeLists.txt).
 #
@@ -29,7 +29,7 @@ if(NOT COMMAND myproject_define_core_options
                       "myproject_define_core_options (version >= 1). CMAKE_MODULE_PATH is: ${CMAKE_MODULE_PATH}")
 endif()
 
-# Deliberately NOT ContainerHub's SanitizerSupport::myproject_supports_sanitizers:
+# Deliberately NOT ANTfrastructure's SanitizerSupport::myproject_supports_sanitizers:
 # that one carries a GCC-15 UBSan carve-out and a different ASan matrix. Adopting
 # it would change this project's Debug sanitizer defaults, which is a separate
 # decision from hoisting the option list.

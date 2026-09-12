@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci-build-and-test.sh - project wrapper around ContainerHub's generic CMake
+# ci-build-and-test.sh - project wrapper around ANTfrastructure's generic CMake
 # build driver (linux/scripts/lib/cmake-build.sh) and its ctest runner
 # (linux/scripts/lib/ctest-run.sh).
 #
@@ -33,15 +33,15 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# The hub path is no longer spelled out here. containerhub_source - in scope
-# because ci-common.sh sources lib/containerhub.sh - resolves it under
-# CONTAINERHUB_DIR and fails naming both the probed path and the fix. The
-# "${_SCRIPT_DIR}/../../third_party/ContainerHub/..." literal this replaces
-# ignored that variable, so the CONTAINERHUB_DIR override the bootstrap exists
+# The hub path is no longer spelled out here. antfrastructure_source - in scope
+# because ci-common.sh sources lib/antfrastructure.sh - resolves it under
+# ANTFRASTRUCTURE_DIR and fails naming both the probed path and the fix. The
+# "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..." literal this replaces
+# ignored that variable, so the ANTFRASTRUCTURE_DIR override the bootstrap exists
 # to provide did nothing here; the same block appeared eight times across five
 # scripts, each with its own wording of the same die message.
-containerhub_source linux/scripts/lib/cmake-build.sh
-containerhub_source linux/scripts/lib/ctest-run.sh
+antfrastructure_source linux/scripts/lib/cmake-build.sh
+antfrastructure_source linux/scripts/lib/ctest-run.sh
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"

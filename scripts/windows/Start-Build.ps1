@@ -1,13 +1,13 @@
 #requires -Version 7.0
-# Build the engine inside the ContainerHub Windows developer image using
-# Stevedore's docker.exe (see third_party/ContainerHub/docs/windows-builds.md
+# Build the engine inside the ANTfrastructure Windows developer image using
+# Stevedore's docker.exe (see third_party/ANTfrastructure/docs/windows-builds.md
 # for why nerdctl is not an option on Windows).
 #
 # Thin project wrapper: the transport decision (tar pipe vs bind mount), the
 # reusable container, the artifact streaming and the delivery verification all
-# live upstream in ContainerHub's WindowsContainerBuild.Reuse module
+# live upstream in ANTfrastructure's WindowsContainerBuild.Reuse module
 # (Invoke-ContainerBuild). Rationale + measurements:
-# ContainerHub docs/windows-container-build-performance.md.
+# ANTfrastructure docs/windows-container-build-performance.md.
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -36,7 +36,7 @@ Set-StrictMode -Version Latest
 
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 
-# Standard import shim: upstream ContainerHub modules win over any vendored copy.
+# Standard import shim: upstream ANTfrastructure modules win over any vendored copy.
 . (Join-Path $PSScriptRoot "Resolve-BuildModule.ps1")
 Import-BuildModule @("WindowsContainerBuild.Reuse")
 

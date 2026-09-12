@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ci-common.sh - bootstrap shim for CI scripts
 #
-# Sources the ContainerHub core library, providing:
+# Sources the ANTfrastructure core library, providing:
 #   Logging    : info, warn, err/die, log
 #   Platform   : arch_oci, is_amd64_arch, detect_system, deb_multiarch_triplet
 #   Parallelism: detect_available_cores, compute_jobs, compute_jobs_with_mem_cap
@@ -18,27 +18,27 @@ _CI_COMMON_SH_LOADED=1
 
 _CI_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Resolve the ContainerHub core library.
+# Resolve the ANTfrastructure core library.
 # Works from both the repo root and an arbitrary working directory.
 #
-# CONTAINERHUB_DIR comes from the canonical bootstrap — a verbatim copy of
-# upstream's shared/linux/templates/containerhub.sh — rather than a ../.. literal
+# ANTFRASTRUCTURE_DIR comes from the canonical bootstrap — a verbatim copy of
+# upstream's shared/linux/templates/antfrastructure.sh — rather than a ../.. literal
 # spelled out here. Six repos each had their own version of that line and they
-# had drifted; see ContainerHub shared/linux/templates/README.md.
+# had drifted; see ANTfrastructure shared/linux/templates/README.md.
 # shellcheck disable=SC1091
-source "${_CI_COMMON_DIR}/lib/containerhub.sh"
+source "${_CI_COMMON_DIR}/lib/antfrastructure.sh"
 
-_CONTAINER_HUB_CORE="${CONTAINERHUB_DIR}/linux/scripts/01-core"
+_ANTFRASTRUCTURE_CORE="${ANTFRASTRUCTURE_DIR}/linux/scripts/01-core"
 
-if [ -f "${_CONTAINER_HUB_CORE}/common.sh" ]; then
+if [ -f "${_ANTFRASTRUCTURE_CORE}/common.sh" ]; then
   # shellcheck disable=SC1091
-  source "${_CONTAINER_HUB_CORE}/common.sh"
+  source "${_ANTFRASTRUCTURE_CORE}/common.sh"
   # Also load modules.sh so callers can use source_module if needed.
-  if [ -f "${_CONTAINER_HUB_CORE}/modules.sh" ]; then
+  if [ -f "${_ANTFRASTRUCTURE_CORE}/modules.sh" ]; then
     # shellcheck disable=SC1091
-    source "${_CONTAINER_HUB_CORE}/modules.sh"
+    source "${_ANTFRASTRUCTURE_CORE}/modules.sh"
   fi
-  info "ContainerHub core library loaded from ${_CONTAINER_HUB_CORE}"
+  info "ANTfrastructure core library loaded from ${_ANTFRASTRUCTURE_CORE}"
 else
   # Minimal fallbacks so scripts still work outside the submodule tree
   # (e.g. when running on a bare checkout without submodule init).
@@ -83,5 +83,5 @@ else
     ${SUDO:-} apt-get install -yq --no-install-recommends "$@"
   }
 
-  warn "ContainerHub core library not found at ${_CONTAINER_HUB_CORE} - using minimal fallbacks"
+  warn "ANTfrastructure core library not found at ${_ANTFRASTRUCTURE_CORE} - using minimal fallbacks"
 fi

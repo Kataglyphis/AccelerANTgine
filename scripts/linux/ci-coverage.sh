@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci-coverage.sh - project wrapper around ContainerHub's generic coverage driver
+# ci-coverage.sh - project wrapper around ANTfrastructure's generic coverage driver
 # (linux/scripts/lib/coverage.sh). Both backends - gcovr for GCC, llvm-cov for
 # Clang - previously lived here as hand-written pipelines; only this project's
 # report paths, filters and the name of the instrumented suite remain.
@@ -9,11 +9,11 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# containerhub_source, not a "${_SCRIPT_DIR}/../../third_party/ContainerHub/..."
-# literal: it resolves under CONTAINERHUB_DIR (which the literal ignored, so the
+# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
+# literal: it resolves under ANTFRASTRUCTURE_DIR (which the literal ignored, so the
 # bootstrap's environment override did nothing) and fails naming the probed path
-# and the fix. In scope because ci-common.sh sources lib/containerhub.sh.
-containerhub_source linux/scripts/lib/coverage.sh
+# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+antfrastructure_source linux/scripts/lib/coverage.sh
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"

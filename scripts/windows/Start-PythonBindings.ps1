@@ -1,8 +1,8 @@
 #requires -Version 7.0
-# Build the Python bindings inside the ContainerHub Windows developer image.
-# Thin project wrapper over ContainerHub's Invoke-ContainerBuild - transport
+# Build the Python bindings inside the ANTfrastructure Windows developer image.
+# Thin project wrapper over ANTfrastructure's Invoke-ContainerBuild - transport
 # decision, reusable container and artifact streaming all live upstream; see
-# ContainerHub docs/windows-container-build-performance.md.
+# ANTfrastructure docs/windows-container-build-performance.md.
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -30,7 +30,7 @@ Set-StrictMode -Version Latest
 
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 
-# Standard import shim: upstream ContainerHub modules win over any vendored copy.
+# Standard import shim: upstream ANTfrastructure modules win over any vendored copy.
 . (Join-Path $PSScriptRoot "Resolve-BuildModule.ps1")
 Import-BuildModule @("WindowsContainerBuild.Reuse")
 

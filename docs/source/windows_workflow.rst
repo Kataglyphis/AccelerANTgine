@@ -16,7 +16,7 @@ Use the wrapper script:
 
    .\scripts\windows\Start-Build.ps1
 
-This script delegates to ContainerHub's ``Invoke-ContainerBuild``
+This script delegates to ANTfrastructure's ``Invoke-ContainerBuild``
 (``WindowsContainerBuild.Reuse``): the sources travel by tar-pipe into a
 reusable container at the family workspace path ``C:\ws`` and
 ``scripts/windows/Build-Windows.ps1`` runs inside it. Bind mounting is the

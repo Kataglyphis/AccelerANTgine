@@ -1,9 +1,9 @@
-# What this repo takes from ContainerHub. One row per asset: the id from
-# third_party/ContainerHub/shared/config/shared-assets.manifest, and a path only
+# What this repo takes from ANTfrastructure. One row per asset: the id from
+# third_party/ANTfrastructure/shared/config/shared-assets.manifest, and a path only
 # when the copy does not sit at that registry row's default.
 #
 # Checked by:
-#   bash third_party/ContainerHub/shared/config/sync-shared-config.sh --repo-root . --check
+#   bash third_party/ANTfrastructure/shared/config/sync-shared-config.sh --repo-root . --check
 #
 # THE THREE DELIBERATE OVERRIDES. This repo carries all five shared configs but
 # takes only two of them. The other three are this project's own answer to a
@@ -35,5 +35,5 @@
 
 clang-format
 cmake-format
-containerhub-sh
+antfrastructure-sh
 resolve-build-module

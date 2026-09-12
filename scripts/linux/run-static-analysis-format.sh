@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-static-analysis-format.sh - project wrapper around ContainerHub's generic
+# run-static-analysis-format.sh - project wrapper around ANTfrastructure's generic
 # code-quality driver (linux/scripts/lib/code-quality.sh).
 #
 # Everything reusable now comes from there: the uv/venv bootstrap for
@@ -19,12 +19,12 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# containerhub_source, not a "${_SCRIPT_DIR}/../../third_party/ContainerHub/..."
-# literal: it resolves under CONTAINERHUB_DIR (which the literal ignored, so the
+# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
+# literal: it resolves under ANTFRASTRUCTURE_DIR (which the literal ignored, so the
 # bootstrap's environment override did nothing) and fails naming the probed path
-# and the fix. In scope because ci-common.sh sources lib/containerhub.sh.
-containerhub_source linux/scripts/lib/code-quality.sh
-containerhub_source linux/scripts/01-core/python_uv.sh
+# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+antfrastructure_source linux/scripts/lib/code-quality.sh
+antfrastructure_source linux/scripts/01-core/python_uv.sh
 
 BUILD_DIR="build"
 COMPILER="clang"
@@ -57,7 +57,7 @@ CODE_QUALITY_CLANG_TIDY_ARGS=(
 
 # cmake-format inputs: the repo config, and discovery over the whole tree minus
 # vendored submodules, every build-*/build_* tree the presets create, and the
-# bootstrap venv. Without the excludes the walk reformats ContainerHub itself.
+# bootstrap venv. Without the excludes the walk reformats ANTfrastructure itself.
 CODE_QUALITY_CMAKE_FORMAT_CONFIG=".cmake-format.yaml"
 CODE_QUALITY_CMAKE_SEARCH_ROOT="."
 CODE_QUALITY_CMAKE_EXCLUDE_PATHS=('./build*/*' './.venv/*' './third_party/*')
@@ -104,7 +104,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Project-specific analyses: no other ContainerHub consumer runs these, so they
+# Project-specific analyses: no other ANTfrastructure consumer runs these, so they
 # stay local rather than being pushed upstream on a sample size of one.
 # ---------------------------------------------------------------------------
 if [[ "${COMPILER}" == "clang" ]]; then

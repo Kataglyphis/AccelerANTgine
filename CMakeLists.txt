@@ -70,33 +70,33 @@ if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
       CACHE BOOL "Disable C++ exceptions (forced OFF: Python bindings need them)" FORCE)
 endif()
 
-# Reusable CMake modules live upstream in the ContainerHub submodule so every
+# Reusable CMake modules live upstream in the ANTfrastructure submodule so every
 # consumer gets the same ones (AGENTS.md section 2, "CMake modules:
-# ContainerHub-first, local override wins"); this repo's own cmake/ keeps only
+# ANTfrastructure-first, local override wins"); this repo's own cmake/ keeps only
 # what encodes THIS project's choices.
 # Both dirs go on CMAKE_MODULE_PATH so every module is included by NAME -
 # `include(Sanitizers)`, not `include(cmake/Sanitizers.cmake)` - which is what
 # lets a module live in either directory without its callers caring.
 #
 # Local first: a project that needs to override an upstream module drops a
-# same-named file in cmake/ and wins, without editing ContainerHub. No local
+# same-named file in cmake/ and wins, without editing ANTfrastructure. No local
 # override remains today: Cache, Tests, Sanitizers and StaticAnalyzers were all
 # reconciled upstream 2026-09-06 and their local copies are gone.
-set(KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ContainerHub/cmake")
+set(KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ANTfrastructure/cmake")
 # Probe CompilerWarnings.cmake, not just the directory: it is one of the modules
 # this repo now has NO local copy of, so its absence is exactly the failure an
 # uninitialised submodule causes - a confusing "Could not find a module" from
 # deep inside ProjectOptions instead of a message naming the real cause.
-if(NOT EXISTS "${KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR}/CompilerWarnings.cmake")
+if(NOT EXISTS "${KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR}/CompilerWarnings.cmake")
   message(
-    FATAL_ERROR "ContainerHub submodule not checked out: ${KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR} has no CMake modules. "
+    FATAL_ERROR "ANTfrastructure submodule not checked out: ${KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR} has no CMake modules. "
                 "Run: git submodule update --init --recursive")
 endif()
 list(
   APPEND
   CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
-  "${KATAGLYPHIS_CONTAINERHUB_CMAKE_DIR}")
+  "${KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR}")
 
 include(PreventInSourceBuilds)
 include(ProjectOptions)
