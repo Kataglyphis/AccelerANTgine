@@ -7,7 +7,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
-    [string]$Image = "ghcr.io/kataglyphis/kataglyphis_beschleuniger:winamd64",
+    [string]$Image,
     [string]$Preset = "x64-ClangCL-Windows-RelWithDebInfo",
     # Explicit docker.exe path; falls back to $env:DOCKER_EXE, the Stevedore
     # install locations, then 'docker' on PATH (Resolve-DockerExe).
@@ -32,7 +32,10 @@ $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 
 # Standard import shim: upstream ANTfrastructure modules win over any vendored copy.
 . (Join-Path $PSScriptRoot "Resolve-BuildModule.ps1")
-Import-BuildModule @("WindowsContainerBuild.Reuse")
+Import-BuildModule @("WindowsContainerBuild.Reuse", "WindowsContainerImage.Common")
+
+# The image ref comes from ANTfrastructure's versions.env, never from here.
+if (-not $Image) { $Image = Get-CiImageReference -Windows }
 
 $docker = Resolve-DockerExe -Override $DockerExe
 Write-Host "Using docker: $docker"

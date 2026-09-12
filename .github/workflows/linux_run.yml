@@ -25,22 +25,8 @@ on:
       GHCR_PAT:
         required: true
 
-env:
-  # One place for the image reference; it was hard-coded in both the pull and
-  # the run step. Mirrors GHCR_IMAGE_WIN in windows_run.yml.
-  #
-  # One tag for both callers. This was briefly derived from inputs.arch, because
-  # :latest-cross was amd64-ONLY and the arm64 caller (linux_run_arm.yml) would
-  # otherwise have got no matching manifest. Re-verified against GHCR 2026-08-12:
-  # the index now lists linux/amd64, linux/arm64 and linux/riscv64 with all three
-  # children present, so docker picks the platform itself and the architecture no
-  # longer belongs in the tag.
-  #
-  # Do NOT go back to plain `:latest`: its children were deleted by the
-  # ghcr-cleanup bug (fixed upstream in b70d3f4) and are still missing, so the
-  # index resolves while every child 404s and `docker pull` says only
-  # "manifest unknown".
-  GHCR_IMAGE_LINUX: ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest-cross
+# No image env: each container action's `image:` input default IS the family ref,
+# and ANTfrastructure's verify_ci_image_refs.py gates it against versions.env.
 
 jobs:
   build:
@@ -58,7 +44,6 @@ jobs:
       - name: Prepare CI host
         uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-linux-ci-host@main
         with:
-          image: ${{ env.GHCR_IMAGE_LINUX }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GHCR_PAT }}
           fetch-depth: '0'
@@ -75,7 +60,6 @@ jobs:
       - name: Run build/test/docs/package inside container
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@main
         with:
-          image: ${{ env.GHCR_IMAGE_LINUX }}
           # CARGO_HOME muss auf einen SCHREIBBAREN Pfad zeigen. Der Image-Default
           # ist /usr/local/cargo und gehoert root, waehrend der Container als
           # Nicht-Root laeuft - cxxbridge-cmd scheiterte damit an
