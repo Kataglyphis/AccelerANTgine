@@ -8,7 +8,6 @@ on:
 
 env:
   BUILD_DIR_RELEASE: "build-clangcl-release"
-  GHCR_IMAGE_WIN: ghcr.io/kataglyphis/kataglyphis_beschleuniger:winamd64
 
 defaults:
   run:
@@ -30,7 +29,6 @@ jobs:
         id: prep
         uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-windows-container-host@main
         with:
-          image: ${{ env.GHCR_IMAGE_WIN }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GHCR_PAT || github.token }}
           fetch-depth: 0
@@ -44,7 +42,7 @@ jobs:
         run: |
           # CpuCount/MemoryGb only bite under -Isolation hyperv; process
           # isolation (the default) shares the whole host.
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Build.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}" -Image "${{ env.GHCR_IMAGE_WIN }}" -CpuCount 32 -MemoryGb 48
+          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Build.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}" -CpuCount 32 -MemoryGb 48
 
       - name: Run debug build on host
         run: |
