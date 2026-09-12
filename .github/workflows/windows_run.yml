@@ -20,15 +20,15 @@ jobs:
     steps:
 
       # The whole prologue - long paths, checkout, short-path clone, data-root
-      # move, disk cleanup, registry login, pull, disk report - is ContainerHub's.
+      # move, disk cleanup, registry login, pull, disk report - is ANTfrastructure's.
       #
       # The short-path clone is not optional here: `submodules: recursive` on the
       # normal workspace was failing this lane at the CHECKOUT step with
-      # "Filename too long" on the ContainerHub -> DocumANTation -> md2pdfLib ->
+      # "Filename too long" on the ANTfrastructure -> DocumANTation -> md2pdfLib ->
       # latex/awesome-beamer chain, so nothing after it ever ran.
       - name: Prepare Windows container host
         id: prep
-        uses: Kataglyphis/ContainerHub/.github/actions/prepare-windows-container-host@main
+        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-windows-container-host@main
         with:
           image: ${{ env.GHCR_IMAGE_WIN }}
           registry-username: ${{ github.actor }}

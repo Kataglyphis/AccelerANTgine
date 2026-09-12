@@ -125,8 +125,8 @@ This enumeration also includes submodules.
    ```
    afterwards.
 3. Optional: Using the newest clang compiler. Install via apt. See [here](https://apt.llvm.org/):
-4. Optional: Run `third_party/ContainerHub/linux/scripts/02-toolchain/setup-dependencies.sh`
-   for preparing important dev tools. The dependency installer is ContainerHub's;
+4. Optional: Run `third_party/ANTfrastructure/linux/scripts/02-toolchain/setup-dependencies.sh`
+   for preparing important dev tools. The dependency installer is ANTfrastructure's;
    this repo does not carry a local copy.
 5. Then build your solution with [CMAKE] (https://cmake.org/) <br />
   Here the recommended way over command line after cloning the repo:<br />
@@ -177,11 +177,11 @@ no `dependabot.yml` here — so this wrapper is the only thing that reads
 `.github/renovate.json` and the only thing watching the seven submodule pins.
 
 `--apply` moves **gitlinks only**, and only for submodules that declare a
-`branch =` in `.gitmodules`; today that is `third_party/ContainerHub` alone. The
+`branch =` in `.gitmodules`; today that is `third_party/ANTfrastructure` alone. The
 other six are reported and explicitly **refused** rather than walked to their
 remote's default branch. Nothing is staged or committed. The Python, Rust and
 pre-commit sides are report-only. See
-[`third_party/ContainerHub/docs/dependency-updates.md`](third_party/ContainerHub/docs/dependency-updates.md).
+[`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md).
 
 #### Rusty things:
 1. Do not forget to upgrade the cxxbridge from time to time:

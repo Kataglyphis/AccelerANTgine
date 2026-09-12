@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci-profile-bench.sh - project wrapper around ContainerHub's generic CMake build
+# ci-profile-bench.sh - project wrapper around ANTfrastructure's generic CMake build
 # driver (linux/scripts/lib/cmake-build.sh) for the profiling/benchmark lane.
 #
 # The jobs computation and the configure+build pair this file used to duplicate
@@ -17,11 +17,11 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# containerhub_source, not a "${_SCRIPT_DIR}/../../third_party/ContainerHub/..."
-# literal: it resolves under CONTAINERHUB_DIR (which the literal ignored, so the
+# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
+# literal: it resolves under ANTFRASTRUCTURE_DIR (which the literal ignored, so the
 # bootstrap's environment override did nothing) and fails naming the probed path
-# and the fix. In scope because ci-common.sh sources lib/containerhub.sh.
-containerhub_source linux/scripts/lib/cmake-build.sh
+# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+antfrastructure_source linux/scripts/lib/cmake-build.sh
 
 PERF_TIMEOUT_SECONDS="180"
 BUILD_DIR="build"

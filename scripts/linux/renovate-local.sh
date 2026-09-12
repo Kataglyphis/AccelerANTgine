@@ -9,7 +9,7 @@
 #   bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
 #   bash scripts/linux/renovate-local.sh --print-bin         # resolved renovate.js
 #
-# THIN WRAPPER over ContainerHub's linux/scripts/renovate-local.sh, the same
+# THIN WRAPPER over ANTfrastructure's linux/scripts/renovate-local.sh, the same
 # shape as run-lint-gates.sh beside it. Upstream owns everything that makes the
 # answer trustworthy: the on-demand, checksum-verified bootstrap of
 # RENOVATE_NODE_VERSION and RENOVATE_VERSION - both pinned in the hub's
@@ -21,7 +21,7 @@
 #
 # THE CONSUMER ROOT IS PASSED EXPLICITLY, and for the same reason
 # run-lint-gates.sh passes it: upstream defaults its target to $PWD, so a run
-# from Src/ or from inside third_party/ContainerHub would grade the wrong tree
+# from Src/ or from inside third_party/ANTfrastructure would grade the wrong tree
 # and answer "up to date" about a repository nobody asked about. A root of your
 # own is therefore an error here - upstream refuses a second one. Every other
 # flag is forwarded untouched.
@@ -33,7 +33,7 @@
 #
 # WHAT --apply REFUSES HERE, which matters more in this repo than in any other
 # consumer: .gitmodules declares SEVEN submodules and exactly ONE of them names
-# a branch - third_party/ContainerHub (branch = main). FUZZTEST,
+# a branch - third_party/ANTfrastructure (branch = main). FUZZTEST,
 # GOOGLE_BENCHMARK, NLOHMANN_JSON, SPDLOG, tomlplusplus and nanobind declare
 # none, and an unset branch does not disarm `git submodule update --remote`: it
 # makes it fall back to the REMOTE'S DEFAULT BRANCH, i.e. every commit on main
@@ -45,7 +45,7 @@
 # That is not theory here. `--apply --dry-run` on 2026-09-09 reported five
 # submodules behind - FUZZTEST, GOOGLE_BENCHMARK, NLOHMANN_JSON, SPDLOG and
 # nanobind - listed all five as REFUSED, and ended in "nothing to apply", with
-# `git status` unchanged afterwards. third_party/ContainerHub was already at the
+# `git status` unchanged afterwards. third_party/ANTfrastructure was already at the
 # tip of main and tomlplusplus was not behind, so the ONE submodule this tool can
 # move had nothing to move. Expect that: on this repo --apply is mostly a
 # machine-checked list of what you must decide yourself.
@@ -91,32 +91,32 @@
 # cannot. The report half only reads and is safe from anywhere.
 #
 # Full rationale, the version pins and the `--platform=github` variant:
-# third_party/ContainerHub/docs/dependency-updates.md - read its token paragraph
+# third_party/ANTfrastructure/docs/dependency-updates.md - read its token paragraph
 # against the GITHUB_COM_TOKEN measurement above.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The bootstrap directly, not ci-common.sh: this wrapper needs containerhub_exec
+# The bootstrap directly, not ci-common.sh: this wrapper needs antfrastructure_exec
 # and nothing else, and ci-common.sh pulls in the whole core library plus its
 # fallback block for a lane that runs no build. The source= directive below
 # points the shell linter at the file rather than silencing it.
-# shellcheck source=lib/containerhub.sh
-source "${_SCRIPT_DIR}/lib/containerhub.sh"
+# shellcheck source=lib/antfrastructure.sh
+source "${_SCRIPT_DIR}/lib/antfrastructure.sh"
 
-# Named separately from containerhub_path's generic "not found / it moved
+# Named separately from antfrastructure_path's generic "not found / it moved
 # upstream" message. While the family adopts this tool the expected failure is a
 # gitlink pinned BEFORE the driver existed upstream, and sending the reader to
 # docs/INDEX.md to hunt for a file that is simply not in this pin wastes the
 # trip. The sibling wrappers in OmniAccelerANT and jotrockenmitlocken carry the
 # same guard for the same reason.
 HUB_RENOVATE_RELATIVE="linux/scripts/renovate-local.sh"
-if [ ! -f "${CONTAINERHUB_DIR}/${HUB_RENOVATE_RELATIVE}" ]; then
-  echo "Error: ${CONTAINERHUB_DIR}/${HUB_RENOVATE_RELATIVE} is missing." >&2
-  echo "       Either ContainerHub is not checked out (git submodule update" >&2
-  echo "       --init --recursive third_party/ContainerHub), or the pinned" >&2
-  echo "       ContainerHub predates the shared Renovate CLI - bump the" >&2
-  echo "       third_party/ContainerHub gitlink." >&2
+if [ ! -f "${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE}" ]; then
+  echo "Error: ${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE} is missing." >&2
+  echo "       Either ANTfrastructure is not checked out (git submodule update" >&2
+  echo "       --init --recursive third_party/ANTfrastructure), or the pinned" >&2
+  echo "       ANTfrastructure predates the shared Renovate CLI - bump the" >&2
+  echo "       third_party/ANTfrastructure gitlink." >&2
   exit 1
 fi
 
-containerhub_exec "${HUB_RENOVATE_RELATIVE}" "${KATAGLYPHIS_REPO_ROOT}" "$@"
+antfrastructure_exec "${HUB_RENOVATE_RELATIVE}" "${KATAGLYPHIS_REPO_ROOT}" "$@"

@@ -1,12 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
-    "AccelerANTgine's Renovate config. Everything shared lives in the preset at ContainerHub's repository root (default.json); the `extends` line below is the whole adoption, exactly as in the four top-level consumers.",
-    "The part this repo cannot get any other way is the git-submodules manager, which Renovate DISABLES by default. third_party/ContainerHub is where this repo's code-quality and coverage libraries come from, and it had drifted 54 commits behind before 2026-09-09 with nothing to notice -- no gate in the family checks gitlink freshness.",
+    "AccelerANTgine's Renovate config. Everything shared lives in the preset at ANTfrastructure's repository root (default.json); the `extends` line below is the whole adoption, exactly as in the four top-level consumers.",
+    "The part this repo cannot get any other way is the git-submodules manager, which Renovate DISABLES by default. third_party/ANTfrastructure is where this repo's code-quality and coverage libraries come from, and it had drifted 54 commits behind before 2026-09-09 with nothing to notice -- no gate in the family checks gitlink freshness.",
     "This repo had NO dependency bot of any kind before this file: no renovate.json and no dependabot.yml. So unlike the other consumers there is no hand-over to sequence and nothing to delete afterwards; this is a pure addition.",
-    "Renovate resolves `github>Kataglyphis/ContainerHub` from ContainerHub's DEFAULT BRANCH, not from the pin in third_party/ContainerHub, so a preset change reaches this repo only after it is merged there. And the Renovate GitHub App is NOT installed on this repository and will not be (owner decision, 2026-09-09) -- no bot will ever author a commit here. That does not make this file idle: the local CLI reads exactly it. See third_party/ContainerHub/docs/dependency-updates.md."
+    "Renovate resolves `github>Kataglyphis/ANTfrastructure` from ANTfrastructure's DEFAULT BRANCH, not from the pin in third_party/ANTfrastructure, so a preset change reaches this repo only after it is merged there. And the Renovate GitHub App is NOT installed on this repository and will not be (owner decision, 2026-09-09) -- no bot will ever author a commit here. That does not make this file idle: the local CLI reads exactly it. See third_party/ANTfrastructure/docs/dependency-updates.md."
   ],
-  "extends": ["github>Kataglyphis/ContainerHub"],
+  "extends": ["github>Kataglyphis/ANTfrastructure"],
   "customManagers": [
     {
       "customType": "regex",
@@ -16,7 +16,7 @@
         "The other TWO are deliberately NOT annotated, and that is the finding rather than an omission. googletest is pinned to an archive of commit 56efe398 -- a digest, not a version, and there is no ordering to follow; making it visible would mean repointing the URL at a release tag, which changes the dependency and is the owner's call. Corrosion is pinned to `master`: that is not a version at all, so this build is not reproducible from its sources, and pinning it is an owner decision this manager must not paper over.",
         "READ THE COMMENT ABOVE THE ABSEIL PIN BEFORE TAKING ITS BUMP. It is coupled to the version FUZZTEST's MODULE.bazel declares and the two must move together; a mismatch breaks e.g. absl::random_mocking_access. Renovate will surface the newer LTS on its own -- deciding to take it is a human step, and it is not a step this manager makes for you.",
         "Two matchStrings, because this file has two pin SHAPES. The first reads a GIT_TAG inside a FetchContent_Declare, quoted or bare. The second reads a value on its own line inside a multi-line set(), which is how CXXBRIDGE_CMD_VERSION is written -- joining that call onto one line would exceed .cmake-format.yaml's line_width of 120 and be wrapped straight back, so the annotation goes directly above the VALUE instead. They cannot both match the same pin: `\\s*` after the newline matches only whitespace, so it can never skip over the literal `GIT_TAG` to reach a quote.",
-        "BeschleunigerBallett carries a near-identical manager for its own third_party/CMakeLists.txt, plus a third shape this repo does not have (`set(<NAME>_TAG <value>)` on one line). The two should be merged into ContainerHub's shared preset as one manager with the union of the matchStrings; that is a hub edit and is deliberately not made from here.",
+        "BeschleunigerBallett carries a near-identical manager for its own third_party/CMakeLists.txt, plus a third shape this repo does not have (`set(<NAME>_TAG <value>)` on one line). The two should be merged into ANTfrastructure's shared preset as one manager with the union of the matchStrings; that is a hub edit and is deliberately not made from here.",
         "The file pattern uses character classes rather than escapes, because the delimiters of a Renovate regex string are slashes and an inner one would end it early."
       ],
       "managerFilePatterns": [

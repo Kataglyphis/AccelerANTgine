@@ -1,6 +1,6 @@
 # Packaging metadata for THIS project. The wiring it feeds - generator
 # selection per platform, the architecture-normalised package name, the NSIS,
-# WiX, DEB and AppImage blocks - lives in ContainerHub's CPackCommon module,
+# WiX, DEB and AppImage blocks - lives in ANTfrastructure's CPackCommon module,
 # because this file was a copy of BeschleunigerBallett's with no shared
 # ancestry and the two copies had already drifted.
 #

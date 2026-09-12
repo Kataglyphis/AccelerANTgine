@@ -3,10 +3,10 @@
 Guidance for coding agents (and new contributors) working in
 AccelerANTgine.
 
-Laid out per ContainerHub's
-[`shared/templates/AGENTS.md.template`](third_party/ContainerHub/shared/templates/README.md).
+Laid out per ANTfrastructure's
+[`shared/templates/AGENTS.md.template`](third_party/ANTfrastructure/shared/templates/README.md).
 The rule that shapes it: *would this still be true in a different project?* If
-yes, ContainerHub owns it and § 2 links to it. If no, it is written out in § 3.
+yes, ANTfrastructure owns it and § 2 links to it. If no, it is written out in § 3.
 
 ## 1. What this project is
 
@@ -22,7 +22,7 @@ is the single fact that most shapes its tooling.
 | `Test/` | Test sources |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh` |
 | `scripts/windows/` | `Build-Windows.ps1`, `Build-PythonBindings.ps1`, the `Start-*.ps1` entry points, and the `Resolve-BuildModule.ps1` bootstrap |
-| `third_party/ContainerHub` | The submodule owning every reusable script, module and doc |
+| `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
 
 **This repo is consumed as a direct submodule** of OmniAccelerANT, at
 `third_party/AccelerANTgine`. The Flutter plugin
@@ -32,23 +32,23 @@ to the superproject root and `add_subdirectory()` the checkout at
 `third_party/AccelerANTgine`. A change here has to reach one superproject
 before an app sees it.
 
-## 2. What ContainerHub owns — links only
+## 2. What ANTfrastructure owns — links only
 
 **Do not restate these procedures here.** Start at
-[`third_party/ContainerHub/docs/INDEX.md`](third_party/ContainerHub/docs/INDEX.md),
+[`third_party/ANTfrastructure/docs/INDEX.md`](third_party/ANTfrastructure/docs/INDEX.md),
 which maps topic → owning document, so these links survive upstream
 reorganisation.
 
 | Topic | Where |
 | --- | --- |
-| Wiring this repo to ContainerHub — resolver, actions, libraries | `docs/adopting-in-a-new-project.md` |
+| Wiring this repo to ANTfrastructure — resolver, actions, libraries | `docs/adopting-in-a-new-project.md` |
 | Linux container builds | `docs/linux-build-basics.md` |
 | Cross-compilation chain and its failure classes | `docs/linux-cross-builds.md`, `docs/cross-build-verification.md` |
 | The Windows image, its entrypoint and known traps | `docs/windows-builds.md` |
 | Bind mount vs tar-pipe, Dev Drive filter setup, container reuse | `docs/windows-container-build-performance.md` |
 | clang-format / clang-tidy / cmake-format and the canonical configs | `docs/code-quality-tooling.md` |
 | Job counts, per-job memory, why a build got OOM-killed | `docs/build-parallelism-memory-tuning.md` |
-| The five shell-safety bug classes | ContainerHub `AGENTS.md` § *Shell safety conventions* |
+| The five shell-safety bug classes | ANTfrastructure `AGENTS.md` § *Shell safety conventions* |
 
 **These scripts are wrappers, not implementations** — change behaviour upstream,
 not here:
@@ -63,11 +63,11 @@ not here:
 | `scripts/linux/renovate-local.sh` | `linux/scripts/renovate-local.sh` — Renovate as a local CLI, plus the git half that applies what it can only detect (passes this repo's root) |
 | `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` + `linux/scripts/01-core/python_uv.sh` for the venv — calls the library steps individually, not `docs_build_main` (the script header says why: the venv bootstrap must run via `bash`, not rely on an exec bit filemode drops) |
 
-CI jobs use ContainerHub's composite actions (`prepare-linux-ci-host`,
+CI jobs use ANTfrastructure's composite actions (`prepare-linux-ci-host`,
 `run-in-linux-container`) rather than hand-written `docker run` blocks.
 
-**CMake modules: ContainerHub-first, local override wins.** `CMakeLists.txt`
-puts this repo's `cmake/` ahead of `third_party/ContainerHub/cmake/` on
+**CMake modules: ANTfrastructure-first, local override wins.** `CMakeLists.txt`
+puts this repo's `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on
 `CMAKE_MODULE_PATH` and includes every module by name. All eleven reusable
 modules now exist only upstream (CompilerWarnings, Doxygen, Hardening,
 InterproceduralOptimization, PreventInSourceBuilds, Speedup,
@@ -81,21 +81,21 @@ this project's own policy — `ProjectOptions.cmake`, `CPackOptions.cmake`,
 StaticAnalyzers copy's clang-tidy `--fix` and three check-disables stay
 autofix-lane-only in `scripts/`; the report-only build gate now surfaces
 those checks. The upstream Tests, Sanitizers and StaticAnalyzers merges only
-reach this repo on the next ContainerHub submodule bump; until then
+reach this repo on the next ANTfrastructure submodule bump; until then
 `include(Tests)` and `include(Sanitizers)` resolve to the pinned upstream
 copies, which predate the clang-cl coverage path and the ASan/UBSan runtime
 hand-work — so do not run a clang-cl Debug ASan build before that bump lands
-(ContainerHub's `docs/windows-clang-cl-sanitizers.md` has the merged story) —
+(ANTfrastructure's `docs/windows-clang-cl-sanitizers.md` has the merged story) —
 and `include(StaticAnalyzers)` resolves to the pinned copy, whose
 two-parameter macro ignores the surplus header-filter argument, so clang-tidy
 falls back to `.clang-tidy`'s `HeaderFilterRegex`.
 
 Two upstream facts repeated here only because they bite before you reach a doc:
 
-- Every ContainerHub PowerShell module declares `#requires -Version 7.0`, so the
+- Every ANTfrastructure PowerShell module declares `#requires -Version 7.0`, so the
   Windows entry scripts do too — launch with `pwsh`, never `powershell`. Under
   5.1 it fails as an opaque `Import-Module` error.
-- Composite actions resolve at `@main`, so a ContainerHub change a workflow
+- Composite actions resolve at `@main`, so a ANTfrastructure change a workflow
   depends on must be pushed **before** the consumer change.
 
 **This repo's glue:** `scripts/windows/Resolve-BuildModule.ps1` — the one file
@@ -120,7 +120,7 @@ written out rather than linked.
   an oversight and re-enabling it produces a wall of parse errors, not findings.
 - **Three analyses stay local rather than going upstream:**
   `clang++ --analyze`, `scan-build-21`, and the `-DUSE_RUST=1` define they need.
-  No other ContainerHub consumer runs them, and one consumer is not enough to
+  No other ANTfrastructure consumer runs them, and one consumer is not enough to
   justify moving code upstream — the two-consumer rule.
 - **`.ixx` files are first-class sources.** Any tooling that globs C++ sources
   must include them; the shared `.pre-commit-config.yaml` regex upstream was
@@ -131,9 +131,9 @@ written out rather than linked.
   `knt_push_frame`, used by the OmniAccelerANT webcam path. Changing a
   signature here breaks a consumer one superproject up, which no build in this
   repo will catch.
-- **Sphinx config pulls its baseline from DocumANTation, via ContainerHub.**
+- **Sphinx config pulls its baseline from DocumANTation, via ANTfrastructure.**
   `docs/source/conf.py` loads `conf_base.py` from
-  `third_party/ContainerHub/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`.
+  `third_party/ANTfrastructure/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`.
   It raises a clear error if that path is missing, which in practice means the
   nested submodule was not initialised recursively.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
@@ -165,7 +165,7 @@ pwsh -NoProfile -File .\scripts\windows\Build-PythonBindings.ps1
 `Start-Build.ps1`, `Start-Debug.ps1`, `Start-Release.ps1`, `Start-Profile.ps1`,
 `Start-PythonBindings.ps1` and `Start-Help.ps1` are the convenience entry
 points over those. `Start-Build.ps1` and `Start-PythonBindings.ps1` run their
-`Build-*.ps1` inside the ContainerHub Windows image via `Invoke-ContainerBuild`
+`Build-*.ps1` inside the ANTfrastructure Windows image via `Invoke-ContainerBuild`
 (`WindowsContainerBuild.Reuse`, imported through `Resolve-BuildModule.ps1`):
 tar-pipe transport into a reusable per-lane build container at `C:\ws` by
 default, `-UseBindMount` to opt into a bind mount, `-FreshContainer` to reset,
@@ -199,7 +199,7 @@ is none on the Windows host.
 **What `--apply` will and will not do here is the thing to know.** It moves
 gitlinks only, by explicit path, and only for submodules that declare a
 `branch =`. Of the seven in `.gitmodules` exactly one does —
-`third_party/ContainerHub` (`branch = main`). Measured 2026-09-09,
+`third_party/ANTfrastructure` (`branch = main`). Measured 2026-09-09,
 `--apply --dry-run` found five behind (`FUZZTEST`, `GOOGLE_BENCHMARK`,
 `NLOHMANN_JSON`, `SPDLOG`, `nanobind`), printed all five as **REFUSED** because
 they name no branch, and ended in "nothing to apply" with `git status`
@@ -217,7 +217,7 @@ the variable that clears it under `--platform=local` is `GITHUB_COM_TOKEN`, not
 `RENOVATE_TOKEN`.
 
 Full rationale:
-[`third_party/ContainerHub/docs/dependency-updates.md`](third_party/ContainerHub/docs/dependency-updates.md).
+[`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md).
 
 ## 6. Docs owned by this repo
 

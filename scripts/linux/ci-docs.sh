@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# ci-docs.sh - project wrapper around ContainerHub's generic Sphinx docs builder
+# ci-docs.sh - project wrapper around ANTfrastructure's generic Sphinx docs builder
 # (linux/scripts/lib/docs-build.sh).
 #
 # What was hand-rolled here and now comes from upstream:
 #   * the venv bootstrap and the inline
 #     `uv pip install sphinx sphinx-book-theme ... breathe exhale ... junit2html`
 #     -> uv_venv_create / uv_pip_install_requirements / uv_venv_activate from
-#        ContainerHub 01-core/python_uv.sh, driven by this repo's OWN
+#        ANTfrastructure 01-core/python_uv.sh, driven by this repo's OWN
 #        requirements.txt so the docs toolchain stops being pinned in two places
 #        (the inline list and requirements.txt had already drifted by a package).
 #   * the _static SVG copy       -> docs_build_copy_static_svg
@@ -43,12 +43,12 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# containerhub_source, not a "${_SCRIPT_DIR}/../../third_party/ContainerHub/..."
-# literal: it resolves under CONTAINERHUB_DIR (which the literal ignored, so the
+# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
+# literal: it resolves under ANTFRASTRUCTURE_DIR (which the literal ignored, so the
 # bootstrap's environment override did nothing) and fails naming the probed path
-# and the fix. In scope because ci-common.sh sources lib/containerhub.sh.
-containerhub_source linux/scripts/lib/docs-build.sh
-containerhub_source linux/scripts/01-core/python_uv.sh
+# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+antfrastructure_source linux/scripts/lib/docs-build.sh
+antfrastructure_source linux/scripts/01-core/python_uv.sh
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
@@ -97,7 +97,7 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   # the cache pinned the generator; standalone (fresh build/) it reproduces.
   cmake -S . -B build -G Ninja
 
-  [[ -f "build/Doxyfile" ]] || die "build/Doxyfile missing after configure: enable_doxygen() (ContainerHub cmake/Doxygen.cmake, via cmake/ProjectOptions.cmake) only writes it when find_package(Doxygen) succeeds - is doxygen installed in this image? The SVG staging below hard-requires its output."
+  [[ -f "build/Doxyfile" ]] || die "build/Doxyfile missing after configure: enable_doxygen() (ANTfrastructure cmake/Doxygen.cmake, via cmake/ProjectOptions.cmake) only writes it when find_package(Doxygen) succeeds - is doxygen installed in this image? The SVG staging below hard-requires its output."
   (cd build && doxygen Doxyfile)
 
   rm -rf docs/source/api

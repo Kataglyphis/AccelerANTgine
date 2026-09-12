@@ -49,11 +49,11 @@ pkg_check_modules(
 # ONNX Runtime dependencies
 # Check multiple possible installation locations:
 # Linux:
-#   1. Container build output: /usr/local/lib/onnxruntime-cpu (from ContainerHub scripts)
+#   1. Container build output: /usr/local/lib/onnxruntime-cpu (from ANTfrastructure scripts)
 #   2. Source installation: /opt/onnxruntime
 #   3. System installation: /usr
 # Windows:
-#   4. Environment variable: ONNXRUNTIME_ROOT or ONNX_ROOT (ContainerHub)
+#   4. Environment variable: ONNXRUNTIME_ROOT or ONNX_ROOT (ANTfrastructure)
 #   5. Standard Windows locations: C:/onnxruntime, C:/onnx, C:/Program Files/onnxruntime
 #   6. vcpkg installed locations
 

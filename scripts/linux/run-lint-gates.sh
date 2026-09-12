@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run-lint-gates.sh - this repo's shell + workflow + secret + Python lint gates.
 #
-# THIN WRAPPER over ContainerHub's linux/scripts/run-lint-gates.sh, which owns
+# THIN WRAPPER over ANTfrastructure's linux/scripts/run-lint-gates.sh, which owns
 # all four gates and everything that makes them trustworthy: the pinned tool
 # bootstraps (shellcheck, actionlint and gitleaks are also SHA256-verified; ruff
 # is version-pinned and fetched via uvx, so uv verifies it against PyPI rather
@@ -28,8 +28,8 @@
 # on its own wrapper if the header is written the obvious way.
 #
 # THE CONSUMER ROOT IS PASSED EXPLICITLY, and upstream refuses to infer it. The
-# half of this gate that does the work lives inside third_party/ContainerHub, so
-# a root derived from its own BASH_SOURCE would grade ContainerHub's tree and
+# half of this gate that does the work lives inside third_party/ANTfrastructure, so
+# a root derived from its own BASH_SOURCE would grade ANTfrastructure's tree and
 # report green over the wrong repository.
 #
 # --exclude defaults to third_party upstream, which is what this repo needs:
@@ -48,12 +48,12 @@
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The bootstrap directly, not ci-common.sh: this wrapper needs containerhub_exec
+# The bootstrap directly, not ci-common.sh: this wrapper needs antfrastructure_exec
 # and nothing else, and ci-common.sh pulls in the whole core library (logging,
 # apt, parallelism) plus its fallback block for a lane that runs no build.
 # source= rather than a disable directive - it points the linter at the file
 # instead of silencing it.
-# shellcheck source=lib/containerhub.sh
-source "${_SCRIPT_DIR}/lib/containerhub.sh"
+# shellcheck source=lib/antfrastructure.sh
+source "${_SCRIPT_DIR}/lib/antfrastructure.sh"
 
-containerhub_exec linux/scripts/run-lint-gates.sh "${KATAGLYPHIS_REPO_ROOT}" "$@"
+antfrastructure_exec linux/scripts/run-lint-gates.sh "${KATAGLYPHIS_REPO_ROOT}" "$@"

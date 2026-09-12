@@ -88,7 +88,7 @@ The recommended Windows build wrapper is:
 
    .\scripts\windows\Start-Build.ps1
 
-This hands the build to ContainerHub's ``Invoke-ContainerBuild`` (module
+This hands the build to ANTfrastructure's ``Invoke-ContainerBuild`` (module
 ``WindowsContainerBuild.Reuse``), which runs
 ``scripts/windows/Build-Windows.ps1`` inside a REUSABLE container with these
 defaults:

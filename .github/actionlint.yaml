@@ -11,7 +11,7 @@
 # it and linux_run_arm.yml passes ubuntu-26.04-arm.
 #
 # actionlint discovers this file by path relative to the repo being linted, so
-# it cannot be read out of third_party/ContainerHub - the hub carries the same
+# it cannot be read out of third_party/ANTfrastructure - the hub carries the same
 # declaration for its own tree, as do BeschleunigerBallett, OrchestrANT and
 # OmniAccelerANT. That per-consumer duplication is a known upstream candidate:
 # lint-workflows.sh could fall back to the hub's config when a consumer ships

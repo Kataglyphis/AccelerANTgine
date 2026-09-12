@@ -149,7 +149,7 @@ ensure_flatpak_runtime() {
     flatpak_arch="$(flatpak --default-arch 2>/dev/null || true)"
   fi
   if [[ -z "${flatpak_arch}" ]]; then
-    # Use ContainerHub's arch_oci, then map back to uname-style for flatpak
+    # Use ANTfrastructure's arch_oci, then map back to uname-style for flatpak
     local oci_arch
     oci_arch="$(arch_oci)"
     case "${oci_arch}" in

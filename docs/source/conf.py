@@ -4,7 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 # ---------------------------------------------------------------------------
-# Import shared Kataglyphis theme baseline from ContainerHub template.
+# Import shared Kataglyphis theme baseline from ANTfrastructure template.
 # This keeps the look-and-feel in sync: when the template changes, this
 # project automatically picks up the new settings on the next build.
 # ---------------------------------------------------------------------------
@@ -16,14 +16,14 @@ _DOCS_SOURCE_DIR = pathlib.Path(__file__).resolve().parent
 _REPO_ROOT = _DOCS_SOURCE_DIR.parents[1]
 _DOXYGEN_XML_DIR = _REPO_ROOT / "build" / "build" / "xml"
 
-# The shared Sphinx baseline moved out of ContainerHub on 2026-07-14 (e3e2d6d),
+# The shared Sphinx baseline moved out of ANTfrastructure on 2026-07-14 (e3e2d6d),
 # inverting the ownership: templates, theme and doc-generation scripts live in
-# DocumANTation, which ContainerHub vendors. Both directory names changed again
+# DocumANTation, which ANTfrastructure vendors. Both directory names changed again
 # on 2026-09-05 — see AGENTS.md.
 _TEMPLATE_DIR = (
     pathlib.Path(__file__).resolve().parents[2]
     / "third_party"
-    / "ContainerHub"
+    / "ANTfrastructure"
     / "third_party"
     / "DocumANTation"
     / "docs-tooling"
@@ -37,7 +37,7 @@ _spec = importlib.util.spec_from_file_location(
 if _spec is None or _spec.loader is None:
     raise ImportError(
         f"Cannot load shared Sphinx baseline from {_TEMPLATE_DIR / 'conf_base.py'}. "
-        "Ensure the ContainerHub submodule is checked out."
+        "Ensure the ANTfrastructure submodule is checked out."
     )
 _conf_base = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_conf_base)
