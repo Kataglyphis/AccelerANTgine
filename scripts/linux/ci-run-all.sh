@@ -51,6 +51,17 @@ done
 info "=== CI Run All ==="
 info "Compiler: ${COMPILER}  Runner: ${RUNNER}  Arch: ${MATRIX_ARCH}"
 
+# clang links against the image's source-built GCC; the prefix is derived from the
+# hub (versions.env GCC_VERSION via cross-gcc.sh), not spelled here: linux_run.yml
+# carried the literal /opt/gcc-15.2.0 and went stale on 2026-08-07.
+if [[ "${COMPILER}" == "clang" ]]; then
+	antfrastructure_source linux/scripts/01-core/cross-gcc.sh
+	_gcc_prefix="$(gcc_toolchain_prefix)"
+	export CXXFLAGS="--gcc-toolchain=${_gcc_prefix}"
+	export LDFLAGS="-L${_gcc_prefix}/lib64 -Wl,-rpath,${_gcc_prefix}/lib64 --gcc-toolchain=${_gcc_prefix}"
+	info "GCC toolchain for clang: ${_gcc_prefix}"
+fi
+
 bash scripts/linux/ci-init.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \
