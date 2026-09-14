@@ -16,9 +16,9 @@ kataglyphis_cpack_common(
   PACKAGE_ICON
   "${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png"
   NSIS_WELCOME_TITLE
-  "Get ready for epic graphics."
+  "Inference on caffeine boost."
   NSIS_FINISH_TITLE
-  "Now you are ready to render :)"
+  "AccelerANTgine is installed."
   NSIS_HEADER_IMAGE
   "${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.bmp"
   NSIS_MUI_ICON

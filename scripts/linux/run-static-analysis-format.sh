@@ -25,6 +25,8 @@ source "${_SCRIPT_DIR}/ci-common.sh"
 # and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
 antfrastructure_source linux/scripts/lib/code-quality.sh
 antfrastructure_source linux/scripts/01-core/python_uv.sh
+antfrastructure_source linux/scripts/01-core/gates.sh
+antfrastructure_source linux/scripts/01-core/tool-checks.sh
 
 BUILD_DIR="build"
 COMPILER="clang"
@@ -82,71 +84,66 @@ mapfile -t FORMAT_FILES < <(code_quality_find_cpp_files Src)
 mapfile -t SRC_FILES    < <(code_quality_find_clang_tidy_files Src)
 
 if [[ ${#SRC_FILES[@]} -eq 0 ]]; then
-  warn "No C++ source/module files found under Src/, skipping static analysis."
-  exit 0
+  # Src/ exists and is full of modules, so an empty set is a discovery bug.
+  die "No C++ source/module files found under Src/ - check the extension lists above."
 fi
 
-# cmake-format lives in a Python env; the library bootstraps it via uv and errs
-# loudly when it cannot. A quality lane without its tool is red, not "continuing".
+# cmake-format lives in a Python env; the library bootstraps it via uv (into
+# the venv it then activates) and errs loudly when it cannot.
 code_quality_ensure_cmake_format
+
+# Every tool up front, the missing ones named together (01-core/tool-checks.sh).
+# A quality lane without its tool is red, not "continuing".
+require_tools cmake cmake-format clang-format clang-tidy scan-build-21 clang++
+
+# Every analysis RUNS, a failure is RECORDED, and the verdict is decided once
+# by assert_gates (01-core/gates.sh) - no `|| true`, no warn-and-skip.
+gate_reset "static-analysis"
 
 mapfile -t CMAKE_FILES < <(code_quality_find_cmake_files)
 if [[ ${#CMAKE_FILES[@]} -eq 0 ]]; then
   # The root CMakeLists.txt always exists, so an empty set is a discovery bug.
   die "cmake-format discovery found no CMake files - check CODE_QUALITY_CMAKE_SEARCH_ROOT/excludes."
 fi
-code_quality_run_cmake_format "${CMAKE_FILES[@]}"
-
-if command -v clang-format >/dev/null 2>&1; then
-  [[ ${#FORMAT_FILES[@]} -gt 0 ]] && code_quality_run_clang_format "${FORMAT_FILES[@]}"
-else
-  warn "clang-format not available, skipping"
-fi
+run_gate cmake-format code_quality_run_cmake_format "${CMAKE_FILES[@]}"
+run_gate clang-format code_quality_run_clang_format "${FORMAT_FILES[@]}"
 
 # ---------------------------------------------------------------------------
 # Project-specific analyses: no other ANTfrastructure consumer runs these, so they
 # stay local rather than being pushed upstream on a sample size of one.
 # ---------------------------------------------------------------------------
-if [[ "${COMPILER}" == "clang" ]]; then
-  if [[ "${DIRECT_ANALYZE}" == "1" ]]; then
-    info "Running clang++ --analyze"
-    clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}" || true
-  fi
+run_scan_build() {
+  [[ -d "${BUILD_DIR}" ]] || err "Build directory '${BUILD_DIR}' not found - scan-build needs a configured tree."
+  mkdir -p scan-build-reports
+  scan-build-21 -o scan-build-reports cmake --build "${BUILD_DIR}"
+}
 
-  if command -v scan-build-21 >/dev/null 2>&1; then
-    if [[ -d "${BUILD_DIR}" ]]; then
-      info "Running scan-build-21"
-      mkdir -p scan-build-reports
-      scan-build-21 -o scan-build-reports cmake --build "${BUILD_DIR}"
-    else
-      warn "Build directory '${BUILD_DIR}' not found, skipping scan-build."
-    fi
-  else
-    warn "scan-build-21 not available, skipping"
-  fi
-fi
-
-# ---------------------------------------------------------------------------
-# clang-tidy. GCC is skipped deliberately: a GCC-generated compile_commands.json
-# carries C++ module flags clang-tidy cannot parse.
-# ---------------------------------------------------------------------------
-if ! command -v clang-tidy >/dev/null 2>&1; then
-  warn "clang-tidy not available, skipping"
-elif [[ "${COMPILER}" != "clang" ]]; then
-  info "Skipping clang-tidy for compiler='${COMPILER}' (GCC module flags are unsupported by clang-tidy)."
-else
-  # Generate the DB if the build tree has not produced one yet.
-  if [[ ! -f "${BUILD_DIR}/compile_commands.json" ]] && command -v cmake >/dev/null 2>&1; then
+# clang-tidy: the DB is generated if the build tree has not produced one yet,
+# and the remapped copy is removed whatever the verdict.
+run_clang_tidy() {
+  if [[ ! -f "${BUILD_DIR}/compile_commands.json" ]]; then
     cmake --preset "${CLANG_DEBUG_PRESET}" -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
   fi
+  code_quality_prepare_compile_db "${BUILD_DIR}"
+  # Absolute paths: clang-tidy matches entries in the DB by path, and the DB
+  # records absolute ones.
+  local abs_src_files=() status=0
+  mapfile -t abs_src_files < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
+  code_quality_run_clang_tidy "${CODE_QUALITY_COMPILE_DB_DIR}" "${abs_src_files[@]}" || status=$?
+  code_quality_cleanup_compile_db
+  return "${status}"
+}
 
-  if code_quality_prepare_compile_db "${BUILD_DIR}"; then
-    # Absolute paths: clang-tidy matches entries in the DB by path, and the DB
-    # records absolute ones.
-    mapfile -t ABS_SRC_FILES < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
-    code_quality_run_clang_tidy "${CODE_QUALITY_COMPILE_DB_DIR}" "${ABS_SRC_FILES[@]}" || true
-    code_quality_cleanup_compile_db
-  else
-    warn "No compilation database available, skipping clang-tidy."
+if [[ "${COMPILER}" == "clang" ]]; then
+  if [[ "${DIRECT_ANALYZE}" == "1" ]]; then
+    run_gate clang-analyze clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}"
   fi
+  run_gate scan-build run_scan_build
+  run_gate clang-tidy run_clang_tidy
+else
+  # Deliberate, not a missing tool: a GCC-generated compile_commands.json
+  # carries C++ module flags clang-tidy cannot parse (AGENTS.md section 4).
+  info "Skipping clang-tidy and scan-build for compiler='${COMPILER}' (clang-only analyses)."
 fi
+
+assert_gates
