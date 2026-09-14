@@ -1,3 +1,7 @@
+# GoogleTest registration (discovery, the clang-cl opt-out and its add_test
+# fallback) lives in the hub: third_party/ANTfrastructure/cmake/GTestDiscovery.cmake.
+include(GTestDiscovery)
+
 function(
   kataglyphis_collect_project_sources
   out_sources
@@ -37,44 +41,10 @@ function(kataglyphis_add_config_module_to_target target_name project_src_dir)
   endif()
 endfunction()
 
+# Kept under its old name so the Test/*/CMakeLists.txt call sites stay as they
+# are; no WORKING_DIRECTORY on purpose (the module header says why).
 function(kataglyphis_configure_gtest_discovery test_target)
-  if(NOT DEFINED KATAGLYPHIS_ENABLE_GTEST_DISCOVERY)
-    set(KATAGLYPHIS_ENABLE_GTEST_DISCOVERY ON)
-  endif()
-
-  # clang-cl ASan/UBSan executables can fail during gtest discovery on Windows
-  # with loader errors (0xc0000135). Fall back to a plain add_test registration.
-  if(WIN32
-     AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-     AND MSVC)
-    set(KATAGLYPHIS_ENABLE_GTEST_DISCOVERY OFF)
-  endif()
-
-  if(KATAGLYPHIS_ENABLE_GTEST_DISCOVERY)
-    message(STATUS "Enabling gtest_discover_tests for ${test_target}.")
-    # On Windows ASan builds, running test executables during build can fail due
-    # to runtime loader path issues. PRE_TEST discovery defers this to ctest.
-    gtest_discover_tests(
-      ${test_target}
-      DISCOVERY_TIMEOUT
-      300
-      DISCOVERY_MODE
-      PRE_TEST)
-  else()
-    message(STATUS "KATAGLYPHIS_ENABLE_GTEST_DISCOVERY is OFF - using add_test fallback for ${test_target}.")
-    add_test(NAME ${test_target} COMMAND $<TARGET_FILE:${test_target}>)
-    if(WIN32)
-      get_filename_component(_kataglyphis_compiler_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
-      set_tests_properties(
-        ${test_target}
-        PROPERTIES
-          WORKING_DIRECTORY
-          "$<TARGET_FILE_DIR:${test_target}>"
-          ENVIRONMENT
-          "PATH=$<TARGET_FILE_DIR:${test_target}>;${CMAKE_BINARY_DIR}/bin;${CMAKE_BINARY_DIR}/lib;${_kataglyphis_compiler_dir};$ENV{PATH}"
-      )
-    endif()
-  endif()
+  kataglyphis_register_gtest_target(${test_target})
 endfunction()
 
 function(

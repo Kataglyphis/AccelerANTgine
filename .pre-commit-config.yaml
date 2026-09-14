@@ -17,5 +17,5 @@ repos:
         name: cmake-format
         entry: cmake-format -i
         language: system
-        files: \.cmake$
+        files: (^|/)CMakeLists\.txt$|\.cmake$
         pass_filenames: true

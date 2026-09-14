@@ -24,11 +24,7 @@
 #                            equivalent of.
 #   .pre-commit-config.yaml  runs an extra local `clang-tidy` hook on commit.
 #                            Which hooks a project runs locally is a workflow
-#                            choice. NOTE: its cmake-format hook still matches
-#                            `\.cmake$` only, so CMakeLists.txt is not formatted
-#                            on commit here - the canonical hook was widened on
-#                            2026-09-06 and this copy predates it. That half is
-#                            staleness rather than intent; see shared/config/README.md.
+#                            choice.
 #
 # `.clang-format` is NOT an override: it was ahead of canonical, and canonical
 # was corrected to match on 2026-08-11.
