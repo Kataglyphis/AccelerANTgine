@@ -12,12 +12,9 @@ For the official docs follow this [link](https://hardwareacceleratedai.jonashein
 
 [![Linux run on ARM/GCC/Clang](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_arm.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_arm.yml)
 [![Linux run on x86/GCC/Clang](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_x86.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_x86.yml)
-[![CMake on Windows MSVC x64](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows_run.yml/badge.svg?branch=main)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows_run.yml)
+[![CMake on Windows MSVC/Clang x64](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows_run.yml/badge.svg?branch=main)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows_run.yml)
 [![CodeQL](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/github-code-scanning/codeql)
 [![Automatic Dependency Submission](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/dependency-graph/auto-submission/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/dependency-graph/auto-submission)
-<!-- [![Linux build](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Linux.yml/badge.svg)](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Linux.yml)
-[![Windows build](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Windows.yml/badge.svg)](https://github.com/Kataglyphis/GraphicsEngineVulkan/actions/workflows/Windows.yml)
-[![TopLang](https://img.shields.io/github/languages/top/Kataglyphis/GraphicsEngineVulkan)]() -->
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypalme/JonasHeinle)
 [![Twitter](https://img.shields.io/twitter/follow/Cataglyphis_?style=social)](https://twitter.com/Cataglyphis_)
 
@@ -31,7 +28,6 @@ For the official docs follow this [link](https://hardwareacceleratedai.jonashein
   - [Installation](#installation)
   - [Upgrades](#upgrades)
 - [Tests](#tests)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
@@ -54,7 +50,7 @@ Frequently tested under:
 
 | Category            | Feature                      | Implement Status |
 |---------------------|------------------------------|:----------------:|
-| Build System        | CMake > 4.1                  |        ✔️        |
+| Build System        | CMake >= 3.31.6              |        ✔️        |
 | Performance         | Performance Benchmark        |        ✔️        |
 | Platform Support    | Linux/Windows support        |        ✔️        |
 | Compiler Support    | Clang/GNU/MSVC support       |        ✔️        |
@@ -71,8 +67,13 @@ Frequently tested under:
 
 ### Dependencies
 This enumeration also includes submodules.
+* [ONNX Runtime](https://onnxruntime.ai/) — inference
+* [GStreamer](https://gstreamer.freedesktop.org/) — media pipelines
+* [WebRTC](https://webrtc.org/) — realtime transport
 * [nlohmann_json](https://github.com/nlohmann/json)
+* [tomlplusplus](https://github.com/marzer/tomlplusplus)
 * [SPDLOG](https://github.com/gabime/spdlog)
+* [nanobind](https://github.com/wjakob/nanobind) — the Python bindings
 * [gtest](https://github.com/google/googletest)
 * [gbenchmark](https://github.com/google/benchmark)
 * [google fuzztest](https://github.com/google/fuzztest)
@@ -110,7 +111,7 @@ This enumeration also includes submodules.
 
 **C++23** or higher required.<br />
 **C17** or higher required.<br />
-**CMake 4.1.1** or higher required.<br />
+**CMake 3.31.6** or higher required.<br />
 
 ### Installation
 
@@ -159,6 +160,13 @@ This enumeration also includes submodules.
 scripts/windows/Build-Windows.ps1 -BuildDir C:\b\kcpp\dbg -BuildDirRelease C:\b\kcpp\rel -LogDir C:\b\kcpp\logs
 ```
 
+### Python bindings
+
+The library is also exposed to Python through nanobind: the module lives in
+`Bindings/python` (`kataglyphis_inference`), its tests in `Test/python`, and
+`scripts/windows/Build-PythonBindings.ps1` (or `Start-PythonBindings.ps1`, which
+runs it inside the ANTfrastructure Windows image) builds and tests it on Windows.
+
 ### Upgrades
 
 #### What is behind: Renovate as a local CLI
@@ -176,11 +184,10 @@ GitHub App is installed on no repo in this family and will not be, and there is
 no `dependabot.yml` here — so this wrapper is the only thing that reads
 `.github/renovate.json` and the only thing watching the seven submodule pins.
 
-`--apply` moves **gitlinks only**, and only for submodules that declare a
-`branch =` in `.gitmodules`; today that is `third_party/ANTfrastructure` alone. The
-other six are reported and explicitly **refused** rather than walked to their
-remote's default branch. Nothing is staged or committed. The Python, Rust and
-pre-commit sides are report-only. See
+All seven submodules declare a `branch =` since 9a5653d, so `--apply` moves
+gitlinks (and nothing else) for any that are behind — `FUZZTEST` included, which
+must move together with the abseil pin in `third_party/CMakeLists.txt`; the
+Python, Rust and pre-commit sides stay report-only. See
 [`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md).
 
 #### Rusty things:
@@ -190,7 +197,7 @@ cargo install cxxbridge-cmd
 ```
 
 # Tests
-I have four tests suites.
+I have five tests suites.
 
 1. Compilation Test Suite: This suite gets executed every compilation step. This ensures the very most important functionality is correct before every compilation.
 
@@ -199,6 +206,8 @@ I have four tests suites.
 3. Perf test suite: It is all about measurements of performance. We are C++ tho! 
 
 4. Fuzz testing suite
+
+5. Python bindings test suite (`Test/python`), run against the built `kataglyphis_inference` module.
 
 ## Performance Tests
 
@@ -282,13 +291,6 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-<!-- ROADMAP -->
-## Roadmap
-Upcoming :)
-<!-- See the [open issues](https://github.com/othneildrew/Best-README-Template/issues) for a list of proposed features (and known issues). -->
-
-
-
 <!-- CONTRIBUTING -->
 ## Contributing
 
@@ -304,6 +306,8 @@ Contributions are what make the open source community such an amazing place to b
 <!-- LICENSE -->
 ## License
 
+Distributed under the MIT License. See [`LICENSE`](LICENSE).
+
 <!-- CONTACT -->
 ## Contact
 
@@ -312,10 +316,6 @@ Jonas Heinle - [@Cataglyphis_](https://twitter.com/Cataglyphis_) - jonasheinle@g
 [jonasheinle.de](https://jonasheinle.de/#/landingPage)
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
-
-<!-- Thanks for free 3D Models: 
-* [Morgan McGuire, Computer Graphics Archive, July 2017 (https://casual-effects.com/data)](http://casual-effects.com/data/)
-* [Viking room](https://sketchfab.com/3d-models/viking-room-a49f1b8e4f5c4ecf9e1fe7d81915ad38) -->
 
 ## Literature 
 

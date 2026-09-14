@@ -31,24 +31,10 @@
 # tool working, not a broken script. The write half is git, and it moves
 # GITLINKS only.
 #
-# WHAT --apply REFUSES HERE, which matters more in this repo than in any other
-# consumer: .gitmodules declares SEVEN submodules and exactly ONE of them names
-# a branch - third_party/ANTfrastructure (branch = main). FUZZTEST,
-# GOOGLE_BENCHMARK, NLOHMANN_JSON, SPDLOG, tomlplusplus and nanobind declare
-# none, and an unset branch does not disarm `git submodule update --remote`: it
-# makes it fall back to the REMOTE'S DEFAULT BRANCH, i.e. every commit on main
-# since the pin was taken. So upstream passes explicit paths, only for the
-# submodule that declares a branch, and prints the other six as REFUSED when
-# they are behind - to be moved by hand, deliberately, and for FUZZTEST with the
-# Abseil/GoogleTest coupling in mind. Nothing is staged or committed either way.
-#
-# That is not theory here. `--apply --dry-run` on 2026-09-09 reported five
-# submodules behind - FUZZTEST, GOOGLE_BENCHMARK, NLOHMANN_JSON, SPDLOG and
-# nanobind - listed all five as REFUSED, and ended in "nothing to apply", with
-# `git status` unchanged afterwards. third_party/ANTfrastructure was already at the
-# tip of main and tomlplusplus was not behind, so the ONE submodule this tool can
-# move had nothing to move. Expect that: on this repo --apply is mostly a
-# machine-checked list of what you must decide yourself.
+# WHAT --apply MOVES HERE: all seven submodules in .gitmodules declare a branch
+# since 9a5653d, so it moves any that are behind - FUZZTEST included, which must
+# move together with the abseil pin in third_party/CMakeLists.txt (AGENTS.md
+# section 3). Nothing is staged or committed either way.
 #
 # THE PYTHON, RUST AND pre-commit SIDES ARE REPORT-ONLY. --apply moves gitlinks
 # and nothing else; point --managers at another ecosystem and you get a table,

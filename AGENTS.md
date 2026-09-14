@@ -4,9 +4,9 @@ Guidance for coding agents (and new contributors) working in
 AccelerANTgine.
 
 Laid out per ANTfrastructure's
-[`shared/templates/AGENTS.md.template`](third_party/ANTfrastructure/shared/templates/README.md).
+[`shared/templates/AGENTS.md.template`](third_party/ANTfrastructure/shared/templates/AGENTS.md.template).
 The rule that shapes it: *would this still be true in a different project?* If
-yes, ANTfrastructure owns it and § 2 links to it. If no, it is written out in § 3.
+yes, ANTfrastructure owns it and § 2 links to it. If no, it is written out in § 4.
 
 ## 1. What this project is
 
@@ -18,7 +18,7 @@ is the single fact that most shapes its tooling.
 | Path | What lives there |
 | --- | --- |
 | `Src/` | The library: `onnx_inference_engine`, `gstreamer_pipeline`, `toml_config`, `config_loader`, `inference_lib`, plus `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/` |
-| `Bindings/`, `build-python/` | Python bindings and their build tree |
+| `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | Test sources |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh` |
 | `scripts/windows/` | `Build-Windows.ps1`, `Build-PythonBindings.ps1`, the `Start-*.ps1` entry points, and the `Resolve-BuildModule.ps1` bootstrap |
@@ -57,7 +57,7 @@ not here:
 | --- | --- |
 | `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism) |
 | `scripts/linux/ci-coverage.sh` | `linux/scripts/lib/coverage.sh` — gcovr for GCC, llvm-cov for clang |
-| `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh` — the cmake-format gate fails loud (no tool, no green lane) and hands the library its uv venv bootstrap as shell functions over `01-core/python_uv.sh`, not helper scripts, for the same exec-bit filemode reason as `ci-docs.sh` |
+| `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh`, every analysis run through `01-core/gates.sh` (`run_gate` … `assert_gates`) with its tools `require_tools`'d rather than skipped — no tool, no green lane; the uv venv bootstrap is handed over as shell functions over `01-core/python_uv.sh`, not helper scripts, for the same exec-bit filemode reason as `ci-docs.sh` |
 | `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |
 | `scripts/linux/ci-profile-bench.sh` | `linux/scripts/lib/cmake-build.sh` — the perf/benchmark run itself stays local |
 | `scripts/linux/renovate-local.sh` | `linux/scripts/renovate-local.sh` — Renovate as a local CLI, plus the git half that applies what it can only detect (passes this repo's root) |
@@ -68,27 +68,12 @@ CI jobs use ANTfrastructure's composite actions (`prepare-linux-ci-host`,
 
 **CMake modules: ANTfrastructure-first, local override wins.** `CMakeLists.txt`
 puts this repo's `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on
-`CMAKE_MODULE_PATH` and includes every module by name. All eleven reusable
-modules now exist only upstream (CompilerWarnings, Doxygen, Hardening,
-InterproceduralOptimization, PreventInSourceBuilds, Speedup,
-StandardProjectSettings, and — reconciled upstream 2026-09-06 — Cache, Tests,
-Sanitizers and StaticAnalyzers; Tests and Sanitizers carried this repo's
-clang-cl coverage path and its ASan/UBSan runtime hand-work with them, and
-StaticAnalyzers' clang-tidy gained an optional header-filter argument that
-`ProjectOptions.cmake` fills with this repo's `Src/.*`). `cmake/` keeps only
-this project's own policy — `ProjectOptions.cmake`, `CPackOptions.cmake`,
-`SystemLibDependencies.cmake`, `fuzztest_compat/`. The old local
-StaticAnalyzers copy's clang-tidy `--fix` and three check-disables stay
-autofix-lane-only in `scripts/`; the report-only build gate now surfaces
-those checks. The upstream Tests, Sanitizers and StaticAnalyzers merges only
-reach this repo on the next ANTfrastructure submodule bump; until then
-`include(Tests)` and `include(Sanitizers)` resolve to the pinned upstream
-copies, which predate the clang-cl coverage path and the ASan/UBSan runtime
-hand-work — so do not run a clang-cl Debug ASan build before that bump lands
-(ANTfrastructure's `docs/windows-clang-cl-sanitizers.md` has the merged story) —
-and `include(StaticAnalyzers)` resolves to the pinned copy, whose
-two-parameter macro ignores the surplus header-filter argument, so clang-tidy
-falls back to `.clang-tidy`'s `HeaderFilterRegex`.
+`CMAKE_MODULE_PATH` and includes every module by name. Local `cmake/` holds
+only this project's own policy — `ProjectOptions.cmake`, `CPackOptions.cmake`,
+`SystemLibDependencies.cmake`, `fuzztest_compat/` — and everything else,
+`Test/cmake/CommonTestBuild.cmake`'s GoogleTest registration (`GTestDiscovery`)
+included, resolves by name from
+[`third_party/ANTfrastructure/cmake`](third_party/ANTfrastructure/cmake/README.md).
 
 Two upstream facts repeated here only because they bite before you reach a doc:
 
@@ -109,7 +94,30 @@ call into must be named in that list explicitly. Its Step 3 runs upstream
 cmake-format with `.cmake-format.yaml` — mirroring the Linux lane's gate; it
 throws when uv or cmake-format is missing, and `-SkipFormat` opts out.
 
-## 3. Pitfalls specific to this project
+## 3. Critical invariant: submodule pins
+
+Builds are only supported against the **recorded submodule gitlinks** — the
+commits CI builds green. `git submodule update --checkout --recursive` restores
+every pin. If a drifted submodule is what you actually want, update the gitlink
+**and** fix the fallout in the same change.
+
+- `third_party/FUZZTEST` and the abseil `FetchContent` pin in
+  `third_party/CMakeLists.txt` MUST move together: the `GIT_TAG` there tracks
+  the version FUZZTEST's `MODULE.bazel` declares, and a mismatch breaks e.g.
+  `absl::random_mocking_access`. `cmake/fuzztest_compat/` papers over the
+  header gap between the current pair — re-check it on every move.
+- No other pin here has a recorded coupling (checked 2026-09-14).
+
+Drift is guarded by ANTfrastructure's shared suite, run by
+`.github/workflows/submodule-pins.yml` on every push and PR that touches
+`.gitmodules` or `third_party/**`. It asserts that every configured submodule
+is checked out, sits at its recorded commit, and is pinned to a commit a fresh
+clone could restore — a pin that is on no remote branch works only on the
+machine that made it. Its checkout needs `submodules: true`; without it the
+suite FAILS rather than passing on an empty tree. Run it after any pin bump. It
+does **not** check the coupling above; that is on you.
+
+## 4. Pitfalls specific to this project
 
 Everything here is false or meaningless in another repo — that is why it is
 written out rather than linked.
@@ -142,7 +150,7 @@ written out rather than linked.
   `x64-{MSVC,ClangCL}-Windows-{Debug,RelWithDebInfo,Profile,Release}`. Coverage
   requires a matching compiler — gcovr only reads GCC output, llvm-cov only clang.
 
-## 4. Build, run, test
+## 5. Build, run, test
 
 The whole Linux CI chain, in order:
 
@@ -175,10 +183,11 @@ redirect files are gone, as is the image-baked `C:\workspace` mount target
 (mounting over an image dir fails at CreateComputeSystem on host/image
 OS-build skew).
 
-CI lanes: `linux_run.yml` (containerized), `linux_run_x86.yml`,
-`linux_run_arm.yml`, `windows_run.yml`.
+CI lanes: `linux_run.yml` (containerized, called by `linux_run_x86.yml` and
+`linux_run_arm.yml`), `windows_run.yml`, `lint-gates.yml`,
+`submodule-pins.yml`.
 
-## 5. Dependency upgrades
+## 6. Dependency upgrades
 
 Renovate, run as a **local CLI** — never by hand, and never by a bot. The
 Renovate GitHub App is installed on no repo in this family and will not be, and
@@ -196,33 +205,19 @@ bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
 Run it from **WSL** — it bootstraps a pinned, checksum-verified Node, and there
 is none on the Windows host.
 
-**What `--apply` will and will not do here is the thing to know.** It moves
-gitlinks only, by explicit path, and only for submodules that declare a
-`branch =`. Of the seven in `.gitmodules` exactly one does —
-`third_party/ANTfrastructure` (`branch = main`). Measured 2026-09-09,
-`--apply --dry-run` found five behind (`FUZZTEST`, `GOOGLE_BENCHMARK`,
-`NLOHMANN_JSON`, `SPDLOG`, `nanobind`), printed all five as **REFUSED** because
-they name no branch, and ended in "nothing to apply" with `git status`
-unchanged. That refusal is the feature: an unset branch does not disarm
-`git submodule update --remote`, it makes it walk to the remote's *default*
-branch. Move those by hand, deliberately.
-
-The Python, Rust and pre-commit sides are **report-only** — `pep621`,
-`pip_requirements`, `cargo`, `pre-commit`. The same day, all four together
-returned two rows, both from `Src/rusty_code/Cargo.toml` and both printing
-`1.0 → 1.0`: the report shows the *manifest* value, and the range already covers
-the new release (the JSON behind it says 1.0.194 → 1.0.200, updateType patch —
-a lock move). That run also warned `Rate limit exceeded for api.github.com`;
-the variable that clears it under `--platform=local` is `GITHUB_COM_TOKEN`, not
-`RENOVATE_TOKEN`.
+All seven submodules declare a `branch =` since 9a5653d, so `--apply` moves
+gitlinks (and nothing else) for any that are behind — `FUZZTEST` included,
+which must move together with the abseil pin in `third_party/CMakeLists.txt`
+(§ 3); the Python, Rust and pre-commit sides stay report-only.
 
 Full rationale:
 [`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md).
 
-## 6. Docs owned by this repo
+## 7. Docs owned by this repo
 
-- Sphinx sources in `docs/`; Doxygen via `Doxyfile.in`; coverage config in
-  `gcovr.cfg`.
+- Hand-written Sphinx sources live in `docs/source/`; everything else under
+  `docs/` is regenerated by `ci-docs.sh` and untracked. Doxygen via
+  `Doxyfile.in`; coverage config in `gcovr.cfg`.
 - `CHANGELOG.md` — and remember a change here surfaces in OmniAccelerANT once
   its `third_party/AccelerANTgine` pin is bumped (and thus in the in-tree
   `packages/kataglyphis_native_inference`), so note anything that moves the C
