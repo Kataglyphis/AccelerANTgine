@@ -5,18 +5,14 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# fix_bind_mount_ownership was 45 lines in this file, under a comment asking for
-# it to move to 01-core beside dartdoc_build_fix_ownership. ANTfrastructure
-# 05b0eb5e did that, and kept the SPLIT that was the point of it rather than
-# just the code: only the paths that actually differ are chowned (never a
-# blanket -R, which on a mostly-correct tree asks the kernel for a chown it
-# refuses for a non-owner and turns a no-op into an error); a failure as a
-# non-root uid is explained and tolerated, because handing a file to another
-# uid needs CAP_CHOWN and as an unprivileged container user that is arithmetic,
-# not a defect; the same failure AS ROOT is fatal, because there it means a
-# read-only or broken mount. A missing target is not an error.
-#
-# The upstream copy spells the fatal arm as err rather than die; both exit 1.
+# fix_bind_mount_ownership was 45 lines here, under a comment asking for it to
+# move to 01-core beside dartdoc_build_fix_ownership. ANTfrastructure 05b0eb5e
+# did that and kept the SPLIT that is the point of it, not just the code:
+# selective chown and never -R, tolerated and explained as non-root, fatal as
+# root, a missing target not an error. The reasoning for each decision is in
+# third_party/ANTfrastructure/docs/shared-script-libraries.md, under the
+# "01-core/bind-mount-ownership.sh" heading.
+# Upstream spells the fatal arm err where this file spelled it die; both exit 1.
 antfrastructure_source linux/scripts/01-core/bind-mount-ownership.sh
 
 WORKSPACE_DIR="$(pwd)"

@@ -19,7 +19,6 @@
 scripts/linux/ci-build-and-test.sh	#!/usr/bin/env bash
 scripts/linux/ci-common.sh	#!/usr/bin/env bash
 scripts/linux/ci-docs.sh	#!/usr/bin/env bash
-scripts/linux/ci-finalize.sh	# Hand the docs tree back to whoever owns the bind mount. Th
 scripts/linux/ci-profile-bench.sh	#!/usr/bin/env bash
 scripts/linux/ci-release.sh	#!/usr/bin/env bash
 scripts/linux/ci-run-all.sh	# clang links against the image's source-built GCC, and BOTH
