@@ -17,6 +17,23 @@ docs/test_results*.xml
 *.prof
 scan-build-reports/
 
+# Python bytecode. Test/python/__pycache__/*.pyc was tracked until 2026-09-15
+# even though pytest rewrites it on every run; a rule here would not have
+# stopped that on its own, because .gitignore does nothing once a path is
+# already in the index.
+__pycache__/
+*.py[cod]
+
+# Large binaries. Two are tracked ON PURPOSE and re-included below; the
+# rationale is in AGENTS.md section 7 "Large tracked binaries". Everything else
+# of that shape stays out, which is the point of the pattern plus its two
+# exceptions: a second model dropped next to the first would otherwise be
+# committed unnoticed.
+*.onnx
+!models/yolo26n.onnx
+*.bmp
+!images/Engine_logo.bmp
+
 *.log
 
 logs/

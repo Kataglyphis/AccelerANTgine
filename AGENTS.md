@@ -144,6 +144,16 @@ written out rather than linked.
   `third_party/ANTfrastructure/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`.
   It raises a clear error if that path is missing, which in practice means the
   nested submodule was not initialised recursively.
+- **Two binaries are tracked on purpose, and one of them is big.**
+  `models/yolo26n.onnx` is 9.5 MiB — the YOLO weights `Test/` and the inference
+  demo load, with no download step anywhere in the build, so a fresh clone that
+  did not carry it would fail at runtime rather than at configure time.
+  `images/Engine_logo.bmp` (156 KiB) is the NSIS installer header image
+  (`cmake/CPackOptions.cmake`), which CPack reads as a literal path at package
+  time. Both predate this note and **stay** — the history is not rewritten and
+  no LFS is introduced. `.gitignore` carries `*.onnx` / `*.bmp` with exactly
+  these two re-included, so a *second* model or bitmap dropped beside them is
+  not committed unnoticed; that is the guard, not a size limit.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
   `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`,
   `linux-debug-clang-tsan`, and on Windows
