@@ -121,7 +121,7 @@ This enumeration also includes submodules.
 
 1. Clone the repo
    ```bash
-   git clone --recurse-submodules git@github.com:Kataglyphis/AccelerANTgine.git
+   git clone --recurse-submodules https://github.com/Kataglyphis/AccelerANTgine.git
    ```
    > **_NOTE:_** In case you forgot the flag --recurse run the following command  
    ```bash
