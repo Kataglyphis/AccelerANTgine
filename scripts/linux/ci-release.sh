@@ -15,20 +15,34 @@
 #     -D flags this lane needs - is one cmake_build_main call. The local tree
 #     wipe went back to --clean-build-dir true with it: cmake_build_run cleans
 #     BEFORE it configures, which is the order that made a local configure unsafe.
-#   * linux/scripts/lib/app-packaging.sh  - the flatpak architecture mapping and
-#     the "an artifact that is missing or empty is not a success" assertion.
-#   * linux/scripts/01-core/tool-checks.sh - has_tool / require_tools, which
-#     replaced a local require_cmd that reported only the first missing tool.
+#   * linux/scripts/lib/app-packaging.sh  - the flatpak architecture mapping,
+#     the "an artifact that is missing or empty is not a success" assertion, and
+#     as of 0e054bbd THE WHOLE FLATPAK BUNDLE: app_packaging_ensure_flatpak_runtime
+#     and app_packaging_package_cmake_install_flatpak are the cmake-install twin
+#     this header used to say did not exist. Two deliberate differences from the
+#     local pair they replace, both improvements this lane wants:
+#       - staging is CONTAINER-NATIVE (KATAGLYPHIS_FLATPAK_WORKDIR, default
+#         /tmp/flatpak-work) and only the finished bundle is copied to <out_dir>.
+#         The local version staged under <build_dir>/flatpak, which on a mounted
+#         Windows workspace is a bind mount, and everything flatpak touches wants
+#         fchmod - which a bind mount refuses;
+#       - OSTREE decides, not flatpak-builder's exit code. A complete export can
+#         exit non-zero on a late chmod, and a zero exit can leave an empty repo;
+#         the local version believed the exit code for both.
+#   * linux/scripts/01-core/tool-checks.sh - has_tool, which replaced a local
+#     require_cmd that reported only the first missing tool. require_tools came
+#     with it and has no caller left in this file: both functions that used it
+#     are the ones app-packaging.sh owns now.
 #   * FLATPAK_RUNTIME_VERSION - a hub pin in 01-core/versions.env, already
 #     exported by the time ci-common.sh returns. The literal 24.08 that used to
 #     sit at the top of this file is gone: it drifted from the pin silently.
 #
 # WHAT IS STILL LOCAL, AND WHY:
-#   * THE FLATPAK BUNDLE. app-packaging.sh packages a *Flutter bundle* tree
-#     (app_packaging_package_linux_bundle_flatpak); this project installs a CMake
-#     tree with `cmake --install` and has no bundle. Until the hub grows a
-#     cmake-install variant, the manifest and the flatpak-builder call stay here
-#     - reusing the parts of the library that are already generic.
+#   * load_project_metadata. The hub packager takes the project name and the
+#     version suffix as ARGUMENTS and nothing upstream reads CMakeCache.txt, so
+#     this stays - as does the fallback chain (cache, then the short git sha,
+#     then "unknown"), which is this project's naming convention and not a
+#     packaging concern.
 #   * ensure_flatpak_tools' apt/AUTO_INSTALL knob. The hub's container helper
 #     assumes an image that already ships the packaging prerequisites and runs
 #     apt through a privilege helper; this script is also run on a dev box.
@@ -123,29 +137,19 @@ load_project_metadata() {
   PROJECT_NAME_META="${project_name}"
   VERSION_SUFFIX_META="${project_version:-${git_sha:-unknown}}"
 }
-
-normalize_installed_file() {
-  local dir="$1"
-  local from_name="$2"
-  local to_name="$3"
-  local source=""
-
-  if [[ -f "${dir}/${from_name}" ]]; then
-    source="${dir}/${from_name}"
-  elif [[ -f "${dir}/${to_name}" ]]; then
-    source="${dir}/${to_name}"
-  fi
-
-  if [[ -n "${source}" && "${source}" != "${dir}/${to_name}" ]]; then
-    cp -f "${source}" "${dir}/${to_name}"
-    rm -f "${source}"
-  fi
-}
-
 # Deliberately NOT the hub's app_packaging_setup_dependencies_for_container: that
 # one assumes the CI image already ships flatpak/flatpak-builder and installs
 # through a privilege helper. This script also runs on a dev box, where the
 # AUTO_INSTALL_FLATPAK knob and plain sudo apt are the right answer.
+#
+# OSTREE IS IN THE LIST, and it is not decoration. The hub packager's verdict is
+# `ostree --repo=<repo> refs`, not flatpak-builder's exit code, so a machine
+# without the ostree CLI reports "not committed" over a perfectly good export -
+# a false red that looks exactly like a packaging failure. Debian's flatpak
+# depends on libostree, NOT on the ostree binary package, so this is a real gap
+# on a dev box and not a theoretical one; the family CI image already ships all
+# three. The hub's app_packaging_require_flatpak_tools checks flatpak and
+# flatpak-builder only, so this check has to be the one that covers it.
 ensure_flatpak_tools() {
   local -a missing_cmds=()
   if ! has_tool flatpak-builder; then
@@ -153,6 +157,9 @@ ensure_flatpak_tools() {
   fi
   if ! has_tool flatpak; then
     missing_cmds+=("flatpak")
+  fi
+  if ! has_tool ostree; then
+    missing_cmds+=("ostree")
   fi
   if [[ "${#missing_cmds[@]}" -eq 0 ]]; then
     return 0
@@ -172,117 +179,14 @@ ensure_flatpak_tools() {
   warn "Missing Flatpak tools (${missing_cmds[*]}). Trying automatic installation via apt..."
 
   require_sudo
-  apt_install flatpak flatpak-builder elfutils
+  apt_install flatpak flatpak-builder ostree elfutils
 
-  if ! has_tool flatpak-builder || ! has_tool flatpak; then
+  if ! has_tool flatpak-builder || ! has_tool flatpak || ! has_tool ostree; then
     warn "Automatic Flatpak tool installation failed."
     return 1
   fi
 
   return 0
-}
-
-ensure_flatpak_runtime() {
-  require_tools flatpak
-
-  local flatpak_arch="${FLATPAK_ARCH}"
-  if [[ -z "${flatpak_arch}" ]]; then
-    flatpak_arch="$(flatpak --default-arch 2>/dev/null || true)"
-  fi
-  if [[ -z "${flatpak_arch}" ]]; then
-    # app_packaging_map_arch_to_flatpak is the hub's mapping (arch_normalize plus
-    # arch_uname_name_for); this file used to carry its own amd64->x86_64 case.
-    flatpak_arch="$(app_packaging_map_arch_to_flatpak "$(arch_oci)")"
-  fi
-
-  local runtime_ref="${FLATPAK_RUNTIME}/${flatpak_arch}/${FLATPAK_RUNTIME_VERSION}"
-  local sdk_ref="${FLATPAK_SDK}/${flatpak_arch}/${FLATPAK_RUNTIME_VERSION}"
-
-  if ! flatpak remote-info --user flathub >/dev/null 2>&1 && ! flatpak remote-info --system flathub >/dev/null 2>&1; then
-    if ! flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1; then
-      flatpak --system remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-    fi
-  fi
-
-  if ! flatpak info --user "${runtime_ref}" >/dev/null 2>&1; then
-    flatpak --user install -y --noninteractive flathub "${runtime_ref}" ||
-      flatpak --system install -y --noninteractive flathub "${runtime_ref}"
-  fi
-
-  if ! flatpak info --user "${sdk_ref}" >/dev/null 2>&1; then
-    flatpak --user install -y --noninteractive flathub "${sdk_ref}" ||
-      flatpak --system install -y --noninteractive flathub "${sdk_ref}"
-  fi
-}
-
-build_flatpak() {
-  local build_dir="$1"
-  local out_dir="$2"
-  require_tools flatpak-builder flatpak
-  ensure_flatpak_runtime
-
-  load_project_metadata "${build_dir}"
-  local project_name="${PROJECT_NAME_META}"
-  local version_suffix="${VERSION_SUFFIX_META}"
-
-  local app_id="${APP_ID}"
-  local flatpak_root="${build_dir}/flatpak"
-  local source_dir="${flatpak_root}/source"
-  local build_root="${flatpak_root}/build"
-  local repo_dir="${flatpak_root}/repo"
-  local manifest_path="${flatpak_root}/${app_id}.json"
-
-  rm -rf "${flatpak_root}"
-  mkdir -p "${source_dir}/app" "${build_root}" "${repo_dir}" "${out_dir}"
-  cmake --install "${build_dir}" --prefix "${source_dir}/app"
-
-  local desktop_dir="${source_dir}/app/share/applications"
-  local icon_dir="${source_dir}/app/share/icons/hicolor/256x256/apps"
-  local metainfo_dir="${source_dir}/app/share/metainfo"
-  normalize_installed_file "${desktop_dir}" "${project_name}.desktop" "${app_id}.desktop"
-  normalize_installed_file "${icon_dir}" "${project_name}.png" "${app_id}.png"
-  normalize_installed_file "${metainfo_dir}" "${project_name}.appdata.xml" "${app_id}.appdata.xml"
-
-  local source_app_path
-  source_app_path="$(cd "${source_dir}/app" && pwd)"
-
-  if [[ ! -x "${source_dir}/app/bin/${project_name}" ]]; then
-    die "Flatpak staging failed: expected executable at ${source_dir}/app/bin/${project_name}"
-  fi
-
-  cat >"${manifest_path}" <<EOF
-{
-  "app-id": "${app_id}",
-  "runtime": "${FLATPAK_RUNTIME}",
-  "runtime-version": "${FLATPAK_RUNTIME_VERSION}",
-  "sdk": "${FLATPAK_SDK}",
-  "command": "${project_name}",
-  "modules": [
-    {
-      "name": "${project_name}",
-      "buildsystem": "simple",
-      "build-commands": [
-        "cp -a . /app"
-      ],
-      "sources": [
-        {
-          "type": "dir",
-          "path": "${source_app_path}"
-        }
-      ]
-    }
-  ]
-}
-EOF
-
-  flatpak-builder --disable-rofiles-fuse --force-clean --repo="${repo_dir}" "${build_root}" "${manifest_path}"
-
-  local out_name="${project_name}-${version_suffix}-linux.flatpak"
-  flatpak build-bundle "${repo_dir}" "${out_dir}/${out_name}" "${app_id}" "${FLATPAK_BRANCH}"
-  # app_packaging_assert_artifact, not `info "written"`: it is the hub's answer to
-  # a packaging step that reported success with no file on disk, and it prints
-  # the "Created: ... (size)" line itself.
-  app_packaging_assert_artifact "${out_dir}/${out_name}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -413,7 +317,23 @@ if [[ "${DO_FLATPAK}" -eq 1 ]]; then
     warn "Skipping Flatpak build (required tools are unavailable)."
     warn "Install flatpak + flatpak-builder or run with --no-flatpak to suppress this warning."
   else
-    build_flatpak "${BUILD_RELEASE_DIR}" "${FLATPAK_OUT_DIR}"
+    # The project name and the version suffix are ARGUMENTS to the hub packager,
+    # so the metadata read that used to sit inside build_flatpak happens here.
+    load_project_metadata "${BUILD_RELEASE_DIR}"
+    # Not folded into the packager upstream, and deliberately so: installing a
+    # runtime is a side effect on the machine, and a caller that manages its own
+    # runtimes must be able to skip it.
+    app_packaging_ensure_flatpak_runtime \
+      "${FLATPAK_ARCH}" "${FLATPAK_RUNTIME}" "${FLATPAK_SDK}" "${FLATPAK_RUNTIME_VERSION}"
+    # FLATPAK_ARCH is passed RAW, empty included. Empty means "this machine",
+    # which is what the local packager always did - it never passed --arch to
+    # flatpak-builder at all. Passing the RESOLVED arch instead would start
+    # pinning every default build to a spelling nobody asked for.
+    app_packaging_package_cmake_install_flatpak \
+      "${BUILD_RELEASE_DIR}" "${FLATPAK_OUT_DIR}" "${APP_ID}" \
+      "${PROJECT_NAME_META}" "${VERSION_SUFFIX_META}" \
+      "${FLATPAK_RUNTIME}" "${FLATPAK_SDK}" "${FLATPAK_RUNTIME_VERSION}" \
+      "${FLATPAK_BRANCH}" "${FLATPAK_ARCH}"
   fi
 fi
 
