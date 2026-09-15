@@ -64,3 +64,37 @@ jobs:
             ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.msi
             ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.exe
             ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.zip
+
+  # CPU-only and container-free: this repo's own Pester suites under
+  # scripts/windows/tests. It builds nothing, finishes in minutes and therefore
+  # carries no opt-in condition - an invariant that only runs when somebody
+  # remembers to ask for it is not a gate.
+  pester-tests:
+    name: Pester suites (scripts/windows/tests)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      # `submodules: true` is top-level only, NOT recursive, and that matters
+      # here: recursive checkout is exactly what forces the build job above into
+      # a short-path clone, dying with "Filename too long" on the
+      # ANTfrastructure -> DocumANTation -> md2pdfLib -> latex/awesome-beamer
+      # chain. These suites read only ANTfrastructure's own
+      # windows/scripts/modules, which arrives at depth 1.
+      - name: Check out
+        uses: actions/checkout@v7.0.1
+        with:
+          submodules: true
+
+      # Pinned, not the runner's default: the suites are written in Pester 3.4's
+      # dash-less assertion syntax (`Should Be 0`), which the Pester 5 shipped on
+      # the runner cannot parse. The install/run/report mechanics are generic and
+      # live in ANTfrastructure; run-pester-suite also refuses a vacuous pass
+      # (TotalCount == 0 -> exit 1), so this cannot go green over an empty
+      # directory.
+      - name: Run Pester suites (pinned 3.4.0)
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@main
+        with:
+          path: scripts/windows/tests
+          version: '3.4.0'
