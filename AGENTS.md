@@ -64,7 +64,7 @@ not here:
 | `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` — `docs_build_main`, with the venv bootstrap handed over as two shell *functions* over `01-core/python_uv.sh`. Why functions and not helper scripts is one owner, the file header: git records a new `.sh` as 100644 under `core.filemode=false`, and a function name is a command with no file mode |
 | `scripts/linux/ci-release.sh` | `linux/scripts/lib/cmake-build.sh` + `lib/app-packaging.sh` — job count, container env repair, flatpak arch mapping and the artifact assertion. The configure line stays local only until upstream grows a repeatable `--configure-arg`; the header says so |
 | `scripts/linux/ci-finalize.sh` | local `fix_bind_mount_ownership`, written to move into `01-core` next to `dartdoc_build_fix_ownership` |
-| `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` — shellcheck, actionlint, gitleaks and ruff, at pinned and SHA256-verified versions; passes this repo's root, which upstream refuses to infer |
+| `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` — shellcheck, actionlint, gitleaks, ruff and the shared-config drift check, at pinned and SHA256-verified versions; passes this repo's root, which upstream refuses to infer. `--ratchets` adds the eight `--root` measurement gates plus doc-links, frozen in `comment-size.allow` and `shellcheck-warnings.allow` at the repo root; CI passes it |
 
 CI jobs use ANTfrastructure's composite actions (`prepare-linux-ci-host`,
 `run-in-linux-container`) rather than hand-written `docker run` blocks.
@@ -234,8 +234,15 @@ OS-build skew).
 CI lanes: `linux_run.yml` (containerized, called by `linux_run_x86.yml` and
 `linux_run_arm.yml`), `windows_run.yml` (the container build, the PowerShell lint
 gate over `scripts/`, and a `pester-tests` job over `scripts/windows/tests/`),
-`lint-gates.yml` — which is `bash scripts/linux/run-lint-gates.sh`, the same
-command a dev box runs — and `submodule-pins.yml`.
+`lint-gates.yml` and `submodule-pins.yml`.
+
+The last two are one `uses:` line each onto ANTfrastructure's reusable
+workflows; only this repo's `on:` filters and two inputs (`submodules: 'true'`
+rather than recursive, `ratchets: true`) stay local. `lint-gates.yml` runs the
+same aggregator a dev box runs — `bash scripts/linux/run-lint-gates.sh
+--ratchets` — against the same explicit root; it reaches it from the hub
+checkout rather than through the wrapper, because the wrappers sit at different
+paths across the family.
 
 ## 6. Docs owned by this repo
 

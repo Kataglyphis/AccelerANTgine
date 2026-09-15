@@ -1,37 +1,45 @@
 name: Lint gates - shell, workflows, secrets, python
 
-# THIS JOB RUNS THE SAME COMMAND A DEVELOPER RUNS LOCALLY, and that identity is
-# the whole reason the lane is one line of `run:`:
+# ONE `uses:` LINE, because ANTfrastructure now ships the lane itself.
+# Seven consumers carried this job as a copy, every copy's header saying
+# "replace this with a `uses:` when the hub grows a reusable lint lane"; hub
+# commit 987f832a is that lane (.github/workflows/lint-gates.yml, workflow_call).
+# What the copy here did - checkout at fetch-depth 1 with submodules, install uv,
+# run the aggregator against an EXPLICIT consumer root - is exactly what the hub
+# job does, and the hub additionally pins actions/checkout by SHA rather than by
+# tag. The dev-box command is unchanged and still the same one:
 #
-#   bash scripts/linux/run-lint-gates.sh
+#   bash scripts/linux/run-lint-gates.sh [--ratchets]
 #
-# ANTfrastructure's linux/scripts/run-lint-gates.sh owns the four gates (shell
-# lint, actionlint + CI image refs, gitleaks, ruff), their pinned bootstraps
-# (shellcheck, actionlint and gitleaks additionally SHA256-verified; ruff is
-# version-pinned and fetched through uvx, which verifies against PyPI rather
-# than a digest recorded here), the git-ls-files scope construction, the
-# empty-scope refusals and the secret gate's self-test. This repo's wrapper only
-# passes the consumer root, which upstream refuses to infer - its own half lives
-# inside third_party/ANTfrastructure, so a self-derived root would grade
-# ANTfrastructure's tree and report green over the wrong repository.
+# The hub job runs the aggregator DIRECTLY out of third_party/ANTfrastructure
+# with "${GITHUB_WORKSPACE}" as the root rather than through that wrapper,
+# because the wrappers sit at different paths across the family and one consumer
+# has no submodule at all. Same script, same root, same verdict.
 #
-# BEFORE THIS FILE THE REPO HAD NO LINT GATE OF ANY KIND. Not over its 12
-# tracked *.sh, not over these 4 workflows, not over its 4 first-party *.py -
-# and no secret scan, while linux_run.yml below deploys over FTP with three
-# repository secrets. The scripts under scripts/linux/ already carried ~11
-# "disable" directives naming codes for a linter that had never run.
+# submodules: 'true', NOT the hub's 'recursive' default. ANTfrastructure is the
+# submodule these gates EXECUTE - all four lint scripts and the aggregator live
+# inside it - and the other six top-level submodules come along at depth 1 with
+# nothing below grading them, since every scope drops third_party/. Recursing
+# into their trees would cost minutes and change no verdict.
 #
-# A STANDALONE WORKFLOW, not a job inside linux_run.yml: that file is a
-# reusable workflow called once per (arch x compiler) by linux_run_x86.yml and
-# linux_run_arm.yml, so a gate placed there would grade the same tree four
-# times. The tree is architecture-independent and so is its verdict.
+# ratchets: true since 2026-09-15. The eight --root measurement gates plus
+# doc-links now grade this tree; comment-size.allow and shellcheck-warnings.allow
+# at the repo root are the seeded freeze files, and a new offender is red.
 #
-# NO CONTAINER IMAGE IS NAMED HERE, unlike every other Linux lane in this repo,
-# and that is correct rather than an oversight: the four gate binaries are
-# bootstrapped from ANTfrastructure's own versions.env at pinned, SHA256-verified
-# versions, so the verdict does not depend on what kataglyphis_beschleuniger
-# happens to ship - and skipping the GHCR login and the multi-gigabyte pull is
-# what makes this the first lane to finish.
+# NO CONTAINER IMAGE IS NAMED, unlike every other Linux lane here, and that is
+# correct rather than an oversight: the gate binaries are bootstrapped from
+# ANTfrastructure's own versions.env at pinned, SHA256-verified versions, so the
+# verdict does not depend on what kataglyphis_beschleuniger happens to ship - and
+# skipping the GHCR login and the multi-gigabyte pull is what makes this the
+# first lane to finish.
+#
+# A STANDALONE WORKFLOW, not a job inside linux_run.yml: that file is a reusable
+# workflow called once per (arch x compiler) by linux_run_x86.yml and
+# linux_run_arm.yml, so a gate placed there would grade the same tree four times.
+# The tree is architecture-independent and so is its verdict.
+#
+# @main, like every other ANTfrastructure reference in this repo: upstream is
+# pushed before the consumer change that needs it.
 
 on:
   push:
@@ -47,30 +55,8 @@ permissions:
 
 jobs:
   lint-gates:
-    name: shellcheck + actionlint + gitleaks + ruff
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-
-    steps:
-      # submodules: true, NOT recursive. ANTfrastructure is a top-level submodule
-      # and it is the one these gates execute - all four lint scripts and the
-      # aggregator that drives them live inside it. The other six top-level
-      # submodules (FUZZTEST, GOOGLE_BENCHMARK, NLOHMANN_JSON, SPDLOG,
-      # tomlplusplus, nanobind) come along at depth 1 and nothing below grades
-      # them: every scope drops third_party/. Recursing into their trees would
-      # cost minutes and change no verdict.
-      #
-      # fetch-depth: 1 is enough - every scope is built from `git ls-files`,
-      # never from history.
-      - name: Check out
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 1
-          submodules: true
-
-      # uvx is how the shared aggregator runs ruff; the runner carries no uv.
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
-
-      - name: Lint gates
-        run: bash scripts/linux/run-lint-gates.sh
+    name: shellcheck + actionlint + gitleaks + ruff + ratchets
+    uses: Kataglyphis/ANTfrastructure/.github/workflows/lint-gates.yml@main
+    with:
+      submodules: 'true'
+      ratchets: true
