@@ -80,10 +80,17 @@ belongs in the **Changed** list below with that consequence spelled out.
   `WindowsMediaRuntime.Common`, whose recursive NuGet probe follows the target
   runtime identifier instead of a literal `win-x64`; this lane's presets are all
   `x64-*`, so it resolves to the same `win-x64` it always matched.
-- 2026-09-15 — `ensure_flatpak_tools` in `scripts/linux/ci-release.sh` requires
-  and installs `ostree` as well. The hub packager's verdict is an `ostree refs`
+- 2026-09-15 — `third_party/ANTfrastructure` moved to `604294e2`, whose
+  `app_packaging_require_flatpak_tools` requires `ostree` alongside `flatpak` and
+  `flatpak-builder`, reports every missing tool rather than only the first, and
+  names what the packaging step wanted each one for. That is the measurement this
+  repo made earlier the same day — the packagers' verdict is an `ostree refs`
   query and Debian's `flatpak` depends on libostree rather than on the CLI, so a
-  dev box without it would report "not committed" over a good export.
+  dev box without it reported "not committed" over an export that had succeeded
+  — so the `has_tool ostree` branch `ensure_flatpak_tools` had grown is gone
+  again. The function keeps its apt/`AUTO_INSTALL_FLATPAK` half, `ostree` among
+  the packages it installs included: that knob serves a dev box the hub's
+  container helper does not.
 
 ### Removed
 
