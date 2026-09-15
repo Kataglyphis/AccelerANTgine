@@ -141,12 +141,6 @@ load_project_metadata() {
 # one assumes the CI image already ships flatpak/flatpak-builder and installs
 # through a privilege helper. This script also runs on a dev box, where the
 # AUTO_INSTALL_FLATPAK knob and plain sudo apt are the right answer.
-#
-# OSTREE IS IN THE LIST because the hub packager's verdict is `ostree refs`, not
-# flatpak-builder's exit code, and app_packaging_require_flatpak_tools checks
-# only flatpak and flatpak-builder. Debian's flatpak depends on libostree, not on
-# the ostree binary, so a dev box without the CLI reports "not committed" over a
-# good export. The family CI image already ships all three.
 ensure_flatpak_tools() {
   local -a missing_cmds=()
   if ! has_tool flatpak-builder; then
@@ -154,9 +148,6 @@ ensure_flatpak_tools() {
   fi
   if ! has_tool flatpak; then
     missing_cmds+=("flatpak")
-  fi
-  if ! has_tool ostree; then
-    missing_cmds+=("ostree")
   fi
   if [[ "${#missing_cmds[@]}" -eq 0 ]]; then
     return 0
