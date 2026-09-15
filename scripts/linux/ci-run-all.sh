@@ -51,15 +51,28 @@ done
 info "=== CI Run All ==="
 info "Compiler: ${COMPILER}  Runner: ${RUNNER}  Arch: ${MATRIX_ARCH}"
 
-# clang links against the image's source-built GCC; the prefix is derived from the
-# hub (versions.env GCC_VERSION via cross-gcc.sh), not spelled here: linux_run.yml
-# carried the literal /opt/gcc-15.2.0 and went stale on 2026-08-07.
+# clang links against the image's source-built GCC, and BOTH halves of that now
+# come from the hub (01-core/cross-gcc.sh). gcc_toolchain_resolve_prefix answers
+# the question gcc_toolchain_prefix() does not - which prefix on THIS machine
+# actually holds a usable GCC: MYPROJECT_GCC_TOOLCHAIN_PATH, then GCC_PREFIX,
+# then the versions.env prefix IF it really carries lib/gcc/*/*/crtbeginS.o,
+# then the newest /opt/gcc-* that does. A half-installed prefix fails at LINK
+# time naming crtbeginS.o and nothing else, which is invisible from here.
+# export_clang_gcc_toolchain_env then writes the flags.
+#
+# This block used to compose them itself from the unprobed prefix, and got three
+# things wrong that the hub helper does not: it set no CFLAGS (so C sources were
+# built against the system GCC while C++ was not), it OVERWROTE any inherited
+# CXXFLAGS/LDFLAGS instead of prepending, and it hard-coded lib64, which does not
+# exist in a prefix that only has lib/. The helper gates on CC being a clang, so
+# the compiler choice is stated here rather than implied - the presets pin
+# CMAKE_C_COMPILER/CMAKE_CXX_COMPILER, so CC/CXX steer only the helper and the
+# non-CMake tools, never the build.
 if [[ "${COMPILER}" == "clang" ]]; then
 	antfrastructure_source linux/scripts/01-core/cross-gcc.sh
-	_gcc_prefix="$(gcc_toolchain_prefix)"
-	export CXXFLAGS="--gcc-toolchain=${_gcc_prefix}"
-	export LDFLAGS="-L${_gcc_prefix}/lib64 -Wl,-rpath,${_gcc_prefix}/lib64 --gcc-toolchain=${_gcc_prefix}"
-	info "GCC toolchain for clang: ${_gcc_prefix}"
+	export CC="${CC:-clang}" CXX="${CXX:-clang++}"
+	export_clang_gcc_toolchain_env
+	info "GCC toolchain for clang: ${CROSS_GCC_TOOLCHAIN_PATH}"
 fi
 
 bash scripts/linux/ci-init.sh \
