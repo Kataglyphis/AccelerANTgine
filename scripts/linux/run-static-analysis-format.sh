@@ -19,8 +19,9 @@
 # 01-core/gates.sh (gate_reset / run_gate / assert_gates) and its tools are
 # require_tools'd up front, so cmake-format, clang-format, clang-tidy,
 # scan-build-21 or clang++ being absent fails the lane instead of quietly
-# shrinking it. That is the third of the three buckets in ANTfrastructure
-# docs/shared-script-libraries.md, "The third bucket: a gate that could not RUN":
+# shrinking it. That is the third of the three buckets in
+# third_party/ANTfrastructure/docs/shared-script-libraries.md, "The third
+# bucket: a gate that could not RUN":
 # a skip is neither a pass nor a failure, it is RED BY DEFAULT, and the inverse
 # default - tolerance for free, strictness only if somebody remembers a flag - is
 # exactly the shape that let this file ship three warn-and-skip branches and a
