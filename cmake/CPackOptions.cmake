@@ -1,8 +1,7 @@
 # Packaging metadata for THIS project. The wiring it feeds - generator
 # selection per platform, the architecture-normalised package name, the NSIS,
 # WiX, DEB and AppImage blocks - lives in ANTfrastructure's CPackCommon module,
-# because this file was a copy of BeschleunigerBallett's with no shared
-# ancestry and the two copies had already drifted.
+# which both this project and BeschleunigerBallett include by name.
 #
 # Everything below is a value that identifies AccelerANTgine and nothing else:
 # its icons, its installer copy, its MSI upgrade code, the .desktop file it
