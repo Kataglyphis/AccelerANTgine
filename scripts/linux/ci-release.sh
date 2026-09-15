@@ -8,6 +8,13 @@
 #     writable CARGO_HOME/SCCACHE_DIR/CCACHE_DIR) and the memory-aware job count.
 #     This file used to call compute_jobs_with_mem_cap itself and export
 #     CMAKE_BUILD_PARALLEL_LEVEL; it does neither now.
+#     AND THE CONFIGURE LINE, as of 2015e12f: --configure-arg is repeatable and
+#     order-preserving and reaches the configure step only, so the block this
+#     header used to describe - parse_args / prepare_env / run with the configure
+#     step skipped, plus a hand-written `cmake -B ... --preset` carrying the two
+#     -D flags this lane needs - is one cmake_build_main call. The local tree
+#     wipe went back to --clean-build-dir true with it: cmake_build_run cleans
+#     BEFORE it configures, which is the order that made a local configure unsafe.
 #   * linux/scripts/lib/app-packaging.sh  - the flatpak architecture mapping and
 #     the "an artifact that is missing or empty is not a success" assertion.
 #   * linux/scripts/01-core/tool-checks.sh - has_tool / require_tools, which
@@ -17,14 +24,6 @@
 #     sit at the top of this file is gone: it drifted from the pin silently.
 #
 # WHAT IS STILL LOCAL, AND WHY:
-#   * THE CONFIGURE LINE. cmake-build.sh configures with exactly
-#     `cmake -B <dir> --preset <name>` and has no way to add a -D, while this
-#     lane needs -DCMAKE_LINK_WHAT_YOU_USE=FALSE and -DCPACK_ENABLE_APPIMAGE.
-#     So the three documented library entry points are used separately -
-#     cmake_build_parse_args, cmake_build_prepare_env, cmake_build_run with the
-#     configure step skipped - and only the one cmake invocation stays here.
-#     When upstream grows a repeatable `--configure-arg`, this block collapses
-#     into a single cmake_build_main call and nothing else changes.
 #   * THE FLATPAK BUNDLE. app-packaging.sh packages a *Flutter bundle* tree
 #     (app_packaging_package_linux_bundle_flatpak); this project installs a CMake
 #     tree with `cmake --install` and has no bundle. Until the hub grows a
@@ -375,34 +374,33 @@ fi
 
 info "Building release with preset: ${CLANG_RELEASE_PRESET}"
 
-# --clean-build-dir is deliberately false and the rm -rf is done here instead:
-# cmake_build_run removes the build directory at the START of its run, which with
-# a locally-issued configure would delete the tree that was just configured. The
-# release lane has always started from nothing - a packaged artifact must not
-# inherit anything - so the behaviour is unchanged, only its owner moved.
-cmake_build_parse_args \
-  --preset "${CLANG_RELEASE_PRESET}" \
-  --build-dir "${BUILD_RELEASE_DIR}" \
-  --clean-build-dir false \
-  --skip-configure true \
-  --mb-per-job 2000
-
-# cmake_build_prepare_env defaults its git safe.directory to /workspace, which is
-# right in the container and wrong on a dev box - and load_project_metadata below
-# runs `git rev-parse`. ci-build-and-test.sh sets the same pair for the same
-# reason; this is now the only place either script registers it.
-CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
-cmake_build_prepare_env
-
-rm -rf "${BUILD_RELEASE_DIR}"
-cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}" \
-  -DCMAKE_LINK_WHAT_YOU_USE=FALSE \
-  -DCPACK_ENABLE_APPIMAGE="${CPACK_APPIMAGE_FLAG}"
-
-# Picks the job count from the cgroup memory limit and builds. The explicit
+# ONE call now. --clean-build-dir is true again because cmake_build_run cleans
+# the build directory BEFORE it configures: the previous false plus a local wipe
+# existed only because the configure was issued here, after the library had
+# already had its chance to clean. The release lane still starts from nothing - a
+# packaged artifact must not inherit anything - so the behaviour is unchanged.
+#
+# The two --configure-arg flags reach the CONFIGURE step only, in the order they
+# are written, which is what the hand-written `cmake -B` line did. They are NOT
+# forwarded to `cmake --build`.
+#
+# CMAKE_BUILD_SAFE_DIRECTORY is set before the call because cmake_build_main runs
+# cmake_build_prepare_env for us, and that defaults its git safe.directory to
+# /workspace - right in the container and wrong on a dev box, where
+# load_project_metadata's `git rev-parse` would then refuse the tree.
+# ci-build-and-test.sh sets the same pair for the same reason.
+#
+# Job count: cmake_build_run picks it from the cgroup memory limit. The explicit
 # `export CMAKE_BUILD_PARALLEL_LEVEL="$(compute_jobs_with_mem_cap)"` this file
 # used to do is gone: one owner for build parallelism across the fleet.
-cmake_build_run
+CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
+cmake_build_main \
+  --preset "${CLANG_RELEASE_PRESET}" \
+  --build-dir "${BUILD_RELEASE_DIR}" \
+  --clean-build-dir true \
+  --mb-per-job 2000 \
+  --configure-arg "-DCMAKE_LINK_WHAT_YOU_USE=FALSE" \
+  --configure-arg "-DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}"
 
 cmake --build "${BUILD_RELEASE_DIR}" --target package
 
