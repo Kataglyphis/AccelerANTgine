@@ -2,7 +2,7 @@
 # Build the Python bindings inside the ANTfrastructure Windows developer image.
 # Thin project wrapper over ANTfrastructure's Invoke-ContainerBuild - transport
 # decision, reusable container and artifact streaming all live upstream; see
-# ANTfrastructure docs/windows-container-build-performance.md.
+# third_party/ANTfrastructure/docs/windows-container-build-performance.md.
 #
 # NAME: this was Start-PythonBindings.ps1. It starts nothing; it builds the
 # bindings inside a container, and the name now says so.

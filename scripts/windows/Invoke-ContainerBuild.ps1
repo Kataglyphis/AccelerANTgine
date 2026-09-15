@@ -7,7 +7,7 @@
 # reusable container, the artifact streaming and the delivery verification all
 # live upstream in ANTfrastructure's WindowsContainerBuild.Reuse module
 # (Invoke-ContainerBuild). Rationale + measurements:
-# ANTfrastructure docs/windows-container-build-performance.md.
+# third_party/ANTfrastructure/docs/windows-container-build-performance.md.
 #
 # NAME: this was Start-Build.ps1, which promised something it never did - it
 # starts no application, it drives a build. It deliberately shares a name with

@@ -48,7 +48,7 @@ reorganisation.
 | Bind mount vs tar-pipe, Dev Drive filter setup, container reuse | `docs/windows-container-build-performance.md` |
 | clang-format / clang-tidy / cmake-format and the canonical configs | `docs/code-quality-tooling.md` |
 | Job counts, per-job memory, why a build got OOM-killed | `docs/build-parallelism-memory-tuning.md` |
-| The five shell-safety bug classes | ANTfrastructure `AGENTS.md` § *Shell safety conventions* |
+| The five shell-safety bug classes | `third_party/ANTfrastructure/AGENTS.md` § *Shell safety conventions* |
 
 **These scripts are wrappers, not implementations** — change behaviour upstream,
 not here:

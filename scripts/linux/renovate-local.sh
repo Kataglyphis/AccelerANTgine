@@ -92,9 +92,9 @@ source "${_SCRIPT_DIR}/lib/antfrastructure.sh"
 # Named separately from antfrastructure_path's generic "not found / it moved
 # upstream" message. While the family adopts this tool the expected failure is a
 # gitlink pinned BEFORE the driver existed upstream, and sending the reader to
-# docs/INDEX.md to hunt for a file that is simply not in this pin wastes the
-# trip. The sibling wrappers in OmniAccelerANT and jotrockenmitlocken carry the
-# same guard for the same reason.
+# third_party/ANTfrastructure/docs/INDEX.md to hunt for a file that is simply
+# not in this pin wastes the trip. The sibling wrappers in OmniAccelerANT and
+# jotrockenmitlocken carry the same guard for the same reason.
 HUB_RENOVATE_RELATIVE="linux/scripts/renovate-local.sh"
 if [ ! -f "${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE}" ]; then
   echo "Error: ${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE} is missing." >&2

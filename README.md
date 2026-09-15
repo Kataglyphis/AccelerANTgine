@@ -24,7 +24,7 @@ For the official docs follow this [link](https://hardwareacceleratedai.jonashein
   - [Dependencies](#dependencies)
   - [Useful tools](#useful-tools)
 - [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
+  - [Specific version requirements](#specific-version-requirements)
   - [Installation](#installation)
   - [Upgrades](#upgrades)
 - [Tests](#tests)
@@ -190,7 +190,7 @@ bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
 ```
 
 Run it from WSL; it bootstraps a pinned, checksum-verified Node on first use.
-`AGENTS.md` § 4 is the in-repo owner of this procedure — what `--apply` will and
+`AGENTS.md` § 4 (Pitfalls) is the in-repo owner of this procedure — what `--apply` will and
 will not move, the `FUZZTEST`/abseil coupling it can trip, the `GITHUB_COM_TOKEN`
 rate-limit note — and
 [`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md)
