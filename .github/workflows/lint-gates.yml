@@ -16,11 +16,18 @@ name: Lint gates - shell, workflows, secrets, python
 # because the wrappers sit at different paths across the family and one consumer
 # has no submodule at all. Same script, same root, same verdict.
 #
-# submodules: 'true', NOT the hub's 'recursive' default. ANTfrastructure is the
-# submodule these gates EXECUTE - all four lint scripts and the aggregator live
-# inside it - and the other six top-level submodules come along at depth 1 with
-# nothing below grading them, since every scope drops third_party/. Recursing
-# into their trees would cost minutes and change no verdict.
+# submodules: 'recursive', which is the hub's default. This file briefly
+# overrode it to 'true' to skip a clone, on the argument that every scope drops
+# third_party/ so nothing below the top level is graded. That holds for the
+# SCOPES and not for the TREE: docs/source/_static/css/custom.css is a tracked
+# symlink into third_party/ANTfrastructure/third_party/DocumANTation, a NESTED
+# submodule, so a top-level-only checkout leaves it dangling. Every --root gate
+# builds its scope through gate_scope.tracked(), which refuses a tracked path
+# that is not on disk - os.path.exists() follows the link - so the ratchets went
+# red on a partial tree the day they were switched on, while a dev box with the
+# family checked out recursively stayed green. The recursion is nearly free
+# anyway: of the seven submodules only ANTfrastructure and nanobind nest at all,
+# one each.
 #
 # ratchets: true since 2026-09-15. The eight --root measurement gates plus
 # doc-links now grade this tree; comment-size.allow and shellcheck-warnings.allow
@@ -58,5 +65,5 @@ jobs:
     name: shellcheck + actionlint + gitleaks + ruff + ratchets
     uses: Kataglyphis/ANTfrastructure/.github/workflows/lint-gates.yml@main
     with:
-      submodules: 'true'
+      submodules: 'recursive'
       ratchets: true
