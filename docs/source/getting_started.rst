@@ -86,7 +86,7 @@ The recommended Windows build wrapper is:
 
 .. code-block:: powershell
 
-   .\scripts\windows\Start-Build.ps1
+   .\scripts\windows\Invoke-ContainerBuild.ps1
 
 This hands the build to ANTfrastructure's ``Invoke-ContainerBuild`` (module
 ``WindowsContainerBuild.Reuse``), which runs

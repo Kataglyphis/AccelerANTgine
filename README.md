@@ -164,7 +164,7 @@ scripts/windows/Build-Windows.ps1 -BuildDir C:\b\kcpp\dbg -BuildDirRelease C:\b\
 
 The library is also exposed to Python through nanobind: the module lives in
 `Bindings/python` (`kataglyphis_inference`), its tests in `Test/python`, and
-`scripts/windows/Build-PythonBindings.ps1` (or `Start-PythonBindings.ps1`, which
+`scripts/windows/Build-PythonBindings.ps1` (or `Invoke-ContainerPythonBindings.ps1`, which
 runs it inside the ANTfrastructure Windows image) builds and tests it on Windows.
 
 ### Upgrades

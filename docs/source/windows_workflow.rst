@@ -14,7 +14,7 @@ Use the wrapper script:
 
 .. code-block:: powershell
 
-   .\scripts\windows\Start-Build.ps1
+   .\scripts\windows\Invoke-ContainerBuild.ps1
 
 This script delegates to ANTfrastructure's ``Invoke-ContainerBuild``
 (``WindowsContainerBuild.Reuse``): the sources travel by tar-pipe into a
@@ -108,7 +108,7 @@ CI Note
 
 The Windows GitHub Actions workflow now follows the same model as local usage:
 
-- build inside the Windows container through ``Start-Build.ps1``
+- build inside the Windows container through ``Invoke-ContainerBuild.ps1``
 - pass ``-CpuCount 32 -MemoryGb 48`` — effective only under ``-Isolation
   hyperv``; the default ``process`` isolation gives the container every host
   CPU regardless
