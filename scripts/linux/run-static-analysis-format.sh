@@ -3,7 +3,8 @@
 # code-quality driver (linux/scripts/lib/code-quality.sh).
 #
 # Everything reusable now comes from there: the uv/venv bootstrap for
-# cmake-format, file discovery, the cmake-format / clang-format runners, the
+# cmake-format (the library's own DEFAULT since 19286e9f - see below), file
+# discovery, the cmake-format / clang-format runners, the
 # compile_commands.json preparation (including the /workspace -> local path
 # remap that makes a container-generated DB usable on a dev box) and the
 # clang-tidy invocation. BeschleunigerBallett has driven the same
@@ -36,7 +37,6 @@ source "${_SCRIPT_DIR}/ci-common.sh"
 # bootstrap's environment override did nothing) and fails naming the probed path
 # and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
 antfrastructure_source linux/scripts/lib/code-quality.sh
-antfrastructure_source linux/scripts/01-core/python_uv.sh
 antfrastructure_source linux/scripts/01-core/gates.sh
 antfrastructure_source linux/scripts/01-core/tool-checks.sh
 
@@ -76,22 +76,6 @@ CODE_QUALITY_CMAKE_FORMAT_CONFIG=".cmake-format.yaml"
 CODE_QUALITY_CMAKE_SEARCH_ROOT="."
 CODE_QUALITY_CMAKE_EXCLUDE_PATHS=('./build*/*' './.venv/*' './third_party/*')
 
-# The library takes the uv venv bootstrap as two *executable* helper paths, but
-# this repo is developed with core.filemode=false: a committed helper would
-# reach the Linux container as 100644 and die "Permission denied" (the ci-docs.sh
-# header documents the incident). Bash runs a function name wherever it expects
-# a command, so the helpers are functions over upstream python_uv.sh instead.
-cmake_format_uv_venv_create() {
-  # Empty python version on purpose: let uv resolve the interpreter
-  # (honouring the container's UV_PYTHON) instead of pinning a default.
-  uv_venv_create .venv ""
-}
-cmake_format_uv_install_requirements() {
-  uv_pip_install_requirements .venv requirements.txt
-}
-CODE_QUALITY_UV_VENV_CREATE_SCRIPT=cmake_format_uv_venv_create
-CODE_QUALITY_UV_INSTALL_REQUIREMENTS_SCRIPT=cmake_format_uv_install_requirements
-
 mapfile -t FORMAT_FILES < <(code_quality_find_cpp_files Src)
 mapfile -t SRC_FILES    < <(code_quality_find_clang_tidy_files Src)
 
@@ -102,6 +86,18 @@ fi
 
 # cmake-format lives in a Python env; the library bootstraps it via uv (into
 # the venv it then activates) and errs loudly when it cannot.
+#
+# NO BOOTSTRAP KNOBS ANY MORE. Until 19286e9f the library REFUSED to bootstrap
+# unless the caller set CODE_QUALITY_UV_VENV_CREATE_SCRIPT and
+# CODE_QUALITY_UV_INSTALL_REQUIREMENTS_SCRIPT, so this file carried the pair of
+# uv wrappers every other consumer also carried. The hub now defaults them to
+# exactly that - a uv venv via 01-core/python_uv.sh plus its own pinned
+# linux/scripts/cmake-format.requirements.txt - and the default is BETTER than
+# what stood here: it installs cmake-format==0.6.13 and pyyaml==6.0.3 rather
+# than this repo's whole requirements.txt (sphinx, breathe, exhale, pre-commit)
+# to obtain one formatter, and it pins the formatter version, so a gate verdict
+# cannot move under a floating release. ci-docs.sh still installs the full
+# requirements.txt into the same .venv for the docs build.
 code_quality_ensure_cmake_format
 
 # Every tool up front, the missing ones named together (01-core/tool-checks.sh).
