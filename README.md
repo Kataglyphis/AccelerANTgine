@@ -67,6 +67,10 @@ Frequently tested under:
 
 ### Dependencies
 This enumeration also includes submodules.
+* [ANTfrastructure](https://github.com/Kataglyphis/ANTfrastructure) — the build
+  hub: every reusable script, CMake module, PowerShell module and CI action this
+  repo runs comes from `third_party/ANTfrastructure`, and its gitlink decides
+  what the lanes actually execute
 * [ONNX Runtime](https://onnxruntime.ai/) — inference
 * [GStreamer](https://gstreamer.freedesktop.org/) — media pipelines
 * [WebRTC](https://webrtc.org/) — realtime transport
@@ -156,9 +160,16 @@ This enumeration also includes submodules.
   $ cmake --build --preset <buildPreset-name> .
   ```
 
+On Windows, through the same script CI runs:
+
 ```powershell
-scripts/windows/Build-Windows.ps1 -BuildDir C:\b\kcpp\dbg -BuildDirRelease C:\b\kcpp\rel -LogDir C:\b\kcpp\logs
+pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1
+pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1 -BuildTargets clangcl-debug -LogDir C:\b\logs
 ```
+
+Build directories and presets are rows in
+`scripts/windows/Build-Windows.config.psd1`, not parameters; each row also names
+an environment variable that overrides it.
 
 ### Python bindings
 
@@ -178,17 +189,12 @@ bash scripts/linux/renovate-local.sh --apply --dry-run   # the plan
 bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
 ```
 
-Run it from WSL; it bootstraps a pinned, checksum-verified Node and Renovate on
-first use. This repository has no dependency bot of any kind — the Renovate
-GitHub App is installed on no repo in this family and will not be, and there is
-no `dependabot.yml` here — so this wrapper is the only thing that reads
-`.github/renovate.json` and the only thing watching the seven submodule pins.
-
-All seven submodules declare a `branch =` since 9a5653d, so `--apply` moves
-gitlinks (and nothing else) for any that are behind — `FUZZTEST` included, which
-must move together with the abseil pin in `third_party/CMakeLists.txt`; the
-Python, Rust and pre-commit sides stay report-only. See
-[`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md).
+Run it from WSL; it bootstraps a pinned, checksum-verified Node on first use.
+`AGENTS.md` § 4 is the in-repo owner of this procedure — what `--apply` will and
+will not move, the `FUZZTEST`/abseil coupling it can trip, the `GITHUB_COM_TOKEN`
+rate-limit note — and
+[`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md)
+is the full rationale.
 
 #### Rusty things:
 1. Do not forget to upgrade the cxxbridge from time to time:
@@ -209,86 +215,59 @@ I have five tests suites.
 
 5. Python bindings test suite (`Test/python`), run against the built `kataglyphis_inference` module.
 
-## Performance Tests
+## Performance tests
 
-### gperftools and pprof
-#### Install deps
-> **__Linux only__**
-1. Step:
-```bash
-sudo apt-get install google-perftools libgoogle-perftools-dev graphviz
-####### only if go is not installed already 
-wget https://go.dev/dl/go1.24.3.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.24.3.linux-amd64.tar.gz
-export PATH=$PATH:/usr/local/go/bin
-source ~/.bashrc
-# to see if everything works
-go version
-####### go on with this step if go already installed
-go install github.com/google/pprof@latest  # if you want to use latest Go-based pprof
-export PATH="$PATH:$HOME/go/bin"
-source ~/.bashrc  # or source ~/.zshrc
-```
-
-2. Step:
-Run actual profiling and look into results:
-```bash
-mkdir -p logs
-LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so CPUPROFILE=logs/profile.prof ./build/bin/AccelerANTgine
-pprof -http=:8080 ./build/bin/AccelerANTgine logs/profile.prof
-```
-
-### valgrind
+`ci-profile-bench.sh` is the profiling and benchmark lane, and it is what CI
+runs:
 
 ```bash
-sudo apt install valgrind kcachegrind
-# build in debug for readable information
-valgrind --tool=callgrind ./build/bin/AccelerANTgine
+bash scripts/linux/ci-profile-bench.sh
 ```
 
-### perf
+It needs gperftools (`google-perftools`, `libgoogle-perftools-dev`), `graphviz`
+and, for the flame graphs, Go's `pprof`; `valgrind --tool=callgrind` is reached
+through `bash scripts/linux/ci-release.sh --callgrind`, and `perf record` needs
+`linux-tools-$(uname -r)`. Installing them is not this project's subject — the
+upstream install instructions for
+[gperftools](https://github.com/gperftools/gperftools),
+[pprof](https://github.com/google/pprof),
+[valgrind](https://valgrind.org/docs/manual/cl-manual.html) and
+[perf](https://perfwiki.github.io/main/) are the ones that stay correct, and the
+CI image already carries the set.
+
+## Static analysis and formatting
+
+One entry point per platform, and CI runs exactly these:
 
 ```bash
-sudo apt install linux-tools-$(uname -r)
-perf record ./build/bin/AccelerANTgine
+bash scripts/linux/run-static-analysis-format.sh
 ```
 
-## Static Analyzers
-
-```bash
-clang --analyze --output-format html $(find Src -name '*.cpp' -o -name '*.cc')
-scan-build cmake --build .
-clang-tidy -p=./build/compile_commands.json  $(find Src -name '*.cpp' -o -name '*.cc')
-
+```powershell
+pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1
 ```
 
-# Format cmake files
+They cover cmake-format, clang-format, clang-tidy, `clang++ --analyze` and
+`scan-build`, over the files the project actually compiles (`.ixx`, `.cppm` and
+`.mxx` included). Every one of them is a gate: a tool that is not installed
+fails the lane rather than being skipped.
 
-The CI gates (`scripts/linux/run-static-analysis-format.sh` on Linux, the
-`Build-Windows.ps1` cmake-format step on Windows) run this over every
-`CMakeLists.txt`/`*.cmake` outside `third_party/`, the build trees and `.venv/`.
-By hand:
+`.clang-format`, `.clang-tidy` and `.cmake-format.yaml` here are **shared**
+configs, and `scripts/linux/run-lint-gates.sh` checks them against
+ANTfrastructure's copies — edit them upstream, not here. What each tool does and
+how to run one of them alone is in
+[`third_party/ANTfrastructure/docs/code-quality-tooling.md`](third_party/ANTfrastructure/docs/code-quality-tooling.md),
+and the configs themselves are described in
+[`third_party/ANTfrastructure/shared/config/README.md`](third_party/ANTfrastructure/shared/config/README.md).
 
-```bash
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-cmake-format -c ./.cmake-format.yaml -i $(find . -type f \( -name '*.cmake' -o -name 'CMakeLists.txt' \) -not -path './build*/*' -not -path './.venv/*' -not -path './third_party/*')
-```
-# Format code files 
+The pre-commit hook installs from the same `requirements.txt`:
 
-```bash
-clang-format -i $(find include -name "*.cpp" -or -name "*.h" -or -name "*.hpp")
-```
-
-Use clang-format as a pre-commit hook like this.
 ```bash
 uv venv
 source .venv/bin/activate # .venv/Scripts/activate on pwsh
-uv pip install pre-commit
+uv pip install -r requirements.txt
 pre-commit install
-# run on all files once (optional)
-pre-commit run --all-files
+pre-commit run --all-files   # once, optional
 ```
 
 <!-- CONTRIBUTING -->

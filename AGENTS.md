@@ -21,7 +21,7 @@ is the single fact that most shapes its tooling.
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | Test sources |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh` |
-| `scripts/windows/` | `Build-Windows.ps1`, `Build-PythonBindings.ps1`, the `Start-*.ps1` entry points, and the `Resolve-BuildModule.ps1` bootstrap |
+| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, and the Pester suites in `tests/` |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
 
 **This repo is consumed as a direct submodule** of OmniAccelerANT, at
@@ -57,11 +57,14 @@ not here:
 | --- | --- |
 | `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism) |
 | `scripts/linux/ci-coverage.sh` | `linux/scripts/lib/coverage.sh` — gcovr for GCC, llvm-cov for clang |
-| `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh`, every analysis run through `01-core/gates.sh` (`run_gate` … `assert_gates`) with its tools `require_tools`'d rather than skipped — no tool, no green lane; the uv venv bootstrap is handed over as shell functions over `01-core/python_uv.sh`, not helper scripts, for the same exec-bit filemode reason as `ci-docs.sh` |
+| `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh`, every analysis run through `01-core/gates.sh` (`run_gate` … `assert_gates`) with its tools `require_tools`'d rather than skipped — no tool, no green lane (the file header names the rule and its owner) |
 | `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |
 | `scripts/linux/ci-profile-bench.sh` | `linux/scripts/lib/cmake-build.sh` — the perf/benchmark run itself stays local |
 | `scripts/linux/renovate-local.sh` | `linux/scripts/renovate-local.sh` — Renovate as a local CLI, plus the git half that applies what it can only detect (passes this repo's root) |
-| `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` + `linux/scripts/01-core/python_uv.sh` for the venv — calls the library steps individually, not `docs_build_main` (the script header says why: the venv bootstrap must run via `bash`, not rely on an exec bit filemode drops) |
+| `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` — `docs_build_main`, with the venv bootstrap handed over as two shell *functions* over `01-core/python_uv.sh`. Why functions and not helper scripts is one owner, the file header: git records a new `.sh` as 100644 under `core.filemode=false`, and a function name is a command with no file mode |
+| `scripts/linux/ci-release.sh` | `linux/scripts/lib/cmake-build.sh` + `lib/app-packaging.sh` — job count, container env repair, flatpak arch mapping and the artifact assertion. The configure line stays local only until upstream grows a repeatable `--configure-arg`; the header says so |
+| `scripts/linux/ci-finalize.sh` | local `fix_bind_mount_ownership`, written to move into `01-core` next to `dartdoc_build_fix_ownership` |
+| `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` — shellcheck, actionlint, gitleaks and ruff, at pinned and SHA256-verified versions; passes this repo's root, which upstream refuses to infer |
 
 CI jobs use ANTfrastructure's composite actions (`prepare-linux-ci-host`,
 `run-in-linux-container`) rather than hand-written `docker run` blocks.
@@ -84,15 +87,12 @@ Two upstream facts repeated here only because they bite before you reach a doc:
   depends on must be pushed **before** the consumer change.
 
 **This repo's glue:** `scripts/windows/Resolve-BuildModule.ps1` — the one file
-that cannot live upstream, because it is what *finds* the submodule.
-`Build-Windows.ps1` imports `WindowsScripts.Shared`, `WindowsBuild.Common`,
-`WindowsUv.Common`, `WindowsFormatting.Common`, `WindowsCMake.Common`,
-`WindowsMsix.Common`, `WindowsMsix.Signing` and `WindowsOnnx.Common` from it.
-Nested imports inside a `.psm1` are **module-private**, so every module you
-call into must be named in that list explicitly. Its Step 3 runs upstream
-`Invoke-CmakeFormatStep` — uv venv plus `requirements.txt`, then in-place
-cmake-format with `.cmake-format.yaml` — mirroring the Linux lane's gate; it
-throws when uv or cmake-format is missing, and `-SkipFormat` opts out.
+that cannot live upstream, because it is what *finds* the submodule. Everything
+`Build-Windows.ps1` does with it — the module import list, the step shapes, why
+a nested import inside a `.psm1` is module-private and every module therefore has
+to be named explicitly — is the consumer calling convention in
+[`third_party/ANTfrastructure/docs/adopting-in-a-new-project.md`](third_party/ANTfrastructure/docs/adopting-in-a-new-project.md)
+§ 8, and the script's own comments are the second copy.
 
 ## 3. Critical invariant: submodule pins
 
@@ -106,7 +106,15 @@ every pin. If a drifted submodule is what you actually want, update the gitlink
   the version FUZZTEST's `MODULE.bazel` declares, and a mismatch breaks e.g.
   `absl::random_mocking_access`. `cmake/fuzztest_compat/` papers over the
   header gap between the current pair — re-check it on every move.
-- No other pin here has a recorded coupling (checked 2026-09-14).
+- `third_party/ANTfrastructure`'s **own** nested submodule is a build input here,
+  not just a transitive detail: `docs/source/conf.py` (:21-28) loads `conf_base.py`
+  from
+  `third_party/ANTfrastructure/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`
+  and raises if it is absent, so the docs lane is pinned to whatever DocumANTation
+  commit the ANTfrastructure gitlink carries. `git submodule update --init` without
+  `--recursive` satisfies every other consumer here and breaks this one — which is
+  why § 4 lists the symptom as a pitfall too.
+- No other pin here has a recorded coupling (checked 2026-09-15).
 
 Drift is guarded by ANTfrastructure's shared suite, run by
 `.github/workflows/submodule-pins.yml` on every push and PR that touches
@@ -154,6 +162,30 @@ written out rather than linked.
   no LFS is introduced. `.gitignore` carries `*.onnx` / `*.bmp` with exactly
   these two re-included, so a *second* model or bitmap dropped beside them is
   not committed unnoticed; that is the guard, not a size limit.
+- **Dependency upgrades are Renovate as a local CLI, and nothing else.** The
+  Renovate GitHub App is installed on no repo in this family and will not be, and
+  there is no `.github/dependabot.yml` here, so this wrapper is the only
+  dependency watch this repo has. It gates nothing: no workflow runs it, it
+  blocks no commit, and it stages and commits nothing.
+
+  ```bash
+  bash scripts/linux/renovate-local.sh                     # report (default: git-submodules)
+  bash scripts/linux/renovate-local.sh --managers pep621   # the pyproject pins
+  bash scripts/linux/renovate-local.sh --apply --dry-run   # the plan
+  bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
+  ```
+
+  Run it from **WSL**: it bootstraps a pinned, checksum-verified Node, and there
+  is none on the Windows host. All seven `.gitmodules` entries declare a
+  `branch =` since 9a5653d, so none of them comes back **REFUSED** any more and
+  `--apply` moves the gitlink of every one that is behind — `FUZZTEST` included,
+  which must move together with the abseil pin (§ 3). The Python, Rust and
+  pre-commit managers stay report-only. Under `--platform=local` the variable
+  that clears `Rate limit exceeded for api.github.com` is `GITHUB_COM_TOKEN`, not
+  `RENOVATE_TOKEN`. Full rationale:
+  [`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md);
+  the measurement that dated the old "exactly one declares a branch" claim is in
+  `CHANGELOG.md`.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
   `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`,
   `linux-debug-clang-tsan`, and on Windows
@@ -200,36 +232,12 @@ redirect files are gone, as is the image-baked `C:\workspace` mount target
 OS-build skew).
 
 CI lanes: `linux_run.yml` (containerized, called by `linux_run_x86.yml` and
-`linux_run_arm.yml`), `windows_run.yml`, `lint-gates.yml`,
-`submodule-pins.yml`.
+`linux_run_arm.yml`), `windows_run.yml` (the container build, the PowerShell lint
+gate over `scripts/`, and a `pester-tests` job over `scripts/windows/tests/`),
+`lint-gates.yml` — which is `bash scripts/linux/run-lint-gates.sh`, the same
+command a dev box runs — and `submodule-pins.yml`.
 
-## 6. Dependency upgrades
-
-Renovate, run as a **local CLI** — never by hand, and never by a bot. The
-Renovate GitHub App is installed on no repo in this family and will not be, and
-this repo has no `.github/dependabot.yml` either, so this wrapper is the **only**
-dependency watch it has. It is not a gate: no workflow runs it, it blocks no
-commit, and it stages and commits nothing.
-
-```bash
-bash scripts/linux/renovate-local.sh                     # report (default: git-submodules)
-bash scripts/linux/renovate-local.sh --managers pep621   # the pyproject pins
-bash scripts/linux/renovate-local.sh --apply --dry-run   # the plan
-bash scripts/linux/renovate-local.sh --apply             # move the gitlinks
-```
-
-Run it from **WSL** — it bootstraps a pinned, checksum-verified Node, and there
-is none on the Windows host.
-
-All seven submodules declare a `branch =` since 9a5653d, so `--apply` moves
-gitlinks (and nothing else) for any that are behind — `FUZZTEST` included,
-which must move together with the abseil pin in `third_party/CMakeLists.txt`
-(§ 3); the Python, Rust and pre-commit sides stay report-only.
-
-Full rationale:
-[`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md).
-
-## 7. Docs owned by this repo
+## 6. Docs owned by this repo
 
 - Hand-written Sphinx sources live in `docs/source/`; everything else under
   `docs/` is regenerated by `ci-docs.sh` and untracked. Doxygen via
