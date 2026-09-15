@@ -76,17 +76,19 @@ jobs:
           # isolation (the default) shares the whole host.
           & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Build.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}" -CpuCount 32 -MemoryGb 48
 
+      # One script, three configurations: Start-Debug/Profile/Release.ps1 were
+      # the same file with a different build directory and suite list.
       - name: Run debug build on host
         run: |
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Debug.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}"
+          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Windows.ps1" -Config Debug -ProjectRoot "${{ steps.prep.outputs.workspace }}"
 
       - name: Run profile build on host
         run: |
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Profile.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}"
+          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Windows.ps1" -Config Profile -ProjectRoot "${{ steps.prep.outputs.workspace }}"
 
       - name: Run release build on host
         run: |
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Release.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}"
+          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Windows.ps1" -Config Release -ProjectRoot "${{ steps.prep.outputs.workspace }}"
 
       - name: Upload Installers & Zip (container build)
         uses: actions/upload-artifact@v6.0.0

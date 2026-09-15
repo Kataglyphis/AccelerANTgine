@@ -53,7 +53,7 @@ Debug Run
 
 .. code-block:: powershell
 
-   .\scripts\windows\Start-Debug.ps1
+   .\scripts\windows\Start-Windows.ps1 -Config Debug
 
 This script:
 
@@ -68,14 +68,14 @@ the older network-dependent smoke test explicitly:
 
 .. code-block:: powershell
 
-   .\scripts\windows\Start-Debug.ps1 -RunWebRtcSmoke -ServerUri ws://localhost:8443
+   .\scripts\windows\Start-Windows.ps1 -Config Debug -RunWebRtcSmoke -ServerUri ws://localhost:8443
 
 Profile Run
 ^^^^^^^^^^^
 
 .. code-block:: powershell
 
-   .\scripts\windows\Start-Profile.ps1
+   .\scripts\windows\Start-Windows.ps1 -Config Profile
 
 This script runs the profile build executable and then executes
 ``perfTestSuite.exe`` when available.
@@ -85,7 +85,7 @@ Release Run
 
 .. code-block:: powershell
 
-   .\scripts\windows\Start-Release.ps1
+   .\scripts\windows\Start-Windows.ps1 -Config Release
 
 This is the lightest validation path for release artifacts and packaged runtime
 output.
@@ -112,7 +112,7 @@ The Windows GitHub Actions workflow now follows the same model as local usage:
 - pass ``-CpuCount 32 -MemoryGb 48`` — effective only under ``-Isolation
   hyperv``; the default ``process`` isolation gives the container every host
   CPU regardless
-- execute ``Start-Debug.ps1``, ``Start-Profile.ps1``, and ``Start-Release.ps1``
+- execute ``Start-Windows.ps1 -Config Debug|Profile|Release``
   on the host after the container build completes
 
 Whether the hosted runner can always satisfy those Docker resource requests still
