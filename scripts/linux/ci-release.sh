@@ -1,9 +1,50 @@
 #!/usr/bin/env bash
+# ci-release.sh - project wrapper around ANTfrastructure's CMake and packaging
+# libraries.
+#
+# WHAT COMES FROM UPSTREAM NOW:
+#   * linux/scripts/lib/cmake-build.sh    - the container environment repair
+#     (git safe.directory, the CCACHE_SECONDARY_STORAGE-is-not-a-URL fix,
+#     writable CARGO_HOME/SCCACHE_DIR/CCACHE_DIR) and the memory-aware job count.
+#     This file used to call compute_jobs_with_mem_cap itself and export
+#     CMAKE_BUILD_PARALLEL_LEVEL; it does neither now.
+#   * linux/scripts/lib/app-packaging.sh  - the flatpak architecture mapping and
+#     the "an artifact that is missing or empty is not a success" assertion.
+#   * linux/scripts/01-core/tool-checks.sh - has_tool / require_tools, which
+#     replaced a local require_cmd that reported only the first missing tool.
+#   * FLATPAK_RUNTIME_VERSION - a hub pin in 01-core/versions.env, already
+#     exported by the time ci-common.sh returns. The literal 24.08 that used to
+#     sit at the top of this file is gone: it drifted from the pin silently.
+#
+# WHAT IS STILL LOCAL, AND WHY:
+#   * THE CONFIGURE LINE. cmake-build.sh configures with exactly
+#     `cmake -B <dir> --preset <name>` and has no way to add a -D, while this
+#     lane needs -DCMAKE_LINK_WHAT_YOU_USE=FALSE and -DCPACK_ENABLE_APPIMAGE.
+#     So the three documented library entry points are used separately -
+#     cmake_build_parse_args, cmake_build_prepare_env, cmake_build_run with the
+#     configure step skipped - and only the one cmake invocation stays here.
+#     When upstream grows a repeatable `--configure-arg`, this block collapses
+#     into a single cmake_build_main call and nothing else changes.
+#   * THE FLATPAK BUNDLE. app-packaging.sh packages a *Flutter bundle* tree
+#     (app_packaging_package_linux_bundle_flatpak); this project installs a CMake
+#     tree with `cmake --install` and has no bundle. Until the hub grows a
+#     cmake-install variant, the manifest and the flatpak-builder call stay here
+#     - reusing the parts of the library that are already generic.
+#   * ensure_flatpak_tools' apt/AUTO_INSTALL knob. The hub's container helper
+#     assumes an image that already ships the packaging prerequisites and runs
+#     apt through a privilege helper; this script is also run on a dev box.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
+
+# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
+# literal: it resolves under ANTFRASTRUCTURE_DIR and fails naming the probed path
+# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+antfrastructure_source linux/scripts/01-core/tool-checks.sh
+antfrastructure_source linux/scripts/lib/cmake-build.sh
+antfrastructure_source linux/scripts/lib/app-packaging.sh
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"
@@ -16,15 +57,19 @@ DO_FLATPAK=1
 FLATPAK_EXPLICIT=0
 FLATPAK_OUT_DIR=""
 FLATPAK_RUNTIME="org.freedesktop.Platform"
-FLATPAK_RUNTIME_VERSION="24.08"
 FLATPAK_SDK="org.freedesktop.Sdk"
 FLATPAK_BRANCH="master"
 AUTO_INSTALL_FLATPAK="1"
 FLATPAK_ARCH=""
 APP_ID="org.kataglyphis.accelerantgine"
 
+# Not defaulted here on purpose - see the header. A hub that stopped publishing
+# the pin must fail loudly rather than fall back to a number nobody maintains.
+[[ -n "${FLATPAK_RUNTIME_VERSION:-}" ]] ||
+  die "FLATPAK_RUNTIME_VERSION is unset: ANTfrastructure linux/scripts/01-core/versions.env no longer publishes it."
+
 usage() {
-  cat <<'EOF'
+  cat <<EOF
 Usage: ci-release.sh [options]
 
 Options:
@@ -39,22 +84,15 @@ Options:
   --no-flatpak|--no-flatpack    Disable Flatpak build
   --flatpak-out-dir <dir>       Flatpak output directory (default: build dir)
   --flatpak-runtime <name>      Flatpak runtime (default: org.freedesktop.Platform)
-  --flatpak-runtime-version <v> Flatpak runtime version (default: 24.08)
+  --flatpak-runtime-version <v> Flatpak runtime branch (default: ANTfrastructure
+                                versions.env FLATPAK_RUNTIME_VERSION, currently
+                                ${FLATPAK_RUNTIME_VERSION})
   --flatpak-sdk <name>          Flatpak SDK (default: org.freedesktop.Sdk)
   --flatpak-branch <name>       Flatpak branch (default: master)
   --flatpak-arch <name>         Flatpak arch override (default: auto-detect)
   --auto-install-flatpak <0|1>  Auto-install flatpak tools (default: 1)
   -h, --help                    Show help
 EOF
-}
-
-require_cmd() {
-  local cmd="$1"
-  if [[ "$cmd" == */* ]]; then
-    [[ -x "$cmd" ]]
-    return
-  fi
-  command -v "$cmd" >/dev/null 2>&1
 }
 
 read_cache_var() {
@@ -105,12 +143,16 @@ normalize_installed_file() {
   fi
 }
 
+# Deliberately NOT the hub's app_packaging_setup_dependencies_for_container: that
+# one assumes the CI image already ships flatpak/flatpak-builder and installs
+# through a privilege helper. This script also runs on a dev box, where the
+# AUTO_INSTALL_FLATPAK knob and plain sudo apt are the right answer.
 ensure_flatpak_tools() {
   local -a missing_cmds=()
-  if ! command -v flatpak-builder >/dev/null 2>&1; then
+  if ! has_tool flatpak-builder; then
     missing_cmds+=("flatpak-builder")
   fi
-  if ! command -v flatpak >/dev/null 2>&1; then
+  if ! has_tool flatpak; then
     missing_cmds+=("flatpak")
   fi
   if [[ "${#missing_cmds[@]}" -eq 0 ]]; then
@@ -122,7 +164,7 @@ ensure_flatpak_tools() {
     return 1
   fi
 
-  if ! command -v apt-get >/dev/null 2>&1; then
+  if ! has_tool apt-get; then
     warn "Missing required command(s): ${missing_cmds[*]}"
     warn "Automatic install is only supported with apt-get."
     return 1
@@ -133,7 +175,7 @@ ensure_flatpak_tools() {
   require_sudo
   apt_install flatpak flatpak-builder elfutils
 
-  if ! command -v flatpak-builder >/dev/null 2>&1 || ! command -v flatpak >/dev/null 2>&1; then
+  if ! has_tool flatpak-builder || ! has_tool flatpak; then
     warn "Automatic Flatpak tool installation failed."
     return 1
   fi
@@ -142,21 +184,16 @@ ensure_flatpak_tools() {
 }
 
 ensure_flatpak_runtime() {
-  require_cmd flatpak
+  require_tools flatpak
 
   local flatpak_arch="${FLATPAK_ARCH}"
   if [[ -z "${flatpak_arch}" ]]; then
     flatpak_arch="$(flatpak --default-arch 2>/dev/null || true)"
   fi
   if [[ -z "${flatpak_arch}" ]]; then
-    # Use ANTfrastructure's arch_oci, then map back to uname-style for flatpak
-    local oci_arch
-    oci_arch="$(arch_oci)"
-    case "${oci_arch}" in
-      amd64) flatpak_arch="x86_64" ;;
-      arm64) flatpak_arch="aarch64" ;;
-      *)     flatpak_arch="${oci_arch}" ;;
-    esac
+    # app_packaging_map_arch_to_flatpak is the hub's mapping (arch_normalize plus
+    # arch_uname_name_for); this file used to carry its own amd64->x86_64 case.
+    flatpak_arch="$(app_packaging_map_arch_to_flatpak "$(arch_oci)")"
   fi
 
   local runtime_ref="${FLATPAK_RUNTIME}/${flatpak_arch}/${FLATPAK_RUNTIME_VERSION}"
@@ -182,8 +219,7 @@ ensure_flatpak_runtime() {
 build_flatpak() {
   local build_dir="$1"
   local out_dir="$2"
-  require_cmd flatpak-builder
-  require_cmd flatpak
+  require_tools flatpak-builder flatpak
   ensure_flatpak_runtime
 
   load_project_metadata "${build_dir}"
@@ -244,7 +280,10 @@ EOF
 
   local out_name="${project_name}-${version_suffix}-linux.flatpak"
   flatpak build-bundle "${repo_dir}" "${out_dir}/${out_name}" "${app_id}" "${FLATPAK_BRANCH}"
-  info "Flatpak bundle written: ${out_dir}/${out_name}"
+  # app_packaging_assert_artifact, not `info "written"`: it is the hub's answer to
+  # a packaging step that reported success with no file on disk, and it prints
+  # the "Created: ... (size)" line itself.
+  app_packaging_assert_artifact "${out_dir}/${out_name}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -329,21 +368,42 @@ if [[ "${COMPILER:-}" != "clang" ]]; then
   exit 0
 fi
 
-# Use cgroup-aware parallelism for the build
-JOBS="$(compute_jobs_with_mem_cap)"
-export CMAKE_BUILD_PARALLEL_LEVEL="${JOBS}"
-info "Build parallelism: ${JOBS} jobs (cgroup + memory aware)"
-
-rm -rf "${BUILD_RELEASE_DIR}"
-
 CPACK_APPIMAGE_FLAG="ON"
 if [[ "${DO_APPIMAGE}" -ne 1 ]]; then
   CPACK_APPIMAGE_FLAG="OFF"
 fi
 
 info "Building release with preset: ${CLANG_RELEASE_PRESET}"
-cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}" -DCMAKE_LINK_WHAT_YOU_USE=FALSE -DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}
-cmake --build "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}"
+
+# --clean-build-dir is deliberately false and the rm -rf is done here instead:
+# cmake_build_run removes the build directory at the START of its run, which with
+# a locally-issued configure would delete the tree that was just configured. The
+# release lane has always started from nothing - a packaged artifact must not
+# inherit anything - so the behaviour is unchanged, only its owner moved.
+cmake_build_parse_args \
+  --preset "${CLANG_RELEASE_PRESET}" \
+  --build-dir "${BUILD_RELEASE_DIR}" \
+  --clean-build-dir false \
+  --skip-configure true \
+  --mb-per-job 2000
+
+# cmake_build_prepare_env defaults its git safe.directory to /workspace, which is
+# right in the container and wrong on a dev box - and load_project_metadata below
+# runs `git rev-parse`. ci-build-and-test.sh sets the same pair for the same
+# reason; this is now the only place either script registers it.
+CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
+cmake_build_prepare_env
+
+rm -rf "${BUILD_RELEASE_DIR}"
+cmake -B "${BUILD_RELEASE_DIR}" --preset "${CLANG_RELEASE_PRESET}" \
+  -DCMAKE_LINK_WHAT_YOU_USE=FALSE \
+  -DCPACK_ENABLE_APPIMAGE="${CPACK_APPIMAGE_FLAG}"
+
+# Picks the job count from the cgroup memory limit and builds. The explicit
+# `export CMAKE_BUILD_PARALLEL_LEVEL="$(compute_jobs_with_mem_cap)"` this file
+# used to do is gone: one owner for build parallelism across the fleet.
+cmake_build_run
+
 cmake --build "${BUILD_RELEASE_DIR}" --target package
 
 if [[ "${DO_FLATPAK}" -eq 1 ]]; then
@@ -360,7 +420,7 @@ if [[ "${DO_FLATPAK}" -eq 1 ]]; then
 fi
 
 if [[ "${DO_CALLGRIND}" -eq 1 ]]; then
-  if ! require_cmd valgrind; then
+  if ! has_tool valgrind; then
     warn "valgrind not found, skipping callgrind."
     exit 0
   fi

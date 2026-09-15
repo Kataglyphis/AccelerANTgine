@@ -27,16 +27,16 @@
 # ahead of the library steps, so the SVGs that get staged are the ones this run
 # just produced.
 #
-# WHY THE INDIVIDUAL LIBRARY STEPS AND NOT docs_build_main:
-# docs_build_prepare_python_env takes the venv bootstrap as two *executable*
-# script paths (DOCS_BUILD_UV_VENV_CREATE_SCRIPT /
-# DOCS_BUILD_UV_INSTALL_REQUIREMENTS_SCRIPT) and runs them directly. This repo is
-# developed on Windows with core.filemode=false, where git records a new .sh as
-# 100644 - such a helper would arrive in the Linux container without its exec bit
-# and die with "Permission denied". Every other script in this directory is
-# invoked as `bash <path>` for that reason. So the python env is built from the
-# very helpers docs_build_prepare_python_env delegates to, and the remaining
-# three library steps are called in the order docs_build_main calls them.
+# THE VENV BOOTSTRAP IS TWO SHELL FUNCTIONS, NOT TWO SCRIPTS - and that is what
+# lets this file call docs_build_main instead of re-implementing its step order.
+# docs_build_prepare_python_env runs DOCS_BUILD_UV_VENV_CREATE_SCRIPT and
+# DOCS_BUILD_UV_INSTALL_REQUIREMENTS_SCRIPT as commands, `(cd "${root}" && "$x")`.
+# A helper *script* would be wrong here: this repo is developed on Windows with
+# core.filemode=false, where git records a new .sh as 100644, so it would reach
+# the Linux container without its exec bit and die with "Permission denied" -
+# which is why every script in this directory is invoked as `bash <path>`. A
+# FUNCTION name is a command too, is inherited by the subshell, and has no file
+# mode at all. Same two steps, same order, no exec bit anywhere.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,17 +69,24 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   info "Building documentation"
 
   # ---------------------------------------------------------------------------
-  # Python environment. uv_venv_create with an explicit empty version lets uv
-  # resolve the interpreter (honouring the container's UV_PYTHON) instead of
-  # pinning python_uv.sh's default, and uv_pip_install_requirements carries the
-  # load-bearing `--python .venv/bin/python` pin: uv honours UV_PYTHON OVER an
-  # activated venv, so a plain `uv pip install` targets the image's root-owned
-  # /opt/venv and dies with Permission denied for the non-root CI user.
+  # Python environment, handed to the library as two commands (see the header).
+  # uv_venv_create with an explicit empty version lets uv resolve the interpreter
+  # (honouring the container's UV_PYTHON) instead of pinning python_uv.sh's
+  # default, and uv_pip_install_requirements carries the load-bearing
+  # `--python .venv/bin/python` pin: uv honours UV_PYTHON OVER an activated venv,
+  # so a plain `uv pip install` targets the image's root-owned /opt/venv and dies
+  # with Permission denied for the non-root CI user.
   # ---------------------------------------------------------------------------
   VENV_DIR="${WORKSPACE_DIR}/.venv"
-  uv_venv_create "${VENV_DIR}" ""
-  uv_pip_install_requirements "${VENV_DIR}" "${WORKSPACE_DIR}/requirements.txt"
-  uv_venv_activate "${VENV_DIR}"
+  DOCS_BUILD_VENV_DIR="${VENV_DIR}"
+
+  docs_venv_create() { uv_venv_create "${VENV_DIR}" ""; }
+  docs_venv_install_requirements() {
+    uv_pip_install_requirements "${VENV_DIR}" "${WORKSPACE_DIR}/requirements.txt"
+  }
+
+  DOCS_BUILD_UV_VENV_CREATE_SCRIPT=docs_venv_create
+  DOCS_BUILD_UV_INSTALL_REQUIREMENTS_SCRIPT=docs_venv_install_requirements
 
   # ---------------------------------------------------------------------------
   # Project-specific pre-Sphinx work, hoisted ahead of the library steps: Doxygen
@@ -136,9 +143,11 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   # an unexplained "cannot stat", so name the real producer first.
   compgen -G "${DOCS_BUILD_SVG_SOURCE_DIR}/*.svg" >/dev/null \
     || die "Doxygen wrote no SVGs to ${DOCS_BUILD_SVG_SOURCE_DIR}; HAVE_DOT=YES in Doxyfile.in needs graphviz (dot) in the image."
-  docs_build_copy_static_svg
-  docs_build_run_generator
-  docs_build_sphinx
+  # docs_build_main = prepare_python_env -> copy_static_svg -> run_generator ->
+  # sphinx. The three steps used to be listed here by hand, in that order, with
+  # the venv done separately above; the only reason was the exec-bit problem the
+  # header now explains away.
+  docs_build_main
 
   # ---------------------------------------------------------------------------
   # Test-result rendering. Kept local rather than pushed upstream: nothing else
