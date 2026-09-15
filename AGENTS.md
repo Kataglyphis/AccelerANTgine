@@ -113,7 +113,12 @@ every pin. If a drifted submodule is what you actually want, update the gitlink
   and raises if it is absent, so the docs lane is pinned to whatever DocumANTation
   commit the ANTfrastructure gitlink carries. `git submodule update --init` without
   `--recursive` satisfies every other consumer here and breaks this one — which is
-  why § 4 lists the symptom as a pitfall too.
+  why § 4 lists the symptom as a pitfall too. `docs/source/_static/css/custom.css`
+  is a tracked SYMLINK into that same tree, and it fails more quietly: Sphinx
+  renders without the brand stylesheet and says nothing. Its target named the
+  pre-rename `third_party/ContainerHub` until 2026-09-15, which is also what the
+  doc-links and code-size ratchets refuse to grade around — a tracked path that is
+  not on disk fails them before they read a line of code.
 - No other pin here has a recorded coupling (checked 2026-09-15).
 
 Drift is guarded by ANTfrastructure's shared suite, run by
