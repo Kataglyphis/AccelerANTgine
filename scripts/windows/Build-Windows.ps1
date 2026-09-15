@@ -13,14 +13,16 @@
 param(
     [string]$WorkspaceDir = $PWD.Path,
     [string[]]$BuildTargets = @("clangcl-debug", "clangcl-profile", "clangcl-release"),
-    [string]$FastBuildDir = "C:\kataglyphis_fast_build",
-    [string]$BuildDirMsvc = "build-msvc-debug",
-    [string]$BuildDirClang = "build-clangcl-debug",
-    [string]$BuildDirProfile = "build-clangcl-profile",
-    [string]$BuildDirClangRelease = "build-clangcl-release",
-    [string]$ClangProfilePreset = "x64-ClangCL-Windows-Profile",
+    # Build directories, presets and their `cmake --build --config` values are
+    # NOT parameters any more: they are rows in Build-Windows.config.psd1, read
+    # through ANTfrastructure's WindowsConfig.Common. Retarget one row with its
+    # BuildDirEnv/PresetEnv environment variable, or point -ConfigPath at a
+    # different table. FastBuildDir and LogDir keep their parameters but take
+    # their defaults from that same file, so there is one place to look.
+    [string]$ConfigPath,
+    [string]$FastBuildDir,
     [string]$LLVMBinPath = "C:\Program Files\LLVM\bin",
-    [string]$LogDir = "logs",
+    [string]$LogDir,
     [switch]$SkipFormat,
     [switch]$SkipMSVC,
     [switch]$SkipClangTidy,
@@ -47,16 +49,71 @@ $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
 
 # Dependency order: Shared, then Build, then what builds on them.
+#
+# Nested imports inside a .psm1 are MODULE-PRIVATE, so every module this script
+# calls into must be named here explicitly - WindowsCMake.Common importing
+# WindowsBuild.Common does not put Write-BuildLog in this scope.
+#
+# WindowsToolchain.Common, WindowsTesting.Common, WindowsClang.Common and
+# WindowsConfig.Common are the four whose jobs this script used to hand-roll:
+# toolchain probing, ctest/manual-test execution with the ASan runtime
+# reachable, clang-tidy over a compile-commands database, and the build table
+# reader. BeschleunigerBallett has imported the same set for months.
 Import-BuildModule @(
     'WindowsScripts.Shared'
     'WindowsBuild.Common'
+    'WindowsConfig.Common'
+    'WindowsToolchain.Common'
     'WindowsUv.Common'
     'WindowsFormatting.Common'
     'WindowsCMake.Common'
+    'WindowsClang.Common'
+    'WindowsTesting.Common'
     'WindowsMsix.Common'
     'WindowsMsix.Signing'
     'WindowsOnnx.Common'
 )
+
+# ---------------------------------------------------------------------------
+# The build table. Import-PowerShellDataFile plus Get-ConfigValue/Get-OrDefault
+# (WindowsConfig.Common) rather than five script parameters with literal
+# defaults: a preset rename becomes a data edit, and every row carries its own
+# environment override, so a CI lane retargets one configuration without anyone
+# adding a parameter for it.
+# ---------------------------------------------------------------------------
+$configPathResolved = Get-OrDefault $ConfigPath (Join-Path $PSScriptRoot 'Build-Windows.config.psd1')
+if (-not (Test-Path $configPathResolved)) {
+    throw "Build config not found: $configPathResolved"
+}
+$BuildConfig = Import-PowerShellDataFile -Path $configPathResolved
+
+function Get-EnvironmentVariableValue {
+    param([string]$Name)
+
+    if ([string]::IsNullOrWhiteSpace($Name)) { return $null }
+    $item = Get-Item -Path "Env:$Name" -ErrorAction SilentlyContinue
+    if ($null -ne $item) { return $item.Value }
+    return $null
+}
+
+function Get-BuildConfiguration {
+    param([Parameter(Mandatory)][string]$Name)
+
+    $row = Get-ConfigValue -Config $BuildConfig -Path "Build.Configurations.$Name"
+    if ($null -eq $row) {
+        throw "Unknown build configuration '$Name' in $configPathResolved."
+    }
+
+    return [pscustomobject]@{
+        Name          = $Name
+        BuildDir      = (Get-OrDefault (Get-EnvironmentVariableValue -Name $row['BuildDirEnv']) $row['BuildDir'])
+        Preset        = (Get-OrDefault (Get-EnvironmentVariableValue -Name $row['PresetEnv']) $row['Preset'])
+        Configuration = $row['Configuration']
+    }
+}
+
+$FastBuildDir = Get-OrDefault $FastBuildDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.FastBuildDir')
+$LogDir = Get-OrDefault $LogDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.LogDir')
 
 # Resolve workspace
 try {
@@ -80,7 +137,7 @@ try {
     Write-BuildLog -Context $Context -Message "Workspace:          $Workspace"
     Write-BuildLog -Context $Context -Message "FastBuildDir:       $FastBuildDir"
     Write-BuildLog -Context $Context -Message "BuildTargets:       $($BuildTargets -join ', ')"
-    Write-BuildLog -Context $Context -Message "ClangProfilePreset: $ClangProfilePreset"
+    Write-BuildLog -Context $Context -Message "BuildConfig:        $configPathResolved"
     Write-BuildLog -Context $Context -Message "LLVMBinPath:        $LLVMBinPath"
     Write-BuildLog -Context $Context -Message ("=" * 60)
 
@@ -89,12 +146,21 @@ try {
     # Fast Local Cache Initialization (Outside mounted dir)
     $fastLocalCache = Initialize-BuildCacheEnvironment -Context $Context -FastBuildDir $FastBuildDir
     
-    $fastBuildMsvcFull = Join-Path $fastLocalCache $BuildDirMsvc
-    $fastBuildClangFull = Join-Path $fastLocalCache $BuildDirClang
-    $fastBuildProfileFull = Join-Path $fastLocalCache $BuildDirProfile
-    $fastBuildReleaseDirFull = Join-Path $fastLocalCache $BuildDirClangRelease
+    # One row per lane: build directory, preset and the --config value that also
+    # decides whether Invoke-CmakeConfigureAndBuild stages the sanitizer runtime.
+    $cfgMsvc = Get-BuildConfiguration -Name 'msvc-debug'
+    $cfgClang = Get-BuildConfiguration -Name 'clangcl-debug'
+    $cfgProfile = Get-BuildConfiguration -Name 'clangcl-profile'
+    $cfgRelease = Get-BuildConfiguration -Name 'clangcl-release'
 
-    $srcDir = Join-Path $Workspace "Src"
+    foreach ($cfg in @($cfgMsvc, $cfgClang, $cfgProfile, $cfgRelease)) {
+        Write-BuildLog -Context $Context -Message ("Configuration {0,-16} -> {1} / {2} / {3}" -f $cfg.Name, $cfg.BuildDir, $cfg.Preset, $cfg.Configuration)
+    }
+
+    $fastBuildMsvcFull = Join-Path $fastLocalCache $cfgMsvc.BuildDir
+    $fastBuildClangFull = Join-Path $fastLocalCache $cfgClang.BuildDir
+    $fastBuildProfileFull = Join-Path $fastLocalCache $cfgProfile.BuildDir
+    $fastBuildReleaseDirFull = Join-Path $fastLocalCache $cfgRelease.BuildDir
 
     $BuildTargets = $BuildTargets -join ',' -split ',' | ForEach-Object { $_.Trim() }
 
@@ -104,17 +170,12 @@ try {
     $doProfile = $BuildTargets -contains "clangcl-profile"
     $doRelease = $BuildTargets -contains "clangcl-release"
 
-    # Helper function for LLVM Paths
-    function Get-LLVMRuntimePaths {
-        param([string]$LLVMBin)
-        if (-not $LLVMBin -or -not (Test-Path $LLVMBin)) { return @() }
-        $llvmRoot = Split-Path -Parent $LLVMBin
-        $clangRoot = Join-Path $llvmRoot "lib\clang"
-        if (-not (Test-Path $clangRoot)) { return @() }
-        return Get-ChildItem -Path $clangRoot -Directory -ErrorAction SilentlyContinue |
-               ForEach-Object { Join-Path $_.FullName "lib\windows" } |
-               Where-Object { Test-Path $_ }
-    }
+    # Get-LLVMRuntimePaths used to live here. It is gone, and nothing replaced it
+    # locally: the ASan runtime is found by WindowsTesting.Common
+    # (Get-AsanRuntimeDirs, which knows about Microsoft's runtime as well as
+    # LLVM's) and staged by WindowsCMake.Common's Invoke-CmakeConfigureAndBuild
+    # for any -Configuration Debug. Both its callers - the hand DLL copy after the
+    # ClangCL debug build and the PATH juggling around ctest - are gone with it.
 
     function Add-ExistingDirectory {
         param(
@@ -176,7 +237,9 @@ try {
         return @($directories)
     }
 
-    function Stage-RuntimeDependencies {
+    # Not the hub's: ONNX Runtime plus GStreamer staging has no second consumer
+    # in the fleet yet, so it stays here under the two-consumer rule.
+    function Copy-RuntimeDependencies {
         param(
             [string]$TargetDir
         )
@@ -217,23 +280,29 @@ try {
             $clangCl = Get-Command clang-cl.exe -ErrorAction SilentlyContinue
             if ($clangCl) { $finalPath = Split-Path -Parent $clangCl.Source }
         }
-        if (Test-Path $finalPath) {
-            $env:PATH = "$finalPath;$env:PATH"
-            $script:llvmBin = $finalPath
-            Write-BuildLog -Context $Context -Message "Added LLVM bin to PATH: $finalPath"
-        }
-
-        $scoopShims = Join-Path $env:USERPROFILE 'scoop\shims'
-        if (Test-Path $scoopShims) {
-            $env:PATH = "$scoopShims;$env:PATH"
-            Write-BuildLog -Context $Context -Message "Added Scoop shims to PATH: $scoopShims"
-        }
+        # Add-DirectoriesToPath (WindowsScripts.Shared) prepends, de-duplicates and
+        # skips a directory that does not exist - the three things the two
+        # hand-written blocks here did between them. Add-DirectoryToPath, which the
+        # audit item named, is its unexported internal helper; the plural is the
+        # exported surface.
+        Add-DirectoriesToPath @(
+            $finalPath
+            (Join-Path $env:USERPROFILE 'scoop\shims')
+        )
+        Write-BuildLog -Context $Context -Message "PATH front: $finalPath and the Scoop shims (when present)"
     }
 
     # --- Step 2: Environment Check ---
+    # Invoke-ToolchainChecks (WindowsToolchain.Common) runs each probe, warns on
+    # the ones that fail and collects the names - the same "report, do not abort"
+    # behaviour the two -IgnoreExitCode calls had, minus the hand-rolling. Pass
+    # -RequiredTools/-FailOnMissingRequiredTools here the day a missing tool
+    # should stop the run.
     Invoke-BuildStep -Context $Context -StepName "Environment Check" -Script {
-        Invoke-BuildExternal -Context $Context -File "clang" -Parameters @("--version") -IgnoreExitCode
-        Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--version") -IgnoreExitCode
+        Invoke-ToolchainChecks -Context $Context -ToolArguments @{
+            clang = @('--version')
+            cmake = @('--version')
+        }
     }
 
     # --- Step 3: cmake-format ---
@@ -244,52 +313,71 @@ try {
         Invoke-BuildStep -Context $Context -StepName "Python tooling + cmake-format" -Critical -Script {
             Invoke-CmakeFormatStep -Context $Context -WorkspacePath $Workspace
         }
+
+        # The other half of the Linux lane's format gate, which this script had
+        # never run: Invoke-ClangFormatStep formats every source
+        # Get-ProjectCppFiles finds against .clang-format, in place. It throws when
+        # clang-format is missing, and -SkipFormat opts out of both steps.
+        Invoke-BuildStep -Context $Context -StepName "clang-format" -Critical -Script {
+            Invoke-ClangFormatStep -Context $Context -WorkspacePath $Workspace
+        }
     }
 
     # --- MSVC Debug Build ---
     if ($doMsvc) {
         Invoke-BuildStep -Context $Context -StepName "MSVC Debug Build" -Script {
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildMsvcFull, "--preset", "x64-MSVC-Windows-Debug", "-S", $Workspace)
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildMsvcFull, "--config", "Debug")
-            
-            Push-Location $fastBuildMsvcFull
-            try { Invoke-BuildExternal -Context $Context -File "ctest" -Parameters @("-C", "Debug", "--output-on-failure") } finally { Pop-Location }
+            # Invoke-CmakeConfigureAndBuild builds `-B <path> --preset <name>` with
+            # NO -S, so the preset's own sourceDir applies and cwd has to be the
+            # workspace - hence Push-Location. It also picks the job count, wires
+            # sccache and streams the build output line by line.
+            Push-Location $Workspace
+            try {
+                Invoke-CmakeConfigureAndBuild -Context $Context `
+                    -BuildPath $fastBuildMsvcFull `
+                    -Preset $cfgMsvc.Preset `
+                    -Configuration $cfgMsvc.Configuration
+            } finally { Pop-Location }
 
-            Sync-BuildArtifacts -Context $Context -Source $fastBuildMsvcFull -Destination (Join-Path $Workspace $BuildDirMsvc) -ExcludeCommonRustAndCppCache
+            # --test-dir, so no Push-Location; -RuntimeFlavor Msvc because this lane
+            # links Microsoft's ASan runtime, not LLVM's, and the two are not
+            # interchangeable.
+            Invoke-CtestDiscoveredTests -Context $Context `
+                -BuildRoot $fastBuildMsvcFull `
+                -Configuration $cfgMsvc.Configuration `
+                -RuntimeFlavor Msvc
+
+            Sync-BuildArtifacts -Context $Context -Source $fastBuildMsvcFull -Destination (Join-Path $Workspace $cfgMsvc.BuildDir) -ExcludeCommonRustAndCppCache
         }
     }
 
     # --- ClangCL Debug Build ---
     if ($doClang) {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Build" -Critical -Script {
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildClangFull, "--preset", "x64-ClangCL-Windows-Debug", "-S", $Workspace, "-Dmyproject_ENABLE_CPPCHECK=OFF", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildClangFull)
+            # -Configuration Debug is load-bearing, not cosmetic: it is the switch
+            # Invoke-CmakeConfigureAndBuild reads to stage the sanitizer runtime DLLs
+            # into the build root and its bin\ before and after the build. That is
+            # what the hand-written clang_rt.asan_dynamic-x86_64.dll copy that used to
+            # sit here did, only it looked in LLVM's tree alone.
+            Push-Location $Workspace
+            try {
+                Invoke-CmakeConfigureAndBuild -Context $Context `
+                    -BuildPath $fastBuildClangFull `
+                    -Preset $cfgClang.Preset `
+                    -Configuration $cfgClang.Configuration `
+                    -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+            } finally { Pop-Location }
 
-            $runtimeDirs = Get-LLVMRuntimePaths -LLVMBin $script:llvmBin
-            $asanRuntime = $null
-            foreach ($dir in $runtimeDirs) {
-                $candidate = Join-Path $dir "clang_rt.asan_dynamic-x86_64.dll"
-                if (Test-Path $candidate) { $asanRuntime = $candidate; break }
-            }
-
-            if ($asanRuntime) {
-                Copy-Item -Path $asanRuntime -Destination (Join-Path $fastBuildClangFull "clang_rt.asan_dynamic-x86_64.dll") -Force
-                $clangBinOutput = Join-Path $fastBuildClangFull "bin"
-                if (Test-Path $clangBinOutput) {
-                    Copy-Item -Path $asanRuntime -Destination (Join-Path $clangBinOutput "clang_rt.asan_dynamic-x86_64.dll") -Force
-                }
-            }
-
-            Stage-RuntimeDependencies -TargetDir (Join-Path $fastBuildClangFull "bin")
+            Copy-RuntimeDependencies -TargetDir (Join-Path $fastBuildClangFull "bin")
         }
 
+        # Invoke-CtestDiscoveredTests puts the ASan runtime directories on PATH for
+        # the duration of the run and restores it afterwards, which is the
+        # save/override/restore block this step used to spell out by hand.
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
-            $runtimePaths = @((Join-Path $fastBuildClangFull "bin"), (Join-Path $fastBuildClangFull "lib")) + (Get-LLVMRuntimePaths -LLVMBin $script:llvmBin)
-            $previousPath = $env:PATH
-            $env:PATH = (($runtimePaths + @($env:PATH)) -join ';')
-
-            Push-Location $fastBuildClangFull
-            try { Invoke-BuildExternal -Context $Context -File "ctest" -Parameters @("-C", "Debug", "--output-on-failure") } finally { Pop-Location; $env:PATH = $previousPath }
+            Invoke-CtestDiscoveredTests -Context $Context `
+                -BuildRoot $fastBuildClangFull `
+                -Configuration $cfgClang.Configuration `
+                -RuntimeFlavor Clang
         }
 
         # Code Coverage
@@ -314,27 +402,46 @@ try {
 
         # Clang Tidy & Scan Build
         if (-not $SkipClangTidy) {
+            # Invoke-ClangTidyFixStep (WindowsClang.Common) owns the file discovery,
+            # the --header-filter, and - the part that matters here - the skip for
+            # any translation unit that imports a C++20 named module, which
+            # clang-tidy cannot analyse without the BMIs the compile-commands
+            # database does not carry.
+            #
+            # -Extension carries this project's module extensions on TOP of the
+            # module default (.cpp/.cc/.cxx). Leave the check disables on -Checks
+            # and NOT in .clang-tidy: section 4 of AGENTS.md explains why the
+            # canonical config file stays shared.
             Invoke-BuildStep -Context $Context -StepName "clang-tidy Analysis" -Script {
-                $sourceFiles = Get-ChildItem -Path $srcDir -Recurse -Include @('*.cpp', '*.cc') | ForEach-Object { $_.FullName }
-                $compileCommands = Join-Path $fastBuildClangFull "compile_commands.json"
-                if ((Test-Path $compileCommands) -and $sourceFiles.Count -gt 0) {
-                    Invoke-BuildExternal -Context $Context -File "clang-tidy" -Parameters (@("--fix", "-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness,-google-explicit-constructor,-hicpp-explicit-conversions", "--header-filter=Src/.*\.h(pp)?$|Src/.*\.ixx$", "-p=$compileCommands") + $sourceFiles) -IgnoreExitCode
-                }
+                Invoke-ClangTidyFixStep -Context $Context `
+                    -WorkspacePath $Workspace `
+                    -BuildRoot $fastBuildClangFull `
+                    -SourceSubdirectory 'Src' `
+                    -Extension @('.cpp', '.cc', '.cxx', '.ixx', '.cppm', '.mxx') `
+                    -Checks @('-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness,-google-explicit-constructor,-hicpp-explicit-conversions') `
+                    -Fix
             }
         }
         
         # Sync Debug Artifacts
         Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Debug Artifacts" -Script {
-            Sync-BuildArtifacts -Context $Context -Source $fastBuildClangFull -Destination (Join-Path $Workspace $BuildDirClang) -ExcludeCommonRustAndCppCache
+            Sync-BuildArtifacts -Context $Context -Source $fastBuildClangFull -Destination (Join-Path $Workspace $cfgClang.BuildDir) -ExcludeCommonRustAndCppCache
         }
     }
 
     # --- Profile Build ---
     if ($doProfile) {
         Invoke-BuildStep -Context $Context -StepName "Profile Build Configure" -Script {
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildProfileFull, "--preset", $ClangProfilePreset, "-S", $Workspace, "-Dmyproject_ENABLE_CPPCHECK=OFF", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildProfileFull)
-            Stage-RuntimeDependencies -TargetDir (Join-Path $fastBuildProfileFull "bin")
+            Push-Location $Workspace
+            try {
+                Invoke-CmakeConfigureAndBuild -Context $Context `
+                    -BuildPath $fastBuildProfileFull `
+                    -Preset $cfgProfile.Preset `
+                    -Configuration $cfgProfile.Configuration `
+                    -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+            } finally { Pop-Location }
+
+            Copy-RuntimeDependencies -TargetDir (Join-Path $fastBuildProfileFull "bin")
         }
 
         Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
@@ -364,23 +471,37 @@ try {
         
         # Sync Profile Artifacts
         Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Profile Artifacts" -Script {
-            Sync-BuildArtifacts -Context $Context -Source $fastBuildProfileFull -Destination (Join-Path $Workspace $BuildDirProfile) -ExcludeCommonRustAndCppCache
+            Sync-BuildArtifacts -Context $Context -Source $fastBuildProfileFull -Destination (Join-Path $Workspace $cfgProfile.BuildDir) -ExcludeCommonRustAndCppCache
         }
     }
 
     # --- Release Build ---
     if ($doRelease) {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Release Build" -Critical -Script {
-            Remove-BuildRoot -Context $Context -Path $fastBuildReleaseDirFull | Out-Null
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("-B", $fastBuildReleaseDirFull, "--preset", "x64-ClangCL-Windows-Release", "-S", $Workspace, "-Dmyproject_ENABLE_CPPCHECK=OFF", "-DENABLE_WIX_PACKAGING=ON")
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull)
-            Stage-RuntimeDependencies -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
+            # -CleanBuildRoot replaces the explicit Remove-BuildRoot that used to
+            # stand here, and it is passed on THIS lane only. The debug and profile
+            # lanes deliberately keep their trees: they live in the reusable
+            # container's C:\kataglyphis_fast_build, which is the only thing making
+            # a rerun incremental, and wiping them would turn every run into a
+            # from-scratch build. The release lane has always started clean, because
+            # a packaged artifact must not inherit anything.
+            Push-Location $Workspace
+            try {
+                Invoke-CmakeConfigureAndBuild -Context $Context `
+                    -BuildPath $fastBuildReleaseDirFull `
+                    -Preset $cfgRelease.Preset `
+                    -Configuration $cfgRelease.Configuration `
+                    -CleanBuildRoot `
+                    -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON')
+            } finally { Pop-Location }
+
+            Copy-RuntimeDependencies -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
         
         # Sync Release Artifacts
         Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Release Artifacts" -Script {
-            Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $BuildDirClangRelease) -ExcludeCommonRustAndCppCache
+            Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $cfgRelease.BuildDir) -ExcludeCommonRustAndCppCache
         }
 
         # MSIX Packaging
@@ -388,7 +509,6 @@ try {
             Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Script {
                 $msixWorkspace = Join-Path $Workspace "packaging\msix"
                 $msixTemplate = Join-Path $msixWorkspace "AppxManifest.template.xml"
-                $msixAssets = Join-Path $msixWorkspace "Assets"
                 $msixOutput = Join-Path $Workspace "dist\msix"
                 $stagingRoot = Join-Path $msixOutput "staging"
 
