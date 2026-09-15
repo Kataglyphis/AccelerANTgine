@@ -410,8 +410,10 @@ try {
             #
             # -Extension carries this project's module extensions on TOP of the
             # module default (.cpp/.cc/.cxx). Leave the check disables on -Checks
-            # and NOT in .clang-tidy: section 4 of AGENTS.md explains why the
-            # canonical config file stays shared.
+            # and NOT in .clang-tidy: that file is a SHARED config whose drift the
+            # lint gate checks against ANTfrastructure's copy (AGENTS.md section 2,
+            # "clang-format / clang-tidy / cmake-format and the canonical
+            # configs"), so a project-local disable belongs on the command line.
             Invoke-BuildStep -Context $Context -StepName "clang-tidy Analysis" -Script {
                 Invoke-ClangTidyFixStep -Context $Context `
                     -WorkspacePath $Workspace `
