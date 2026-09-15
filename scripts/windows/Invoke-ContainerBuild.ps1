@@ -8,6 +8,13 @@
 # live upstream in ANTfrastructure's WindowsContainerBuild.Reuse module
 # (Invoke-ContainerBuild). Rationale + measurements:
 # ANTfrastructure docs/windows-container-build-performance.md.
+#
+# NAME: this was Start-Build.ps1, which promised something it never did - it
+# starts no application, it drives a build. It deliberately shares a name with
+# the upstream cmdlet it is a thin wrapper over, and that is unambiguous:
+# PowerShell resolves Invoke-ContainerBuild below to the imported FUNCTION,
+# because a script file is only found through PATH or an explicit path and the
+# working directory is on neither.
 
 [CmdletBinding(SupportsShouldProcess)]
 param(

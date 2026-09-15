@@ -3,6 +3,9 @@
 # Thin project wrapper over ANTfrastructure's Invoke-ContainerBuild - transport
 # decision, reusable container and artifact streaming all live upstream; see
 # ANTfrastructure docs/windows-container-build-performance.md.
+#
+# NAME: this was Start-PythonBindings.ps1. It starts nothing; it builds the
+# bindings inside a container, and the name now says so.
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -57,7 +60,7 @@ $buildCommand = {
 $build = @{
     DockerExe     = $docker
     Image         = $Image
-    # Not Start-Build's container: the two lanes must never race for one
+    # Not Invoke-ContainerBuild.ps1's container: the two lanes must never race for one
     # reusable container. Its persistent C:\pybuild tree keeps reruns fast.
     ContainerName = "accelerantgine-python-persistent"
     RepoRoot      = $ProjectRoot

@@ -91,7 +91,7 @@ Choose the smallest validation path that still proves the change.
 - Linux debug correctness: ``cmake --preset linux-debug-clang``
 - Linux TSan validation: ``cmake --preset linux-debug-clang-tsan``
 - Linux profile benchmarks: ``cmake --preset linux-profile-clang``
-- Windows debug/profile/release container builds: ``.\scripts\windows\Start-Build.ps1``
+- Windows debug/profile/release container builds: ``.\scripts\windows\Invoke-ContainerBuild.ps1``
 - Windows host execution:
   ``.\scripts\windows\Start-Windows.ps1 -Config Debug|Profile|Release``
 

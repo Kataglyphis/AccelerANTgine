@@ -74,7 +74,7 @@ jobs:
         run: |
           # CpuCount/MemoryGb only bite under -Isolation hyperv; process
           # isolation (the default) shares the whole host.
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Build.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}" -CpuCount 32 -MemoryGb 48
+          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Invoke-ContainerBuild.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}" -CpuCount 32 -MemoryGb 48
 
       # One script, three configurations: Start-Debug/Profile/Release.ps1 were
       # the same file with a different build directory and suite list.

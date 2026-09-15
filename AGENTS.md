@@ -186,8 +186,9 @@ the three it replaced differed only in a build directory and a suite list, and
 it reads that build directory from `Build-Windows.config.psd1` — the same table
 `Build-Windows.ps1` builds into, so producer and consumer cannot disagree.
 
-`Start-Build.ps1`, `Start-PythonBindings.ps1` and `Start-Help.ps1` are the other
-entry points. `Start-Build.ps1` and `Start-PythonBindings.ps1` run their
+`Invoke-ContainerBuild.ps1`, `Invoke-ContainerPythonBindings.ps1` and
+`Show-BuildHelp.ps1` are the other entry points — named for what they do, because
+none of them starts the application. The first two run their
 `Build-*.ps1` inside the ANTfrastructure Windows image via `Invoke-ContainerBuild`
 (`WindowsContainerBuild.Reuse`, imported through `Resolve-BuildModule.ps1`):
 tar-pipe transport into a reusable per-lane build container at `C:\ws` by
