@@ -63,6 +63,27 @@ belongs in the **Changed** list below with that consequence spelled out.
   renamed to say so: `Start-Build.ps1` → `Invoke-ContainerBuild.ps1`,
   `Start-PythonBindings.ps1` → `Invoke-ContainerPythonBindings.ps1`,
   `Start-Help.ps1` → `Show-BuildHelp.ps1`.
+- 2026-09-15 — `third_party/ANTfrastructure` moved to `49be50f0` and four
+  helpers this repo had written locally, each under a header saying it would
+  leave once the hub grew one, came from the hub instead.
+  `scripts/linux/ci-release.sh` configures through a single `cmake_build_main`
+  using the new repeatable `--configure-arg` — the hand-written
+  `cmake -B … --preset` carrying `-DCMAKE_LINK_WHAT_YOU_USE` and
+  `-DCPACK_ENABLE_APPIMAGE` is gone — and packages through
+  `app_packaging_ensure_flatpak_runtime` and
+  `app_packaging_package_cmake_install_flatpak`, which stage container-native
+  (so a bind-mounted workspace cannot refuse the `fchmod` that
+  `flatpak build-bundle` performs) and let `ostree` rather than
+  flatpak-builder's exit code decide whether the app was committed.
+  `scripts/linux/ci-finalize.sh` calls `01-core/bind-mount-ownership.sh`.
+  `scripts/windows/Build-Windows.ps1` stages its media runtime through
+  `WindowsMediaRuntime.Common`, whose recursive NuGet probe follows the target
+  runtime identifier instead of a literal `win-x64`; this lane's presets are all
+  `x64-*`, so it resolves to the same `win-x64` it always matched.
+- 2026-09-15 — `ensure_flatpak_tools` in `scripts/linux/ci-release.sh` requires
+  and installs `ostree` as well. The hub packager's verdict is an `ostree refs`
+  query and Debian's `flatpak` depends on libostree rather than on the CLI, so a
+  dev box without it would report "not committed" over a good export.
 
 ### Removed
 
@@ -70,6 +91,15 @@ belongs in the **Changed** list below with that consequence spelled out.
   `docs/test-results*/`, `docs/test_results.xml` and `profile.prof`.
 - 2026-09-15 — `Test/python/__pycache__/*.pyc` left the index; `__pycache__/` is
   now ignored.
+- 2026-09-15 — 254 lines of local helper code, replaced by the hub rather than
+  deleted: `ensure_flatpak_runtime` (32), `build_flatpak` (69) and
+  `normalize_installed_file` (17) from `scripts/linux/ci-release.sh`;
+  `fix_bind_mount_ownership` (45) from `scripts/linux/ci-finalize.sh`; and
+  `Add-ExistingDirectory` (13), `Get-RuntimeDependencyDirectories` (45) and
+  `Copy-RuntimeDependencies` (33) from `scripts/windows/Build-Windows.ps1`.
+  `load_project_metadata` and `ensure_flatpak_tools` stayed: nothing upstream
+  reads `CMakeCache.txt`, and the apt/`AUTO_INSTALL_FLATPAK` knob is for a dev
+  box the hub's container helper does not serve.
 
 ### Fixed
 
