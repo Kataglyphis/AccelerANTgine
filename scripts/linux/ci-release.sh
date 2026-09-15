@@ -142,14 +142,11 @@ load_project_metadata() {
 # through a privilege helper. This script also runs on a dev box, where the
 # AUTO_INSTALL_FLATPAK knob and plain sudo apt are the right answer.
 #
-# OSTREE IS IN THE LIST, and it is not decoration. The hub packager's verdict is
-# `ostree --repo=<repo> refs`, not flatpak-builder's exit code, so a machine
-# without the ostree CLI reports "not committed" over a perfectly good export -
-# a false red that looks exactly like a packaging failure. Debian's flatpak
-# depends on libostree, NOT on the ostree binary package, so this is a real gap
-# on a dev box and not a theoretical one; the family CI image already ships all
-# three. The hub's app_packaging_require_flatpak_tools checks flatpak and
-# flatpak-builder only, so this check has to be the one that covers it.
+# OSTREE IS IN THE LIST because the hub packager's verdict is `ostree refs`, not
+# flatpak-builder's exit code, and app_packaging_require_flatpak_tools checks
+# only flatpak and flatpak-builder. Debian's flatpak depends on libostree, not on
+# the ostree binary, so a dev box without the CLI reports "not committed" over a
+# good export. The family CI image already ships all three.
 ensure_flatpak_tools() {
   local -a missing_cmds=()
   if ! has_tool flatpak-builder; then
@@ -278,25 +275,16 @@ fi
 
 info "Building release with preset: ${CLANG_RELEASE_PRESET}"
 
-# ONE call now. --clean-build-dir is true again because cmake_build_run cleans
-# the build directory BEFORE it configures: the previous false plus a local wipe
-# existed only because the configure was issued here, after the library had
-# already had its chance to clean. The release lane still starts from nothing - a
-# packaged artifact must not inherit anything - so the behaviour is unchanged.
+# ONE call now, where parse_args / prepare_env / run plus a hand-written
+# `cmake -B ... --preset` used to sit. --clean-build-dir is true again because
+# cmake_build_run cleans BEFORE it configures; the false plus a local wipe
+# existed only because the configure was issued down here. The lane still starts
+# from nothing, so the behaviour is unchanged.
 #
-# The two --configure-arg flags reach the CONFIGURE step only, in the order they
-# are written, which is what the hand-written `cmake -B` line did. They are NOT
-# forwarded to `cmake --build`.
-#
-# CMAKE_BUILD_SAFE_DIRECTORY is set before the call because cmake_build_main runs
-# cmake_build_prepare_env for us, and that defaults its git safe.directory to
-# /workspace - right in the container and wrong on a dev box, where
-# load_project_metadata's `git rev-parse` would then refuse the tree.
-# ci-build-and-test.sh sets the same pair for the same reason.
-#
-# Job count: cmake_build_run picks it from the cgroup memory limit. The explicit
-# `export CMAKE_BUILD_PARALLEL_LEVEL="$(compute_jobs_with_mem_cap)"` this file
-# used to do is gone: one owner for build parallelism across the fleet.
+# The two --configure-arg flags reach the CONFIGURE step only, in order, and are
+# NOT forwarded to `cmake --build`. CMAKE_BUILD_SAFE_DIRECTORY is set first
+# because cmake_build_main runs cmake_build_prepare_env, whose /workspace default
+# is wrong on a dev box: load_project_metadata's `git rev-parse` would refuse it.
 CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
 cmake_build_main \
   --preset "${CLANG_RELEASE_PRESET}" \
