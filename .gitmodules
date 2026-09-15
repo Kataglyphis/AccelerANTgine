@@ -17,8 +17,7 @@
 	branch = v1.x
 [submodule "third_party/ANTfrastructure"]
 	path = third_party/ANTfrastructure
-	url = git@github.com:Kataglyphis/ANTfrastructure.git
-
+	url = https://github.com/Kataglyphis/ANTfrastructure.git
 	branch = main
 [submodule "third_party/tomlplusplus"]
 	path = third_party/tomlplusplus
@@ -26,5 +25,5 @@
 	branch = master
 [submodule "third_party/nanobind"]
 	path = third_party/nanobind
-	url = git@github.com:wjakob/nanobind.git
+	url = https://github.com/wjakob/nanobind.git
 	branch = master
