@@ -307,11 +307,43 @@ try {
 
     # --- Step 3: cmake-format ---
     # Mirrors the Linux lane's cmake-format gate. Upstream Invoke-CmakeFormatStep
-    # creates/heals the uv venv itself and installs requirements.txt, so no
-    # separate venv step is needed; it throws when uv or cmake-format is missing.
+    # creates/heals the uv venv itself and installs the requirements it is
+    # pointed at, so no separate venv step is needed; it throws when uv or
+    # cmake-format is missing.
+    #
+    # BOTH PARAMETERS BELOW ARE NEW IN 19286e9f, and each closes a gap against
+    # the Linux lane rather than adding a preference:
+    #
+    #   -RequirementsPath  without it the step installs this repo's WHOLE
+    #                      requirements.txt - sphinx, sphinx-book-theme,
+    #                      myst-parser, breathe, exhale, pre-commit - to obtain
+    #                      one formatter, and takes cmake-format unpinned, so a
+    #                      floating release could move a verdict with no commit
+    #                      to blame. The hub's cmake-format.requirements.txt is
+    #                      the pinned pair (cmake-format==0.6.13, pyyaml==6.0.3)
+    #                      that run-static-analysis-format.sh installs since the
+    #                      library gained its venv default, so the two lanes now
+    #                      format with the SAME cmake-format.
+    #
+    #   -ExcludePattern    the module's built-in excludes cover build*/,
+    #                      third_party/, _deps/ and vcpkg_installed/ but not
+    #                      .venv/, which the Linux side has always listed
+    #                      (CODE_QUALITY_CMAKE_EXCLUDE_PATHS). It bites only on
+    #                      the filesystem fallback - git ls-files never lists an
+    #                      untracked venv - which is exactly the dev box, where
+    #                      the venv the step itself just created holds cmake
+    #                      files it would then reformat.
+    #
+    # -Check is deliberately NOT passed. This repo's Linux gate also formats in
+    # place (run_gate cmake-format -> code_quality_run_cmake_format with no
+    # --check), and turning a build driver into a gate that fails on unformatted
+    # input is a policy change, not an adoption.
     if (-not $SkipFormat) {
+        $cmakeFormatRequirements = Join-Path $Workspace 'third_party\ANTfrastructure\linux\scripts\cmake-format.requirements.txt'
         Invoke-BuildStep -Context $Context -StepName "Python tooling + cmake-format" -Critical -Script {
-            Invoke-CmakeFormatStep -Context $Context -WorkspacePath $Workspace
+            Invoke-CmakeFormatStep -Context $Context -WorkspacePath $Workspace `
+                -RequirementsPath $cmakeFormatRequirements `
+                -ExcludePattern @('\\\.venv\\')
         }
 
         # The other half of the Linux lane's format gate, which this script had
@@ -507,6 +539,42 @@ try {
         }
 
         # MSIX Packaging
+        #
+        # STAGING IS THE CALLER'S; EVERYTHING AFTER IT IS THE HUB'S.
+        # Invoke-MsixPackage (WindowsMsix.Common, new in 19286e9f) is the
+        # orchestration three consumers had each written out - lay the assets
+        # out, expand the manifest template, pack, assert, optionally sign -
+        # and the only part that genuinely differs between them is WHAT GOES
+        # INTO the staging directory. Here that is the ClangCL release exe, its
+        # dll, and the three extra assets this project's AppxManifest names
+        # beyond the four the hub always writes: SmallTile, LargeTile and
+        # SplashScreen, referenced from uap:DefaultTile and uap:SplashScreen.
+        #
+        # Two things the 65 hand-rolled lines this replaces did NOT do:
+        #   * XML-ESCAPE the token values. Expand-XmlTemplateTokens runs each
+        #     one through SecurityElement::Escape; the .Replace chain put
+        #     __DESCRIPTION__ into an XML attribute raw, so a single ampersand
+        #     in it produces a manifest makeappx rejects with a parser error.
+        #   * ASSERT the output. makeappx has been seen to report success and
+        #     produce no file; the step then went green and the artifact upload
+        #     found nothing.
+        #
+        # The version literal goes with them. Get-PackageVersion reads
+        # VERSION.txt / version.txt and pads to the four components an
+        # AppxManifest requires (makeappx rejects three). This repo ships
+        # neither file today, so it returns the same 0.0.1.0 that was typed
+        # twice here - but from one place, and correctly the day a version file
+        # lands.
+        #
+        # The three warn-and-skip preconditions stay HERE rather than becoming
+        # the hub's throws. This step is not -Critical, a Windows box without
+        # the SDK is a dev box rather than a broken lane, and making that red is
+        # a policy change, not an adoption. -MakeAppxPath hands the tool this
+        # already resolved to the hub so it is not probed a second time.
+        #
+        # Invoke-MsixSign is called here rather than through -Sign: the hub's
+        # -Sign passes the staging directory's PARENT as the workspace, and
+        # Invoke-MsixSign looks for the signing *.pfx in the workspace ROOT.
         if (-not $SkipMSIX) {
             Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Script {
                 $msixWorkspace = Join-Path $Workspace "packaging\msix"
@@ -534,43 +602,38 @@ try {
                     return
                 }
 
+                # A fresh staging tree, then the three assets the hub does not
+                # know about. Invoke-MsixPackage creates both directories with
+                # -Force and never clears them, so what is put here survives.
                 if (Test-Path $stagingRoot) { Remove-Item $stagingRoot -Recurse -Force }
-                New-Item -ItemType Directory -Path (Join-Path $stagingRoot "Assets") -Force | Out-Null
-
-                Write-BuildLog -Context $Context -Message "Copying binaries..."
-                Copy-Item $exePath -Destination $stagingRoot -Force
-                if (Test-Path $dllPath) { Copy-Item $dllPath -Destination $stagingRoot -Force }
-
-                Write-BuildLog -Context $Context -Message "Copying logos..."
-                $logoDestArgs = @(
-                    @{Dest="StoreLogo.png"},
-                    @{Dest="Square44x44Logo.png"},
-                    @{Dest="Square150x150Logo.png"},
-                    @{Dest="Wide310x150Logo.png"},
-                    @{Dest="SmallTile.png"},
-                    @{Dest="LargeTile.png"},
-                    @{Dest="SplashScreen.png"}
-                )
-                foreach ($arg in $logoDestArgs) {
-                    Copy-Item $logoSource -Destination (Join-Path $stagingRoot "Assets\$($arg.Dest)") -Force
+                $stagingAssets = Join-Path $stagingRoot "Assets"
+                New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
+                foreach ($extraAsset in @("SmallTile.png", "LargeTile.png", "SplashScreen.png")) {
+                    Copy-Item $logoSource -Destination (Join-Path $stagingAssets $extraAsset) -Force
                 }
 
-                Write-BuildLog -Context $Context -Message "Generating AppxManifest.xml..."
-                $manifestContent = Get-Content $msixTemplate -Raw
-                $manifestContent = $manifestContent.Replace("__PACKAGE_NAME__", "AccelerANTgine")
-                $manifestContent = $manifestContent.Replace("__PUBLISHER__", "CN=Kataglyphis")
-                $manifestContent = $manifestContent.Replace("__VERSION__", "0.0.1.0")
-                $manifestContent = $manifestContent.Replace("__DISPLAY_NAME__", "Kataglyphis C++ Inference")
-                $manifestContent = $manifestContent.Replace("__PUBLISHER_DISPLAY_NAME__", "Kataglyphis")
-                $manifestContent = $manifestContent.Replace("__DESCRIPTION__", "High-performance C++ inference engine with ONNXRuntime and WebRTC streaming")
-                $manifestContent = $manifestContent.Replace("__EXECUTABLE__", "AccelerANTgine.exe")
-                Set-Content -Path (Join-Path $stagingRoot "AppxManifest.xml") -Value $manifestContent -Encoding utf8
-
+                $packageVersion = Get-PackageVersion -WorkspacePath $Workspace
                 New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
-                $msixFile = Join-Path $msixOutput "AccelerANTgine_0.0.1.0_x64.msix"
+                $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_x64.msix"
 
-                Write-BuildLog -Context $Context -Message "Creating MSIX package..."
-                Invoke-BuildExternal -Context $Context -File $makeappx -Parameters @("pack", "/d", $stagingRoot, "/p", $msixFile, "/o") | Out-Null
+                Write-BuildLog -Context $Context -Message "Creating MSIX package (version $packageVersion)..."
+                Invoke-MsixPackage -Context $Context `
+                    -StagingDir $stagingRoot `
+                    -ManifestTemplatePath $msixTemplate `
+                    -TokenMap @{
+                        '__PACKAGE_NAME__'           = 'AccelerANTgine'
+                        '__PUBLISHER__'              = 'CN=Kataglyphis'
+                        '__VERSION__'                = $packageVersion
+                        '__DISPLAY_NAME__'           = 'Kataglyphis C++ Inference'
+                        '__PUBLISHER_DISPLAY_NAME__' = 'Kataglyphis'
+                        '__DESCRIPTION__'            = 'High-performance C++ inference engine with ONNXRuntime and WebRTC streaming'
+                        '__EXECUTABLE__'             = 'AccelerANTgine.exe'
+                    } `
+                    -OutputPath $msixFile `
+                    -ExePath $exePath `
+                    -ExtraFiles @($dllPath) `
+                    -LogoPath $logoSource `
+                    -MakeAppxPath $makeappx | Out-Null
 
                 Write-BuildLog -Context $Context -Message "MSIX package created: $msixFile"
 
