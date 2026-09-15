@@ -5,6 +5,20 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
+# fix_bind_mount_ownership was 45 lines in this file, under a comment asking for
+# it to move to 01-core beside dartdoc_build_fix_ownership. ANTfrastructure
+# 05b0eb5e did that, and kept the SPLIT that was the point of it rather than
+# just the code: only the paths that actually differ are chowned (never a
+# blanket -R, which on a mostly-correct tree asks the kernel for a chown it
+# refuses for a non-owner and turns a no-op into an error); a failure as a
+# non-root uid is explained and tolerated, because handing a file to another
+# uid needs CAP_CHOWN and as an unprivileged container user that is arithmetic,
+# not a defect; the same failure AS ROOT is fatal, because there it means a
+# read-only or broken mount. A missing target is not an error.
+#
+# The upstream copy spells the fatal arm as err rather than die; both exit 1.
+antfrastructure_source linux/scripts/01-core/bind-mount-ownership.sh
+
 WORKSPACE_DIR="$(pwd)"
 
 while [[ $# -gt 0 ]]; do
@@ -18,57 +32,4 @@ done
 # a different uid than the host user, so everything ci-docs.sh wrote is
 # root-owned until this runs - and on the host that shows up as a docs/ nobody
 # can clean or regenerate.
-#
-# THE `|| true` IS GONE, and that is the point of this block rather than a
-# tidy-up: a chown that fails leaves exactly the unusable tree this step exists
-# to prevent, and swallowing the exit code made the failure invisible until
-# somebody tried to delete docs/ by hand. This is generic enough to belong in
-# ANTfrastructure's 01-core beside dartdoc_build_fix_ownership, which carries the
-# same six lines; it stays here only until that function exists to call.
-fix_bind_mount_ownership() {
-  local target="${1:?target directory required}"
-  local reference="${2:?reference path required}"
-
-  [[ -d "${target}" ]] || {
-    info "Nothing to fix: ${target} does not exist"
-    return 0
-  }
-
-  local owner_uid owner_gid
-  owner_uid="$(stat -c "%u" "${reference}")"
-  owner_gid="$(stat -c "%g" "${reference}")"
-
-  # Only the paths that actually differ, never a blanket `chown -R`: on a tree
-  # where most files are already correct, recursing over them asks for a chown
-  # the kernel refuses for a non-owner and turns a no-op into an error.
-  local -a wrong=()
-  mapfile -d '' -t wrong < <(
-    find "${target}" \( ! -uid "${owner_uid}" -o ! -gid "${owner_gid}" \) -print0 2>/dev/null
-  )
-
-  if [[ "${#wrong[@]}" -eq 0 ]]; then
-    info "${target} is already owned by ${owner_uid}:${owner_gid}; nothing to do"
-    return 0
-  fi
-
-  info "Handing ${#wrong[@]} path(s) under ${target} back to ${owner_uid}:${owner_gid}"
-  if printf '%s\0' "${wrong[@]}" | xargs -0 --no-run-if-empty chown -h "${owner_uid}:${owner_gid}"; then
-    return 0
-  fi
-
-  # THE BLANKET `|| true` IS GONE, but the replacement is not a blanket `die`
-  # either, and the split is the whole point. Giving a file to a DIFFERENT uid
-  # needs CAP_CHOWN, i.e. root: as an unprivileged container user it is not a
-  # defect, it is arithmetic, and a red nobody can act on is what the `|| true`
-  # was hiding from. As root the same failure is a real error - a read-only or
-  # broken mount - and must stop the run.
-  if [[ "$(id -u)" -ne 0 ]]; then
-    warn "chown to ${owner_uid}:${owner_gid} is not permitted for uid $(id -u); ${target} stays as it is."
-    warn "Only root can hand files to another uid. Run the container as root, or with a uid matching the mount."
-    return 0
-  fi
-
-  die "chown -h ${owner_uid}:${owner_gid} under ${target} failed as root; the host user cannot clean or regenerate it."
-}
-
 fix_bind_mount_ownership "${WORKSPACE_DIR}/docs" "${WORKSPACE_DIR}"
