@@ -72,6 +72,7 @@ Import-BuildModule @(
     'WindowsMsix.Common'
     'WindowsMsix.Signing'
     'WindowsOnnx.Common'
+    'WindowsMediaRuntime.Common'
 )
 
 # ---------------------------------------------------------------------------
@@ -177,102 +178,25 @@ try {
     # for any -Configuration Debug. Both its callers - the hand DLL copy after the
     # ClangCL debug build and the PATH juggling around ctest - are gone with it.
 
-    function Add-ExistingDirectory {
-        param(
-            [System.Collections.Generic.List[string]]$Directories,
-            [string]$Candidate
-        )
-
-        if (-not [string]::IsNullOrWhiteSpace($Candidate) -and (Test-Path $Candidate)) {
-            $resolved = (Resolve-Path $Candidate).Path
-            if (-not $Directories.Contains($resolved)) {
-                $Directories.Add($resolved)
-            }
-        }
-    }
-
-    function Get-RuntimeDependencyDirectories {
-        $directories = New-Object 'System.Collections.Generic.List[string]'
-
-        foreach ($candidate in @(
-            'C:\gstreamer\bin',
-            'C:\gstreamer\1.0\msvc_x86_64\bin',
-            'C:\Program Files\gstreamer\1.0\msvc_x86_64\bin'
-        )) {
-            Add-ExistingDirectory -Directories $directories -Candidate $candidate
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($env:ONNX_ROOT) -and
-            -not [string]::IsNullOrWhiteSpace($env:ONNX_VERSION) -and
-            -not [string]::IsNullOrWhiteSpace($env:ONNX_GENAI_VERSION) -and
-            -not [string]::IsNullOrWhiteSpace($env:ONNX_DIRECTML_VERSION)) {
-            try {
-                $onnxLayout = Get-OnnxPackageLayout `
-                    -OnnxRoot $env:ONNX_ROOT `
-                    -OnnxVersion $env:ONNX_VERSION `
-                    -OnnxGenAiVersion $env:ONNX_GENAI_VERSION `
-                    -OnnxDirectMlVersion $env:ONNX_DIRECTML_VERSION
-
-                foreach ($candidate in @(
-                    $onnxLayout.RuntimeNativeDir,
-                    $onnxLayout.DirectMlNativeDir,
-                    $onnxLayout.CudaNativeDir,
-                    $onnxLayout.GenAiNativeDir,
-                    $onnxLayout.GenAiDirectMlNativeDir,
-                    $onnxLayout.GenAiCudaNativeDir
-                )) {
-                    Add-ExistingDirectory -Directories $directories -Candidate $candidate
-                }
-            } catch {
-                Write-BuildLogWarning -Context $Context -Message "Failed to resolve ONNX runtime layout: $($_.Exception.Message)"
-            }
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($env:ONNX_ROOT) -and (Test-Path $env:ONNX_ROOT)) {
-            Get-ChildItem -Path $env:ONNX_ROOT -Directory -Recurse -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -like '*\runtimes\win-x64\native' } |
-                ForEach-Object { Add-ExistingDirectory -Directories $directories -Candidate $_.FullName }
-        }
-
-        return @($directories)
-    }
-
-    # Not the hub's: ONNX Runtime plus GStreamer staging has no second consumer
-    # in the fleet yet, so it stays here under the two-consumer rule.
-    function Copy-RuntimeDependencies {
-        param(
-            [string]$TargetDir
-        )
-
-        if (-not (Test-Path $TargetDir)) {
-            New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-        }
-
-        # @(...) at the CALL SITE, not just inside the function: PowerShell unrolls a
-        # returned array into the pipeline, so an empty one yields zero objects and the
-        # assignment lands $null. Under `Set-StrictMode -Version Latest` (set by
-        # Resolve-BuildModule.ps1 and WindowsBuild.Common.psm1) $null.Count then throws
-        # "The property 'Count' cannot be found on this object" and kills this Critical
-        # step AFTER a fully successful compile — which is exactly the case this guard
-        # was written to handle gracefully.
-        $runtimeDirs = @(Get-RuntimeDependencyDirectories)
-        if ($runtimeDirs.Count -eq 0) {
-            Write-BuildLogWarning -Context $Context -Message "No external runtime dependency directories found to stage into $TargetDir"
-            return
-        }
-
-        $staged = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($runtimeDir in $runtimeDirs) {
-            Write-BuildLog -Context $Context -Message "Staging runtime DLLs from: $runtimeDir"
-            Get-ChildItem -Path $runtimeDir -Filter '*.dll' -File -ErrorAction SilentlyContinue | ForEach-Object {
-                Copy-Item -Path $_.FullName -Destination (Join-Path $TargetDir $_.Name) -Force
-                $null = $staged.Add($_.Name)
-            }
-        }
-
-        Write-BuildLog -Context $Context -Message "Staged $($staged.Count) runtime DLLs into $TargetDir"
-    }
-
+    # Add-ExistingDirectory, Get-RuntimeDependencyDirectories and
+    # Copy-RuntimeDependencies used to live here, under a comment saying the pair
+    # stayed "under the two-consumer rule". The rule is met, so they are
+    # WindowsMediaRuntime.Common's Get-MediaRuntimeDirectory and
+    # Copy-MediaRuntimeBundle now (ANTfrastructure f92f10ef) - a module whose
+    # signature was taken from the three call sites below, which is why they
+    # collapse to one exported call each.
+    #
+    # ONE BEHAVIOUR DIFFERENCE, and it is the one this lane wants: the recursive
+    # NuGet probe is pinned to the TARGET runtime identifier rather than the
+    # literal 'win-x64' the local copy hard-coded, so a foreign-rid payload
+    # cannot be staged next to the exe. Nothing moves today - every preset in
+    # Build-Windows.config.psd1 is x64-*, and Get-WindowsRuntimeIdentifier
+    # resolves amd64 -> win-x64 unless WINDOWS_TARGET_ARCH says otherwise - so
+    # the probe matches exactly what it matched before on this lane, and starts
+    # being correct rather than lucky if the lane is ever pointed at arm64.
+    #
+    # The empty-payload guard the local comment was written for is upstream too,
+    # and pinned by its suite: the resolver returns an empty ARRAY, not $null.
     # --- Step 1: Environment Setup ---
     Invoke-BuildStep -Context $Context -StepName "Environment Setup" -Critical -Script {
         $finalPath = $LLVMBinPath
@@ -399,7 +323,10 @@ try {
                     -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
             } finally { Pop-Location }
 
-            Copy-RuntimeDependencies -TargetDir (Join-Path $fastBuildClangFull "bin")
+            # $null = : the hub function RETURNS the staged DLL count so a caller
+            # can gate on it. This lane does not, and an unassigned int inside an
+            # Invoke-BuildStep script block lands in that step's output stream.
+            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
         }
 
         # Invoke-CtestDiscoveredTests puts the ASan runtime directories on PATH for
@@ -475,7 +402,10 @@ try {
                     -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
             } finally { Pop-Location }
 
-            Copy-RuntimeDependencies -TargetDir (Join-Path $fastBuildProfileFull "bin")
+            # $null = : the hub function RETURNS the staged DLL count so a caller
+            # can gate on it. This lane does not, and an unassigned int inside an
+            # Invoke-BuildStep script block lands in that step's output stream.
+            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
         }
 
         Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
@@ -529,7 +459,10 @@ try {
                     -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON')
             } finally { Pop-Location }
 
-            Copy-RuntimeDependencies -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
+            # $null = : the hub function RETURNS the staged DLL count so a caller
+            # can gate on it. This lane does not, and an unassigned int inside an
+            # Invoke-BuildStep script block lands in that step's output stream.
+            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
         
