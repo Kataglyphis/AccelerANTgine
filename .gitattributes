@@ -17,3 +17,6 @@ CMakeLists.txt   text eol=lf
 # exclude all files from language analysis which do not directly contribute to engine
 third_party/** linguist-vendored
 build/** linguist-vendored
+
+# Ratchet freeze files are read by the Linux gates; keep them LF.
+*.allow text eol=lf

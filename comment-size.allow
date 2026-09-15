@@ -1,0 +1,30 @@
+# Frozen 2026-09-15, the run that first turned --ratchets on in this repo.
+# Format: <file>	<first comment line, truncated to 60 chars>. Two-way rule: a
+# block that is not here FAILS, and a row whose block is gone or has shrunk under
+# the limit FAILS too, so the freeze cannot rot. Shrink a block, then DELETE its
+# line. third_party/ANTfrastructure/docs/code-quality-tooling.md
+#
+# WHY THESE ARE FROZEN AND NOT SHORTENED. Every one is a WRAPPER header, and the
+# thing it records is why the wrapper is thin: which half of the job moved
+# upstream, which knob the hub reads, and which incident the local half exists
+# for. The owner directive says long text belongs in docs/ with a pointer, and
+# this repo has no docs/*.md to point at - docs/ here is Sphinx sources plus
+# generated output (AGENTS.md section 6). Creating a docs page per wrapper is a
+# separate decision from turning the ratchet on, so the state is recorded rather
+# than churned. The gate now refuses the NEXT one.
+#
+# scripts/linux/lib/antfrastructure.sh is a vendored copy of the hub's
+# shared/linux/templates/antfrastructure.sh and is watched by the shared-config
+# drift gate: its blocks can only shrink upstream.
+scripts/linux/ci-build-and-test.sh	#!/usr/bin/env bash
+scripts/linux/ci-common.sh	#!/usr/bin/env bash
+scripts/linux/ci-docs.sh	#!/usr/bin/env bash
+scripts/linux/ci-finalize.sh	# Hand the docs tree back to whoever owns the bind mount. Th
+scripts/linux/ci-profile-bench.sh	#!/usr/bin/env bash
+scripts/linux/ci-release.sh	#!/usr/bin/env bash
+scripts/linux/ci-run-all.sh	# clang links against the image's source-built GCC, and BOTH
+scripts/linux/lib/antfrastructure.sh	# Replace this process with a ANTfrastructure driver, forwar
+scripts/linux/renovate-local.sh	#!/usr/bin/env bash
+scripts/linux/run-lint-gates.sh	#!/usr/bin/env bash
+scripts/linux/run-static-analysis-format.sh	# cmake-format lives in a Python env; the library bootstraps
+scripts/linux/run-static-analysis-format.sh	#!/usr/bin/env bash

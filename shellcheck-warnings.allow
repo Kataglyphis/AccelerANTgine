@@ -1,0 +1,20 @@
+# shellcheck -S warning findings frozen per (file, code) over the file set
+# lint-shell.sh grades. Format: <file> | SC<code> | <count> | <reason>
+# Four-way rule: a new pair, a HIGHER count, an unrecorded LOWER count and a row
+# whose pair is gone all FAIL - so a fix must be recorded, not just made. Record
+# one with verify_shellcheck_warnings.py --write-baseline [--files f].
+# third_party/ANTfrastructure/docs/code-quality-tooling.md
+#
+# Frozen 2026-09-15, the run that first turned --ratchets on here. Every SC2034
+# row below is the SAME finding: these scripts are wrappers that set a knob and
+# then hand control to a hub library through antfrastructure_source, a path
+# resolved at RUNTIME. shellcheck cannot follow it, so every variable the hub
+# reads looks unused here. Each reason names the library that reads it, which is
+# the check a reviewer can actually repeat.
+scripts/linux/ci-build-and-test.sh | SC2034 | 2 | reviewed 2026-09-15, KEEP: CMAKE_BUILD_SAFE_DIRECTORY and CTEST_RUN_SAFE_DIRECTORY are knobs of the hub's linux/scripts/lib/cmake-build.sh and lib/ctest-run.sh, which this file sources. Removing either drops the container's git safe.directory registration and every cmake/ctest call fails on dubious ownership.
+scripts/linux/ci-coverage.sh | SC2034 | 3 | reviewed 2026-09-15, KEEP: COVERAGE_LLVM_IGNORE_REGEX, COVERAGE_GCOVR_EXTRA_ARGS and COVERAGE_LLVM_HTML_DIR are read by the hub's lib/coverage.sh. They are this project's coverage scope and output layout; the driver has no other way to learn them.
+scripts/linux/ci-docs.sh | SC2034 | 5 | reviewed 2026-09-15, KEEP: DOCS_BUILD_VENV_DIR, DOCS_BUILD_UV_VENV_CREATE_SCRIPT, DOCS_BUILD_UV_INSTALL_REQUIREMENTS_SCRIPT, DOCS_BUILD_PROJECT_ROOT and DOCS_BUILD_GENERATOR_SCRIPT are read by the hub's lib/docs-build.sh. The two *_SCRIPT knobs hold FUNCTION names, which is the one shape shellcheck is least able to see through.
+scripts/linux/ci-profile-bench.sh | SC2034 | 1 | reviewed 2026-09-15, KEEP: CMAKE_BUILD_SAFE_DIRECTORY, read by the hub's lib/cmake-build.sh. Same knob, same reason as ci-build-and-test.sh.
+scripts/linux/ci-release.sh | SC2034 | 1 | reviewed 2026-09-15, KEEP: CMAKE_BUILD_SAFE_DIRECTORY, read by the hub's lib/cmake-build.sh via cmake_build_prepare_env, which this file calls directly because the release lane needs its own configure line.
+scripts/linux/run-static-analysis-format.sh | SC2034 | 7 | reviewed 2026-09-15, KEEP: the seven CODE_QUALITY_* knobs (CPP_FORMAT_EXTENSIONS, CLANG_TIDY_EXTENSIONS, CLANG_TIDY_FIX, CLANG_TIDY_ARGS, CMAKE_FORMAT_CONFIG, CMAKE_SEARCH_ROOT, CMAKE_EXCLUDE_PATHS) are read by the hub's lib/code-quality.sh. They carry this project's C++20 module extensions and its clang-tidy disables, which is precisely what must NOT move upstream.
+scripts/linux/run-static-analysis-format.sh | SC2054 | 1 | reviewed 2026-09-15, KEEP: the commas sit INSIDE one clang-tidy argument, -checks=-a,-b,-c, and are clang-tidy's own separator. Replacing them with spaces would pass three arguments clang-tidy rejects, and the check disables would stop applying.
