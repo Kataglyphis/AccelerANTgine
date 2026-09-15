@@ -34,6 +34,38 @@ jobs:
           fetch-depth: 0
           short-path-target: /d/ws
 
+      # PowerShell lint, ahead of the three-hour container build rather than
+      # after it: a syntax error in scripts\windows\*.ps1 is otherwise
+      # discovered when the container finally reaches that file. Two passes -
+      # a mandatory parse + AST-trap gate, and PSScriptAnalyzer.
+      #
+      # Pinned exactly as BeschleunigerBallett and the hub pin it, so a refresh
+      # of the runner image's preinstalled modules cannot silently change what
+      # this gate reports.
+      - name: Install PSScriptAnalyzer
+        run: Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
+
+      # -Path is the parameter ANTfrastructure added for exactly this: a consumer
+      # points the gate at ITS tree while the PSScriptAnalyzerSettings.psd1 stays
+      # resolved against the SCRIPT's own location, so the hub's ruleset is
+      # consumed BY REFERENCE and no copy lands here. `scripts` is walked
+      # recursively, covering scripts/windows/ and scripts/windows/tests/.
+      #
+      # working-directory is the short-path clone, like every other step here -
+      # the submodule (and therefore Invoke-Lint.ps1 itself) exists only there.
+      #
+      # -FailOnAnalyzer is deliberately NOT passed and this step deliberately
+      # carries no continue-on-error; they are not the same thing. The step FAILS
+      # on any parse error or AST-trap violation - hard defects. Only the
+      # PSScriptAnalyzer pass is advisory, which is the hub's own documented ramp.
+      # Add -FailOnAnalyzer once this repo's findings are triaged; never reach for
+      # continue-on-error, which would hide the parse gate too.
+      - name: Lint PowerShell (parse gate + PSScriptAnalyzer)
+        working-directory: ${{ steps.prep.outputs.workspace }}
+        run: >-
+          pwsh -NoProfile -File third_party/ANTfrastructure/windows/scripts/Invoke-Lint.ps1
+          -Path scripts
+
       # Every path below is steps.prep.outputs.workspace, NOT github.workspace:
       # the build tree lives in the short-path clone, and the wrapper scripts
       # live with it. A relative `.\scripts\...` would resolve against the
