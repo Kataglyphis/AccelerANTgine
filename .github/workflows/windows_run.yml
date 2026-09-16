@@ -2,9 +2,9 @@ name: CMake on Windows MSVC/Clang x64
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
 
 env:
   BUILD_DIR_RELEASE: "build-clangcl-release"

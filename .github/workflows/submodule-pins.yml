@@ -40,13 +40,13 @@ name: Submodule Pins
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
     paths:
       - '.gitmodules'
       - 'third_party/**'
       - '.github/workflows/submodule-pins.yml'
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
     paths:
       - '.gitmodules'
       - 'third_party/**'
