@@ -50,9 +50,9 @@ name: Lint gates - shell, workflows, secrets, python
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
 
 # Read-only: this lane reports a verdict and writes nothing. The other
 # workflows here predate the default-permissions tightening and still run on

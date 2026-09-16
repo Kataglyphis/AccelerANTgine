@@ -2,9 +2,9 @@ name: Linux run on ARM/GCC/Clang
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
 
 jobs:
   build-ubuntu26_04_gcc-arm:
