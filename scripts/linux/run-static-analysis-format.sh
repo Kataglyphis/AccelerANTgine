@@ -138,7 +138,15 @@ run_clang_tidy() {
   # records absolute ones.
   local abs_src_files=() status=0
   mapfile -t abs_src_files < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
-  code_quality_run_clang_tidy "${CODE_QUALITY_COMPILE_DB_DIR}" "${abs_src_files[@]}" || status=$?
+  # clang-tidy has to read the module PCMs the build wrote, so it must be the
+  # compiler's own: the image's PATH clang-tidy is LLVM 21 and fails every Src/
+  # file on clang 23's ("module file ... uses a newer format that cannot be
+  # read"). The subshell keeps the swap to clang-tidy whatever order the gates
+  # run in: clang-format's version is a format verdict of its own. ci-common.sh.
+  (
+    use_compiler_llvm_tools "${BUILD_DIR}" clang-tidy
+    code_quality_run_clang_tidy "${CODE_QUALITY_COMPILE_DB_DIR}" "${abs_src_files[@]}"
+  ) || status=$?
   code_quality_cleanup_compile_db
   return "${status}"
 }

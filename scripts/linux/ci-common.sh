@@ -85,3 +85,47 @@ else
 
   warn "ANTfrastructure core library not found at ${_ANTFRASTRUCTURE_CORE} - using minimal fallbacks"
 fi
+
+# compiler_llvm_tool <build-dir> <tool> - prints the absolute path of <tool> from
+# the LLVM install of the C++ compiler that configured <build-dir> (its
+# CMakeCache.txt CMAKE_CXX_COMPILER, else clang++), or fails printing nothing.
+# The CI image puts a source-built clang 23 (/usr/local/llvm-target) behind
+# clang/clang++, but bare clang-tidy, llvm-profdata and llvm-cov on PATH are
+# Ubuntu's LLVM 21, which cannot read what clang 23 writes: raw profile format 11
+# ("no profile can be merged") and C++ module PCMs ("uses a newer format that
+# cannot be read"). -print-prog-name answers with the compiler's sibling binary.
+compiler_llvm_tool() {
+  local build_dir="$1" tool="$2" cxx="" path=""
+  if [[ -f "${build_dir}/CMakeCache.txt" ]]; then
+    cxx="$(sed -n 's/^CMAKE_CXX_COMPILER:[A-Z]*=//p' "${build_dir}/CMakeCache.txt" | head -n 1)"
+  fi
+  path="$("${cxx:-clang++}" -print-prog-name="${tool}" 2>/dev/null)" || return 1
+  [[ "${path}" == /* && -x "${path}" ]] || return 1
+  printf '%s\n' "${path}"
+}
+
+# use_compiler_llvm_tools <build-dir> <tool>... - puts the directory holding the
+# compiler's own copy of EVERY named tool first on PATH, for hub functions that
+# call them by bare name (coverage.sh, code-quality.sh). Warns and leaves PATH
+# alone when the compiler has no such set; the caller's require_tools decides.
+# Callers scope it (a subshell) when the directory holds tools they must not
+# swap - clang-format's version is a format verdict of its own.
+use_compiler_llvm_tools() {
+  local build_dir="$1" path dir tool
+  shift
+  if ! path="$(compiler_llvm_tool "${build_dir}" "$1")"; then
+    warn "The compiler of '${build_dir}' names no $1 of its own; using PATH's $*, which must read what that compiler wrote."
+    return 0
+  fi
+  dir="$(dirname "${path}")"
+  for tool in "$@"; do
+    if [[ ! -x "${dir}/${tool}" ]]; then
+      warn "${dir} has no ${tool} beside $1; using PATH's $*, which must read what that compiler wrote."
+      return 0
+    fi
+  done
+  PATH="${dir}:${PATH}"
+  export PATH
+  hash -r
+  info "LLVM tools matching the compiler of '${build_dir}': ${dir} ($*)"
+}
