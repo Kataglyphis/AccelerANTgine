@@ -73,7 +73,11 @@ Import-BuildModule @(
     'WindowsMsix.Signing'
     'WindowsOnnx.Common'
     'WindowsMediaRuntime.Common'
+    'WindowsOrtBundle.Common'   # project-local: the G6 proof of each staged bin\
 )
+# G6, the hub's ORT census, proves the staged ONNX Runtime; a hub pin older than its
+# ORT single-source commit lacks it (and stages NuGet layouts only, so System32's ORT won).
+try { Import-BuildModule @('WindowsOrtProvenance.Common') } catch { throw (Get-OrtCensusRequirement -Cause $_.Exception.Message) }
 
 # ---------------------------------------------------------------------------
 # The build table. Import-PowerShellDataFile plus Get-ConfigValue/Get-OrDefault
@@ -186,14 +190,14 @@ try {
     # signature was taken from the three call sites below, which is why they
     # collapse to one exported call each.
     #
-    # ONE BEHAVIOUR DIFFERENCE, and it is the one this lane wants: the recursive
-    # NuGet probe is pinned to the TARGET runtime identifier rather than the
-    # literal 'win-x64' the local copy hard-coded, so a foreign-rid payload
-    # cannot be staged next to the exe. Nothing moves today - every preset in
-    # Build-Windows.config.psd1 is x64-*, and Get-WindowsRuntimeIdentifier
-    # resolves amd64 -> win-x64 unless WINDOWS_TARGET_ARCH says otherwise - so
-    # the probe matches exactly what it matched before on this lane, and starts
-    # being correct rather than lucky if the lane is ever pointed at arm64.
+    # ONNX Runtime comes from the chain install only (ANTfrastructure owner rule
+    # 2026-09-23). A hub pin before that change probed NuGet runtimes\<rid>\native
+    # layouts alone, found nothing under the image's chain ONNX_ROOT, and left the
+    # exe to load System32's Windows ML onnxruntime.dll. From that change on the
+    # hub stages ONNX_ROOT\lib + \bin (Get-OnnxChainLayout) and byte-checks every
+    # ORT DLL it leaves; Assert-BundleChainOrt then runs the hub's G6 census over
+    # each bin\ (chain bytes, and every importer resolving to them), and the
+    # import block above refuses a hub pin that predates G6.
     #
     # The empty-payload guard the local comment was written for is upstream too,
     # and pinned by its suite: the resolver returns an empty ARRAY, not $null.
@@ -327,6 +331,7 @@ try {
             # can gate on it. This lane does not, and an unassigned int inside an
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
+            $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildClangFull "bin")
         }
 
         # Invoke-CtestDiscoveredTests puts the ASan runtime directories on PATH for
@@ -406,6 +411,7 @@ try {
             # can gate on it. This lane does not, and an unassigned int inside an
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
+            $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildProfileFull "bin")
         }
 
         Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
@@ -463,6 +469,13 @@ try {
             # can gate on it. This lane does not, and an unassigned int inside an
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
+            $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildReleaseDirFull "bin")
+            # The NSIS/WiX/ZIP installers pack the install tree, not bin\: G6 proves that tree first.
+            $installProof = Join-Path ([System.IO.Path]::GetTempPath()) "accelerantgine-install-$([guid]::NewGuid().ToString('N'))"
+            try {
+                Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--install", $fastBuildReleaseDirFull, "--prefix", $installProof, "--config", $cfgRelease.Configuration)
+                $null = Assert-BundleChainOrt -Root $installProof -ExeDirectory (Join-Path $installProof "bin")
+            } finally { Remove-Item -LiteralPath $installProof -Recurse -Force -ErrorAction SilentlyContinue }
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
         
@@ -549,6 +562,17 @@ try {
                 New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
                 $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_x64.msix"
 
+                # The package carries the chain ORT the release bin\ staged, or a client
+                # loads System32's Windows ML copy; G6 proves the payload before it is packed.
+                $payloadDir = Join-Path $msixOutput "payload"
+                if (Test-Path $payloadDir) { Remove-Item $payloadDir -Recurse -Force }
+                New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
+                $ortRuntime = @('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'DirectML.dll') |
+                    ForEach-Object { Join-Path (Split-Path $exePath -Parent) $_ } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+                Copy-Item -LiteralPath (@($exePath, $dllPath) + @($ortRuntime)) -Destination $payloadDir
+                $null = Assert-BundleChainOrt -Root $payloadDir
+                $payloadExtra = @(Get-ChildItem -LiteralPath $payloadDir -Filter '*.dll' -File | ForEach-Object FullName)
+
                 Write-BuildLog -Context $Context -Message "Creating MSIX package (version $packageVersion)..."
                 Invoke-MsixPackage -Context $Context `
                     -StagingDir $stagingRoot `
@@ -563,8 +587,8 @@ try {
                         '__EXECUTABLE__'             = 'AccelerANTgine.exe'
                     } `
                     -OutputPath $msixFile `
-                    -ExePath $exePath `
-                    -ExtraFiles @($dllPath) `
+                    -ExePath (Join-Path $payloadDir 'AccelerANTgine.exe') `
+                    -ExtraFiles $payloadExtra `
                     -LogoPath $logoSource `
                     -MakeAppxPath $makeappx | Out-Null
 

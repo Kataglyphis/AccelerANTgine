@@ -39,6 +39,34 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- 2026-09-23 — **ONNX Runtime is REQUIRED and chain-only** (ANTfrastructure
+  owner rule of 2026-09-23). `cmake/SystemLibDependencies.cmake` searches one
+  prefix — `-DONNXRUNTIME_ROOT`, else `$ENV{ONNX_ROOT}` (Windows image) or
+  `/usr/local/lib/onnxruntime-cpu` (Linux image) — with `NO_DEFAULT_PATH`, and
+  configure stops with `FATAL_ERROR` when it is missing or when its runtime
+  library does not embed the chain's ORT source root (`C:\temp\onnx-src\…`,
+  `/opt/onnxruntime/…`). Gone: the `C:/onnxruntime`, `C:/onnx`, Program Files,
+  vcpkg, `/opt/onnxruntime`, `/usr`, `/usr/local` and pkg-config fallbacks, the
+  `ONNX_LIB`/`ONNX_INCLUDE` and `$ENV{ONNXRUNTIME_ROOT}` shortcuts, and the
+  WARNING that told users to download a release or `apt install
+  libonnxruntime-dev`. Also fixed: on Linux the search list used to be
+  overwritten after the override was inserted, so `ONNXRUNTIME_ROOT` never
+  applied there. A build without ORT (`HAS_ONNXRUNTIME=0`) is no longer
+  reachable through a missing library. The CUDA EP code is unchanged.
+  The shipped ORT is proved as well: `scripts/windows/Build-Windows.ps1` runs
+  ANTfrastructure's G6 census (`Test-OrtProvenanceTree`) over each `bin\` after
+  `Copy-MediaRuntimeBundle`, and `Build-PythonBindings.ps1` copies only the chain
+  layout (`Get-OnnxChainLayout`; it used to copy every `onnxruntime*.dll` under
+  `ONNX_ROOT`, NuGet trees included) and proves the package with G6 before it
+  reports it staged. The CPack installers carry it as well: the NSIS, WiX and
+  ZIP packages were built from `install()` rules that held no ORT, so an
+  installed exe loaded System32's Windows ML copy. `SystemLibDependencies.cmake`
+  now installs the proven `onnxruntime.dll` (+ `onnxruntime_providers_shared.dll`,
+  `DirectML.dll`) into `bin\`, and the release step runs G6 over a
+  `cmake --install` of the tree before `--target package`. Both scripts need the
+  hub pin at its ORT single-source commit of 2026-09-23 or later and stop
+  naming it otherwise: at the older pin the lane
+  staged NuGet layouts only and the exe loaded System32's `onnxruntime.dll`.
 - 2026-09-14 — `scripts/linux/run-static-analysis-format.sh` runs every analysis
   through ANTfrastructure's `01-core/gates.sh` and `require_tools`: no `|| true`
   and no warn-and-skip survive, so a missing tool is red rather than green.
