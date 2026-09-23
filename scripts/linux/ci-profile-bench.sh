@@ -24,6 +24,10 @@ source "${_SCRIPT_DIR}/ci-common.sh"
 antfrastructure_source linux/scripts/lib/cmake-build.sh
 
 PERF_TIMEOUT_SECONDS="180"
+# The window the workload still runs for when perf cannot (see perf_probe).
+SMOKE_SECONDS="10"
+# Where this script's own signalling server listens (see start_signalling_server).
+SIGNALLING_PORT="18443"
 BUILD_DIR="build"
 COMPILER="clang"
 GCC_PROFILE_PRESET="linux-profile-GNU"
@@ -42,12 +46,15 @@ PROFILE_BINARY="bin/AccelerANTgine"
 # and exits 0 (Src/cli_main.cpp:168-175), so a bare invocation profiles process
 # startup and nothing else. The usage block in cli_main.cpp documents
 # `--webrtc --source test` as the headless no-camera path; it streams the
-# synthetic source until told to stop, which gives perf a real window.
+# synthetic source until told to stop - as long as a signalling server answers,
+# which start_signalling_server provides.
 PROFILE_ARGS="--webrtc --source test"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --perf-timeout-seconds) PERF_TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
+    --smoke-seconds) SMOKE_SECONDS="${2:-}"; shift 2 ;;
+    --signalling-port) SIGNALLING_PORT="${2:-}"; shift 2 ;;
     --build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
     --compiler) COMPILER="${2:-}"; shift 2 ;;
     --gcc-profile-preset) GCC_PROFILE_PRESET="${2:-}"; shift 2 ;;
@@ -113,53 +120,101 @@ perf_probe() {
   fi
 }
 
-# Exit 124 is `timeout` reporting ITS OWN configured timeout, and here it is the
-# EXPECTED end of a good run: under ${PROFILE_ARGS} the CLI streams the synthetic
-# test source until told to stop, so PERF_TIMEOUT_SECONDS is what closes the
-# profile window. perf finalizes perf.data when timeout TERMs it, and the CLI's
-# own SIGTERM handler (Src/cli_main.cpp:245-246) exits cleanly, which is what
-# lets gperftools dump CPUPROFILE. Everything else is a real failure - perf
-# refusing the real workload after the probe passed, or a binary that crashed or
-# bailed out before the window closed. This block used to be wrapped in
-# `set +e` and warn on ANY non-zero exit, so a lane that never recorded a single
-# sample still went green.
-run_perf_record() {
-  local perf_exit=0
+# The workload is a WebRTC producer and needs a signalling server to stream. With
+# none on its URI (default ws://127.0.0.1:8443) webrtcsink's signaller gets
+# "Connection refused", the state turns Error, and the CLI's loop
+# (Src/cli_main.cpp:250-258) breaks and returns 0 about 200 ms in - so with a
+# real perf the lane died "exited cleanly before the window closed". Unless
+# --profile-args names its own --server, this starts the image's
+# gst-webrtc-signalling-server on 127.0.0.1:${SIGNALLING_PORT} and points the
+# CLI at it; not 8443, where a dev box's own producer listens. AGENTS.md sec. 4.
+SIGNALLING_PID=""
+WORKLOAD_ARGS=("${PROFILE_ARGS_ARR[@]}")
+
+workload_needs_signalling_server() {
+  local arg webrtc=1
+  for arg in "${PROFILE_ARGS_ARR[@]}"; do
+    case "${arg}" in
+      --server | --server=* | -server | -server=*) return 1 ;;
+      --webrtc | --webrtc=true | -webrtc | -webrtc=true) webrtc=0 ;;
+    esac
+  done
+  return "${webrtc}"
+}
+
+start_signalling_server() {
+  workload_needs_signalling_server || return 0
+  command -v gst-webrtc-signalling-server >/dev/null 2>&1 \
+    || die "The workload needs a WebRTC signalling server and there is no gst-webrtc-signalling-server on PATH (gst-plugins-rs; the CI image has it in /opt/gstreamer/bin). Install it, or name a running server with --profile-args '... --server ws://HOST:PORT'."
+  local log="${WORKSPACE_DIR}/${LOGS_DIR}/signalling-server.log" attempt
+  gst-webrtc-signalling-server --host 127.0.0.1 --port "${SIGNALLING_PORT}" >"${log}" 2>&1 &
+  SIGNALLING_PID=$!
+  trap stop_signalling_server EXIT
+  for ((attempt = 0; attempt < 50; attempt++)); do
+    sleep 0.2
+    kill -0 "${SIGNALLING_PID}" 2>/dev/null \
+      || die "gst-webrtc-signalling-server exited before it listened on 127.0.0.1:${SIGNALLING_PORT} (port taken? --signalling-port picks another): $(tail -n 3 "${log}" | tr '\n' ' ')"
+    if (exec 3<>"/dev/tcp/127.0.0.1/${SIGNALLING_PORT}") 2>/dev/null; then
+      WORKLOAD_ARGS+=("--server=ws://127.0.0.1:${SIGNALLING_PORT}")
+      info "signalling server for the workload: ws://127.0.0.1:${SIGNALLING_PORT} (log: ${log})"
+      return 0
+    fi
+  done
+  die "gst-webrtc-signalling-server did not listen on 127.0.0.1:${SIGNALLING_PORT} within 10 s: $(tail -n 3 "${log}" | tr '\n' ' ')"
+}
+
+stop_signalling_server() {
+  [[ -n "${SIGNALLING_PID}" ]] || return 0
+  kill "${SIGNALLING_PID}" 2>/dev/null || true
+  wait "${SIGNALLING_PID}" 2>/dev/null || true
+  SIGNALLING_PID=""
+  trap - EXIT
+}
+
+# run_workload <what> <window-seconds> [recorder argv...] - the workload under
+# `timeout`, behind the recorder when one is given. Exit 124 is timeout's own
+# and the EXPECTED end: the CLI streams until stopped, perf finalizes perf.data
+# on the TERM, and the CLI's SIGTERM handler (Src/cli_main.cpp:245-246) exits
+# cleanly, which lets gperftools dump CPUPROFILE. An early exit 0 means the
+# workload bailed out (bad flag, version-print, no signalling server) and only
+# startup was measured; any other exit is a failure. This used to warn on ANY
+# non-zero exit, so a lane that recorded nothing still went green.
+run_workload() {
+  local what="$1" window="$2" status=0
+  shift 2
+  start_signalling_server
   (
-    cd "${BUILD_DIR}" && timeout "${PERF_TIMEOUT_SECONDS}" \
-      perf record "${PERF_RECORD_ARGS[@]}" -- \
-      env CPUPROFILE="${PROFILE_OUTPUT}" "./${PROFILE_BINARY}" "${PROFILE_ARGS_ARR[@]}"
-  ) || perf_exit=$?
+    cd "${BUILD_DIR}" && timeout "${window}" \
+      "$@" env CPUPROFILE="${PROFILE_OUTPUT}" "./${PROFILE_BINARY}" "${WORKLOAD_ARGS[@]}"
+  ) || status=$?
+  stop_signalling_server
 
-  if [[ "${perf_exit}" -eq 124 ]]; then
-    info "perf window closed by the configured ${PERF_TIMEOUT_SECONDS}s timeout (the intended bound)"
-  elif [[ "${perf_exit}" -eq 0 ]]; then
-    # A good run can ONLY end in 124: timeout exits 124 whenever it had to stop
-    # the child, and under ${PROFILE_ARGS} the CLI streams until stopped. A clean
-    # early exit therefore means the workload bailed out (bad flag, immediate
-    # version-print-and-exit, missing source) and the profile measured startup.
-    die "profiled workload exited cleanly before the ${PERF_TIMEOUT_SECONDS}s window closed - under '${PROFILE_ARGS}' the CLI streams until stopped, so an early exit 0 means nothing was profiled"
+  if [[ "${status}" -eq 124 ]]; then
+    info "${what} window closed by the configured ${window}s timeout (the intended bound)"
+  elif [[ "${status}" -eq 0 ]]; then
+    die "profiled workload exited cleanly before the ${window}s window closed - under '${PROFILE_ARGS}' the CLI streams until stopped, so an early exit 0 means nothing was profiled"
   else
-    die "perf record failed with exit code ${perf_exit}"
-  fi
-
-  info "perf data: ${BUILD_DIR}/perf.data"
-  if [[ -s "${PROFILE_OUTPUT}" ]]; then
-    info "gperftools CPU profile: ${PROFILE_OUTPUT}"
-  else
-    # Named expected case, not an error: ProjectOptions.cmake links -lprofiler
-    # only when find_library(PROFILER_LIB profiler) succeeds; without it the
-    # build falls back to -pg and CPUPROFILE is inert.
-    info "no gperftools profile at ${PROFILE_OUTPUT} (libprofiler not linked; ProjectOptions.cmake fell back to -pg)"
+    die "${what} failed with exit code ${status}"
   fi
 }
 
 perf_probe
 if [[ -z "${PERF_SKIP_REASON}" ]]; then
-  run_perf_record
+  run_workload "perf record" "${PERF_TIMEOUT_SECONDS}" perf record "${PERF_RECORD_ARGS[@]}" --
+  info "perf data: ${BUILD_DIR}/perf.data"
 else
   warn "perf record SKIPPED - this host cannot run perf: ${PERF_SKIP_REASON}"
-  warn "No perf.data is written and the profiled workload does not run; the benchmark suite below still does. perf needs the 'perf' binary (Ubuntu 26.04: package linux-perf) and permission to open perf events (CAP_PERFMON or --privileged in a container, or a low enough kernel.perf_event_paranoid)."
+  warn "No perf.data is written. perf needs the 'perf' binary (Ubuntu 26.04: package linux-perf) and permission to open perf events (CAP_PERFMON or --privileged in a container, or a low enough kernel.perf_event_paranoid). The workload still runs for ${SMOKE_SECONDS}s without a recorder, so one that stops streaming early fails here either way."
+  run_workload "workload (no recorder)" "${SMOKE_SECONDS}"
+fi
+
+if [[ -s "${PROFILE_OUTPUT}" ]]; then
+  info "gperftools CPU profile: ${PROFILE_OUTPUT}"
+else
+  # Named expected case, not an error: ProjectOptions.cmake links -lprofiler
+  # only when find_library(PROFILER_LIB profiler) succeeds; without it the
+  # build falls back to -pg and CPUPROFILE is inert.
+  info "no gperftools profile at ${PROFILE_OUTPUT} (libprofiler not linked; ProjectOptions.cmake fell back to -pg)"
 fi
 
 (cd "${BUILD_DIR}" && ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json)

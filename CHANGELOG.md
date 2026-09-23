@@ -166,9 +166,45 @@ belongs in the **Changed** list below with that consequence spelled out.
   `linux-tools-common` stopped shipping `/usr/bin/perf`; it is `linux-perf`
   now). A probe (`perf record` with the real options around `true`) now decides:
   where it fails, the lane WARNs with perf's own message and skips the recording
-  and the profiled workload; the benchmark suite runs either way. Where it
-  passes, everything but the window-closing exit 124 is still fatal, as since
-  072937a. README no longer claims the CI image carries perf and gperftools.
+  (and, until the 2026-09-24 entry below, the workload with it); the benchmark
+  suite runs either way. Where it passes, everything but the window-closing exit
+  124 is still fatal, as since 072937a. README no longer claims the CI image
+  carries perf and gperftools.
+- 2026-09-24 — **a working `perf` records the whole window now; the 09-23 fix
+  alone was not enough.** With `linux-perf` installed in a `--privileged`
+  `latest-cross` container (how CI runs), the probe passed and the lane died
+  `profiled workload exited cleanly before the 20s window closed`: the workload,
+  `bin/AccelerANTgine --webrtc --source test`, is a WebRTC producer, and with no
+  signalling server on its default `ws://127.0.0.1:8443` it logs `Connection
+  refused`, breaks out on `StreamState::Error` (`Src/cli_main.cpp:250-258`) and
+  returns 0 about 200 ms in. `ci-profile-bench.sh` now starts the image's
+  `gst-webrtc-signalling-server` on `127.0.0.1:18443` (new `--signalling-port`)
+  for the window, passes the CLI `--server=` to it, and stops it afterwards, on
+  the failure paths too; a `--profile-args` that names its own `--server` gets
+  no server. Where perf cannot run, the workload still runs for a
+  `--smoke-seconds` window (10 s) without a recorder, so an early exit is red
+  there as well — skipping it is what hid this in CI. Measured in the
+  `latest-cross` image with `linux-perf` installed: the clang lane at CI's 180 s
+  window recorded 1558 samples (12.6 MB `perf.data`), the gcc lane at 20 s 229,
+  both closing on exit 124 with the benchmark suite after them; without perf
+  the 10 s window closes the same way after `State: Connecting -> Streaming`,
+  and no signalling server outlives a run.
+- 2026-09-24 — **clang-tidy is the compiler's own, like the coverage tools.**
+  Once coverage passed, the clang lane's next step failed in the image (CI never
+  got that far): bare `clang-tidy` is Ubuntu's LLVM 21 and cannot read the
+  module PCMs clang 23 writes (`module file … uses a newer format that cannot be
+  read`, all 18 `Src/` files, `== clang-tidy: FAILED (exit 1) ==`). The
+  `-print-prog-name` lookup moved from
+  `ci-coverage.sh` into `ci-common.sh` (`compiler_llvm_tool`,
+  `use_compiler_llvm_tools`); `ci-coverage.sh` uses it for `llvm-profdata` and
+  `llvm-cov`, and `run-static-analysis-format.sh` for `clang-tidy` alone, in a
+  subshell, so `clang-format` keeps the version its verdict was made with.
+  Measured in the `latest-cross` image, the clang lane in `ci-run-all.sh` order:
+  build + ctest, coverage (10 profiles merged) and all four static gates
+  (cmake-format, clang-format, scan-build, clang-tidy from
+  `/usr/local/llvm-target/bin`) exit 0. The ARM workflow stays red regardless:
+  its gcc job dies compiling on `sanitizer/common_interface_defs.h`, because the
+  image's native aarch64 GCC ships no libsanitizer — an image fix, AGENTS.md § 4.
 
 ## Historical measurements
 

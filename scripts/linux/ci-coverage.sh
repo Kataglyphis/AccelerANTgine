@@ -47,30 +47,6 @@ COVERAGE_LLVM_IGNORE_REGEX=(".*/(third_party|build[^/]*/_deps|_deps|Test|tests|u
 # suite's own Test/ sources, which the ignore regex above then drops.
 COVERAGE_OBJECT="lib/libAccelerANTgine.so"
 
-# The llvm-profdata/llvm-cov that match the compiler which built the tree. The
-# hub's coverage_llvm_report calls both by bare name, and the CI image's PATH
-# resolves them to Ubuntu's LLVM 21 while its clang is a source-built LLVM 23
-# under /usr/local/llvm-target. clang 23 writes raw profile format version 11;
-# LLVM 21 reads 10 and refuses the lot ("raw profile version mismatch ...
-# error: no profile can be merged", measured in the image 2026-09-23). The
-# compiler knows its own tools: -print-prog-name answers with the sibling
-# binary when there is one, so that directory goes first on PATH.
-use_compiler_matched_llvm_tools() {
-  local cxx="" profdata
-  if [[ -f "${BUILD_DIR}/CMakeCache.txt" ]]; then
-    cxx="$(sed -n 's/^CMAKE_CXX_COMPILER:[A-Z]*=//p' "${BUILD_DIR}/CMakeCache.txt" | head -n 1)"
-  fi
-  cxx="${cxx:-clang++}"
-  profdata="$("${cxx}" -print-prog-name=llvm-profdata 2>/dev/null || true)"
-  if [[ "${profdata}" == /* && -x "${profdata}" && -x "$(dirname "${profdata}")/llvm-cov" ]]; then
-    PATH="$(dirname "${profdata}"):${PATH}"
-    export PATH
-    info "llvm tools matching ${cxx}: $(dirname "${profdata}")"
-  else
-    warn "${cxx} names no llvm-profdata/llvm-cov pair of its own; using PATH's, which must read what ${cxx} wrote"
-  fi
-}
-
 if [[ "${COMPILER}" == "gcc" ]]; then
   # gcovr reads .gcda/.gcno from the compile directory, hence the cd; the paths
   # baked into .gcno are relative to it.
@@ -94,8 +70,12 @@ else
   [[ -f "${BUILD_DIR}/${COVERAGE_OBJECT}" ]] \
     || die "Coverage object '${BUILD_DIR}/${COVERAGE_OBJECT}' not found - the instrumented build did not produce the library."
 
-  use_compiler_matched_llvm_tools
-  require_tools llvm-profdata
+  # The hub's coverage_llvm_report calls llvm-profdata and llvm-cov by bare name,
+  # and the image's PATH copies are LLVM 21, which refuses clang 23's raw profile
+  # format 11 (ci-common.sh, compiler_llvm_tool). Nothing else runs after this,
+  # so the swap need not be scoped.
+  use_compiler_llvm_tools "${BUILD_DIR}" llvm-profdata llvm-cov
+  require_tools llvm-profdata llvm-cov
 
   # coverage_llvm_report takes ONE profile path. llvm-profdata merge accepts an
   # indexed profile as input as readily as a raw one, so every raw profile of the

@@ -234,9 +234,17 @@ this project's subject — the upstream install instructions for
 [pprof](https://github.com/google/pprof),
 [valgrind](https://valgrind.org/docs/manual/cl-manual.html) and
 [perf](https://perfwiki.github.io/main/) are the ones that stay correct. The CI
-image does NOT carry the whole set: it has no `perf` (so the lane warns and
-skips `perf record`, then runs the benchmarks) and no gperftools `libprofiler`
-(configure falls back to `-pg`).
+image does NOT carry the whole set: it has no `perf` (so the lane warns, runs
+the workload for a short window without a recorder, then runs the benchmarks)
+and no gperftools `libprofiler` (configure falls back to `-pg`).
+
+A `perf` binary alone does not make a profile. The profiled workload is the
+CLI's WebRTC producer on its synthetic source (`--webrtc --source test`), which
+only streams while a signalling server answers; with none it gives up about
+200 ms in. `ci-profile-bench.sh` therefore starts `gst-webrtc-signalling-server`
+(gst-plugins-rs; the image has it) on `127.0.0.1:18443` for the window and
+points the CLI there, unless `--profile-args` names a `--server` of its own.
+`--signalling-port` moves it.
 
 ## Static analysis and formatting
 

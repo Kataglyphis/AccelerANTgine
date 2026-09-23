@@ -225,21 +225,53 @@ written out rather than linked.
   `ci-coverage.sh` merges every file there into one indexed profile before the
   hub's `coverage_llvm_report`, which takes ONE profile path and ONE object. The
   object is `lib/libAccelerANTgine.so`, where `Src/` lives — a test executable's
-  own mapping holds only `Test/`, which the ignore regex drops. The llvm tools
-  are the compiler's own (`clang++ -print-prog-name=llvm-profdata`): the image
-  puts Ubuntu's LLVM 21 `llvm-profdata` first on PATH, and it refuses clang 23's
-  raw profile format 11 (`no profile can be merged`). The report reading 0.00%
-  for every `Src/` file is the truth, not a broken merge: the `Test/` suites are
-  placeholders that never call the library. `linux-debug-GNU` does not set the
-  option, so the GCC lane's gcovr step reports `0 out of 0` lines.
-- **perf is optional in `ci-profile-bench.sh`, and the CI image has none.**
-  Ubuntu 26.04's `linux-tools-common`, which the image installs, no longer ships
-  `/usr/bin/perf` — perf is the `linux-perf` package now — so a bare `timeout …
-  perf record` died with exit 127. The script probes `perf record` (same options)
-  around `true`; where that fails it WARNs with perf's own message and skips the
-  recording and the profiled workload, and the benchmark suite still runs. Where
-  the probe passes, everything but the window-closing exit 124 stays fatal. A CI
-  profile needs `linux-perf` in the image, an ANTfrastructure change.
+  own mapping holds only `Test/`, which the ignore regex drops. The report
+  reading 0.00% for every `Src/` file is the truth, not a broken merge: the
+  `Test/` suites are placeholders that never call the library.
+  `linux-debug-GNU` does not set the option, so the GCC lane's gcovr step
+  reports `0 out of 0` lines.
+- **Every LLVM tool that reads clang's output must be the compiler's own.** The
+  image's `clang`/`clang++` are a source-built LLVM 23 (`/usr/local/llvm-target`),
+  but bare `clang-tidy`, `llvm-profdata` and `llvm-cov` on PATH are Ubuntu's
+  LLVM 21: `llvm-profdata` refuses clang 23's raw profile format 11 (`no profile
+  can be merged`), and `clang-tidy` fails all 18 `Src/` files on the module
+  PCMs the build wrote (`module file … uses a newer format that cannot be
+  read`). `ci-common.sh`'s `use_compiler_llvm_tools` asks the configured
+  compiler (`-print-prog-name`) and puts its directory first on PATH:
+  `ci-coverage.sh` for the profile pair, `run-static-analysis-format.sh` for
+  `clang-tidy` only, in a subshell, so `clang-format`'s version — a format
+  verdict of its own — does not move with it. The image-side fix is upstream:
+  the hub's `register-llvm-alternatives.sh` registers only `clang`, `clang++`,
+  `llvm-ar` and `llvm-ranlib`.
+- **perf is optional in `ci-profile-bench.sh`, the CI image has none, and perf
+  alone is not a profile.** Ubuntu 26.04's `linux-tools-common`, which the image
+  installs, no longer ships `/usr/bin/perf` — perf is the `linux-perf` package
+  now — so a bare `timeout … perf record` died with exit 127. The script probes
+  `perf record` (same options) around `true`; where that fails it WARNs with
+  perf's own message, records nothing, and still runs the workload for a
+  `--smoke-seconds` window (10 s) without a recorder, so a workload that stops
+  streaming early fails the lane either way; then the benchmark suite. The
+  workload, `bin/AccelerANTgine --webrtc --source test`, is a WebRTC producer:
+  with no signalling server on its URI it gets `Connection refused`, its loop
+  breaks on `StreamState::Error` and it returns 0 about 200 ms in — measured with
+  `linux-perf` installed in a `--privileged` image container, which is how CI
+  runs. So unless `--profile-args` names its own `--server`, the script starts
+  the image's `gst-webrtc-signalling-server` on `127.0.0.1:18443`
+  (`--signalling-port`; not the CLI's default 8443, which a dev box's own
+  producer holds) for the window and points the CLI at it. Where the probe
+  passes, everything but the window-closing exit 124 stays fatal. A CI perf
+  profile still needs `linux-perf` in the image, an ANTfrastructure change, and
+  with no consumer attached the producer mostly idles: 150 to 230 samples in a
+  20 s window were measured, not a hot loop.
+- **The ARM workflow's gcc job is red at build time, and not because of this
+  repo.** `linux-debug-GNU` is a Debug build, which turns ASan on
+  (`cmake/ProjectOptions.cmake`); abseil then includes
+  `sanitizer/common_interface_defs.h`, and the image's native aarch64 GCC
+  (`/opt/gcc-16.2.0`) ships no libsanitizer, so the build dies on that header
+  (every ARM run since 32168022135 that got as far as compiling, 35921977310
+  included). The fix is the image's —
+  ANTfrastructure's GCC build has to build libsanitizer for a native GCC — so a
+  green ARM workflow waits for that image whatever the clang lanes do.
 
 ## 5. Build, run, test
 
