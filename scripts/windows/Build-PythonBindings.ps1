@@ -21,6 +21,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# The chain ONNX Runtime staging and its G6 proof come from ANTfrastructure through the
+# repo's resolver; a hub pin older than its ORT single-source commit lacks G6.
+. (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
+Import-BuildModule @('WindowsOnnx.Common', 'WindowsOrtBundle.Common')
+try { Import-BuildModule @('WindowsOrtProvenance.Common') } catch { throw (Get-OrtCensusRequirement -Cause $_.Exception.Message) }
+
 Write-Host "=== Python bindings build ($Preset) ==="
 cmake --preset $Preset -S $WorkspaceDir -B $BuildDir `
     -DKATAGLYPHIS_BUILD_PYTHON_BINDINGS=ON `
@@ -58,12 +64,11 @@ foreach ($candidate in $gstCandidates) {
     }
 }
 
-# ONNX Runtime: source layouts (bin\onnxruntime.dll) and NuGet layouts
-# (runtimes\win-x64\native) both appear across images — search recursively.
-if ($env:ONNX_ROOT -and (Test-Path $env:ONNX_ROOT)) {
-    Get-ChildItem -Path $env:ONNX_ROOT -Recurse -Filter 'onnxruntime*.dll' -File -ErrorAction SilentlyContinue |
-        ForEach-Object { Copy-Item $_.FullName -Destination (Join-Path $libsDir $_.Name) -Force }
-}
+# ONNX Runtime: the chain install's layout only (owner rule 2026-09-23). Get-OnnxChainLayout
+# refuses a NuGet tree or a release zip, and the package is not staged until G6 proves that
+# every ORT binary in it is the image's chain build and _libs (which __init__ registers) holds it.
+Copy-ChainOrtLib -OnnxRoot "$env:ONNX_ROOT" -Destination $libsDir
+$null = Assert-BundleChainOrt -Root $dest -DllDirectory $libsDir
 
 Write-Host "Python package staged to $dest"
 exit 0

@@ -46,183 +46,104 @@ pkg_check_modules(
   IMPORTED_TARGET
   glib-2.0>=2.70)
 
-# ONNX Runtime dependencies
-# Check multiple possible installation locations:
-# Linux:
-#   1. Container build output: /usr/local/lib/onnxruntime-cpu (from ANTfrastructure scripts)
-#   2. Source installation: /opt/onnxruntime
-#   3. System installation: /usr
-# Windows:
-#   4. Environment variable: ONNXRUNTIME_ROOT or ONNX_ROOT (ANTfrastructure)
-#   5. Standard Windows locations: C:/onnxruntime, C:/onnx, C:/Program Files/onnxruntime
-#   6. vcpkg installed locations
-
+# ONNX Runtime: the family's chain build ONLY (ANTfrastructure owner rule
+# 2026-09-23). One prefix is searched - ONNXRUNTIME_ROOT if given, else the image's
+# ($ENV{ONNX_ROOT} on Windows, /usr/local/lib/onnxruntime-cpu on Linux) - and it is
+# REQUIRED: no system, vendor, vcpkg or pkg-config fallback, and a runtime library
+# that does not embed the chain's ORT source root is refused. Not covered: which
+# copy the OS loader picks at run time; the packaging lanes stage the chain one.
 set(ONNXRUNTIME_ROOT
     ""
-    CACHE PATH "ONNX Runtime installation root")
+    CACHE PATH "Chain-built ONNX Runtime prefix (default: the family image's)")
 
 if(ONNXRUNTIME_ROOT)
-  list(
-    INSERT
-    ONNXRUNTIME_SEARCH_PATHS
-    0
-    "${ONNXRUNTIME_ROOT}")
-elseif(DEFINED ENV{ONNXRUNTIME_ROOT})
-  list(
-    INSERT
-    ONNXRUNTIME_SEARCH_PATHS
-    0
-    "$ENV{ONNXRUNTIME_ROOT}")
-elseif(DEFINED ENV{ONNX_ROOT})
-  list(
-    INSERT
-    ONNXRUNTIME_SEARCH_PATHS
-    0
-    "$ENV{ONNX_ROOT}")
-endif()
-
-# Platform-specific search paths
-if(WIN32)
-  set(ONNXRUNTIME_SEARCH_PATHS
-      ${ONNXRUNTIME_SEARCH_PATHS}
-      "$ENV{ONNXRUNTIME_ROOT}"
-      "$ENV{ONNX_ROOT}"
-      "C:/onnxruntime"
-      "C:/onnx"
-      "C:/Program Files/onnxruntime"
-      "C:/Program Files (x86)/onnxruntime"
-      "$ENV{VCPKG_ROOT}/installed/x64-windows"
-      "$ENV{VCPKG_ROOT}/installed/x64-windows-static")
-else()
-  set(ONNXRUNTIME_SEARCH_PATHS
-      "/usr/local/lib/onnxruntime-cpu"
-      "/opt/onnxruntime"
-      "/usr"
-      "/usr/local")
-endif()
-
-# Try to find ONNX Runtime in each search path
-set(ONNXRUNTIME_FOUND FALSE)
-
-# If ENV variables ONNX_LIB and ONNX_INCLUDE are explicitly set (e.g. by Docker container)
-if(DEFINED ENV{ONNX_LIB} AND DEFINED ENV{ONNX_INCLUDE})
-  find_library(
-    _ONNXRUNTIME_LIB
-    NAMES onnxruntime
-    PATHS "$ENV{ONNX_LIB}"
-    NO_DEFAULT_PATH)
-  find_path(
-    _ONNXRUNTIME_INCLUDE_DIR
-    NAMES onnxruntime_cxx_api.h
-    PATHS "$ENV{ONNX_INCLUDE}"
-    NO_DEFAULT_PATH)
-  if(_ONNXRUNTIME_LIB AND _ONNXRUNTIME_INCLUDE_DIR)
-    set(ONNXRUNTIME_FOUND TRUE)
-    set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
-    set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
-    set(ONNXRUNTIME_ROOT "$ENV{ONNX_ROOT}")
-    message(STATUS "Found ONNX Runtime via ONNX_LIB and ONNX_INCLUDE")
-    message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
-    message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
+  set(_ort_root "${ONNXRUNTIME_ROOT}")
+elseif(WIN32)
+  if(NOT DEFINED ENV{ONNX_ROOT} OR "$ENV{ONNX_ROOT}" STREQUAL "")
+    message(
+      FATAL_ERROR
+        "ONNX Runtime: ONNX_ROOT is not set. Build inside the family Windows image, or pass -DONNXRUNTIME_ROOT=<a chain-built ORT prefix>."
+    )
   endif()
+  set(_ort_root "$ENV{ONNX_ROOT}")
+else()
+  set(_ort_root "/usr/local/lib/onnxruntime-cpu")
+endif()
+file(TO_CMAKE_PATH "${_ort_root}" _ort_root)
+
+# A cached hit from an earlier configure must not outlive a prefix change.
+unset(_ONNXRUNTIME_LIB CACHE)
+unset(_ONNXRUNTIME_INCLUDE_DIR CACHE)
+find_library(
+  _ONNXRUNTIME_LIB
+  NAMES onnxruntime
+  PATHS "${_ort_root}/lib"
+  NO_DEFAULT_PATH)
+find_path(
+  _ONNXRUNTIME_INCLUDE_DIR
+  NAMES onnxruntime_cxx_api.h
+  PATHS "${_ort_root}/include" "${_ort_root}/include/onnxruntime" "${_ort_root}/include/onnxruntime/core/session"
+  NO_DEFAULT_PATH)
+if(NOT _ONNXRUNTIME_LIB OR NOT _ONNXRUNTIME_INCLUDE_DIR)
+  message(
+    FATAL_ERROR
+      "ONNX Runtime: no chain-built ORT under ${_ort_root} (library: ${_ONNXRUNTIME_LIB}, headers: ${_ONNXRUNTIME_INCLUDE_DIR}). Only the family image's chain build is allowed; nothing else is searched."
+  )
 endif()
 
-if(NOT ONNXRUNTIME_FOUND)
-  foreach(_search_path ${ONNXRUNTIME_SEARCH_PATHS})
-    if(EXISTS "${_search_path}")
-      # Check for library
-      if(WIN32)
-        find_library(
-          _ONNXRUNTIME_LIB
-          NAMES onnxruntime
-          PATHS "${_search_path}/lib" "${_search_path}/lib/x64"
-          NO_DEFAULT_PATH)
-      else()
-        find_library(
-          _ONNXRUNTIME_LIB
-          NAMES onnxruntime libonnxruntime
-          PATHS "${_search_path}/lib"
-                "${_search_path}/lib64"
-                "${_search_path}/lib/aarch64-linux-gnu"
-                "${_search_path}/lib/x86_64-linux-gnu"
-          NO_DEFAULT_PATH)
-      endif()
+# ORT embeds its source paths; the chain's checkout is the hub's Build-OnnxFromSource.ps1
+# SourceDir (Windows) and onnxruntime/build/lib/common.sh ORT_SRC_DIR (Linux).
+if(WIN32)
+  set(_ort_runtime "${_ort_root}/bin/onnxruntime.dll")
+  set(_ort_chain_marker "temp.onnx-src.onnxruntime.core.")
+else()
+  get_filename_component(_ort_runtime "${_ONNXRUNTIME_LIB}" REALPATH)
+  set(_ort_chain_marker "/opt/onnxruntime/onnxruntime/core/")
+endif()
+if(NOT EXISTS "${_ort_runtime}")
+  message(
+    FATAL_ERROR "ONNX Runtime: ${_ort_runtime} is missing, so ${_ort_root} cannot be proved to be the chain build.")
+endif()
+file(
+  STRINGS "${_ort_runtime}" _ort_chain_hit
+  LIMIT_COUNT 1
+  REGEX "${_ort_chain_marker}")
+if(NOT _ort_chain_hit)
+  message(
+    FATAL_ERROR
+      "ONNX Runtime: ${_ort_runtime} is not the family's chain build (no '${_ort_chain_marker}' source path in it). A downloaded, distro or vendor ORT is not allowed."
+  )
+endif()
 
-      # Check for headers
-      find_path(
-        _ONNXRUNTIME_INCLUDE_DIR
-        NAMES onnxruntime_cxx_api.h
-        PATHS "${_search_path}/include" "${_search_path}/include/onnxruntime"
-              "${_search_path}/include/onnxruntime/core/session"
-        NO_DEFAULT_PATH)
+set(ONNXRUNTIME_FOUND TRUE)
+set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
+set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
+message(STATUS "Found chain-built ONNX Runtime at: ${_ort_root}")
+message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
+message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
 
-      # Also check for headers in nested structure
-      if(NOT _ONNXRUNTIME_INCLUDE_DIR)
-        find_path(
-          _ONNXRUNTIME_INCLUDE_DIR
-          NAMES onnxruntime_c_api.h
-          PATHS "${_search_path}/include" "${_search_path}/include/onnxruntime"
-          NO_DEFAULT_PATH)
-      endif()
-
-      if(_ONNXRUNTIME_LIB AND _ONNXRUNTIME_INCLUDE_DIR)
-        set(ONNXRUNTIME_FOUND TRUE)
-        set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
-        set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
-        set(ONNXRUNTIME_ROOT "${_search_path}")
-        message(STATUS "Found ONNX Runtime at: ${_search_path}")
-        message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
-        message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
-        break()
-      endif()
-
-      # Clear cache for next iteration
-      unset(_ONNXRUNTIME_LIB CACHE)
-      unset(_ONNXRUNTIME_INCLUDE_DIR CACHE)
+# The proven chain ORT installs beside the exe, so every CPack installer carries it (else a client
+# loads System32's Windows ML copy). Build-Windows.ps1 runs G6 over the install tree before packing.
+if(WIN32)
+  set(_ort_install_files "${_ort_runtime}")
+  foreach(_ort_companion onnxruntime_providers_shared.dll DirectML.dll)
+    if(EXISTS "${_ort_root}/bin/${_ort_companion}")
+      list(APPEND _ort_install_files "${_ort_root}/bin/${_ort_companion}")
     endif()
   endforeach()
-endif()
-
-# Fallback to pkg-config (Linux only)
-if(NOT ONNXRUNTIME_FOUND AND NOT WIN32)
-  pkg_check_modules(_ONNXRUNTIME_PKG libonnxruntime onnxruntime)
-  if(_ONNXRUNTIME_PKG_FOUND)
-    set(ONNXRUNTIME_FOUND TRUE)
-    set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_PKG_LINK_LIBRARIES}")
-    set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_PKG_INCLUDE_DIRS}")
-    message(STATUS "Found ONNX Runtime via pkg-config")
-  endif()
-endif()
-
-if(NOT ONNXRUNTIME_FOUND)
-  if(WIN32)
-    message(WARNING "ONNX Runtime not found. Install via:")
-    message(WARNING "  - Download from: https://github.com/microsoft/onnxruntime/releases")
-    message(WARNING "  - Extract to C:/onnxruntime or set ONNXRUNTIME_ROOT env variable")
-    message(WARNING "  - vcpkg: vcpkg install onnxruntime")
-  else()
-    message(WARNING "ONNX Runtime not found. Install via:")
-    message(WARNING "  - Container: /usr/local/lib/onnxruntime-cpu")
-    message(WARNING "  - Source: /opt/onnxruntime")
-    message(WARNING "  - Package: apt install libonnxruntime-dev")
-  endif()
+  install(FILES ${_ort_install_files} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 # GStreamer and ONNX Runtime are now linked via IMPORTED_TARGET in Src/CMakeLists.txt
 
-# Create imported target for ONNX Runtime
-if(ONNXRUNTIME_FOUND AND ONNXRUNTIME_LIBRARY)
-  add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
-  set_target_properties(onnxruntime::onnxruntime PROPERTIES IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
-                                                            INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}")
-  # Add additional include directories for nested header structure
-  if(EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/session")
-    target_include_directories(onnxruntime::onnxruntime
-                               INTERFACE "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/session")
-  endif()
-  if(EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/providers/cpu")
-    target_include_directories(onnxruntime::onnxruntime
-                               INTERFACE "${ONNXRUNTIME_ROOT}/include/onnxruntime/core/providers/cpu")
-  endif()
-  message(STATUS "ONNX Runtime imported target created successfully")
+add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
+set_target_properties(onnxruntime::onnxruntime PROPERTIES IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
+                                                          INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}")
+# Add additional include directories for nested header structure
+if(EXISTS "${_ort_root}/include/onnxruntime/core/session")
+  target_include_directories(onnxruntime::onnxruntime INTERFACE "${_ort_root}/include/onnxruntime/core/session")
 endif()
+if(EXISTS "${_ort_root}/include/onnxruntime/core/providers/cpu")
+  target_include_directories(onnxruntime::onnxruntime INTERFACE "${_ort_root}/include/onnxruntime/core/providers/cpu")
+endif()
+message(STATUS "ONNX Runtime imported target created successfully")

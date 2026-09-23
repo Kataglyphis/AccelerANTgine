@@ -21,7 +21,7 @@ is the single fact that most shapes its tooling.
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | Test sources |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh` |
-| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, and the Pester suites in `tests/` |
+| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the project-local `modules/` (today `WindowsOrtBundle.Common`: the ONNX Runtime proof of a staged bundle), and the Pester suites in `tests/` |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
 
 **This repo is consumed as a direct submodule** of OmniAccelerANT, at
@@ -191,6 +191,26 @@ written out rather than linked.
   [`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md);
   the measurement that dated the old "exactly one declares a branch" claim is in
   `CHANGELOG.md`.
+- **ONNX Runtime is REQUIRED and must be the family's chain build.**
+  `cmake/SystemLibDependencies.cmake` searches exactly one prefix
+  (`-DONNXRUNTIME_ROOT`, else the image's `ONNX_ROOT` on Windows or
+  `/usr/local/lib/onnxruntime-cpu` on Linux) and refuses a runtime library that
+  does not embed the chain's ORT source root — so a host without the image's ORT
+  fails at configure time, by design (owner rule 2026-09-23). Do not add a
+  fallback path, a pkg-config probe or a "download it" hint back; point
+  `ONNXRUNTIME_ROOT` at a chain-built prefix instead. What ships is proved too:
+  every `bin\` the Windows lane stages (hub `Copy-MediaRuntimeBundle`), the
+  release install tree the NSIS/WiX/ZIP installers pack (the same CMake file
+  installs the proven `onnxruntime.dll` and its companions into `bin\`, and the
+  lane proves a `cmake --install` of it before `--target package`), the MSIX
+  payload, and the Python package (`Build-PythonBindings.ps1`, the chain layout
+  only) go through
+  ANTfrastructure's G6 census (`Test-OrtProvenanceTree`, via
+  `scripts/windows/modules/WindowsOrtBundle.Common.psm1`): every ORT binary the
+  image's chain build, byte for byte, and `onnxruntime.dll` beside the exe (or
+  in the package's `_libs`). Both scripts stop, naming the hub commit, while the
+  pinned hub predates G6: that older hub staged NuGet layouts only, so the exe
+  loaded System32's Windows ML `onnxruntime.dll`.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
   `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`,
   `linux-debug-clang-tsan`, and on Windows
