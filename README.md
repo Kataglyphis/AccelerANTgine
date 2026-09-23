@@ -226,14 +226,17 @@ bash scripts/linux/ci-profile-bench.sh
 
 It needs gperftools (`google-perftools`, `libgoogle-perftools-dev`), `graphviz`
 and, for the flame graphs, Go's `pprof`; `valgrind --tool=callgrind` is reached
-through `bash scripts/linux/ci-release.sh --callgrind`, and `perf record` needs
-`linux-tools-$(uname -r)`. Installing them is not this project's subject — the
-upstream install instructions for
+through `bash scripts/linux/ci-release.sh --callgrind`, and `perf record` needs a
+`perf` binary (Ubuntu 26.04: the `linux-perf` package — `linux-tools-common` no
+longer ships one) plus permission to open perf events. Installing them is not
+this project's subject — the upstream install instructions for
 [gperftools](https://github.com/gperftools/gperftools),
 [pprof](https://github.com/google/pprof),
 [valgrind](https://valgrind.org/docs/manual/cl-manual.html) and
-[perf](https://perfwiki.github.io/main/) are the ones that stay correct, and the
-CI image already carries the set.
+[perf](https://perfwiki.github.io/main/) are the ones that stay correct. The CI
+image does NOT carry the whole set: it has no `perf` (so the lane warns and
+skips `perf record`, then runs the benchmarks) and no gperftools `libprofiler`
+(configure falls back to `-pg`).
 
 ## Static analysis and formatting
 

@@ -84,43 +84,82 @@ if [[ ! -x "${BUILD_DIR}/${PROFILE_BINARY}" ]]; then
   die "Profiling target '${BUILD_DIR}/${PROFILE_BINARY}' is missing or not executable after building preset '${PRESET}'."
 fi
 
+# How perf records, shared by the probe and the real run so that a passing probe
+# vouches for exactly the options the real run uses (--call-graph dwarf needs a
+# perf built with DWARF unwinding, not just any perf).
+PERF_RECORD_ARGS=(-F 99 --call-graph dwarf)
+
+# Can this host run perf at all? Sets PERF_SKIP_REASON when it cannot. The CI
+# image cannot: Ubuntu 26.04's linux-tools-common no longer ships /usr/bin/perf
+# (it moved to linux-perf, which the image does not install), and the bare
+# `timeout ... perf record` died with exit 127, "timeout: failed to execute
+# process" (run 35921977662). Such a host - or one whose perf_event_paranoid or
+# seccomp forbids perf_event_open - gets a WARN naming why. The probe records
+# `true` with the real options, so once it passes every exit of the real run but
+# 124 stays fatal. Detail: AGENTS.md section 4.
+perf_probe() {
+  PERF_SKIP_REASON=""
+  if ! command -v perf >/dev/null 2>&1; then
+    PERF_SKIP_REASON="no 'perf' on PATH"
+    return 0
+  fi
+  local probe_dir probe_out probe_status=0
+  probe_dir="$(mktemp -d)"
+  probe_out="$(timeout 60 perf record "${PERF_RECORD_ARGS[@]}" -o "${probe_dir}/probe.data" -- true 2>&1)" \
+    || probe_status=$?
+  rm -rf "${probe_dir}"
+  if [[ "${probe_status}" -ne 0 ]]; then
+    PERF_SKIP_REASON="'perf record ${PERF_RECORD_ARGS[*]} -- true' exited ${probe_status}: ${probe_out//$'\n'/ | }"
+  fi
+}
+
 # Exit 124 is `timeout` reporting ITS OWN configured timeout, and here it is the
 # EXPECTED end of a good run: under ${PROFILE_ARGS} the CLI streams the synthetic
 # test source until told to stop, so PERF_TIMEOUT_SECONDS is what closes the
 # profile window. perf finalizes perf.data when timeout TERMs it, and the CLI's
 # own SIGTERM handler (Src/cli_main.cpp:245-246) exits cleanly, which is what
-# lets gperftools dump CPUPROFILE. Everything else is a real failure - a perf
-# that is not installed, no perf_event_paranoid permission, or a binary that
-# crashed or bailed out before the window closed. This block used to be wrapped
-# in `set +e` and warn on ANY non-zero exit, so a lane that never recorded a
-# single sample still went green.
-PERF_EXIT=0
-(
-  cd "${BUILD_DIR}" && timeout "${PERF_TIMEOUT_SECONDS}" \
-    perf record -F 99 --call-graph dwarf -- \
-    env CPUPROFILE="${PROFILE_OUTPUT}" "./${PROFILE_BINARY}" "${PROFILE_ARGS_ARR[@]}"
-) || PERF_EXIT=$?
+# lets gperftools dump CPUPROFILE. Everything else is a real failure - perf
+# refusing the real workload after the probe passed, or a binary that crashed or
+# bailed out before the window closed. This block used to be wrapped in
+# `set +e` and warn on ANY non-zero exit, so a lane that never recorded a single
+# sample still went green.
+run_perf_record() {
+  local perf_exit=0
+  (
+    cd "${BUILD_DIR}" && timeout "${PERF_TIMEOUT_SECONDS}" \
+      perf record "${PERF_RECORD_ARGS[@]}" -- \
+      env CPUPROFILE="${PROFILE_OUTPUT}" "./${PROFILE_BINARY}" "${PROFILE_ARGS_ARR[@]}"
+  ) || perf_exit=$?
 
-if [[ "${PERF_EXIT}" -eq 124 ]]; then
-  info "perf window closed by the configured ${PERF_TIMEOUT_SECONDS}s timeout (the intended bound)"
-elif [[ "${PERF_EXIT}" -eq 0 ]]; then
-  # A good run can ONLY end in 124: timeout exits 124 whenever it had to stop
-  # the child, and under ${PROFILE_ARGS} the CLI streams until stopped. A clean
-  # early exit therefore means the workload bailed out (bad flag, immediate
-  # version-print-and-exit, missing source) and the profile measured startup.
-  die "profiled workload exited cleanly before the ${PERF_TIMEOUT_SECONDS}s window closed - under '${PROFILE_ARGS}' the CLI streams until stopped, so an early exit 0 means nothing was profiled"
-elif [[ "${PERF_EXIT}" -ne 0 ]]; then
-  die "perf record failed with exit code ${PERF_EXIT}"
-fi
+  if [[ "${perf_exit}" -eq 124 ]]; then
+    info "perf window closed by the configured ${PERF_TIMEOUT_SECONDS}s timeout (the intended bound)"
+  elif [[ "${perf_exit}" -eq 0 ]]; then
+    # A good run can ONLY end in 124: timeout exits 124 whenever it had to stop
+    # the child, and under ${PROFILE_ARGS} the CLI streams until stopped. A clean
+    # early exit therefore means the workload bailed out (bad flag, immediate
+    # version-print-and-exit, missing source) and the profile measured startup.
+    die "profiled workload exited cleanly before the ${PERF_TIMEOUT_SECONDS}s window closed - under '${PROFILE_ARGS}' the CLI streams until stopped, so an early exit 0 means nothing was profiled"
+  else
+    die "perf record failed with exit code ${perf_exit}"
+  fi
 
-info "perf data: ${BUILD_DIR}/perf.data"
-if [[ -s "${PROFILE_OUTPUT}" ]]; then
-  info "gperftools CPU profile: ${PROFILE_OUTPUT}"
+  info "perf data: ${BUILD_DIR}/perf.data"
+  if [[ -s "${PROFILE_OUTPUT}" ]]; then
+    info "gperftools CPU profile: ${PROFILE_OUTPUT}"
+  else
+    # Named expected case, not an error: ProjectOptions.cmake links -lprofiler
+    # only when find_library(PROFILER_LIB profiler) succeeds; without it the
+    # build falls back to -pg and CPUPROFILE is inert.
+    info "no gperftools profile at ${PROFILE_OUTPUT} (libprofiler not linked; ProjectOptions.cmake fell back to -pg)"
+  fi
+}
+
+perf_probe
+if [[ -z "${PERF_SKIP_REASON}" ]]; then
+  run_perf_record
 else
-  # Named expected case, not an error: ProjectOptions.cmake links -lprofiler
-  # only when find_library(PROFILER_LIB profiler) succeeds; without it the
-  # build falls back to -pg and CPUPROFILE is inert.
-  info "no gperftools profile at ${PROFILE_OUTPUT} (libprofiler not linked; ProjectOptions.cmake fell back to -pg)"
+  warn "perf record SKIPPED - this host cannot run perf: ${PERF_SKIP_REASON}"
+  warn "No perf.data is written and the profiled workload does not run; the benchmark suite below still does. perf needs the 'perf' binary (Ubuntu 26.04: package linux-perf) and permission to open perf events (CAP_PERFMON or --privileged in a container, or a low enough kernel.perf_event_paranoid)."
 fi
 
 (cd "${BUILD_DIR}" && ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json)

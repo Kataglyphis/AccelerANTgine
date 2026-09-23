@@ -216,6 +216,30 @@ written out rather than linked.
   `linux-debug-clang-tsan`, and on Windows
   `x64-{MSVC,ClangCL}-Windows-{Debug,RelWithDebInfo,Profile,Release}`. Coverage
   requires a matching compiler — gcovr only reads GCC output, llvm-cov only clang.
+- **llvm-cov coverage is `linux-debug-clang`'s, one profile per process.**
+  `myproject_ENABLE_COVERAGE` defaults OFF (since 927e8fc), so the preset sets it
+  ON; `linux-debug-clang-tsan` inherits `linux-clang`, not that preset, and stays
+  uninstrumented. `gtest_discover_tests` runs every test case as its own process,
+  so `ci-build-and-test.sh` points `LLVM_PROFILE_FILE` at
+  `<build>/profraw/%p.profraw` (emptied first) for the ctest and fuzz runs, and
+  `ci-coverage.sh` merges every file there into one indexed profile before the
+  hub's `coverage_llvm_report`, which takes ONE profile path and ONE object. The
+  object is `lib/libAccelerANTgine.so`, where `Src/` lives — a test executable's
+  own mapping holds only `Test/`, which the ignore regex drops. The llvm tools
+  are the compiler's own (`clang++ -print-prog-name=llvm-profdata`): the image
+  puts Ubuntu's LLVM 21 `llvm-profdata` first on PATH, and it refuses clang 23's
+  raw profile format 11 (`no profile can be merged`). The report reading 0.00%
+  for every `Src/` file is the truth, not a broken merge: the `Test/` suites are
+  placeholders that never call the library. `linux-debug-GNU` does not set the
+  option, so the GCC lane's gcovr step reports `0 out of 0` lines.
+- **perf is optional in `ci-profile-bench.sh`, and the CI image has none.**
+  Ubuntu 26.04's `linux-tools-common`, which the image installs, no longer ships
+  `/usr/bin/perf` — perf is the `linux-perf` package now — so a bare `timeout …
+  perf record` died with exit 127. The script probes `perf record` (same options)
+  around `true`; where that fails it WARNs with perf's own message and skips the
+  recording and the profiled workload, and the benchmark suite still runs. Where
+  the probe passes, everything but the window-closing exit 124 stays fatal. A CI
+  profile needs `linux-perf` in the image, an ANTfrastructure change.
 
 ## 5. Build, run, test
 

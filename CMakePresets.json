@@ -100,12 +100,13 @@
     {
       "name": "linux-debug-clang",
       "displayName": "Linux Debug Clang",
-      "description": "Linux Debug build with Clang",
+      "description": "Linux Debug build with Clang, instrumented for llvm-cov coverage",
       "inherits": "linux-clang",
       "binaryDir": "${sourceDir}/build/",
       "installDir": "${sourceDir}/build/",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "myproject_ENABLE_COVERAGE": "ON"
       }
     },
     {
