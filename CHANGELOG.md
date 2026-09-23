@@ -140,6 +140,35 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 - 2026-09-12 — the CI image reference is resolved from ANTfrastructure's
   `versions.env` instead of being retyped here.
+- 2026-09-23 — **the clang lanes' coverage step measures again** (x64 and arm64,
+  runs 35921977662 / 35921977310 stopped at `error: Test/compile/default.profraw:
+  No such file or directory`). Three causes, each fixed here:
+  `myproject_ENABLE_COVERAGE` has defaulted OFF since 927e8fc and
+  `linux-debug-clang` never set it, so nothing was instrumented — the preset now
+  sets it ON (`linux-debug-clang-tsan` does not inherit it and stays
+  uninstrumented); `gtest_discover_tests` runs each test case as its own
+  process, so one fixed `default.profraw` could hold at most the last one —
+  `ci-build-and-test.sh` now sets `LLVM_PROFILE_FILE=<build>/profraw/%p.profraw`
+  (emptied first) for the ctest and fuzz runs, and `ci-coverage.sh` merges every
+  file there (new `--profraw-dir`, passed to both by `ci-run-all.sh`); and the
+  image's PATH `llvm-profdata` is Ubuntu's LLVM 21, which refuses clang 23's raw
+  profile format 11 — `ci-coverage.sh` now puts the compiler's own tools
+  (`clang++ -print-prog-name=llvm-profdata`) first. The report's object is now
+  `lib/libAccelerANTgine.so`, where `Src/` is compiled; `./compileTestSuite`'s
+  own mapping held only `Test/`, which the ignore regex drops. Measured in the
+  `latest-cross` image at `/workspace`: 10 profiles (6 test cases, 3 discovery
+  runs, 1 fuzz run), the TSan tree with 0 instrumented build lines, and a report
+  over the ten `Src/` files at 0.00% — the suites never call the library.
+- 2026-09-23 — **`ci-profile-bench.sh` no longer dies with exit 127 where perf
+  cannot run.** The gcc-x64 job of run 35921977662 got as far as `timeout:
+  failed to execute process: No such file or directory` / `perf record failed
+  with exit code 127`: the image has no `perf` (Ubuntu 26.04's
+  `linux-tools-common` stopped shipping `/usr/bin/perf`; it is `linux-perf`
+  now). A probe (`perf record` with the real options around `true`) now decides:
+  where it fails, the lane WARNs with perf's own message and skips the recording
+  and the profiled workload; the benchmark suite runs either way. Where it
+  passes, everything but the window-closing exit 124 is still fatal, as since
+  072937a. README no longer claims the CI image carries perf and gperftools.
 
 ## Historical measurements
 

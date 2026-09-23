@@ -81,19 +81,26 @@ bash scripts/linux/ci-init.sh \
 	--runner "${RUNNER}" \
 	--arch "${MATRIX_ARCH}"
 
+# One directory for the clang lane's raw coverage profiles, named once here:
+# ci-build-and-test.sh points LLVM_PROFILE_FILE into it, ci-coverage.sh merges
+# what is there.
+PROFRAW_DIR="${BUILD_DIR}/profraw"
+
 bash scripts/linux/ci-build-and-test.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \
 	--build-dir "${BUILD_DIR}" \
 	--build-type "${BUILD_TYPE}" \
 	--gcc-debug-preset "${GCC_DEBUG_PRESET}" \
-	--clang-debug-preset "${CLANG_DEBUG_PRESET}"
+	--clang-debug-preset "${CLANG_DEBUG_PRESET}" \
+	--profraw-dir "${PROFRAW_DIR}"
 
 bash scripts/linux/ci-coverage.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \
 	--build-dir "${BUILD_DIR}" \
-	--coverage-json "${COVERAGE_JSON}"
+	--coverage-json "${COVERAGE_JSON}" \
+	--profraw-dir "${PROFRAW_DIR}"
 
 bash scripts/linux/run-static-analysis-format.sh \
 	--build-dir "${BUILD_DIR}" \

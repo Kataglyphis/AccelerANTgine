@@ -51,6 +51,10 @@ GCC_DEBUG_PRESET="linux-debug-GNU"
 CLANG_DEBUG_PRESET="linux-debug-clang"
 CLANG_TSAN_PRESET="linux-debug-clang-tsan"
 TSAN_BUILD_DIR="build_tsan"
+# Where the clang lane's instrumented runs write their raw profiles; empty means
+# <build-dir>/profraw. ci-coverage.sh reads the same directory, and ci-run-all.sh
+# hands both scripts the same value.
+PROFRAW_DIR=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -62,9 +66,11 @@ while [[ $# -gt 0 ]]; do
     --clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
     --clang-tsan-preset) CLANG_TSAN_PRESET="${2:-}"; shift 2 ;;
     --tsan-build-dir) TSAN_BUILD_DIR="${2:-}"; shift 2 ;;
+    --profraw-dir) PROFRAW_DIR="${2:-}"; shift 2 ;;
     *) die "Unknown argument: $1" ;;
   esac
 done
+PROFRAW_DIR="${PROFRAW_DIR:-${BUILD_DIR}/profraw}"
 
 case "${COMPILER}" in
   gcc)
@@ -100,6 +106,21 @@ info "Using preset: ${PRESET}"
 # the configure preset already pins CMAKE_BUILD_TYPE.
 cmake_build_main --preset "${PRESET}" --build-dir "${BUILD_DIR}" --mb-per-job 2000
 
+# Clang lane: linux-debug-clang builds with myproject_ENABLE_COVERAGE=ON, so every
+# test process (gtest_discover_tests runs each case as its own process) and the
+# fuzz run write a raw profile at exit. Unset, each writes default.profraw in its
+# own cwd over the one before; %p gives every process its own file, which also
+# holds the profile of the lib/libAccelerANTgine.so it loaded. Absolute, because
+# ctest runs each suite from its own subdirectory; emptied first, because
+# ci-coverage.sh merges everything in it. Detail: AGENTS.md section 4.
+if [[ "${COMPILER}" == "clang" ]]; then
+  mkdir -p "${PROFRAW_DIR}"
+  PROFRAW_DIR="$(cd "${PROFRAW_DIR}" && pwd)"
+  find "${PROFRAW_DIR}" -maxdepth 1 -type f -name '*.profraw' -delete
+  export LLVM_PROFILE_FILE="${PROFRAW_DIR}/%p.profraw"
+  info "Coverage profiles go to ${LLVM_PROFILE_FILE}"
+fi
+
 # Subshell: ctest_run_execute cds into the build tree in the CALLER's shell (it
 # is deliberately not subshelled upstream so the command stays inspectable), and
 # the TSan run below has to start from the workspace root again.
@@ -125,6 +146,11 @@ if [[ "${COMPILER}" == "clang" ]]; then
     die "Fuzz test binary '${FUZZ_TEST}' is missing or not executable, but preset '${PRESET}' configures Test/fuzz for Clang+Debug. The build did not produce it."
   fi
   "${FUZZ_TEST}"
+
+  # The coverage set ends here. The TSan tree is not instrumented - its preset
+  # inherits linux-clang, not linux-debug-clang - so nothing below should write
+  # a profile; unsetting makes sure a future change cannot add one to the set.
+  unset LLVM_PROFILE_FILE
 
   info "=== Running additional build with TSan ==="
   info "Using preset: ${CLANG_TSAN_PRESET}"
