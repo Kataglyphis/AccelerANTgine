@@ -263,7 +263,7 @@ written out rather than linked.
   profile still needs `linux-perf` in the image, an ANTfrastructure change, and
   with no consumer attached the producer mostly idles: 150 to 230 samples in a
   20 s window were measured, not a hot loop.
-- **The ARM workflow's gcc job is red at build time, and not because of this
+- **`linux-arm64.yml`'s gcc job is red at build time, and not because of this
   repo.** `linux-debug-GNU` is a Debug build, which turns ASan on
   (`cmake/ProjectOptions.cmake`); abseil then includes
   `sanitizer/common_interface_defs.h`, and the image's native aarch64 GCC
@@ -271,7 +271,7 @@ written out rather than linked.
   (every ARM run since 32168022135 that got as far as compiling, 35921977310
   included). The fix is the image's —
   ANTfrastructure's GCC build has to build libsanitizer for a native GCC — so a
-  green ARM workflow waits for that image whatever the clang lanes do.
+  green `linux-arm64.yml` waits for that image whatever the clang lanes do.
 
 ## 5. Build, run, test
 
@@ -312,14 +312,22 @@ redirect files are gone, as is the image-baked `C:\workspace` mount target
 (mounting over an image dir fails at CreateComputeSystem on host/image
 OS-build skew).
 
-CI lanes: `linux_run.yml` (containerized, called by `linux_run_x86.yml` and
-`linux_run_arm.yml`), `windows_run.yml` (the container build, the PowerShell lint
-gate over `scripts/`, and a `pester-tests` job over `scripts/windows/tests/`),
-`lint-gates.yml` and `submodule-pins.yml`.
+CI lanes, named by the owner's fleet convention of 2026-09-24 — kebab-case
+files, one file per platform + arch, display names `<Platform> <Arch> · <what>`:
+`linux-x64.yml` and `linux-arm64.yml` (each calls the containerized
+`reusable-linux.yml` once per compiler), `windows-x64.yml` (the container build,
+the PowerShell lint gate over `scripts/`, and a `pester-tests` job over
+`scripts/windows/tests/`), `lint-gates.yml` and `submodule-pins.yml`. The three
+platform lanes run on every push and PR to `main` and `develop`, with no path
+filter. Every job that owns a runner carries `timeout-minutes`, every workflow
+declares `permissions:`, and every upload sets `if-no-files-found: error` — the
+hub's workflow conventions (`verify_workflow_conventions.py`), measured at zero
+findings here since the rename.
 
-The last two are one `uses:` line each onto ANTfrastructure's reusable
-workflows; only this repo's `on:` filters and two inputs (`submodules: 'true'`
-rather than recursive, `ratchets: true`) stay local. `lint-gates.yml` runs the
+`lint-gates.yml` and `submodule-pins.yml` are one `uses:` line each onto
+ANTfrastructure's reusable workflows; only this repo's `on:` filters and their
+inputs (`submodules: 'recursive'` and `ratchets: true` for the lint gates,
+`pester-version: '3.4.0'` for the pins) stay local. `lint-gates.yml` runs the
 same aggregator a dev box runs — `bash scripts/linux/run-lint-gates.sh
 --ratchets` — against the same explicit root; it reaches it from the hub
 checkout rather than through the wrapper, because the wrappers sit at different

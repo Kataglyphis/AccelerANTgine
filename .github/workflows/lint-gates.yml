@@ -1,4 +1,4 @@
-name: Lint gates - shell, workflows, secrets, python
+name: Lint gates
 
 # ONE `uses:` LINE, because ANTfrastructure now ships the lane itself.
 # Seven consumers carried this job as a copy, every copy's header saying
@@ -40,9 +40,9 @@ name: Lint gates - shell, workflows, secrets, python
 # skipping the GHCR login and the multi-gigabyte pull is what makes this the
 # first lane to finish.
 #
-# A STANDALONE WORKFLOW, not a job inside linux_run.yml: that file is a reusable
-# workflow called once per (arch x compiler) by linux_run_x86.yml and
-# linux_run_arm.yml, so a gate placed there would grade the same tree four times.
+# A STANDALONE WORKFLOW, not a job inside reusable-linux.yml: that file is a
+# reusable workflow called once per (arch x compiler) by linux-x64.yml and
+# linux-arm64.yml, so a gate placed there would grade the same tree four times.
 # The tree is architecture-independent and so is its verdict.
 #
 # @main, like every other ANTfrastructure reference in this repo: upstream is
@@ -54,9 +54,8 @@ on:
   pull_request:
     branches: ["main", "develop"]
 
-# Read-only: this lane reports a verdict and writes nothing. The other
-# workflows here predate the default-permissions tightening and still run on
-# the repository default.
+# Read-only: this lane reports a verdict and writes nothing. Every other
+# workflow here declares its token scope too, since 2026-09-24.
 permissions:
   contents: read
 

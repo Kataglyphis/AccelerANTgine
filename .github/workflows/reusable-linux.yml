@@ -1,4 +1,7 @@
-name: Build and Test on Ubuntu 26.04 with x86/ARM arch and GCC Clang
+name: Linux · reusable build
+
+# Called once per (arch x compiler) by linux-x64.yml and linux-arm64.yml - the
+# fleet naming convention (2026-09-24): one caller file per platform + arch.
 
 on:
   workflow_call:
@@ -31,6 +34,15 @@ on:
 jobs:
   build:
     runs-on: ${{ inputs.runner }} # Dynamically use input
+    # Measured: green runs took up to 48 min (x64 and arm64, 2026-03), recent
+    # ones 18-33 min. 120 bounds a hung step well short of the 6-hour default.
+    timeout-minutes: 120
+    # Exactly the repository's restricted default (read, measured 2026-09-24),
+    # written down so a settings change cannot widen it. Every caller must
+    # grant at least this, or the nested job refuses to start.
+    permissions:
+      contents: read
+      packages: read
     defaults:
       run:
         shell: bash
@@ -99,6 +111,9 @@ jobs:
         uses: actions/upload-artifact@v6.0.0
         with:
           name: linux-packages
+          # ci-release.sh already asserts the artifacts exist; an empty upload
+          # here means that assertion was bypassed, so it fails the job.
+          if-no-files-found: error
           path: |
             build-release/*.tar.gz
             build-release/*.tgz

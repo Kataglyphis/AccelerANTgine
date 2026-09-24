@@ -1,4 +1,4 @@
-name: CMake on Windows MSVC/Clang x64
+name: Windows x64 · build + test
 
 on:
   push:
@@ -16,6 +16,14 @@ defaults:
 jobs:
   build:
     runs-on: windows-2025
+    # Measured: green runs took up to 78 min (2026-04), and a cold container
+    # build is priced at three hours below. 240 still ends a hung step early.
+    timeout-minutes: 240
+    # Exactly the repository's restricted default (read, measured 2026-09-24).
+    # packages: read backs the `|| github.token` registry fallback below.
+    permissions:
+      contents: read
+      packages: read
     steps:
 
       # The whole prologue - long paths, checkout, short-path clone, data-root
@@ -94,6 +102,9 @@ jobs:
         uses: actions/upload-artifact@v6.0.0
         with:
           name: windows-installers-container
+          # The build above ran to completion to get here, so no installer and
+          # no zip is a packaging failure, not a quiet green.
+          if-no-files-found: error
           path: |
             ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.msi
             ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.exe

@@ -25,7 +25,7 @@
 #   3. marks the workspace git-safe.
 #
 # What stays here is genuinely project-specific: this repo's CLI (ci-run-all.sh
-# and linux_run.yml drive it), the compiler -> preset mapping, and the
+# and reusable-linux.yml drive it), the compiler -> preset mapping, and the
 # clang-only fuzz/TSan lane.
 set -euo pipefail
 

@@ -14,9 +14,9 @@
 # WHAT THIS CLOSES. Before this file the repo ran no lint gate of any kind:
 # not over its 12 tracked *.sh, not over its 4 workflows, not over its 4
 # first-party *.py, and - the one that matters most - no secret scan, while
-# .github/workflows/linux_run.yml deploys the built docs over FTP with three
-# repository secrets (SERVER, USERNAME, PW). A credential committed to this
-# tree had nothing standing between it and the push.
+# .github/workflows/reusable-linux.yml deploys the built docs over FTP with
+# three repository secrets (SERVER, USERNAME, PW). A credential committed to
+# this tree had nothing standing between it and the push.
 #
 # The scripts in this directory carried 21 "disable" directives naming codes for
 # a linter that had never run over them; 13 remain after this change set. Those are now assertions somebody can

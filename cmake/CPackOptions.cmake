@@ -30,7 +30,7 @@ kataglyphis_cpack_common(
   # AccelerANTgine over an installed GraphicsEngine would have REMOVED it, and
   # vice versa. That is not theoretical here - WiX defaults OFF below, but
   # scripts/windows/Build-Windows.ps1 passes -DENABLE_WIX_PACKAGING=ON and
-  # windows_run.yml uploads the resulting *.msi, so released AccelerANTgine
+  # windows-x64.yml uploads the resulting *.msi, so released AccelerANTgine
   # MSIs do carry BB's code.
   #
   # The migration cost is one-way and accepted: an AccelerANTgine already

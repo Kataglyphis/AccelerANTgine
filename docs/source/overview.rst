@@ -25,10 +25,12 @@ Build Matrix Summary
 The repository already encodes the build matrix in ``CMakePresets.json`` and the
 GitHub workflows.
 
-- Linux x86 and ARM builds run through ``.github/workflows/linux_run.yml``
+- Linux x64 and arm64 builds run through ``.github/workflows/linux-x64.yml``
+  and ``.github/workflows/linux-arm64.yml``, both calling the reusable
+  ``.github/workflows/reusable-linux.yml``
 - Linux runs execute build, tests, coverage, static analysis, docs, benchmarks,
   and release packaging inside the container image
-- Windows builds run through ``.github/workflows/windows_run.yml``
+- Windows builds run through ``.github/workflows/windows-x64.yml``
 - Windows local development builds are done inside the container, while runtime
   execution is done on the host through PowerShell wrappers
 
