@@ -100,6 +100,7 @@ list(
 
 include(PreventInSourceBuilds)
 include(ProjectOptions)
+include(MsvcRuntime)
 
 myproject_setup_options()
 
@@ -258,5 +259,11 @@ if(UNIX AND NOT APPLE)
 endif()
 # we keep the relative paths in the install dir
 # keep in mind that install dir will be in front of this relative path ...
+
+# Every target exists by now: fail the configure, naming them, if any would link
+# another MSVC runtime than the project's (cmake/MsvcRuntime.cmake). This tree
+# only: embedded in a Flutter runner (OmniAccelerANT's native plugin
+# add_subdirectory()s it), CMAKE_SOURCE_DIR is the runner's, whose targets are not ours to judge.
+myproject_check_msvc_runtime("${CMAKE_CURRENT_SOURCE_DIR}")
 
 include(CPackOptions)

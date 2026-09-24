@@ -138,6 +138,24 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-24 — one MSVC runtime for the whole build. abseil 20260526.0 sets
+  `CMAKE_MSVC_RUNTIME_LIBRARY` to `MultiThreaded$<$<CONFIG:Debug>:Debug>DLL` in its
+  own scope (its `CMakeLists.txt:64-67`), so under the clang-cl ASAN Debug preset,
+  where `ProjectOptions` forces `MultiThreadedDLL`, every absl object carried MDd
+  while the rest carried MD. The Windows lane compiled 550 of 607 steps and then
+  died linking FUZZTEST's `grammar_domain_code_generator`: `lld-link:
+  /failifmismatch: mismatch detected for 'RuntimeLibrary'` (MD_DynamicRelease vs
+  `absl_flags_parse.lib` MDd_DynamicDebug). It stayed hidden behind the image's
+  sccache endpoint, which failed every compile first. `cmake/MsvcRuntime.cmake`
+  now pins every compiled third-party target to the project's runtime (end of
+  `third_party/CMakeLists.txt`), and the root `CMakeLists.txt` fails the configure,
+  naming the targets, if anything in this tree would still link another runtime.
+  The check walks this project's tree only: embedded in a Flutter runner (the
+  OmniAccelerANT plugin `add_subdirectory()`s it), the runner's targets are not
+  judged. Proven on the real abseil 20260526.0 source: without the pin the check
+  names `absl_base`, `absl_flags_parse`, … (MultiThreadedDebugDLL); with it, all
+  93 compiled targets resolve to MultiThreadedDLL. Release builds, where
+  `ProjectOptions` sets no runtime, are untouched.
 - 2026-09-12 — the CI image reference is resolved from ANTfrastructure's
   `versions.env` instead of being retyped here.
 - 2026-09-23 — **the clang lanes' coverage step measures again** (x64 and arm64,
