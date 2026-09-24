@@ -156,6 +156,19 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-24 — **every configuration's `bin\` carries the image's GStreamer core
+  DLLs.** The first run with the import-closure report (36044940426) named the cause
+  right away. The CLI was missing `gstreamer-1.0-0.dll`, `glib-2.0-0.dll`,
+  `gobject-2.0-0.dll`, `gstapp-1.0-0.dll` and `gstanalytics-1.0-0.dll`, all
+  imported by `AccelerANTgine.dll`. The VC++ runtime (14.51) and the ASan runtime
+  already resolved from `bin\`. The hub's `Copy-MediaRuntimeBundle` looks for
+  GStreamer only where its SDK installer puts it, and the image builds it into
+  `C:\runtime\bin`, so it had staged only the 7 ONNX Runtime DLLs.
+  `Copy-ImageGStreamerRuntime` copies that directory's DLLs (`GSTREAMER_BIN`
+  overrides the path) with the same exclusion OmniAccelerANT's runner bundling
+  uses: never an ORT-family DLL. It runs before each `Assert-BundleChainOrt`, so G6
+  proves the final directory. The MSIX payload lists its files by name and does not
+  change.
 - 2026-09-24 — **the docs build renders the test-result pages before Sphinx reads
   them.** The Linux x64 lane (run 36035276548) failed `make linkcheck` on a single
   warning, made fatal by `-W`: `test-results/index.rst:9: toctree glob pattern '*'
