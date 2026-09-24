@@ -117,6 +117,30 @@ function Get-BuildConfiguration {
     }
 }
 
+# App-local VC++ runtime (Microsoft's supported local deployment) from the toolset that
+# built the tree. Start-Windows.ps1's host runs otherwise load the runner's redistributable,
+# and a VS 2022 runner's is older than the VS 2026 toolset these binaries import from: the
+# Debug CLI would not start there (run 36035275991). Build-tree only; the installers pack the
+# CMake install tree and MSIX names its files, so nothing here ships.
+function Copy-AppLocalVcRuntime {
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Context,
+        [Parameter(Mandatory)][string[]]$Destination
+    )
+    $crt = @()
+    if ($env:VCToolsRedistDir) {
+        $crt = @(Get-ChildItem -Path (Join-Path $env:VCToolsRedistDir 'x64\Microsoft.VC*.CRT\*.dll') -File -ErrorAction SilentlyContinue)
+    }
+    if ($crt.Count -eq 0) {
+        Write-BuildLogWarning -Context $Context -Message "No VC++ runtime under VCToolsRedistDir ('$env:VCToolsRedistDir'); host runs of this tree use the host's redistributable."
+        return
+    }
+    foreach ($dir in $Destination) {
+        foreach ($dll in $crt) { Copy-Item -LiteralPath $dll.FullName -Destination $dir -Force }
+    }
+    Write-BuildLog -Context $Context -Message "App-local VC++ runtime: $($crt.Count) DLL(s) from $($crt[0].DirectoryName) -> $($Destination -join ', ')"
+}
+
 $FastBuildDir = Get-OrDefault $FastBuildDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.FastBuildDir')
 $LogDir = Get-OrDefault $LogDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.LogDir')
 
@@ -332,6 +356,7 @@ try {
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
             $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildClangFull "bin")
+            Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
         }
 
         # Invoke-CtestDiscoveredTests puts the ASan runtime directories on PATH for
@@ -437,6 +462,7 @@ try {
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
             $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildProfileFull "bin")
+            Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildProfileFull "bin"), $fastBuildProfileFull)
         }
 
         Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
@@ -495,6 +521,7 @@ try {
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
             $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildReleaseDirFull "bin")
+            Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildReleaseDirFull "bin"), $fastBuildReleaseDirFull)
             # The NSIS/WiX/ZIP installers pack the install tree, not bin\: G6 proves that tree first.
             $installProof = Join-Path ([System.IO.Path]::GetTempPath()) "accelerantgine-install-$([guid]::NewGuid().ToString('N'))"
             try {

@@ -56,6 +56,7 @@ Import-BuildModule @(
     'WindowsBuild.Common'
     'WindowsConfig.Common'
     'WindowsTesting.Common'
+    'WindowsTargetArch.Common'
 )
 
 # -Config -> a row of the build table. The row names are the same tokens
@@ -119,6 +120,46 @@ function Invoke-BuiltArtifact {
 
     if (-not $ran) {
         $script:missingArtifacts += $ExecutableName
+        $exe = Resolve-TestExecutable -BuildRoot $buildDir -ExecutableName $ExecutableName -AdditionalRelativeDirectory $RelativeDirectory
+        if ($exe) { Write-ImportClosureReport -Executable $exe -SearchDirs @((Join-Path $buildDir 'bin'), $buildDir) }
+    }
+}
+
+# The hub reports a start failure only as "loader/runtime mismatch": one message for
+# STATUS_DLL_NOT_FOUND and STATUS_ENTRYPOINT_NOT_FOUND. Walk the import closure the way
+# the loader searches (exe dir, System32, then PATH) and name what is missing, plus where
+# each runtime DLL resolves, since a runner's copy can be older than the build's (run
+# 36035275991: the Debug CLI would not start on the host, its placeholder suites would).
+function Write-ImportClosureReport {
+    param(
+        [Parameter(Mandatory)][string]$Executable,
+        [string[]]$SearchDirs = @()
+    )
+    $system = [Environment]::SystemDirectory
+    $dirs = @((Split-Path -Parent $Executable), $system) + $SearchDirs + @($env:PATH -split ';' | Where-Object { $_ })
+    $resolved = @{}
+    $queue = [System.Collections.Generic.Queue[string]]::new()
+    $queue.Enqueue($Executable)
+    while ($queue.Count -gt 0) {
+        $file = $queue.Dequeue()
+        foreach ($name in @(Get-PeImportNames -Path $file)) {
+            $key = $name.ToLowerInvariant()
+            if ($resolved.ContainsKey($key) -or $key -like 'api-ms-win-*' -or $key -like 'ext-ms-*') { continue }
+            $hit = $dirs | ForEach-Object { Join-Path $_ $name } |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+            $resolved[$key] = $hit
+            if (-not $hit) {
+                Write-BuildLogWarning -Context $ctx -Message "  import closure: $name (imported by $(Split-Path -Leaf $file)) -- NOT FOUND"
+            } elseif (-not $hit.StartsWith($system, [StringComparison]::OrdinalIgnoreCase)) {
+                $queue.Enqueue($hit)
+            }
+        }
+    }
+    foreach ($runtime in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'clang_rt.asan_dynamic-x86_64.dll') {
+        if ($resolved[$runtime]) {
+            $version = (Get-Item -LiteralPath $resolved[$runtime]).VersionInfo.FileVersion
+            Write-BuildLog -Context $ctx -Message "  import closure: $runtime -> $($resolved[$runtime]) ($version)"
+        }
     }
 }
 

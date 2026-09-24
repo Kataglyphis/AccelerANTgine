@@ -156,6 +156,23 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-24 — **the host runs get the VC++ runtime of the toolset that built them, and
+  say what is missing when a binary will not start.** With clang-tidy and the ASan helper
+  fixed, run 36035275991 built everything and reached the host steps. The Debug suites
+  passed there, but the CLI would not start ("Windows loader/runtime mismatch"). The suites
+  are placeholders that never call the library, so the CLI is the first binary on the
+  runner to load the real closure. The binaries come from the image's VS 2026 toolset
+  (14.51), while the windows-2025 runner carries the VS 2022 redistributable, which is
+  older and only backward-compatible. `Build-Windows.ps1` now copies the toolset's own CRT
+  DLLs (`VCToolsRedistDir\x64\Microsoft.VC*.CRT`) beside every configuration's `bin\` and
+  build root: Microsoft's supported app-local deployment, and build-tree only, since the
+  installers pack the CMake install tree and MSIX names its files. When a binary still will
+  not start, `Start-Windows.ps1` walks its import closure in the loader's order (exe dir,
+  System32, PATH). It names every DLL it cannot find and the version each runtime DLL
+  resolves to, so the next failure names its cause rather than the hub's single message
+  for two exit codes. Both were checked on this host: the staging copies into both
+  directories and warns without a redist; the report named `python314.dll` as missing for a
+  lone `python.exe`.
 - 2026-09-24 — **the Windows clang-tidy step skips every TU that reads a BMI**
   when no clang-tidy sits beside the compiler. With the MSVC runtime fixed (next
   entry), run 36008508666 built all 607 steps, then failed its first clang-tidy
