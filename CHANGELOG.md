@@ -156,6 +156,20 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-24 — **the Windows clang-tidy step skips every TU that reads a BMI**
+  when no clang-tidy sits beside the compiler. With the MSVC runtime fixed (next
+  entry), run 36008508666 built all 607 steps, then failed its first clang-tidy
+  file: `config_loader.cpp: module file '…kataglyphis.config_loader.pcm' built
+  from a different branch () than the compiler`. The image compiles with its
+  patched LLVM, which ships no clang-tidy, so the step ran scoop's. The hub's
+  default skip only matches `import kataglyphis`, which misses implementation
+  units, `import nlohmann.json;` and `import tomlplusplus;`. The step now uses
+  the compiler's own `clang-tidy.exe` when there is one (read from
+  `CMAKE_CXX_COMPILER`), and otherwise skips the implementation units and every
+  import, which leaves the six self-contained `.ixx` interfaces. This has been
+  broken since the image switched compilers; weeks of earlier failures in the
+  same lane hid it. AGENTS.md § 4 has the Windows half of "Every LLVM tool that
+  reads clang's output must be the compiler's own".
 - 2026-09-24 — one MSVC runtime for the whole build. abseil 20260526.0 sets
   `CMAKE_MSVC_RUNTIME_LIBRARY` to `MultiThreaded$<$<CONFIG:Debug>:Debug>DLL` in its
   own scope (its `CMakeLists.txt:64-67`), so under the clang-cl ASAN Debug preset,

@@ -243,6 +243,18 @@ written out rather than linked.
   verdict of its own — does not move with it. The image-side fix is upstream:
   the hub's `register-llvm-alternatives.sh` registers only `clang`, `clang++`,
   `llvm-ar` and `llvm-ranlib`.
+  Windows has the same trap with a different pair: the image compiles with its
+  patched LLVM (`C:/llvm-patched/bin/clang-cl.exe`, built `clang;lld` only), so
+  the `clang-tidy` on PATH is scoop's, and it refuses the BMIs with `module file
+  … built from a different branch () than the compiler`. `Build-Windows.ps1`'s
+  clang-tidy step reads `CMAKE_CXX_COMPILER` from the build's `CMakeCache.txt`
+  and uses a `clang-tidy.exe` beside it when there is one. There is none today,
+  so it skips every TU that reads a BMI: the implementation units
+  (`module kataglyphis.x;`) and anything that imports, `export import`
+  included. That leaves the six `.ixx` interfaces that import nothing, where
+  Linux analyses all 18 files. The image-side fix is adding
+  `clang-tools-extra` to the hub's `Build-LlvmFromSource.ps1`, which re-keys the
+  LLVM layer and everything built on it.
 - **perf is optional in `ci-profile-bench.sh`, the CI image has none, and perf
   alone is not a profile.** Ubuntu 26.04's `linux-tools-common`, which the image
   installs, no longer ships `/usr/bin/perf` — perf is the `linux-perf` package
