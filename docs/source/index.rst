@@ -68,7 +68,7 @@ Coverage
 Test results
 ------------
 
-* `Test results (JUnit XML viewer) <test-results/>`_
+* :doc:`Test results <test-results/index>`
 
 Indices and tables
 ==================

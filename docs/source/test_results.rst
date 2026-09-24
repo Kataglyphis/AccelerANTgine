@@ -6,8 +6,9 @@ available in the workspace.
 
 Available outputs may include:
 
-- converted JUnit result pages under ``docs/test-results``
-- markdown conversions under ``docs/source/test-results``
+- one page per JUnit report the test step writes (``docs/test_results*.xml``),
+  rendered by ``scripts/linux/junit_to_markdown.py`` into
+  ``docs/source/test-results``
 - coverage HTML under ``docs/coverage``
 
 The Linux docs pipeline is responsible for populating these generated assets.
@@ -27,4 +28,4 @@ Recommended path:
 Direct links inside the built site:
 
 - ``coverage/index.html`` for coverage reports
-- ``test-results/`` for generated test result HTML
+- :doc:`test-results/index` for the test result pages
