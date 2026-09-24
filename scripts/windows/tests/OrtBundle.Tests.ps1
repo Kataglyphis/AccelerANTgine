@@ -11,6 +11,8 @@ Describe 'WindowsOrtBundle.Common' {
     . (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1')
     Import-BuildModule @('WindowsOnnx.Common', 'WindowsOrtBundle.Common', 'WindowsOrtProvenance.Common')
 
+    # A fake __FILE__ path ends in NUL, as a compiler writes it: G6 takes only a whole NUL-terminated
+    # ORT source path as a fingerprint (hub fix of 2026-09-24), so "$chainSrc text" would be none.
     $chainSrc = 'C:\temp\onnx-src\onnxruntime\core\session\inference_session.cc'
     $foreignSrc = 'C:\__w\1\s\onnxruntime\core\session\inference_session.cc'
 
@@ -29,7 +31,7 @@ Describe 'WindowsOrtBundle.Common' {
 
     function New-ChainRoot([string] $Name) {
         $root = Join-Path $TestDrive "$Name\onnx"
-        New-FakePe (Join-Path $root 'bin\onnxruntime.dll') "$chainSrc OrtGetApiBase"
+        New-FakePe (Join-Path $root 'bin\onnxruntime.dll') "$chainSrc`0OrtGetApiBase"
         New-FakePe (Join-Path $root 'bin\onnxruntime_providers_shared.dll') 'provider bridge'
         New-FakePe (Join-Path $root 'bin\DirectML.dll') 'directml'
         return $root
@@ -68,7 +70,7 @@ Describe 'WindowsOrtBundle.Common' {
             New-FakePe (Join-Path $pkg 'onnxruntime.dll') $foreignSrc
             Get-ThrowText { Assert-BundleChainOrt -Root $tree -DllDirectory $libs } | Should Match 'FOREIGN'
             Remove-Item -LiteralPath (Join-Path $pkg 'onnxruntime.dll')
-            New-FakePe (Join-Path $libs 'onnxruntime.dll') "$chainSrc FileVersion 1.27.0"
+            New-FakePe (Join-Path $libs 'onnxruntime.dll') "$chainSrc`0FileVersion 1.27.0"
             Get-ThrowText { Assert-BundleChainOrt -Root $tree -DllDirectory $libs } | Should Match 'STALE'
             Remove-Item -LiteralPath (Join-Path $libs 'onnxruntime.dll')
             Get-ThrowText { Assert-BundleChainOrt -Root $tree -DllDirectory $libs } | Should Match 'MISSING'
