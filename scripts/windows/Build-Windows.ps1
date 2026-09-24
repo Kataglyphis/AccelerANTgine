@@ -378,14 +378,39 @@ try {
             # lint gate checks against ANTfrastructure's copy (AGENTS.md section 2,
             # "clang-format / clang-tidy / cmake-format and the canonical
             # configs"), so a project-local disable belongs on the command line.
+            #
+            # The clang-tidy must be the compiler's own, or it refuses the BMIs
+            # ("built from a different branch"). With none beside the compiler,
+            # every TU that reads a BMI is skipped: implementation units and any
+            # import, not only the hub default's `import kataglyphis`. AGENTS.md
+            # section 4, "Every LLVM tool that reads clang's output".
             Invoke-BuildStep -Context $Context -StepName "clang-tidy Analysis" -Script {
-                Invoke-ClangTidyFixStep -Context $Context `
-                    -WorkspacePath $Workspace `
-                    -BuildRoot $fastBuildClangFull `
-                    -SourceSubdirectory 'Src' `
-                    -Extension @('.cpp', '.cc', '.cxx', '.ixx', '.cppm', '.mxx') `
-                    -Checks @('-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness,-google-explicit-constructor,-hicpp-explicit-conversions') `
-                    -Fix
+                $tidyArgs = @{
+                    Context            = $Context
+                    WorkspacePath      = $Workspace
+                    BuildRoot          = $fastBuildClangFull
+                    SourceSubdirectory = 'Src'
+                    Extension          = @('.cpp', '.cc', '.cxx', '.ixx', '.cppm', '.mxx')
+                    Checks             = @('-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness,-google-explicit-constructor,-hicpp-explicit-conversions')
+                    Fix                = $true
+                }
+                $cache = Join-Path $fastBuildClangFull 'CMakeCache.txt'
+                $compilerLine = Select-String -Path $cache -Pattern '^CMAKE_CXX_COMPILER:[A-Z]+=(.+)$' -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+                $ownTidy = if ($compilerLine) { Join-Path (Split-Path -Parent $compilerLine.Matches[0].Groups[1].Value) 'clang-tidy.exe' }
+                $savedPath = $env:PATH
+                try {
+                    if ($ownTidy -and (Test-Path $ownTidy)) {
+                        $env:PATH = "$(Split-Path -Parent $ownTidy);$env:PATH"
+                        Write-BuildLog -Context $Context -Message "clang-tidy: the compiler's own, $ownTidy"
+                    } else {
+                        $tidyArgs.ModuleImportPattern = '(?m)^\s*((export\s+)?import\s+[\w.:<>"/]+|module\s+[\w.:]+)\s*;'
+                        Write-BuildLog -Context $Context -Message "clang-tidy: none beside the compiler ($(if ($compilerLine) { $compilerLine.Matches[0].Groups[1].Value } else { "no CMAKE_CXX_COMPILER in $cache" })); every TU that needs a BMI is skipped"
+                    }
+                    Invoke-ClangTidyFixStep @tidyArgs
+                } finally {
+                    $env:PATH = $savedPath
+                }
             }
         }
         
