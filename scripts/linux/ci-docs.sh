@@ -27,8 +27,14 @@
 # ahead of the library steps, so the SVGs that get staged are the ones this run
 # just produced.
 #
+# ORDERING FIX (the test results): the JUnit pages were rendered AFTER Sphinx and
+# copied into its source BEFORE it, so a fresh checkout built an empty
+# test-results toctree and -W failed on it (run 36035276548). The library's four
+# steps are now called one by one, the pages rendered between the venv (which
+# installs junit2html) and Sphinx.
+#
 # THE VENV BOOTSTRAP IS TWO SHELL FUNCTIONS, NOT TWO SCRIPTS - and that is what
-# lets this file call docs_build_main instead of re-implementing its step order.
+# lets this file call the library's steps instead of re-implementing them.
 # docs_build_prepare_python_env runs DOCS_BUILD_UV_VENV_CREATE_SCRIPT and
 # DOCS_BUILD_UV_INSTALL_REQUIREMENTS_SCRIPT as commands, `(cd "${root}" && "$x")`.
 # A helper *script* would be wrong here: this repo is developed on Windows with
@@ -120,10 +126,6 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   mkdir -p docs/source/coverage
   mkdir -p docs/source/test-results
 
-  if [ -d "docs/test-results-md" ] && [ "$(ls -A docs/test-results-md 2>/dev/null)" ]; then
-    cp -r docs/test-results-md/* docs/source/test-results/
-  fi
-
   # ---------------------------------------------------------------------------
   # Library pipeline: stage the SVGs, generate the diagrams, run Sphinx.
   # DOCS_BUILD_SPHINXOPTS and DOCS_BUILD_TARGETS stay at the library defaults.
@@ -143,11 +145,9 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   # an unexplained "cannot stat", so name the real producer first.
   compgen -G "${DOCS_BUILD_SVG_SOURCE_DIR}/*.svg" >/dev/null \
     || die "Doxygen wrote no SVGs to ${DOCS_BUILD_SVG_SOURCE_DIR}; HAVE_DOT=YES in Doxyfile.in needs graphviz (dot) in the image."
-  # docs_build_main = prepare_python_env -> copy_static_svg -> run_generator ->
-  # sphinx. The three steps used to be listed here by hand, in that order, with
-  # the venv done separately above; the only reason was the exec-bit problem the
-  # header now explains away.
-  docs_build_main
+  # The library's steps one by one, not docs_build_main: the test-result pages
+  # have to land between the venv (junit2html) and Sphinx. See the header.
+  docs_build_prepare_python_env
 
   # ---------------------------------------------------------------------------
   # Test-result rendering. Kept local rather than pushed upstream: nothing else
@@ -208,6 +208,22 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
       pandoc "$f" --verbose -f html -t gfm -o "${WORKSPACE_DIR}/docs/test-results-md/$(basename "$f" .html).md"
     done
   fi
+
+  # Into the Sphinx source, BEFORE the build. A build that found no JUnit XML says
+  # so on a page: the toctree globs this directory, and -W fails an empty glob.
+  md_pages=("${WORKSPACE_DIR}"/docs/test-results-md/*.md)
+  rm -f "${WORKSPACE_DIR}/docs/source/test-results/no-results.md"
+  if [ ${#md_pages[@]} -gt 0 ]; then
+    cp "${md_pages[@]}" "${WORKSPACE_DIR}/docs/source/test-results/"
+  else
+    printf '# No test results\n\nThis documentation build found no JUnit XML to render.\n' \
+      > "${WORKSPACE_DIR}/docs/source/test-results/no-results.md"
+  fi
+
+  docs_build_copy_static_svg
+  docs_build_run_generator
+  docs_build_sphinx
+  info "Sphinx build complete"
 
   # Both copies below used to end in `|| true`. The directory is checked on the
   # line above each, so the only thing that swallowed was a real copy failure -
