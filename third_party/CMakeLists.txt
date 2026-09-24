@@ -20,8 +20,9 @@ set(ABSL_PROPAGATE_CXX_STD
     CACHE BOOL "Use C++ standard from Abseil." FORCE)
 
 # NOTE: no /MT forcing here — clang-cl ASAN uses clang_rt.asan_dynamic (dynamic
-# CRT compatible), so abseil builds with the same runtime as the rest of the
-# project (MultiThreadedDLL when embedding in Flutter).
+# CRT compatible). abseil does NOT follow the project's runtime on its own: it
+# sets CMAKE_MSVC_RUNTIME_LIBRARY in its own scope (debug CRT in a Debug build),
+# so the end of this file pins every third-party target to the project's.
 FetchContent_MakeAvailable(abseil-cpp)
 
 # include google test to project
@@ -278,3 +279,7 @@ if(RUST_FEATURES)
   endif()
 
 endif()
+
+# One MSVC runtime for every dependency above (abseil pins its own otherwise);
+# the root CMakeLists checks the whole build after this. cmake/MsvcRuntime.cmake.
+myproject_force_msvc_runtime("${CMAKE_CURRENT_SOURCE_DIR}")
