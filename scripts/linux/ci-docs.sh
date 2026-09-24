@@ -30,8 +30,8 @@
 # ORDERING FIX (the test results): the JUnit pages were rendered AFTER Sphinx and
 # copied into its source BEFORE it, so a fresh checkout built an empty
 # test-results toctree and -W failed on it (run 36035276548). The library's four
-# steps are now called one by one, the pages rendered between the venv (which
-# installs junit2html) and Sphinx.
+# steps are now called one by one, and junit_to_markdown.py writes the pages
+# straight into the Sphinx source before Sphinx runs.
 #
 # THE VENV BOOTSTRAP IS TWO SHELL FUNCTIONS, NOT TWO SCRIPTS - and that is what
 # lets this file call the library's steps instead of re-implementing them.
@@ -146,78 +146,30 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   compgen -G "${DOCS_BUILD_SVG_SOURCE_DIR}/*.svg" >/dev/null \
     || die "Doxygen wrote no SVGs to ${DOCS_BUILD_SVG_SOURCE_DIR}; HAVE_DOT=YES in Doxyfile.in needs graphviz (dot) in the image."
   # The library's steps one by one, not docs_build_main: the test-result pages
-  # have to land between the venv (junit2html) and Sphinx. See the header.
+  # have to land before Sphinx reads them. See the header.
   docs_build_prepare_python_env
 
   # ---------------------------------------------------------------------------
-  # Test-result rendering. Kept local rather than pushed upstream: nothing else
-  # in the fleet converts JUnit XML into the docs site, and a sample size of one
-  # is not a library.
+  # Test-result pages, one per report ci-build-and-test.sh wrote with
+  # `ctest --output-junit docs/test_results*.xml`. Kept local rather than pushed
+  # upstream: nothing else in the fleet puts JUnit XML on its docs site.
   # ---------------------------------------------------------------------------
-  # junit2html is in requirements.txt and was just installed into the venv that
-  # is active in this shell, so "not available" means the bootstrap above lied
-  # about succeeding. This used to warn and skip.
-  if ! command -v junit2html >/dev/null 2>&1; then
-    die "junit2html not on PATH although requirements.txt installed it into ${VENV_DIR}."
-  fi
-
-  shopt -s globstar nullglob
-  mkdir -p docs/test-results
-
-  xml_candidates=(
-    "${WORKSPACE_DIR}"/**/junit*.xml
-    "${WORKSPACE_DIR}"/**/test-results*.xml
-    "${WORKSPACE_DIR}"/**/TEST-*.xml
-    "${WORKSPACE_DIR}"/**/test-*.xml
-  )
-
-  converted_count=0
-  skipped_non_junit_count=0
-  skipped_empty_count=0
-
-  for f in "${xml_candidates[@]}"; do
-    [ -s "$f" ] || {
-      skipped_empty_count=$((skipped_empty_count + 1))
-      continue
-    }
-    if grep -qE "<testsuites|<testsuite" "$f"; then
-      if junit2html "$f" "${WORKSPACE_DIR}/docs/test-results/$(basename "$f" .xml).html"; then
-        converted_count=$((converted_count + 1))
-      else
-        skipped_non_junit_count=$((skipped_non_junit_count + 1))
-      fi
-    else
-      skipped_non_junit_count=$((skipped_non_junit_count + 1))
-    fi
+  results_dir="${WORKSPACE_DIR}/docs/source/test-results"
+  # Only generated pages match: the hand-written file here is index.rst.
+  rm -f "${results_dir}"/*.md
+  shopt -s nullglob
+  reports=("${WORKSPACE_DIR}"/docs/test_results*.xml)
+  shopt -u nullglob
+  for report in "${reports[@]}"; do
+    "${VENV_DIR}/bin/python" "${_SCRIPT_DIR}/junit_to_markdown.py" \
+      "${report}" "${results_dir}/$(basename "${report}" .xml).md"
   done
-
-  info "JUnit conversion summary: converted=${converted_count} skipped_non_junit=${skipped_non_junit_count} skipped_empty=${skipped_empty_count}"
-
-  if ! command -v pandoc >/dev/null 2>&1; then
-    info "Installing pandoc via apt"
-    require_sudo
-    apt_install pandoc
-  fi
-  mkdir -p "${WORKSPACE_DIR}/docs/test-results-md"
-  shopt -s globstar nullglob
-  html_files=("${WORKSPACE_DIR}"/docs/test-results/*.html)
-  if [ ${#html_files[@]} -eq 0 ]; then
-    info "No HTML files found in docs/test-results. Skipping pandoc conversion."
-  else
-    for f in "${html_files[@]}"; do
-      pandoc "$f" --verbose -f html -t gfm -o "${WORKSPACE_DIR}/docs/test-results-md/$(basename "$f" .html).md"
-    done
-  fi
-
-  # Into the Sphinx source, BEFORE the build. A build that found no JUnit XML says
-  # so on a page: the toctree globs this directory, and -W fails an empty glob.
-  md_pages=("${WORKSPACE_DIR}"/docs/test-results-md/*.md)
-  rm -f "${WORKSPACE_DIR}/docs/source/test-results/no-results.md"
-  if [ ${#md_pages[@]} -gt 0 ]; then
-    cp "${md_pages[@]}" "${WORKSPACE_DIR}/docs/source/test-results/"
-  else
+  info "Test-result pages: rendered ${#reports[@]} JUnit report(s)"
+  # A build that found no report says so on a page: the toctree globs this
+  # directory, and -W fails an empty glob.
+  if [ ${#reports[@]} -eq 0 ]; then
     printf '# No test results\n\nThis documentation build found no JUnit XML to render.\n' \
-      > "${WORKSPACE_DIR}/docs/source/test-results/no-results.md"
+      > "${results_dir}/no-results.md"
   fi
 
   docs_build_copy_static_svg
@@ -225,19 +177,15 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   docs_build_sphinx
   info "Sphinx build complete"
 
-  # Both copies below used to end in `|| true`. The directory is checked on the
-  # line above each, so the only thing that swallowed was a real copy failure -
-  # and a site silently missing its coverage or test-result pages is exactly
-  # what this step exists to prevent.
+  # The copy below used to end in `|| true`. The directory is checked on the
+  # line above it, so the only thing that swallowed was a real copy failure -
+  # and a site silently missing its coverage pages is exactly what this step
+  # exists to prevent. The test-result pages are Sphinx pages now, not a copy.
   SITE_DIR="${WORKSPACE_DIR}/docs/build/html"
   mkdir -p "$SITE_DIR"
   if [[ -d "${WORKSPACE_DIR}/docs/coverage" ]]; then
     mkdir -p "$SITE_DIR/coverage"
     cp -r "${WORKSPACE_DIR}/docs/coverage/." "$SITE_DIR/coverage/"
-  fi
-  if [[ -d "${WORKSPACE_DIR}/docs/test-results" ]]; then
-    mkdir -p "$SITE_DIR/test-results"
-    cp -r "${WORKSPACE_DIR}/docs/test-results/." "$SITE_DIR/test-results/"
   fi
 
   info "Documentation build complete"

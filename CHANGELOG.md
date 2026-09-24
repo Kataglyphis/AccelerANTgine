@@ -156,6 +156,28 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-24 — **the docs step renders the test results itself, and for the first
+  time.** Run 36052807549 passed build and tests, then died in `ci-docs.sh` at
+  `Installing pandoc via apt` → `This script requires sudo or root`. The image has
+  no pandoc and the lane runs as uid 1001. The pandoc block had always been there,
+  but every earlier run failed in Sphinx before reaching it. Nothing had ever needed
+  it either: `ctest --output-junit` writes `docs/test_results*.xml` (underscore),
+  and the step globbed `test-results*.xml`/`test-*.xml`, so it converted nothing
+  (`converted=0`). `scripts/linux/junit_to_markdown.py` (stdlib only) now turns
+  each report into a Markdown page in `docs/source/test-results/`. That means one
+  H1 page, a table per suite and the failed tests' output, with no raw HTML, so
+  Sphinx `-W` reads it. It replaces junit2html (dropped from `requirements.txt`)
+  and pandoc. The step reads exactly the files the test step writes, and it
+  deletes stale generated pages before rendering. The site no longer copies
+  `docs/test-results/`, which nothing writes now. `conf.py` listed
+  `docs/source/test-results` in `html_extra_path`, and the HTML builder drops
+  those directories from its sources, so the pages were never built at all (only
+  linkcheck read them). They are real pages now. The index reaches them through a
+  checked `:doc:` link instead of the `<test-results/>` URL, which only junit2html's
+  copied output ever filled. Checked by running `ci-docs.sh` in the image on a copy
+  of the tracked tree with this tree's two reports: html and linkcheck
+  `build succeeded` under `-W`, and `test-results/test_results.html` has the six
+  rows.
 - 2026-09-24 — **every configuration's `bin\` carries the image's GStreamer core
   DLLs.** The first run with the import-closure report (36044940426) named the cause
   right away. The CLI was missing `gstreamer-1.0-0.dll`, `glib-2.0-0.dll`,

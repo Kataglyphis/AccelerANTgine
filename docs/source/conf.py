@@ -124,10 +124,12 @@ html_theme_options["repository_url"] = (
     "https://github.com/Kataglyphis/AccelerANTgine"
 )
 
-# Copy generated coverage and test-result assets into the built site root when available.
+# Copy generated coverage assets into the built site root when available. NOT
+# test-results: those are Sphinx pages (ci-docs.sh renders them), and the HTML
+# builder drops every html_extra_path directory from its sources.
 html_extra_path = [
     extra_dir.name
-    for extra_dir in (_DOCS_SOURCE_DIR / "coverage", _DOCS_SOURCE_DIR / "test-results")
+    for extra_dir in (_DOCS_SOURCE_DIR / "coverage",)
     if extra_dir.exists()
 ]
 
