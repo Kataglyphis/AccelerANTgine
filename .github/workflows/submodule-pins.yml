@@ -1,4 +1,4 @@
-name: Submodule Pins
+name: Submodule pins
 
 # ONE `uses:` LINE. Seven submodules, and one of them - third_party/ANTfrastructure
 # - owns the scripts that run the tests, the static analysis, the packaging and

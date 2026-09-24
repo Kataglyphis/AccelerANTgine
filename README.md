@@ -10,9 +10,9 @@
   
 For the official docs follow this [link](https://hardwareacceleratedai.jonasheinle.de/).
 
-[![Linux run on ARM/GCC/Clang](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_arm.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_arm.yml)
-[![Linux run on x86/GCC/Clang](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_x86.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux_run_x86.yml)
-[![CMake on Windows MSVC/Clang x64](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows_run.yml/badge.svg?branch=main)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows_run.yml)
+[![Linux arm64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml)
+[![Linux x64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-x64.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-x64.yml)
+[![Windows x64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-x64.yml/badge.svg?branch=main)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-x64.yml)
 [![CodeQL](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/github-code-scanning/codeql)
 [![Automatic Dependency Submission](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/dependency-graph/auto-submission/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/dependency-graph/auto-submission)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypalme/JonasHeinle)

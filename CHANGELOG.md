@@ -39,6 +39,24 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- 2026-09-24 — **workflows follow the owner's fleet naming convention**
+  (kebab-case files, one file per platform + arch, display names
+  `<Platform> <Arch> · <what>`). Renamed: `linux_run.yml` →
+  `reusable-linux.yml` ("Linux · reusable build"), `linux_run_x86.yml` →
+  `linux-x64.yml` ("Linux x64 · build + test"), `linux_run_arm.yml` →
+  `linux-arm64.yml` ("Linux arm64 · build + test"), `windows_run.yml` →
+  `windows-x64.yml` ("Windows x64 · build + test"); `lint-gates.yml` and
+  `submodule-pins.yml` keep their files and now display as "Lint gates" and
+  "Submodule pins". Triggers are unchanged — all three platform lanes still run
+  on every push and PR to `main`/`develop`. The README badges, AGENTS.md, the
+  Sphinx overview and every comment naming a workflow file moved with them;
+  the entries below keep the names they had at the time. Touching the files
+  also cleared all ten of this repo's hub workflow-convention findings: the two
+  runner-owning `build` jobs carry `timeout-minutes` (120 Linux, 240 Windows,
+  against measured green runs of at most 48 and 78 minutes), every renamed
+  workflow declares `permissions:` (`contents: read` + `packages: read`, the
+  repository's restricted default, so the token can do nothing it could not
+  before), and both uploads set `if-no-files-found: error`.
 - 2026-09-23 — **ONNX Runtime is REQUIRED and chain-only** (ANTfrastructure
   owner rule of 2026-09-23). `cmake/SystemLibDependencies.cmake` searches one
   prefix — `-DONNXRUNTIME_ROOT`, else `$ENV{ONNX_ROOT}` (Windows image) or

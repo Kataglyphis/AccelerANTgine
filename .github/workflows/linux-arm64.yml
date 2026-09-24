@@ -1,4 +1,4 @@
-name: Linux run on ARM/GCC/Clang
+name: Linux arm64 · build + test
 
 on:
   push:
@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: ["main", "develop"]
 
+# The ceiling for the nested reusable-linux.yml job, which asks for exactly
+# this; a narrower grant here makes it refuse to start.
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   build-ubuntu26_04_gcc-arm:
-    uses: ./.github/workflows/linux_run.yml
+    uses: ./.github/workflows/reusable-linux.yml
     with:
       compiler: gcc
       runner: ubuntu-26.04-arm
@@ -21,7 +27,7 @@ jobs:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
   build-ubuntu26_04_clang-arm:
-    uses: ./.github/workflows/linux_run.yml
+    uses: ./.github/workflows/reusable-linux.yml
     with:
       compiler: clang
       runner: ubuntu-26.04-arm
