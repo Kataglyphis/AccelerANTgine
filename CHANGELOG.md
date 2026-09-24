@@ -156,6 +156,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-24 — **the docs build renders the test-result pages before Sphinx reads
+  them.** The Linux x64 lane (run 36035276548) failed `make linkcheck` on a single
+  warning, made fatal by `-W`: `test-results/index.rst:9: toctree glob pattern '*'
+  didn't match any documents`. `ci-docs.sh` copied `docs/test-results-md` into the
+  Sphinx source before `docs_build_main`, but produced it after, so a fresh checkout
+  built an empty toctree. A local rerun hid this by picking up the previous run's
+  pages. The script now calls the library's four steps one by one and renders the
+  pages between the venv (which installs junit2html) and Sphinx. A build with no
+  JUnit XML at all gets a `no-results.md` page that says so, instead of an empty
+  glob. Checked: shellcheck-warnings ratchet OK (7 frozen, none new), and the copy
+  logic both ways (placeholder when empty; pages copied, stale placeholder removed).
 - 2026-09-24 — **the host runs get the VC++ runtime of the toolset that built them, and
   say what is missing when a binary will not start.** With clang-tidy and the ASan helper
   fixed, run 36035275991 built everything and reached the host steps. The Debug suites
