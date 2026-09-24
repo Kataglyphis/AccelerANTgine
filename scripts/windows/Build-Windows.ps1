@@ -141,6 +141,28 @@ function Copy-AppLocalVcRuntime {
     Write-BuildLog -Context $Context -Message "App-local VC++ runtime: $($crt.Count) DLL(s) from $($crt[0].DirectoryName) -> $($Destination -join ', ')"
 }
 
+# The image's GStreamer core DLLs (glib, gobject, gstreamer-1.0, gstapp, ...) beside the
+# CLI. Copy-MediaRuntimeBundle finds GStreamer only in the SDK installer's locations, and
+# the image builds it into C:\runtime\bin, so a host run lacked every one of them (run
+# 36044940426: "gstreamer-1.0-0.dll (imported by AccelerANTgine.dll) -- NOT FOUND").
+# Same source and exclusion as OmniAccelerANT's runner bundling: never an ORT-family DLL,
+# which only the chain staging may supply, and G6 then proves the directory.
+function Copy-ImageGStreamerRuntime {
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Context,
+        [Parameter(Mandatory)][string]$Destination
+    )
+    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
+    if (-not (Test-Path -LiteralPath $gstBin -PathType Container)) {
+        Write-BuildLogWarning -Context $Context -Message "GStreamer bin not found ($gstBin); host runs of this tree lack GStreamer."
+        return
+    }
+    $dlls = @(Get-ChildItem -LiteralPath $gstBin -Filter '*.dll' -File |
+        Where-Object { $_.Name -notlike 'onnxruntime*' -and $_.Name -ne 'DirectML.dll' })
+    foreach ($dll in $dlls) { Copy-Item -LiteralPath $dll.FullName -Destination $Destination -Force }
+    Write-BuildLog -Context $Context -Message "Image GStreamer runtime: $($dlls.Count) DLL(s) from $gstBin (ORT family excluded) -> $Destination"
+}
+
 $FastBuildDir = Get-OrDefault $FastBuildDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.FastBuildDir')
 $LogDir = Get-OrDefault $LogDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.LogDir')
 
@@ -355,6 +377,7 @@ try {
             # can gate on it. This lane does not, and an unassigned int inside an
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
+            Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildClangFull "bin")
             $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildClangFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
         }
@@ -461,6 +484,7 @@ try {
             # can gate on it. This lane does not, and an unassigned int inside an
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
+            Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildProfileFull "bin")
             $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildProfileFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildProfileFull "bin"), $fastBuildProfileFull)
         }
@@ -520,6 +544,7 @@ try {
             # can gate on it. This lane does not, and an unassigned int inside an
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
+            Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildReleaseDirFull "bin")
             $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildReleaseDirFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildReleaseDirFull "bin"), $fastBuildReleaseDirFull)
             # The NSIS/WiX/ZIP installers pack the install tree, not bin\: G6 proves that tree first.
