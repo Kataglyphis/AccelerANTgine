@@ -13,6 +13,7 @@ For the official docs follow this [link](https://hardwareacceleratedai.jonashein
 [![Linux arm64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml)
 [![Linux x64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-x64.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-x64.yml)
 [![Windows x64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-x64.yml/badge.svg?branch=main)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-x64.yml)
+[![Windows arm64 · cross build + run](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-arm64-cross.yml/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-arm64-cross.yml)
 [![CodeQL](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/github-code-scanning/codeql)
 [![Automatic Dependency Submission](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/dependency-graph/auto-submission/badge.svg)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/dependency-graph/auto-submission)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypalme/JonasHeinle)

@@ -9,7 +9,7 @@
     Name="__PACKAGE_NAME__"
     Publisher="__PUBLISHER__"
     Version="__VERSION__"
-    ProcessorArchitecture="x64" />
+    ProcessorArchitecture="__ARCH__" />
 
   <Properties>
     <DisplayName>__DISPLAY_NAME__</DisplayName>
