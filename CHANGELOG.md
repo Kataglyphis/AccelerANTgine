@@ -50,6 +50,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- 2026-09-25 — **`windows-x64.yml` is a thin caller of the hub's reusable
+  `container-ci-windows.yml`**, like `windows-arm64-cross.yml` (the family's
+  thin-caller step, after OxidANT's). The container build is `Build-Windows.ps1
+  -BuildTargets clangcl-debug,clangcl-profile,clangcl-release` over the hub's
+  bind mount; the lane's `host-command` runs `Start-Windows.ps1` for each
+  configuration on the runner host. The PowerShell lint gate is its own
+  `lint-powershell` job, and the Pester suites keep theirs. One artifact,
+  `AccelerANTgine-windows-x64` (`dist/windows-x64`, the NSIS installer now
+  included in its `packages`), replaces `windows-installers-container`.
 - 2026-09-25 — **the x64 packages carry the same DLL closure as arm64** (owner
   decision 2026-09-25; the x64 MSI, ZIP and MSIX were thinner). clangcl-release
   fills `KATAGLYPHIS_PACKAGE_DLL_DIR`, the hub's `kataglyphis_install_package_dlls`,

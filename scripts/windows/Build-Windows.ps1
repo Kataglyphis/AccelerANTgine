@@ -602,9 +602,9 @@ try {
 
         # The product in dist\windows-<x64|arm64>, the directory a Windows lane uploads: the
         # install tree the installers pack, which carries the package DLL closure, so it runs
-        # on a clean machine of either arch (G6 proves the ORT in it); the MSI and ZIP beside
-        # it. NSIS's installer stub is x86 by design, and the arm64 lane's arch gate walks
-        # this tree, so NSIS stays in the build root.
+        # on a clean machine of either arch (G6 proves the ORT in it); the installers beside
+        # it. NSIS's installer stub is x86 by design, which the arm64 lane's arch gate refuses
+        # in this tree, so only x64 ships the NSIS installer here.
         Invoke-BuildStep -Context $Context -StepName "Portable Bundle ($TargetArch)" -Critical -Script {
             $distArch = Join-Path $Workspace "dist\windows-$packageArch"
             $bundle = Join-Path $distArch 'bundle'
@@ -624,8 +624,13 @@ try {
             $packages = Join-Path $distArch 'packages'
             if (Test-Path $packages) { Remove-Item -LiteralPath $packages -Recurse -Force }
             New-Item -ItemType Directory -Force -Path $packages | Out-Null
-            Get-ChildItem -LiteralPath $fastBuildReleaseDirFull -File | Where-Object { $_.Extension -in '.msi', '.zip' } |
-                Copy-Item -Destination $packages
+            $installers = @(Get-ChildItem -LiteralPath $fastBuildReleaseDirFull -File | Where-Object { $_.Extension -in '.msi', '.zip' })
+            if (-not $isCross) {
+                # NSIS names its installer like the MSI; the build root's other .exe files are tests.
+                $installers += @($installers | ForEach-Object { Join-Path $fastBuildReleaseDirFull "$($_.BaseName).exe" } |
+                        Select-Object -Unique | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Get-Item)
+            }
+            $installers | Copy-Item -Destination $packages
             Write-BuildLog -Context $Context -Message "Portable bundle $bundle; the install tree carries its whole DLL closure ($($installed.Count) file(s) in bin)"
         }
 
