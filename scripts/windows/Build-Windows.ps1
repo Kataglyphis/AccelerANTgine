@@ -673,9 +673,11 @@ try {
         # a policy change, not an adoption. -MakeAppxPath hands the tool this
         # already resolved to the hub so it is not probed a second time.
         #
-        # Invoke-MsixSign is called here rather than through -Sign: the hub's
-        # -Sign passes the staging directory's PARENT as the workspace, and
-        # Invoke-MsixSign looks for the signing *.pfx in the workspace ROOT.
+        # -Sign -SigningRoot $Workspace: the hub signs with the first *.pfx at the
+        # repository root (gitignored) and MSIX_PFX_PASSWORD, then verifies; with
+        # no .pfx it warns and the package stays unsigned. This repo called
+        # Invoke-MsixSign itself until the hub's -Sign stopped searching the
+        # staging directory's parent (hub, 2026-09-25).
         if (-not $SkipMSIX) {
             Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Script {
                 $msixWorkspace = Join-Path $Workspace "packaging\msix"
@@ -747,11 +749,10 @@ try {
                     -ExePath (Join-Path $payloadDir 'AccelerANTgine.exe') `
                     -ExtraFiles $payloadExtra `
                     -LogoPath $logoSource `
-                    -MakeAppxPath $makeappx | Out-Null
+                    -MakeAppxPath $makeappx `
+                    -Sign -SigningRoot $Workspace | Out-Null
 
                 Write-BuildLog -Context $Context -Message "MSIX package created: $msixFile"
-
-                Invoke-MsixSign -Context $Context -WorkspacePath $Workspace -MsixOutPath $msixFile
             }
         }
     }

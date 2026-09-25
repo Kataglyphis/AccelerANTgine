@@ -50,6 +50,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- 2026-09-25 — **MSIX signing goes through the hub's `-Sign -SigningRoot`.** The
+  MSIX step signs with a `*.pfx` at the repository root and `MSIX_PFX_PASSWORD`, as
+  before, but through `Invoke-MsixPackage` rather than a direct `Invoke-MsixSign`
+  call. That call worked around the hub's old `-Sign`, which searched the staging
+  directory's parent. Needs the hub commit where `-Sign` takes `-SigningRoot`.
 - 2026-09-25 — **`windows-x64.yml` is a thin caller of the hub's reusable
   `container-ci-windows.yml`**, like `windows-arm64-cross.yml` (the family's
   thin-caller step, after OxidANT's). The container build is `Build-Windows.ps1
