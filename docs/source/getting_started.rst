@@ -10,6 +10,10 @@ Prerequisites
 - C++23-capable compiler toolchain
 - CMake 3.31.6 or newer
 - Git submodules checked out
+- ONNX Runtime from the family image's chain build: configure searches only
+  ``-DONNXRUNTIME_ROOT``, else the image's own prefix, and stops without it
+- GStreamer 1.24 or newer, found through pkg-config
+- Rust (cargo), unless configured with ``-DRUST_FEATURES=OFF``
 - Python tooling for docs when building Sphinx locally
 - Docker for the Windows containerized build flow
 
@@ -18,7 +22,7 @@ Clone The Repository
 
 .. code-block:: bash
 
-   git clone --recurse-submodules git@github.com:Kataglyphis/AccelerANTgine.git
+   git clone --recurse-submodules https://github.com/Kataglyphis/AccelerANTgine.git
 
 If you cloned without submodules:
 
@@ -97,7 +101,8 @@ defaults:
   via ``-UseBindMount``; a fresh container via ``-FreshContainer``)
 - ``--isolation process`` — resource caps apply only under ``-Isolation
   hyperv`` (``-CpuCount``/``-MemoryGb`` knobs)
-- artifact delivery back to ``build-<target>`` on the host, verified per lane
+- artifact delivery back to the host: ``build-<target>`` (verified per lane),
+  ``logs`` and ``dist``
 
 The wrapper builds these targets:
 
@@ -110,6 +115,9 @@ Artifacts are synchronized back into the repository under:
 - ``build-clangcl-debug``
 - ``build-clangcl-profile``
 - ``build-clangcl-release``
+- ``dist/windows-x64``: the release configuration's portable bundle, its
+  installers and its MSIX
+- ``logs``
 
 Run The App On The Windows Host
 -------------------------------
@@ -123,10 +131,11 @@ Use the host-side scripts from ``scripts/windows``:
    .\scripts\windows\Start-Windows.ps1 -Config Profile
    .\scripts\windows\Start-Windows.ps1 -Config Release
 
-These scripts run the built executables from the synchronized build folders.
-``-Config Debug`` performs a stable CLI check and executes the debug test
-binaries it finds. If you have a signalling server available, you can opt into
-the WebRTC smoke test with ``-RunWebRtcSmoke``.
+The script runs the built executables from the synchronized build folders.
+``-Config Debug`` performs a stable CLI check and runs the commit and compile
+test suites; a missing or unstartable one fails the run. If you have a
+signalling server available, you can opt into the WebRTC smoke test with
+``-RunWebRtcSmoke``.
 
 Build Documentation
 -------------------

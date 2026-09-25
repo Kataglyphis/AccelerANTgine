@@ -102,7 +102,9 @@ The GitHub workflows are the reference for how the project is expected to build
 and validate:
 
 - Linux workflows orchestrate build, tests, coverage, analysis, docs, and release
-- Windows workflow builds inside the project container and uploads packaged artifacts
+- Windows workflows build inside the family container image, run what they
+  built (on the x64 runner host, and on ``windows-11-arm`` for the arm64 cross
+  build) and upload ``dist/windows-x64`` or ``dist/windows-arm64``
 
 When adding features, keep local verification aligned with those same paths so
 CI remains a confirmation step rather than a discovery step.

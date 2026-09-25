@@ -3,10 +3,10 @@ AccelerANTgine documentation
 
 .. rst-class:: hero-section
 
-Native C++ inference library with C API bindings and CLI tooling.
+Native C++ inference library with C API bindings, Python bindings and CLI tooling.
 
 - Hardware-accelerated AI inference
-- Cross-platform (Linux x86/ARM, Windows)
+- Cross-platform (Linux x64/arm64, Windows x64/arm64)
 - Doxygen-generated API reference
 
 .. grid:: 2
