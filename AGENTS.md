@@ -21,7 +21,7 @@ is the single fact that most shapes its tooling.
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | Test sources |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
-| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the project-local `modules/` (today `WindowsOrtBundle.Common`: the ONNX Runtime proof of a staged bundle), and the Pester suites in `tests/` |
+| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, and the Pester suites in `tests/`. There is no project-local `modules/` any more: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
 
 **This repo is consumed as a direct submodule** of OmniAccelerANT, at
@@ -220,12 +220,12 @@ written out rather than linked.
   lane proves a `cmake --install` of it before `--target package`), the MSIX
   payload, and the Python package (`Build-PythonBindings.ps1`, the chain layout
   only) go through
-  ANTfrastructure's G6 census (`Test-OrtProvenanceTree`, via
-  `scripts/windows/modules/WindowsOrtBundle.Common.psm1`): every ORT binary the
-  image's chain build, byte for byte, and `onnxruntime.dll` beside the exe (or
-  in the package's `_libs`). Both scripts stop, naming the hub commit, while the
-  pinned hub predates G6: that older hub staged NuGet layouts only, so the exe
-  loaded System32's Windows ML `onnxruntime.dll`.
+  ANTfrastructure's G6 census, through the hub's `Assert-ChainOrtTree`
+  (`WindowsOrtPayload.Common`): every ORT binary the image's chain build, byte for
+  byte, `onnxruntime.dll` beside the exe (or in the package's `_libs`), and no
+  ORT-family DLL that the chain ORT or GenAI install has not got. The Python
+  package stages with `Copy-ChainOrtBeside -All`. Both scripts stop, naming the
+  hub commit, while the pinned hub predates that module.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
   `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`,
   `linux-debug-clang-tsan`, and on Windows

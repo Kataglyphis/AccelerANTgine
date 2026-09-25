@@ -49,6 +49,14 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- **The ONNX Runtime proof is the hub's `WindowsOrtPayload.Common`** (hub `ad08bc30`,
+  2026-09-25). `WindowsOrtBundle.Common` and its cases moved there: `Copy-ChainOrtLib`
+  is `Copy-ChainOrtBeside -All`, `Assert-BundleChainOrt` is `Assert-ChainOrtTree`
+  (`-ExeDirectory`/`-DllDirectory` are `-OrtDirectory`, the Python package's waiver
+  `-WaiveUnresolved`). The hub's proof also refuses an ORT-family DLL that the chain
+  ORT or GenAI install has not got, and a `DirectML.dll` of other bytes.
+  `OrtProofWiring.Tests.ps1` keeps the one case that is this repo's: the install
+  tree is proved after `--install` and before `--target package`.
 
 - 2026-09-25 — **MSIX signing goes through the hub's `-Sign -SigningRoot`.** The
   MSIX step signs with a `*.pfx` at the repository root and `MSIX_PFX_PASSWORD`, as
