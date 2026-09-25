@@ -19,6 +19,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- 2026-09-25 — `.github/workflows/windows-arm64-cross.yml` ("Windows arm64 · cross
+  build + run", owner decision 2026-09-25), a thin caller of ANTfrastructure's
+  reusable `container-ci-windows.yml`. `Build-Windows.ps1 -TargetArch arm64
+  -BuildTargets clangcl-release` builds in the family image's arm64 bundle, the
+  hub's arch gate grades `dist/windows-arm64`, and `windows-11-arm` runs
+  `bundle/bin/AccelerANTgine.exe`. Verified locally in the bundle: 6/6 steps, 22
+  arm64 binaries, no unresolved import, the `aarch64` MSI/ZIP and the arm64 MSIX.
+  The first run caught the arm64 redist's ARM64EC `vcruntime140_1.dll` in the
+  package; the hub's CPack module now leaves it out.
+  Also fixed on the way: an error outside every build step was logged and the
+  script still exited 0; it exits 1 now.
 - 2026-09-14 — `.github/workflows/lint-gates.yml` plus
   `scripts/linux/run-lint-gates.sh`: shellcheck, actionlint, gitleaks and ruff
   over this tree. Before it the repo ran no lint gate of any kind while

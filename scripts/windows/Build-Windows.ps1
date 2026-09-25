@@ -8,6 +8,9 @@
   Run with defaults or pass parameters to override workspace path and other options.
   Accepts a -BuildTargets array to selectively build specific targets (e.g. clangcl-debug, clangcl-profile, clangcl-release).
   Builds are executed outside the mounted workspace for performance, and artifacts are synced back upon completion.
+  -TargetArch arm64 is the cross build of windows-arm64-cross.yml, run in the family image's arm64 bundle:
+  clangcl-release only, configured with the hub's cross arguments, and packaged to dist\windows-arm64
+  (a portable bundle carrying its DLL closure, the MSI and ZIP, the MSIX).
 #>
 
 param(
@@ -31,7 +34,10 @@ param(
     [switch]$SkipPGO,
     [switch]$SkipMSIX,
     [switch]$ContinueOnError,
-    [switch]$StopOnError
+    [switch]$StopOnError,
+    # amd64 (alias x64) or arm64. Empty: the image's WINDOWS_TARGET_ARCH, else amd64,
+    # resolved by the hub's Get-WindowsTargetArch, which throws on anything else.
+    [string]$TargetArch = ''
 )
 
 $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
@@ -74,7 +80,24 @@ Import-BuildModule @(
     'WindowsOnnx.Common'
     'WindowsMediaRuntime.Common'
     'WindowsOrtBundle.Common'   # project-local: the G6 proof of each staged bin\
+    'WindowsTargetArch.Common'  # the target: accepted spellings, cross or not, the MSVC lib dir
 )
+# The cross lanes' configure arguments, package arch and DLL closure. A hub pin older than
+# the cross lanes lacks the module and says which commit it needs.
+try { Import-BuildModule @('WindowsCrossBundle.Common') } catch {
+    throw "This build needs ANTfrastructure's WindowsCrossBundle.Common (hub commit of 2026-09-25, third_party/ANTfrastructure/docs/windows-cross-builds.md); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
+}
+$TargetArch = Get-WindowsTargetArch -Arch $TargetArch
+$isCross = Test-WindowsCrossTarget -Arch $TargetArch
+$packageArch = Get-WindowsPackageArch -Arch $TargetArch
+# Checked before the build log opens, so a refusal exits non-zero. Debug links an ASan
+# runtime the bundle has no aarch64 copy of and runs FuzzTest's grammar generator during
+# the build; Profile runs benchmarks and a PGO pass; MSVC's preset pins x64.
+$requestedTargets = @($BuildTargets -join ',' -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$notCross = @($requestedTargets | Where-Object { $_ -ne 'clangcl-release' })
+if ($isCross -and $notCross.Count -gt 0) {
+    throw "-TargetArch $TargetArch builds clangcl-release only, not $($notCross -join ', ') (third_party/ANTfrastructure/docs/windows-cross-builds.md)."
+}
 # G6, the hub's ORT census, proves the staged ONNX Runtime; a hub pin older than its
 # ORT single-source commit lacks it (and stages NuGet layouts only, so System32's ORT won).
 try { Import-BuildModule @('WindowsOrtProvenance.Common') } catch { throw (Get-OrtCensusRequirement -Cause $_.Exception.Message) }
@@ -129,7 +152,7 @@ function Copy-AppLocalVcRuntime {
     )
     $crt = @()
     if ($env:VCToolsRedistDir) {
-        $crt = @(Get-ChildItem -Path (Join-Path $env:VCToolsRedistDir 'x64\Microsoft.VC*.CRT\*.dll') -File -ErrorAction SilentlyContinue)
+        $crt = @(Get-ChildItem -Path (Join-Path $env:VCToolsRedistDir "$packageArch\Microsoft.VC*.CRT\*.dll") -File -ErrorAction SilentlyContinue)
     }
     if ($crt.Count -eq 0) {
         Write-BuildLogWarning -Context $Context -Message "No VC++ runtime under VCToolsRedistDir ('$env:VCToolsRedistDir'); host runs of this tree use the host's redistributable."
@@ -182,6 +205,7 @@ if (-not (Test-Path $logDirPath)) {
 
 $Context = New-BuildContext -Workspace $Workspace -LogDir $logDirPath -StopOnError:(-not $ContinueOnError)
 Open-BuildLog -Context $Context
+$unhandledError = $false
 
 try {
     Write-BuildLog -Context $Context -Message "=== Kataglyphis Container Build Script ==="
@@ -190,6 +214,7 @@ try {
     Write-BuildLog -Context $Context -Message "BuildTargets:       $($BuildTargets -join ', ')"
     Write-BuildLog -Context $Context -Message "BuildConfig:        $configPathResolved"
     Write-BuildLog -Context $Context -Message "LLVMBinPath:        $LLVMBinPath"
+    Write-BuildLog -Context $Context -Message "TargetArch:         $TargetArch$(if ($isCross) { ' (cross)' })"
     Write-BuildLog -Context $Context -Message ("=" * 60)
 
     Set-Location -Path $Workspace
@@ -211,7 +236,9 @@ try {
     $fastBuildMsvcFull = Join-Path $fastLocalCache $cfgMsvc.BuildDir
     $fastBuildClangFull = Join-Path $fastLocalCache $cfgClang.BuildDir
     $fastBuildProfileFull = Join-Path $fastLocalCache $cfgProfile.BuildDir
-    $fastBuildReleaseDirFull = Join-Path $fastLocalCache $cfgRelease.BuildDir
+    # A cross build keeps its own tree beside the host's, so neither clobbers the other.
+    $releaseBuildDir = if ($isCross) { "$($cfgRelease.BuildDir)-$TargetArch" } else { $cfgRelease.BuildDir }
+    $fastBuildReleaseDirFull = Join-Path $fastLocalCache $releaseBuildDir
 
     $BuildTargets = $BuildTargets -join ',' -split ',' | ForEach-Object { $_.Trim() }
 
@@ -537,7 +564,8 @@ try {
                     -Preset $cfgRelease.Preset `
                     -Configuration $cfgRelease.Configuration `
                     -CleanBuildRoot `
-                    -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON')
+                    -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON') +
+                        @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
 
             # $null = : the hub function RETURNS the staged DLL count so a caller
@@ -555,10 +583,34 @@ try {
             } finally { Remove-Item -LiteralPath $installProof -Recurse -Force -ErrorAction SilentlyContinue }
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
-        
+
+        # The cross lane's product (windows-arm64-cross.yml): the install tree the installers
+        # pack, plus every DLL its binaries import from the image, so it runs on a clean arm64
+        # device (Copy-PeImportClosure; G6 proves the ORT in it). The MSI and ZIP travel beside
+        # it; NSIS's installer stub is x86 by design, and the arch gate walks this tree.
+        if ($isCross) {
+            Invoke-BuildStep -Context $Context -StepName "Portable Bundle ($TargetArch)" -Critical -Script {
+                $distArch = Join-Path $Workspace "dist\windows-$TargetArch"
+                $bundle = Join-Path $distArch 'bundle'
+                if (Test-Path $bundle) { Remove-Item -LiteralPath $bundle -Recurse -Force }
+                Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--install", $fastBuildReleaseDirFull, "--prefix", $bundle, "--config", $cfgRelease.Configuration)
+                $bundleBin = Join-Path $bundle 'bin'
+                $seeds = @(Get-ChildItem -LiteralPath $bundleBin -File | Where-Object { $_.Extension -in '.exe', '.dll' } | ForEach-Object FullName)
+                $search = @(if ($env:ONNX_ROOT) { Join-Path $env:ONNX_ROOT 'bin' }) + @('C:\runtime\bin')
+                $copied = @(Copy-PeImportClosure -Path $seeds -SearchDirectory $search -Destination $bundleBin -Arch $TargetArch)
+                $null = Assert-BundleChainOrt -Root $bundle -ExeDirectory $bundleBin
+                $packages = Join-Path $distArch 'packages'
+                if (Test-Path $packages) { Remove-Item -LiteralPath $packages -Recurse -Force }
+                New-Item -ItemType Directory -Force -Path $packages | Out-Null
+                Get-ChildItem -LiteralPath $fastBuildReleaseDirFull -File | Where-Object { $_.Extension -in '.msi', '.zip' } |
+                    Copy-Item -Destination $packages
+                Write-BuildLog -Context $Context -Message "Portable bundle $bundle; DLL closure from $($search -join ', '): $(@($copied | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
+            }
+        }
+
         # Sync Release Artifacts
         Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Release Artifacts" -Script {
-            Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $cfgRelease.BuildDir) -ExcludeCommonRustAndCppCache
+            Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $releaseBuildDir) -ExcludeCommonRustAndCppCache
         }
 
         # MSIX Packaging
@@ -602,8 +654,11 @@ try {
             Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Script {
                 $msixWorkspace = Join-Path $Workspace "packaging\msix"
                 $msixTemplate = Join-Path $msixWorkspace "AppxManifest.template.xml"
-                $msixOutput = Join-Path $Workspace "dist\msix"
-                $stagingRoot = Join-Path $msixOutput "staging"
+                $msixOutput = if ($isCross) { Join-Path $Workspace "dist\windows-$TargetArch\msix" } else { Join-Path $Workspace "dist\msix" }
+                # A cross build keeps its intermediates in its build tree: dist\windows-<arch> is
+                # uploaded whole and graded by the arch gate, so it holds products only.
+                $msixWork = if ($isCross) { Join-Path $fastBuildReleaseDirFull "msix" } else { $msixOutput }
+                $stagingRoot = Join-Path $msixWork "staging"
 
                 $exePath = Join-Path $fastBuildReleaseDirFull "bin\AccelerANTgine.exe"
                 $dllPath = Join-Path $fastBuildReleaseDirFull "bin\AccelerANTgine.dll"
@@ -637,16 +692,23 @@ try {
 
                 $packageVersion = Get-PackageVersion -WorkspacePath $Workspace
                 New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
-                $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_x64.msix"
+                $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_${packageArch}.msix"
 
                 # The package carries the chain ORT the release bin\ staged, or a client
                 # loads System32's Windows ML copy; G6 proves the payload before it is packed.
-                $payloadDir = Join-Path $msixOutput "payload"
+                # A cross package ships the portable bundle's bin\ whole: an arm64 device
+                # has no VC++ redist and no C:\runtime, so the DLL closure travels too.
+                $payloadDir = Join-Path $msixWork "payload"
                 if (Test-Path $payloadDir) { Remove-Item $payloadDir -Recurse -Force }
                 New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
-                $ortRuntime = @('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'DirectML.dll') |
-                    ForEach-Object { Join-Path (Split-Path $exePath -Parent) $_ } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
-                Copy-Item -LiteralPath (@($exePath, $dllPath) + @($ortRuntime)) -Destination $payloadDir
+                if ($isCross) {
+                    $bundleBin = Join-Path $Workspace "dist\windows-$TargetArch\bundle\bin"
+                    Copy-Item -LiteralPath @(Get-ChildItem -LiteralPath $bundleBin -File | Where-Object { $_.Extension -in '.exe', '.dll' } | ForEach-Object FullName) -Destination $payloadDir
+                } else {
+                    $ortRuntime = @('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'DirectML.dll') |
+                        ForEach-Object { Join-Path (Split-Path $exePath -Parent) $_ } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+                    Copy-Item -LiteralPath (@($exePath, $dllPath) + @($ortRuntime)) -Destination $payloadDir
+                }
                 $null = Assert-BundleChainOrt -Root $payloadDir
                 $payloadExtra = @(Get-ChildItem -LiteralPath $payloadDir -Filter '*.dll' -File | ForEach-Object FullName)
 
@@ -658,6 +720,7 @@ try {
                         '__PACKAGE_NAME__'           = 'AccelerANTgine'
                         '__PUBLISHER__'              = 'CN=Kataglyphis'
                         '__VERSION__'                = $packageVersion
+                        '__ARCH__'                   = $packageArch
                         '__DISPLAY_NAME__'           = 'Kataglyphis C++ Inference'
                         '__PUBLISHER_DISPLAY_NAME__' = 'Kataglyphis'
                         '__DESCRIPTION__'            = 'High-performance C++ inference engine with ONNXRuntime and WebRTC streaming'
@@ -677,12 +740,15 @@ try {
     }
 
 } catch {
+    # An error outside every build step is in no step's failure list, and this run used
+    # to exit 0 over it. Recorded, so the exit code below says so.
+    $unhandledError = $true
     Write-BuildLogError -Context $Context -Message "Unhandled critical error: $($_.Exception.Message)"
 } finally {
     Write-BuildSummary -Context $Context
     Close-BuildLog -Context $Context
     
-    if ($Context.Results.Failed.Count -gt 0) {
+    if ($unhandledError -or $Context.Results.Failed.Count -gt 0) {
         exit 1
     }
 }

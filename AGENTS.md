@@ -329,12 +329,30 @@ files, one file per platform + arch, display names `<Platform> <Arch> · <what>`
 `linux-x64.yml` and `linux-arm64.yml` (each calls the containerized
 `reusable-linux.yml` once per compiler), `windows-x64.yml` (the container build,
 the PowerShell lint gate over `scripts/`, and a `pester-tests` job over
-`scripts/windows/tests/`), `lint-gates.yml` and `submodule-pins.yml`. The three
-platform lanes run on every push and PR to `main` and `develop`, with no path
-filter. Every job that owns a runner carries `timeout-minutes`, every workflow
+`scripts/windows/tests/`), `windows-arm64-cross.yml`, `lint-gates.yml` and
+`submodule-pins.yml`. The four platform lanes run on every push and PR to `main`
+and `develop`, with no path filter. Every job that owns a runner carries `timeout-minutes`, every workflow
 declares `permissions:`, and every upload sets `if-no-files-found: error` — the
 hub's workflow conventions (`verify_workflow_conventions.py`), measured at zero
 findings here since the rename.
+
+`windows-arm64-cross.yml` (owner decision 2026-09-25) is one `uses:` onto the hub's
+reusable `container-ci-windows.yml`. The job runs `Build-Windows.ps1 -TargetArch arm64
+-BuildTargets clangcl-release` in the family image's arm64 bundle. The hub's arch gate then
+grades `dist/windows-arm64`, and `windows-11-arm` runs `bundle/bin/AccelerANTgine.exe`.
+On a cross build the script:
+
+- refuses every target but clangcl-release, before the log opens. Debug links an x64-only
+  ASan runtime and runs FuzzTest's grammar generator at build time, and Profile runs
+  benchmarks and PGO;
+- configures with the hub's `Get-CrossConfigureArgs -Corrosion`;
+- builds into `build-clangcl-release-arm64`;
+- writes the portable bundle: the install tree plus its DLL closure (`Copy-PeImportClosure`),
+  proved by G6;
+- writes the `aarch64` MSI and ZIP (not NSIS: its installer stub is x86) and the arm64 MSIX,
+  whose manifest takes `__ARCH__`.
+
+An error outside every build step now exits 1: it used to be logged and exit 0.
 
 `lint-gates.yml` and `submodule-pins.yml` are one `uses:` line each onto
 ANTfrastructure's reusable workflows; only this repo's `on:` filters and their
