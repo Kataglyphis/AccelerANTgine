@@ -35,7 +35,7 @@ name: Submodule pins
 # the Windows PowerShell 5.1 that 3.4.0 needs - under a green run with no commit
 # to blame.
 #
-# @main, like every other ANTfrastructure reference in this repo: upstream is
+# @develop, like every other ANTfrastructure reference in this repo: upstream is
 # pushed before the consumer change that needs it.
 
 on:
@@ -62,6 +62,6 @@ concurrency:
 jobs:
   pins:
     name: Submodule pins sit at their recorded commits
-    uses: Kataglyphis/ANTfrastructure/.github/workflows/submodule-pins.yml@main
+    uses: Kataglyphis/ANTfrastructure/.github/workflows/submodule-pins.yml@develop
     with:
       pester-version: '3.4.0'

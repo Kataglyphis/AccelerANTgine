@@ -45,7 +45,7 @@ name: Lint gates
 # linux-arm64.yml, so a gate placed there would grade the same tree four times.
 # The tree is architecture-independent and so is its verdict.
 #
-# @main, like every other ANTfrastructure reference in this repo: upstream is
+# @develop, like every other ANTfrastructure reference in this repo: upstream is
 # pushed before the consumer change that needs it.
 
 on:
@@ -62,7 +62,7 @@ permissions:
 jobs:
   lint-gates:
     name: shellcheck + actionlint + gitleaks + ruff + ratchets
-    uses: Kataglyphis/ANTfrastructure/.github/workflows/lint-gates.yml@main
+    uses: Kataglyphis/ANTfrastructure/.github/workflows/lint-gates.yml@develop
     with:
       submodules: 'recursive'
       ratchets: true
