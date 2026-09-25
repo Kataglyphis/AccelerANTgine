@@ -18,7 +18,7 @@
 [submodule "third_party/ANTfrastructure"]
 	path = third_party/ANTfrastructure
 	url = https://github.com/Kataglyphis/ANTfrastructure.git
-	branch = main
+	branch = develop
 [submodule "third_party/tomlplusplus"]
 	path = third_party/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
