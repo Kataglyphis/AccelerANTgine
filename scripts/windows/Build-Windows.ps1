@@ -80,7 +80,6 @@ Import-BuildModule @(
     'WindowsMsix.Signing'
     'WindowsOnnx.Common'
     'WindowsMediaRuntime.Common'
-    'WindowsOrtBundle.Common'   # project-local: the G6 proof of each staged bin\
     'WindowsTargetArch.Common'  # the target: accepted spellings, cross or not, the MSVC lib dir
 )
 # The cross configure arguments, the package arch and the DLL closure with its search order.
@@ -102,9 +101,11 @@ $notCross = @($requestedTargets | Where-Object { $_ -ne 'clangcl-release' })
 if ($isCross -and $notCross.Count -gt 0) {
     throw "-TargetArch $TargetArch builds clangcl-release only, not $($notCross -join ', ') (third_party/ANTfrastructure/docs/windows-cross-builds.md)."
 }
-# G6, the hub's ORT census, proves the staged ONNX Runtime; a hub pin older than its
-# ORT single-source commit lacks it (and stages NuGet layouts only, so System32's ORT won).
-try { Import-BuildModule @('WindowsOrtProvenance.Common') } catch { throw (Get-OrtCensusRequirement -Cause $_.Exception.Message) }
+# The G6 proof of every staged bin\, install tree and payload: the hub's WindowsOrtPayload.Common,
+# this repo's WindowsOrtBundle.Common until 2026-09-25. An older hub pin lacks it.
+try { Import-BuildModule @('WindowsOrtPayload.Common') } catch {
+    throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit ad08bc30 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
+}
 
 # ---------------------------------------------------------------------------
 # The build table. Import-PowerShellDataFile plus Get-ConfigValue/Get-OrDefault
@@ -272,9 +273,9 @@ try {
     # layouts alone, found nothing under the image's chain ONNX_ROOT, and left the
     # exe to load System32's Windows ML onnxruntime.dll. From that change on the
     # hub stages ONNX_ROOT\lib + \bin (Get-OnnxChainLayout) and byte-checks every
-    # ORT DLL it leaves; Assert-BundleChainOrt then runs the hub's G6 census over
-    # each bin\ (chain bytes, and every importer resolving to them), and the
-    # import block above refuses a hub pin that predates G6.
+    # ORT DLL it leaves; Assert-ChainOrtTree (WindowsOrtPayload.Common) then runs the
+    # hub's G6 census over each bin\ (chain bytes, and every importer resolving to
+    # them), and the import block above refuses a hub pin that predates it.
     #
     # The empty-payload guard the local comment was written for is upstream too,
     # and pinned by its suite: the resolver returns an empty ARRAY, not $null.
@@ -409,7 +410,7 @@ try {
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildClangFull "bin")
-            $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildClangFull "bin")
+            $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildClangFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
         }
 
@@ -516,7 +517,7 @@ try {
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildProfileFull "bin")
-            $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildProfileFull "bin")
+            $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildProfileFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildProfileFull "bin"), $fastBuildProfileFull)
         }
 
@@ -583,7 +584,7 @@ try {
             # Invoke-BuildStep script block lands in that step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildReleaseDirFull "bin")
-            $null = Assert-BundleChainOrt -Root (Join-Path $fastBuildReleaseDirFull "bin")
+            $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildReleaseDirFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildReleaseDirFull "bin"), $fastBuildReleaseDirFull)
             # Everything the engine imports, transitively, from the hub's search order (the
             # chain ORT, the media stack, the target's VC++ runtime): what a clean machine lacks.
@@ -595,7 +596,7 @@ try {
             $installProof = Join-Path ([System.IO.Path]::GetTempPath()) "accelerantgine-install-$([guid]::NewGuid().ToString('N'))"
             try {
                 Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--install", $fastBuildReleaseDirFull, "--prefix", $installProof, "--config", $cfgRelease.Configuration)
-                $null = Assert-BundleChainOrt -Root $installProof -ExeDirectory (Join-Path $installProof "bin")
+                $null = Assert-ChainOrtTree -Root $installProof -OrtDirectory (Join-Path $installProof "bin")
             } finally { Remove-Item -LiteralPath $installProof -Recurse -Force -ErrorAction SilentlyContinue }
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
@@ -620,7 +621,7 @@ try {
             if ($added.Count) {
                 throw "The install tree lacks $($added -join ', '), which its binaries import, so every installer would ship without it: seed the package DLL closure with the binary that imports it."
             }
-            $null = Assert-BundleChainOrt -Root $bundle -ExeDirectory $bundleBin
+            $null = Assert-ChainOrtTree -Root $bundle -OrtDirectory $bundleBin
             $packages = Join-Path $distArch 'packages'
             if (Test-Path $packages) { Remove-Item -LiteralPath $packages -Recurse -Force }
             New-Item -ItemType Directory -Force -Path $packages | Out-Null
@@ -728,7 +729,7 @@ try {
                 New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
                 $bundleBin = Join-Path $Workspace "dist\windows-$packageArch\bundle\bin"
                 Copy-Item -LiteralPath @(Get-ChildItem -LiteralPath $bundleBin -File | Where-Object { $_.Extension -in '.exe', '.dll' } | ForEach-Object FullName) -Destination $payloadDir
-                $null = Assert-BundleChainOrt -Root $payloadDir
+                $null = Assert-ChainOrtTree -Root $payloadDir
                 $payloadExtra = @(Get-ChildItem -LiteralPath $payloadDir -Filter '*.dll' -File | ForEach-Object FullName)
 
                 Write-BuildLog -Context $Context -Message "Creating MSIX package (version $packageVersion)..."

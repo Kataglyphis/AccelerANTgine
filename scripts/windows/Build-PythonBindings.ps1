@@ -22,10 +22,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 # The chain ONNX Runtime staging and its G6 proof come from ANTfrastructure through the
-# repo's resolver; a hub pin older than its ORT single-source commit lacks G6.
+# repo's resolver: WindowsOrtPayload.Common, which an older hub pin lacks.
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
-Import-BuildModule @('WindowsOnnx.Common', 'WindowsOrtBundle.Common')
-try { Import-BuildModule @('WindowsOrtProvenance.Common') } catch { throw (Get-OrtCensusRequirement -Cause $_.Exception.Message) }
+try { Import-BuildModule @('WindowsOrtPayload.Common') } catch {
+    throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit ad08bc30 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
+}
 
 Write-Host "=== Python bindings build ($Preset) ==="
 cmake --preset $Preset -S $WorkspaceDir -B $BuildDir `
@@ -67,8 +68,8 @@ foreach ($candidate in $gstCandidates) {
 # ONNX Runtime: the chain install's layout only (owner rule 2026-09-23). Get-OnnxChainLayout
 # refuses a NuGet tree or a release zip, and the package is not staged until G6 proves that
 # every ORT binary in it is the image's chain build and _libs (which __init__ registers) holds it.
-Copy-ChainOrtLib -OnnxRoot "$env:ONNX_ROOT" -Destination $libsDir
-$null = Assert-BundleChainOrt -Root $dest -DllDirectory $libsDir
+$null = Copy-ChainOrtBeside -OnnxRoot "$env:ONNX_ROOT" -Destination $libsDir -All
+$null = Assert-ChainOrtTree -Root $dest -OrtDirectory $libsDir -WaiveUnresolved
 
 Write-Host "Python package staged to $dest"
 exit 0
