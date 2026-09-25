@@ -347,10 +347,18 @@ On a cross build the script:
   benchmarks and PGO;
 - configures with the hub's `Get-CrossConfigureArgs -Corrosion`;
 - builds into `build-clangcl-release-arm64`;
-- writes the portable bundle: the install tree plus its DLL closure (`Copy-PeImportClosure`),
-  proved by G6;
-- writes the `aarch64` MSI and ZIP (not NSIS: its installer stub is x86) and the arm64 MSIX,
+- ships the `aarch64` MSI and ZIP (not NSIS: its installer stub is x86) and the arm64 MSIX,
   whose manifest takes `__ARCH__`.
+
+**Both arches ship the same product (owner decision 2026-09-25: x64 was thinner).**
+clangcl-release configures `KATAGLYPHIS_PACKAGE_DLL_DIR`, the hub's
+`kataglyphis_install_package_dlls`, and fills it after the build with
+`Copy-PeImportClosure` over `AccelerANTgine.exe` and `AccelerANTgine.dll`. The search runs in the
+order of `Get-ProductDllSearchPath`: the chain ONNX Runtime, the image's `C:\runtime\bin`,
+then the target's VC++ runtime. The CPack installers and the portable bundle in
+`dist/windows-<x64|arm64>/bundle` carry that closure, and G6 proves the ORT in each. The MSIX
+ships the bundle's `bin\` whole. `windows-x64.yml` uploads `dist/windows-x64`
+(`AccelerANTgine-windows-x64`) beside the build root's installers.
 
 An error outside every build step now exits 1: it used to be logged and exit 0.
 

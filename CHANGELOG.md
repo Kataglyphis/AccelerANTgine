@@ -50,6 +50,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- 2026-09-25 — **the x64 packages carry the same DLL closure as arm64** (owner
+  decision 2026-09-25; the x64 MSI, ZIP and MSIX were thinner). clangcl-release
+  fills `KATAGLYPHIS_PACKAGE_DLL_DIR`, the hub's `kataglyphis_install_package_dlls`,
+  with `Copy-PeImportClosure` over the engine's exe and DLL, searching the hub's
+  `Get-ProductDllSearchPath` (the chain ONNX Runtime, `C:\runtime\bin`, the
+  target's VC++ runtime), so every CPack installer carries it. The portable
+  bundle and the MSIX, which ships the bundle's `bin\` whole, are built on both
+  arches into `dist/windows-<x64|arm64>`. The x64 MSIX moved from `dist/msix` to
+  `dist/windows-x64/msix`, and `windows-x64.yml` uploads `dist/windows-x64` as
+  `AccelerANTgine-windows-x64`. Needs the hub at the commit that adds
+  `Get-ProductDllSearchPath`; an older pin stops with that commit named.
 - 2026-09-24 — **workflows follow the owner's fleet naming convention**
   (kebab-case files, one file per platform + arch, display names
   `<Platform> <Arch> · <what>`). Renamed: `linux_run.yml` →

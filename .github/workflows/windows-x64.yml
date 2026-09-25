@@ -110,6 +110,16 @@ jobs:
             ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.exe
             ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.zip
 
+      # The product the arm64 lane uploads as dist/windows-arm64, built the same
+      # way (owner decision 2026-09-25): the portable bundle with the engine's DLL
+      # closure, the MSI and ZIP, the MSIX.
+      - name: Upload the x64 product (bundle, packages, MSIX)
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: AccelerANTgine-windows-x64
+          if-no-files-found: error
+          path: ${{ steps.prep.outputs.workspace }}/dist/windows-x64
+
   # CPU-only and container-free: this repo's own Pester suites under
   # scripts/windows/tests. It builds nothing, finishes in minutes and therefore
   # carries no opt-in condition - an invariant that only runs when somebody
