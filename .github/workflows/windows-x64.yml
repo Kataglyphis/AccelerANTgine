@@ -1,3 +1,14 @@
+# .github/workflows/windows-x64.yml
+#
+# The Windows x64 lane: Build-Windows.ps1 builds, tests and packages the three
+# clang-cl configurations in the family image, the runner host then runs each of
+# them (Start-Windows.ps1), and dist/windows-x64 uploads as one artifact, like the
+# arm64 lane's dist/windows-arm64. A thin caller of ANTfrastructure's reusable
+# container-ci-windows.yml (the family's hub reusable lanes, 2026-09-25), which
+# owns the image, the checkout, the container run and the upload; the PowerShell
+# lint and the Pester suites are this repo's own jobs beside it.
+#
+# ALWAYS RUNS, like every lane here: no job-level `if:`.
 name: Windows x64 · build + test
 
 on:
@@ -5,120 +16,78 @@ on:
     branches: ["main", "develop"]
   pull_request:
     branches: ["main", "develop"]
+  workflow_dispatch:
 
-env:
-  BUILD_DIR_RELEASE: "build-clangcl-release"
+permissions:
+  contents: read
 
-defaults:
-  run:
-    shell: pwsh # Set PowerShell as default shell for all steps
+# A superseded run on a feature branch or PR is cancelled; runs on the default
+# branch always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
   build:
+    name: Build, test, package (x64)
+    uses: Kataglyphis/ANTfrastructure/.github/workflows/container-ci-windows.yml@develop
+    with:
+      target-arch: amd64
+      build-script: scripts/windows/Build-Windows.ps1
+      build-args: |
+        -WorkspaceDir
+        C:\ws
+        -BuildTargets
+        clangcl-debug,clangcl-profile,clangcl-release
+      # The container has no desktop, so the host runs what the build synced back
+      # into build-clangcl-<config>: the engine, the test suites and the fuzz test.
+      host-command: |
+        ./scripts/windows/Start-Windows.ps1 -Config Debug -ProjectRoot .
+        ./scripts/windows/Start-Windows.ps1 -Config Profile -ProjectRoot .
+        ./scripts/windows/Start-Windows.ps1 -Config Release -ProjectRoot .
+      artifact-name: AccelerANTgine-windows-x64
+      # The portable bundle with the engine's DLL closure, the MSI, ZIP and NSIS
+      # installers, and the MSIX.
+      artifact-dir: dist/windows-x64
+      # Measured: green runs took up to 78 min (2026-04), and a cold container
+      # build is priced at three hours. 240 still ends a hung step early.
+      timeout-minutes: 240
+    secrets:
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}
+
+  # PowerShell lint: a mandatory parse + AST-trap gate, and PSScriptAnalyzer,
+  # pinned exactly as BeschleunigerBallett and the hub pin it. Its own job, so a
+  # syntax error in scripts\windows\*.ps1 shows in minutes, beside the build
+  # rather than ahead of it.
+  #
+  # -Path points the hub's gate at THIS tree while its PSScriptAnalyzerSettings.psd1
+  # stays resolved against the script's own location, so the ruleset is consumed
+  # by reference. -FailOnAnalyzer is deliberately NOT passed: the step fails on a
+  # parse error or an AST-trap violation, and only PSScriptAnalyzer is advisory,
+  # the hub's documented ramp. Add it once this repo's findings are triaged.
+  lint-powershell:
+    name: PowerShell lint (scripts)
     runs-on: windows-2025
-    # Measured: green runs took up to 78 min (2026-04), and a cold container
-    # build is priced at three hours below. 240 still ends a hung step early.
-    timeout-minutes: 240
-    # Exactly the repository's restricted default (read, measured 2026-09-24).
-    # packages: read backs the `|| github.token` registry fallback below.
+    timeout-minutes: 15
     permissions:
       contents: read
-      packages: read
+    defaults:
+      run:
+        shell: pwsh
     steps:
-
-      # The whole prologue - long paths, checkout, short-path clone, data-root
-      # move, disk cleanup, registry login, pull, disk report - is ANTfrastructure's.
-      #
-      # The short-path clone is not optional here: `submodules: recursive` on the
-      # normal workspace was failing this lane at the CHECKOUT step with
-      # "Filename too long" on the ANTfrastructure -> DocumANTation -> md2pdfLib ->
-      # latex/awesome-beamer chain, so nothing after it ever ran.
-      - name: Prepare Windows container host
-        id: prep
-        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-windows-container-host@develop
+      # Top-level submodules only: the gate is the hub's Invoke-Lint.ps1.
+      - name: Check out
+        uses: actions/checkout@v7.0.1
         with:
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GHCR_PAT || github.token }}
-          fetch-depth: 0
-          short-path-target: /d/ws
+          submodules: true
 
-      # PowerShell lint, ahead of the three-hour container build rather than
-      # after it: a syntax error in scripts\windows\*.ps1 is otherwise
-      # discovered when the container finally reaches that file. Two passes -
-      # a mandatory parse + AST-trap gate, and PSScriptAnalyzer.
-      #
-      # Pinned exactly as BeschleunigerBallett and the hub pin it, so a refresh
-      # of the runner image's preinstalled modules cannot silently change what
-      # this gate reports.
       - name: Install PSScriptAnalyzer
         run: Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
 
-      # -Path is the parameter ANTfrastructure added for exactly this: a consumer
-      # points the gate at ITS tree while the PSScriptAnalyzerSettings.psd1 stays
-      # resolved against the SCRIPT's own location, so the hub's ruleset is
-      # consumed BY REFERENCE and no copy lands here. `scripts` is walked
-      # recursively, covering scripts/windows/ and scripts/windows/tests/.
-      #
-      # working-directory is the short-path clone, like every other step here -
-      # the submodule (and therefore Invoke-Lint.ps1 itself) exists only there.
-      #
-      # -FailOnAnalyzer is deliberately NOT passed and this step deliberately
-      # carries no continue-on-error; they are not the same thing. The step FAILS
-      # on any parse error or AST-trap violation - hard defects. Only the
-      # PSScriptAnalyzer pass is advisory, which is the hub's own documented ramp.
-      # Add -FailOnAnalyzer once this repo's findings are triaged; never reach for
-      # continue-on-error, which would hide the parse gate too.
       - name: Lint PowerShell (parse gate + PSScriptAnalyzer)
-        working-directory: ${{ steps.prep.outputs.workspace }}
         run: >-
           pwsh -NoProfile -File third_party/ANTfrastructure/windows/scripts/Invoke-Lint.ps1
           -Path scripts
-
-      # Every path below is steps.prep.outputs.workspace, NOT github.workspace:
-      # the build tree lives in the short-path clone, and the wrapper scripts
-      # live with it. A relative `.\scripts\...` would resolve against the
-      # submodule-less checkout instead.
-      - name: Build in container via wrapper
-        run: |
-          # CpuCount/MemoryGb only bite under -Isolation hyperv; process
-          # isolation (the default) shares the whole host.
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Invoke-ContainerBuild.ps1" -ProjectRoot "${{ steps.prep.outputs.workspace }}" -CpuCount 32 -MemoryGb 48
-
-      # One script, three configurations: Start-Debug/Profile/Release.ps1 were
-      # the same file with a different build directory and suite list.
-      - name: Run debug build on host
-        run: |
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Windows.ps1" -Config Debug -ProjectRoot "${{ steps.prep.outputs.workspace }}"
-
-      - name: Run profile build on host
-        run: |
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Windows.ps1" -Config Profile -ProjectRoot "${{ steps.prep.outputs.workspace }}"
-
-      - name: Run release build on host
-        run: |
-          & "${{ steps.prep.outputs.workspace }}\scripts\windows\Start-Windows.ps1" -Config Release -ProjectRoot "${{ steps.prep.outputs.workspace }}"
-
-      - name: Upload Installers & Zip (container build)
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: windows-installers-container
-          # The build above ran to completion to get here, so no installer and
-          # no zip is a packaging failure, not a quiet green.
-          if-no-files-found: error
-          path: |
-            ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.msi
-            ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.exe
-            ${{ steps.prep.outputs.workspace }}/${{ env.BUILD_DIR_RELEASE }}/*.zip
-
-      # The product the arm64 lane uploads as dist/windows-arm64, built the same
-      # way (owner decision 2026-09-25): the portable bundle with the engine's DLL
-      # closure, the MSI and ZIP, the MSIX.
-      - name: Upload the x64 product (bundle, packages, MSIX)
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: AccelerANTgine-windows-x64
-          if-no-files-found: error
-          path: ${{ steps.prep.outputs.workspace }}/dist/windows-x64
 
   # CPU-only and container-free: this repo's own Pester suites under
   # scripts/windows/tests. It builds nothing, finishes in minutes and therefore
@@ -132,8 +101,7 @@ jobs:
       contents: read
     steps:
       # `submodules: true` is top-level only, NOT recursive, and that matters
-      # here: recursive checkout is exactly what forces the build job above into
-      # a short-path clone, dying with "Filename too long" on the
+      # here: a recursive checkout dies with "Filename too long" on the
       # ANTfrastructure -> DocumANTation -> md2pdfLib -> latex/awesome-beamer
       # chain. These suites read only ANTfrastructure's own
       # windows/scripts/modules, which arrives at depth 1.
