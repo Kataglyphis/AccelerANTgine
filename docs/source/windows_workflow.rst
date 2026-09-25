@@ -41,6 +41,9 @@ run them directly.
 - ``build-clangcl-debug``
 - ``build-clangcl-profile``
 - ``build-clangcl-release``
+- ``dist\windows-x64`` for the release configuration's products: the portable
+  ``bundle`` (the install tree with the engine's whole DLL closure), the MSI,
+  ZIP and NSIS installers in ``packages``, and the MSIX in ``msix``
 - ``logs`` for container build logs and analysis artifacts
 
 Host-Side Execution
@@ -59,9 +62,12 @@ This script:
 
 - starts the CLI from ``build-clangcl-debug\bin\AccelerANTgine.exe``
 - performs a stable local CLI version check by default
-- runs ``commitTestSuite.exe`` when present
-- runs ``compileTestSuite.exe`` when present
-- reports the presence of ``first_fuzz_test.exe``
+- runs ``commitTestSuite.exe`` and ``compileTestSuite.exe``
+- reports the presence of ``first_fuzz_test.exe`` without running it
+
+A missing or unstartable binary fails the run. For one that exists but will not
+start, the script first walks its imports and names every DLL the loader cannot
+find.
 
 For a host machine that already has a signalling server running, you can opt into
 the older network-dependent smoke test explicitly:
@@ -78,7 +84,7 @@ Profile Run
    .\scripts\windows\Start-Windows.ps1 -Config Profile
 
 This script runs the profile build executable and then executes
-``perfTestSuite.exe`` when available.
+``perfTestSuite.exe``; a missing suite fails the run.
 
 Release Run
 ^^^^^^^^^^^
@@ -87,33 +93,46 @@ Release Run
 
    .\scripts\windows\Start-Windows.ps1 -Config Release
 
-This is the lightest validation path for release artifacts and packaged runtime
-output.
+This is the lightest validation path: the CLI check alone, run from
+``build-clangcl-release\bin`` (the build tree, not the ``dist`` bundle).
 
 Build Script Responsibilities
 -----------------------------
 
 ``scripts/windows/Build-Windows.ps1`` does more than compile:
 
+- formats the CMake and C++ sources in place (``-SkipFormat`` skips both)
 - configures preset-driven builds
+- stages the image's GStreamer DLLs, the chain ONNX Runtime (proved by
+  ANTfrastructure's G6 census) and the toolset's VC++ runtime beside each
+  configuration's binaries
 - runs debug tests with ``ctest``
-- collects LLVM coverage artifacts when available
+- has an LLVM coverage step over ``Test\compile\default.profraw``, which finds
+  nothing today: the ``x64-ClangCL-Windows-Debug`` preset leaves
+  ``myproject_ENABLE_COVERAGE`` off
 - runs ``clang-tidy``
 - runs profile benchmarks
-- builds release packages
-- optionally creates MSIX output
+- builds release packages and the portable bundle in ``dist\windows-x64``
+- optionally creates MSIX output (``-SkipMSIX`` skips it), signed with the first
+  ``*.pfx`` at the repository root and ``MSIX_PFX_PASSWORD`` when there is one,
+  and unsigned with a warning otherwise
 
 CI Note
 -------
 
-The Windows GitHub Actions workflow now follows the same model as local usage:
+CI runs the same script, but not through ``Invoke-ContainerBuild.ps1``.
+``.github/workflows/windows-x64.yml`` is a thin caller of ANTfrastructure's
+reusable ``container-ci-windows.yml``, which bind-mounts the checkout (``D:\ws``
+on the runner, ``C:\ws`` in the container) and runs ``Build-Windows.ps1`` there
+for ``clangcl-debug``, ``clangcl-profile`` and ``clangcl-release``. Its host
+command then runs ``Start-Windows.ps1 -Config Debug|Profile|Release`` on the
+runner host, which has the desktop the container lacks, and
+``dist/windows-x64`` uploads as the ``AccelerANTgine-windows-x64`` artifact. Two
+jobs beside it lint ``scripts/`` (the hub's ``Invoke-Lint.ps1``) and run the
+Pester suites in ``scripts/windows/tests``.
 
-- build inside the Windows container through ``Invoke-ContainerBuild.ps1``
-- pass ``-CpuCount 32 -MemoryGb 48`` — effective only under ``-Isolation
-  hyperv``; the default ``process`` isolation gives the container every host
-  CPU regardless
-- execute ``Start-Windows.ps1 -Config Debug|Profile|Release``
-  on the host after the container build completes
-
-Whether the hosted runner can always satisfy those Docker resource requests still
-depends on the runner environment.
+``.github/workflows/windows-arm64-cross.yml`` calls the same reusable workflow
+for ``clangcl-release`` only, with ``-TargetArch arm64``: a cross build in the
+image's arm64 bundle, graded by the hub's arch gate, whose
+``bundle/bin/AccelerANTgine.exe`` then runs on GitHub's ``windows-11-arm``
+runner.

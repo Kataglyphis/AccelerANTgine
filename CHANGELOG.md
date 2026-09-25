@@ -192,6 +192,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-25 — **README, AGENTS.md and the Sphinx pages match the tree again.**
+  What a reader would have hit: the README said to run
+  `cmake --build --preset <name> .` from inside `build/`, which the image's
+  CMake 4.4.3 refuses with `Unknown argument .`; its Windows example passed an
+  absolute `-LogDir`, which `Build-Windows.ps1` joins onto the workspace;
+  AGENTS.md put `knt_push_frame` in this repo's C API, which holds only
+  `kataglyphis_add` (the plugin exports `knt_push_frame` itself).
+  Also corrected: the Renovate notes (the default is every manager the tree has,
+  and `--apply` rewrites manifests and locks too, since hub d04631ed), `.clang-tidy`
+  listed as a shared config (`.antfrastructure-shared.manifest` keeps it local),
+  `Build-PythonBindings.ps1` said to run tests it does not run, and the Windows
+  CI page, which still described the lane before `container-ci-windows.yml`.
 - 2026-09-24 — **the docs step renders the test results itself, and for the first
   time.** Run 36052807549 passed build and tests, then died in `ci-docs.sh` at
   `Installing pandoc via apt` → `This script requires sudo or root`. The image has

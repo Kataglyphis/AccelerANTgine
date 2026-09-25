@@ -2,7 +2,7 @@ Overview
 ========
 
 AccelerANTgine provides a native C++ inference library, C API bindings,
-and CLI tooling.
+Python bindings (nanobind), and CLI tooling.
 
 The API reference is generated from Doxygen XML via Breathe/Exhale and published
 under the API section.
@@ -15,9 +15,12 @@ Project Layout
 - ``Test/commit``: broader debug-mode test suite intended for regular validation
 - ``Test/fuzz``: fuzz targets enabled for debug Clang builds on Linux and Windows
 - ``Test/perf``: benchmark suite built in ``RelWithDebInfo`` profile builds
+- ``Bindings/python``: the ``kataglyphis_inference`` Python module, tested by
+  ``Test/python``
 - ``docs/source``: Sphinx content and generated API integration points
 - ``scripts/linux``: Linux CI orchestration scripts
-- ``scripts/windows``: Windows container build wrapper and host-side run scripts
+- ``scripts/windows``: the Windows build script, its container wrappers and the
+  host-side run script
 
 Build Matrix Summary
 --------------------
@@ -30,9 +33,12 @@ GitHub workflows.
   ``.github/workflows/reusable-linux.yml``
 - Linux runs execute build, tests, coverage, static analysis, docs, benchmarks,
   and release packaging inside the container image
-- Windows builds run through ``.github/workflows/windows-x64.yml``
-- Windows local development builds are done inside the container, while runtime
-  execution is done on the host through PowerShell wrappers
+- Windows x64 builds run through ``.github/workflows/windows-x64.yml`` and the
+  arm64 cross build through ``.github/workflows/windows-arm64-cross.yml``, both
+  thin callers of ANTfrastructure's reusable ``container-ci-windows.yml``
+- Windows builds are done inside the container, while runtime execution is done
+  on a host through PowerShell (``Start-Windows.ps1`` for x64; the arm64 product
+  runs on GitHub's ``windows-11-arm`` runner)
 
 Test Suite Selection
 --------------------
