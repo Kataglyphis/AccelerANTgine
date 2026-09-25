@@ -1,6 +1,10 @@
 # do not track user specific vcpkg things
 CMakeUserPresets.json
 
+# The MSIX signing certificate lives at the repository root (Build-Windows.ps1's
+# MSIX step signs with it); a private key must never be committed.
+*.pfx
+
 .flatpak-builder
 *.AppImage
 .cache
