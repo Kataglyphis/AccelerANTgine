@@ -54,7 +54,7 @@ jobs:
       # copy of the retry loop, so the retry count and per-attempt timeout live
       # in one place for every repo instead of drifting per workflow.
       - name: Prepare CI host
-        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-linux-ci-host@main
+        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-linux-ci-host@develop
         with:
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GHCR_PAT }}
@@ -70,7 +70,7 @@ jobs:
       # an action's own run block does not inherit the CALLER STEP's env, only
       # the job's.
       - name: Run build/test/docs/package inside container
-        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@main
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
         with:
           # CARGO_HOME muss auf einen SCHREIBBAREN Pfad zeigen. Der Image-Default
           # ist /usr/local/cargo und gehoert root, waehrend der Container als
@@ -125,7 +125,7 @@ jobs:
       # refusal): third_party/ANTfrastructure/docs/ftp-deploys.md.
       - name: Sync files to domain
         if: inputs.runner == 'ubuntu-26.04' && inputs.compiler == 'clang'
-        uses: Kataglyphis/ANTfrastructure/.github/actions/deploy-over-ftp@main
+        uses: Kataglyphis/ANTfrastructure/.github/actions/deploy-over-ftp@develop
         with:
           server: ${{ secrets.SERVER }}
           username: ${{ secrets.USERNAME }}

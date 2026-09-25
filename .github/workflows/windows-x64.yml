@@ -35,7 +35,7 @@ jobs:
       # latex/awesome-beamer chain, so nothing after it ever ran.
       - name: Prepare Windows container host
         id: prep
-        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-windows-container-host@main
+        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-windows-container-host@develop
         with:
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GHCR_PAT || github.token }}
@@ -139,7 +139,7 @@ jobs:
       # (TotalCount == 0 -> exit 1), so this cannot go green over an empty
       # directory.
       - name: Run Pester suites (pinned 3.4.0)
-        uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@main
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@develop
         with:
           path: scripts/windows/tests
           version: '3.4.0'
