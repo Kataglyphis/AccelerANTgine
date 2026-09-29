@@ -21,7 +21,6 @@ scripts/linux/ci-common.sh	#!/usr/bin/env bash
 scripts/linux/ci-docs.sh	#!/usr/bin/env bash
 scripts/linux/ci-profile-bench.sh	#!/usr/bin/env bash
 scripts/linux/ci-release.sh	#!/usr/bin/env bash
-scripts/linux/ci-run-all.sh	# clang links against the image's source-built GCC, and BOTH
 scripts/linux/lib/antfrastructure.sh	# Replace this process with a ANTfrastructure driver, forwar
 scripts/linux/renovate-local.sh	#!/usr/bin/env bash
 scripts/linux/run-lint-gates.sh	#!/usr/bin/env bash
