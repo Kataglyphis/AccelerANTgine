@@ -5,6 +5,7 @@ on:
     branches: ["main", "develop"]
   pull_request:
     branches: ["main", "develop"]
+  workflow_dispatch:
 
 # The ceiling for the nested reusable-linux.yml job, which asks for exactly
 # this; a narrower grant here makes it refuse to start.

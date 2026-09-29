@@ -122,9 +122,10 @@ jobs:
             build-release/*.flatpak
 
       # The family's one FTP policy (upstream pin, permission fixup, empty-tree
-      # refusal): third_party/ANTfrastructure/docs/ftp-deploys.md.
+      # refusal): third_party/ANTfrastructure/docs/ftp-deploys.md. A manual
+      # dispatch (any branch) never deploys.
       - name: Sync files to domain
-        if: inputs.runner == 'ubuntu-26.04' && inputs.compiler == 'clang'
+        if: inputs.runner == 'ubuntu-26.04' && inputs.compiler == 'clang' && github.event_name != 'workflow_dispatch'
         uses: Kataglyphis/ANTfrastructure/.github/actions/deploy-over-ftp@develop
         with:
           server: ${{ secrets.SERVER }}
