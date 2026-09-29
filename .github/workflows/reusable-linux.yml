@@ -64,8 +64,8 @@ jobs:
           submodules: recursive
 
       # The compiler cache outlives the container: sccache for the clang presets,
-      # ccache for GCC (the hub's Cache.cmake forces it). Only pushes save, so PR
-      # and dispatch runs spend no quota.
+      # ccache for GCC (the hub's Cache.cmake forces it). Only pushes to develop
+      # save, so PR, dispatch and release runs spend no quota.
       - name: Restore compiler cache
         id: cc
         uses: Kataglyphis/ANTfrastructure/.github/actions/compiler-cache-restore@develop
