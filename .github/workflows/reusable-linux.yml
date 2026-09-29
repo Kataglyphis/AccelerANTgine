@@ -62,21 +62,13 @@ jobs:
           submodules: recursive
 
       # The compiler cache outlives the container: sccache for the clang presets,
-      # ccache for GCC (the hub's Cache.cmake forces it). The image's cache dirs
-      # are mounted from this runner dir. Keyed per run, restored from the newest;
-      # only pushes (main/develop) save, so PR and dispatch runs cost no quota.
+      # ccache for GCC (the hub's Cache.cmake forces it). Only pushes save, so PR
+      # and dispatch runs spend no quota.
       - name: Restore compiler cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cc
+        uses: Kataglyphis/ANTfrastructure/.github/actions/compiler-cache-restore@develop
         with:
-          path: ${{ runner.temp }}/compiler-cache
-          key: compiler-cache-${{ inputs.arch }}-${{ inputs.compiler }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: compiler-cache-${{ inputs.arch }}-${{ inputs.compiler }}-
-
-      - name: Prepare compiler cache dirs
-        run: |
-          mkdir -p "${{ runner.temp }}/compiler-cache/sccache" "${{ runner.temp }}/compiler-cache/ccache"
-          chmod -R a+rwX "${{ runner.temp }}/compiler-cache"
-          du -sh "${{ runner.temp }}/compiler-cache"/*
+          key: ${{ inputs.arch }}-${{ inputs.compiler }}
 
       #################################################################################################################
       ######################################## Prepare deps ###########################################################
@@ -102,9 +94,7 @@ jobs:
           extra-args: >-
             --privileged --platform ${{ inputs.platform }}
             -e CARGO_HOME=/tmp/cargo
-            -v ${{ runner.temp }}/compiler-cache/sccache:/var/cache/sccache
-            -v ${{ runner.temp }}/compiler-cache/ccache:/var/cache/ccache
-            -e SCCACHE_CACHE_SIZE=2G -e CCACHE_MAXSIZE=2G
+            ${{ steps.cc.outputs.docker-args }}
           script: >-
             bash -lc 'set -e; bash scripts/linux/ci-run-all.sh
             --compiler "${{ inputs.compiler }}"
@@ -127,11 +117,10 @@ jobs:
             --release-flatpak-out-dir ""'
 
       - name: Save compiler cache
-        if: always() && github.event_name == 'push'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always()
+        uses: Kataglyphis/ANTfrastructure/.github/actions/compiler-cache-save@develop
         with:
-          path: ${{ runner.temp }}/compiler-cache
-          key: compiler-cache-${{ inputs.arch }}-${{ inputs.compiler }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ inputs.arch }}-${{ inputs.compiler }}
 
       - name: Upload Linux Packages (Clang only)
         if: ${{ inputs.compiler == 'clang' }}
