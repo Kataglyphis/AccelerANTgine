@@ -11,6 +11,8 @@ on:
 permissions:
   contents: read
   packages: read
+  # compiler-cache-save deletes its key's older cache entries.
+  actions: write
 
 jobs:
   build-ubuntu26_04_gcc-arm:

@@ -43,6 +43,8 @@ jobs:
     permissions:
       contents: read
       packages: read
+      # compiler-cache-save deletes this key's older cache entries.
+      actions: write
     defaults:
       run:
         shell: bash
