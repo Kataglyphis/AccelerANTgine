@@ -22,34 +22,6 @@ set(WINDOWS_CI
 set(RUST_FEATURES
     ON
     CACHE BOOL "Enable Rust features in our project.")
-set(MYPROJECT_GCC_TOOLCHAIN_PATH
-    ""
-    CACHE PATH "Optional GCC toolchain root used by Clang and Rust tooling on Linux (for example /opt/gcc-15.2.0)")
-
-# Auto-detect custom GCC toolchain for Clang on Linux to avoid workflow env setup
-if(UNIX
-   AND NOT APPLE
-   AND MYPROJECT_GCC_TOOLCHAIN_PATH
-   AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(_GCC_TOOLCHAIN_ROOT "${MYPROJECT_GCC_TOOLCHAIN_PATH}")
-  set(_GCC_TOOLCHAIN_LIB "${_GCC_TOOLCHAIN_ROOT}/lib64")
-  if(NOT EXISTS "${_GCC_TOOLCHAIN_LIB}")
-    set(_GCC_TOOLCHAIN_LIB "${_GCC_TOOLCHAIN_ROOT}/lib")
-  endif()
-
-  if(EXISTS "${_GCC_TOOLCHAIN_LIB}")
-    message(STATUS "Using GCC toolchain at ${_GCC_TOOLCHAIN_ROOT} for Clang")
-    string(APPEND CMAKE_C_FLAGS " --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
-    string(APPEND CMAKE_CXX_FLAGS " --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
-    string(APPEND CMAKE_EXE_LINKER_FLAGS
-           " -L${_GCC_TOOLCHAIN_LIB} -Wl,-rpath,${_GCC_TOOLCHAIN_LIB} --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
-    string(APPEND CMAKE_SHARED_LINKER_FLAGS
-           " -L${_GCC_TOOLCHAIN_LIB} -Wl,-rpath,${_GCC_TOOLCHAIN_LIB} --gcc-toolchain=${_GCC_TOOLCHAIN_ROOT}")
-  else()
-    message(WARNING "GCC toolchain found at ${_GCC_TOOLCHAIN_ROOT}, but no lib or lib64 dir exists.")
-  endif()
-endif()
-
 if(RUST_FEATURES)
   message(STATUS "Rust features are enabled.")
   if(MSVC)
@@ -89,8 +61,9 @@ set(KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_par
 # deep inside ProjectOptions instead of a message naming the real cause.
 if(NOT EXISTS "${KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR}/CompilerWarnings.cmake")
   message(
-    FATAL_ERROR "ANTfrastructure submodule not checked out: ${KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR} has no CMake modules. "
-                "Run: git submodule update --init --recursive")
+    FATAL_ERROR
+      "ANTfrastructure submodule not checked out: ${KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR} has no CMake modules. "
+      "Run: git submodule update --init --recursive")
 endif()
 list(
   APPEND

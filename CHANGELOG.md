@@ -197,6 +197,26 @@ belongs in the **Changed** list below with that consequence spelled out.
   `load_project_metadata` and `ensure_flatpak_tools` stayed: nothing upstream
   reads `CMakeCache.txt`, and the apt/`AUTO_INSTALL_FLATPAK` knob is for a dev
   box the hub's container helper does not serve.
+- 2026-09-29 — **the injected `--gcc-toolchain` and the compiler-LLVM-tools
+  lookup, both retired by the image** (hub BACKLOG CON37). `:latest` of
+  2026-09-29 (index `sha256:696642b2…`) lets a bare `clang`/`clang++` select
+  `/opt/gcc-16.2.0` through `<native-triple>-clang{,++}.cfg` (hub CON16) and
+  puts clang's own LLVM 23 `clang-tidy`/`llvm-profdata`/`llvm-cov` on PATH
+  (CON15). Gone: `MYPROJECT_GCC_TOOLCHAIN_PATH` and its `--gcc-toolchain`/
+  `-L`/`-rpath` block in `CMakeLists.txt`, the same flag in `Src/CMakeLists.txt`'s
+  corrosion `CXXFLAGS` (cxx's `cc` build passes `--target=<native triple>`,
+  which loads the same cfg), `ci-run-all.sh`'s `export_clang_gcc_toolchain_env`
+  call, and `ci-common.sh`'s `compiler_llvm_tool`/`use_compiler_llvm_tools`
+  with their callers in `ci-coverage.sh` and `run-static-analysis-format.sh`.
+  `clang-format` stays 21. Measured in the published amd64 child
+  (`sha256:e1bc35af…`), CI's clang arguments: no `--gcc-toolchain` on any
+  command line, ctest 6/6 and 4/4, 10 profiles merged, cmake-format,
+  clang-format, scan-build and clang-tidy (18 files) ok, and tar.gz, deb,
+  AppImage and flatpak built. The x64 gcc job's link failure
+  (`R_X86_64_TPOFF32` against nlohmann's `nesting_depth` in
+  `config_loader.cpp.o`) is older than this change and unchanged by it. The
+  AGENTS.md pitfall about arm64's missing libsanitizer went too: run
+  36568033223 was green on this image.
 
 ### Fixed
 

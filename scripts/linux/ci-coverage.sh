@@ -70,11 +70,8 @@ else
   [[ -f "${BUILD_DIR}/${COVERAGE_OBJECT}" ]] \
     || die "Coverage object '${BUILD_DIR}/${COVERAGE_OBJECT}' not found - the instrumented build did not produce the library."
 
-  # The hub's coverage_llvm_report calls llvm-profdata and llvm-cov by bare name,
-  # and the image's PATH copies are LLVM 21, which refuses clang 23's raw profile
-  # format 11 (ci-common.sh, compiler_llvm_tool). Nothing else runs after this,
-  # so the swap need not be scoped.
-  use_compiler_llvm_tools "${BUILD_DIR}" llvm-profdata llvm-cov
+  # clang's own LLVM 23 pair (the image's PATH since hub CON15): an older
+  # llvm-profdata refuses clang 23's raw profile format 11.
   require_tools llvm-profdata llvm-cov
 
   # coverage_llvm_report takes ONE profile path. llvm-profdata merge accepts an

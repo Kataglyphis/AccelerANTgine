@@ -54,24 +54,9 @@ if(RUST_FEATURES)
       CXXFLAGS=/EHsc)
   else()
     # Native-only corrosion/toolchain setup (no cross-building).
-    if(NOT DEFINED MYPROJECT_GCC_TOOLCHAIN_PATH)
-      set(MYPROJECT_GCC_TOOLCHAIN_PATH
-          ""
-          CACHE PATH "Optional GCC toolchain root")
-    endif()
-
-    # For Clang, optionally point to a GCC toolchain for libstdc++/headers.
-    set(_gcc_toolchain_root "")
-    if(MYPROJECT_GCC_TOOLCHAIN_PATH AND EXISTS "${MYPROJECT_GCC_TOOLCHAIN_PATH}")
-      set(_gcc_toolchain_root "${MYPROJECT_GCC_TOOLCHAIN_PATH}")
-    elseif(DEFINED MYPROJECT_GCC_TOOLCHAIN_PATH_DEFAULT AND EXISTS "${MYPROJECT_GCC_TOOLCHAIN_PATH_DEFAULT}")
-      set(_gcc_toolchain_root "${MYPROJECT_GCC_TOOLCHAIN_PATH_DEFAULT}")
-    endif()
-
+    # A bare clang++ finds the image's GCC by itself (its
+    # <native-triple>-clang++.cfg), cc-rs' --target=<native triple> included.
     set(RUST_CXXFLAGS "-fexceptions")
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND _gcc_toolchain_root)
-      set(RUST_CXXFLAGS "--gcc-toolchain=${_gcc_toolchain_root} ${RUST_CXXFLAGS}")
-    endif()
     if(DEFINED ENV{CXXFLAGS}
        AND NOT
            "$ENV{CXXFLAGS}"
