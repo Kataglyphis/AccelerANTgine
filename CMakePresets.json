@@ -28,7 +28,7 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "COMPILER_CACHE": ""
+        "COMPILER_CACHE": "sccache"
       }
     },
     {
@@ -89,7 +89,7 @@
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "RUST_FEATURES": "OFF",
-        "COMPILER_CACHE": ""
+        "COMPILER_CACHE": "sccache"
       },
       "condition": {
         "type": "equals",
