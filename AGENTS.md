@@ -57,7 +57,7 @@ not here:
 
 | Script | Upstream driver |
 | --- | --- |
-| `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism). It still carries its own `compiler_llvm_tool` and `use_compiler_llvm_tools` (§ 4), which the hub took over as `linux/scripts/lib/compiler-llvm-tools.sh` on 2026-09-24 |
+| `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism) |
 | `scripts/linux/ci-coverage.sh` | `linux/scripts/lib/coverage.sh` — gcovr for GCC, llvm-cov for clang |
 | `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh`, every analysis run through `01-core/gates.sh` (`run_gate` … `assert_gates`) with its tools `require_tools`'d rather than skipped — no tool, no green lane (the file header names the rule and its owner) |
 | `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |
@@ -246,19 +246,20 @@ written out rather than linked.
   `Test/` suites are placeholders that never call the library.
   `linux-debug-GNU` does not set the option, so the GCC lane's gcovr step
   reports `0 out of 0` lines.
-- **Every LLVM tool that reads clang's output must be the compiler's own.** The
-  image's `clang`/`clang++` are a source-built LLVM 23 (`/usr/local/llvm-target`),
-  but bare `clang-tidy`, `llvm-profdata` and `llvm-cov` on PATH are Ubuntu's
-  LLVM 21: `llvm-profdata` refuses clang 23's raw profile format 11 (`no profile
-  can be merged`), and `clang-tidy` fails all 18 `Src/` files on the module
-  PCMs the build wrote (`module file … uses a newer format that cannot be
-  read`). `ci-common.sh`'s `use_compiler_llvm_tools` asks the configured
-  compiler (`-print-prog-name`) and puts its directory first on PATH:
-  `ci-coverage.sh` for the profile pair, `run-static-analysis-format.sh` for
-  `clang-tidy` only, in a subshell, so `clang-format`'s version — a format
-  verdict of its own — does not move with it. The image-side fix is upstream:
-  the hub's `register-llvm-alternatives.sh` registers only `clang`, `clang++`,
-  `llvm-ar` and `llvm-ranlib`.
+- **Every LLVM tool that reads clang's output must be the compiler's own.**
+  On Linux the image does that now: `clang-tidy`, `llvm-profdata`, `llvm-cov`
+  and the rest on PATH are clang's LLVM 23 (hub CON15, `:latest` of 2026-09-29),
+  so `ci-coverage.sh` and `run-static-analysis-format.sh` call them by bare name.
+  An older image put Ubuntu's LLVM 21 there, which refuses clang 23's raw
+  profile format 11 (`no profile can be merged`) and its module PCMs (`module
+  file … uses a newer format that cannot be read`); should either message come
+  back, it is an image regression, not something to paper over here again.
+  `clang-format` stays 21 on purpose — a format verdict of its own.
+  The same image lets a bare `clang`/`clang++` select `/opt/gcc-16.2.0` through
+  the `<native-triple>-clang{,++}.cfg` beside the compiler (hub CON16), so
+  neither CMake nor `ci-run-all.sh` injects `--gcc-toolchain` any more; the
+  cxx crate's `cc` build passes `--target=<native triple>`, which loads the
+  same file.
   Windows has the same trap with a different pair: the image compiles with its
   patched LLVM (`C:/llvm-patched/bin/clang-cl.exe`, built `clang;lld` only), so
   the `clang-tidy` on PATH is scoop's, and it refuses the BMIs with `module file
@@ -291,17 +292,6 @@ written out rather than linked.
   profile still needs `linux-perf` in the image, an ANTfrastructure change, and
   with no consumer attached the producer mostly idles: 150 to 230 samples in a
   20 s window were measured, not a hot loop.
-- **`linux-arm64.yml`'s gcc job is red at build time, and not because of this
-  repo.** `linux-debug-GNU` is a Debug build, which turns ASan on
-  (`cmake/ProjectOptions.cmake`); abseil then includes
-  `sanitizer/common_interface_defs.h`, and the image's native aarch64 GCC
-  (`/opt/gcc-16.2.0`) ships no libsanitizer, so the build dies on that header
-  (every ARM run since 32168022135 that got as far as compiling, 35921977310
-  included). The fix is the image's: hub e2de5852 makes ANTfrastructure's GCC
-  build ship libsanitizer for a native GCC (hub BACKLOG CON7;
-  `docs/cross-build-verification.md` § *The native GCC ships libsanitizer*).
-  It is in hub source and in no published `:latest` yet (hub BACKLOG CON11), so
-  a green `linux-arm64.yml` waits for that image whatever the clang lanes do.
 
 ## 5. Build, run, test
 
