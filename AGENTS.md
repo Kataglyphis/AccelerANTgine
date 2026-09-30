@@ -51,6 +51,7 @@ reorganisation.
 | clang-format / clang-tidy / cmake-format and the canonical configs | `docs/code-quality-tooling.md` |
 | Job counts, per-job memory, why a build got OOM-killed | `docs/build-parallelism-memory-tuning.md` |
 | The five shell-safety bug classes | `third_party/ANTfrastructure/AGENTS.md` § *Shell safety conventions* |
+| Code comments: one line, only the why; API docs short; gated | `third_party/ANTfrastructure/AGENTS.md` § *Comments: one line, only the why* |
 
 **These scripts are wrappers, not implementations** — change behaviour upstream,
 not here:

@@ -1,9 +1,6 @@
 #requires -Version 7.0
 
-# Prints the Windows entry points. This was Start-Help.ps1, a name that suggested
-# it launched something; it only reports. Keep this listing in step with
-# scripts/windows/ - it is the first thing a newcomer reads, and AGENTS.md
-# section 5 is the other copy.
+# Prints the Windows entry points; keep it in step with scripts/windows/ and AGENTS.md section 5.
 
 Write-Host "=== AccelerANTgine Run Scripts ===" -ForegroundColor Cyan
 Write-Host ""

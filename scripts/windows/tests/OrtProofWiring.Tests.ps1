@@ -1,11 +1,6 @@
 #requires -Version 7.0
 
-# The chain ONNX Runtime staging and the G6 proof of every staged bin\, install tree, MSIX payload and
-# the Python package are the hub's WindowsOrtPayload.Common since 2026-09-25; its suite,
-# OrtPayload.Common.Tests.ps1, holds the cases this repo's WindowsOrtBundle.Common carried. What stays
-# here is how Build-Windows.ps1 wires the proof into the release.
-# NOTE: written for Pester 3.4.0 (what the Windows lane pins) - no BeforeAll
-# outside Describe, dash-less Should, and no `Should Throw` under pwsh 7.
+# How Build-Windows.ps1 wires the hub's G6 proof in; Pester 3.4.0 syntax (dash-less Should, no `Should Throw` under pwsh 7).
 
 Describe 'ONNX Runtime proof wiring' {
 

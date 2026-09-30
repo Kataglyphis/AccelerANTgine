@@ -1,6 +1,4 @@
-# Python bindings for AccelerANTgine (nanobind).
-# Only entered when KATAGLYPHIS_BUILD_PYTHON_BINDINGS is ON — nanobind and
-# find_package(Python) are set up in third_party/CMakeLists.txt.
+# Python bindings (nanobind); nanobind and find_package(Python) are set up in third_party/CMakeLists.txt.
 
 option(KATAGLYPHIS_PYTHON_STUBS "Generate .pyi stubs for the Python bindings" ON)
 
@@ -9,21 +7,15 @@ nanobind_add_module(kataglyphis_python NB_STATIC kataglyphis_bindings.cpp)
 set_target_properties(
   kataglyphis_python
   PROPERTIES OUTPUT_NAME "_core"
-             # The binding TU imports the project's C++ modules (.ixx); the
-             # global scan switch is OFF for clang-cl, so opt in per-target
-             # exactly like the CLI target does.
+             # The TU imports the project's modules, and the global scan switch is OFF for clang-cl.
              CXX_SCAN_FOR_MODULES ON
-             # On ELF platforms the extension must find the core shared
-             # library sitting next to it inside the package directory.
+             # On ELF the extension must find the core shared library next to it in the package.
              BUILD_RPATH "$ORIGIN"
              INSTALL_RPATH "$ORIGIN")
 
 target_compile_features(kataglyphis_python PRIVATE cxx_std_23)
 
-# NOTE: deliberately no myproject_warnings here — nanobind's headers are not
-# warning-clean under the project's warning set. myproject_options flags still
-# arrive transitively via AccelerANTgine's PUBLIC link, which keeps
-# the BMI-relevant flags (/EHs, sanitizers) consistent with the imported BMIs.
+# No myproject_warnings: nanobind's headers are not warning-clean; the BMI-relevant options still arrive via PUBLIC.
 target_link_libraries(kataglyphis_python PRIVATE AccelerANTgine)
 
 # --- Stage an importable package into <build>/python/kataglyphis_inference ---
@@ -55,8 +47,7 @@ if(KATAGLYPHIS_PYTHON_STUBS)
     kataglyphis_python)
 endif()
 
-# --- Wheel install rules (scikit-build-core selects the python_bindings
-# component; the project's regular install tree is untouched) ----------------
+# --- Wheel install rules (scikit-build-core installs only the python_bindings component) ---
 install(
   TARGETS kataglyphis_python
   LIBRARY DESTINATION kataglyphis_inference COMPONENT python_bindings

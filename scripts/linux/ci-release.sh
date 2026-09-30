@@ -1,60 +1,12 @@
 #!/usr/bin/env bash
-# ci-release.sh - project wrapper around ANTfrastructure's CMake and packaging
-# libraries.
-#
-# WHAT COMES FROM UPSTREAM NOW:
-#   * linux/scripts/lib/cmake-build.sh    - the container environment repair
-#     (git safe.directory, the CCACHE_SECONDARY_STORAGE-is-not-a-URL fix,
-#     writable CARGO_HOME/SCCACHE_DIR/CCACHE_DIR) and the memory-aware job count.
-#     This file used to call compute_jobs_with_mem_cap itself and export
-#     CMAKE_BUILD_PARALLEL_LEVEL; it does neither now.
-#     AND THE CONFIGURE LINE, as of 2015e12f: --configure-arg is repeatable and
-#     order-preserving and reaches the configure step only, so the block this
-#     header used to describe - parse_args / prepare_env / run with the configure
-#     step skipped, plus a hand-written `cmake -B ... --preset` carrying the two
-#     -D flags this lane needs - is one cmake_build_main call. The local tree
-#     wipe went back to --clean-build-dir true with it: cmake_build_run cleans
-#     BEFORE it configures, which is the order that made a local configure unsafe.
-#   * linux/scripts/lib/app-packaging.sh  - the flatpak architecture mapping,
-#     the "an artifact that is missing or empty is not a success" assertion, and
-#     as of 0e054bbd THE WHOLE FLATPAK BUNDLE: app_packaging_ensure_flatpak_runtime
-#     and app_packaging_package_cmake_install_flatpak are the cmake-install twin
-#     this header used to say did not exist. Two deliberate differences from the
-#     local pair they replace, both improvements this lane wants:
-#       - staging is CONTAINER-NATIVE (KATAGLYPHIS_FLATPAK_WORKDIR, default
-#         /tmp/flatpak-work) and only the finished bundle is copied to <out_dir>.
-#         The local version staged under <build_dir>/flatpak, which on a mounted
-#         Windows workspace is a bind mount, and everything flatpak touches wants
-#         fchmod - which a bind mount refuses;
-#       - OSTREE decides, not flatpak-builder's exit code. A complete export can
-#         exit non-zero on a late chmod, and a zero exit can leave an empty repo;
-#         the local version believed the exit code for both.
-#   * linux/scripts/01-core/tool-checks.sh - has_tool, which replaced a local
-#     require_cmd that reported only the first missing tool. require_tools came
-#     with it and has no caller left in this file: both functions that used it
-#     are the ones app-packaging.sh owns now.
-#   * FLATPAK_RUNTIME_VERSION - a hub pin in 01-core/versions.env, already
-#     exported by the time ci-common.sh returns. The literal 24.08 that used to
-#     sit at the top of this file is gone: it drifted from the pin silently.
-#
-# WHAT IS STILL LOCAL, AND WHY:
-#   * load_project_metadata. The hub packager takes the project name and the
-#     version suffix as ARGUMENTS and nothing upstream reads CMakeCache.txt, so
-#     this stays - as does the fallback chain (cache, then the short git sha,
-#     then "unknown"), which is this project's naming convention and not a
-#     packaging concern.
-#   * ensure_flatpak_tools' apt/AUTO_INSTALL knob. The hub's container helper
-#     assumes an image that already ships the packaging prerequisites and runs
-#     apt through a privilege helper; this script is also run on a dev box.
+# ci-release.sh - release build, CPack and Flatpak over ANTfrastructure's cmake-build.sh and app-packaging.sh.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
-# literal: it resolves under ANTFRASTRUCTURE_DIR and fails naming the probed path
-# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+# antfrastructure_source (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override.
 antfrastructure_source linux/scripts/01-core/tool-checks.sh
 antfrastructure_source linux/scripts/lib/cmake-build.sh
 antfrastructure_source linux/scripts/lib/app-packaging.sh
@@ -76,8 +28,7 @@ AUTO_INSTALL_FLATPAK="1"
 FLATPAK_ARCH=""
 APP_ID="org.kataglyphis.accelerantgine"
 
-# Not defaulted here on purpose - see the header. A hub that stopped publishing
-# the pin must fail loudly rather than fall back to a number nobody maintains.
+# Not defaulted: a hub that stopped publishing the pin must fail, not fall back to a stale number.
 [[ -n "${FLATPAK_RUNTIME_VERSION:-}" ]] ||
   die "FLATPAK_RUNTIME_VERSION is unset: ANTfrastructure linux/scripts/01-core/versions.env no longer publishes it."
 
@@ -137,10 +88,7 @@ load_project_metadata() {
   PROJECT_NAME_META="${project_name}"
   VERSION_SUFFIX_META="${project_version:-${git_sha:-unknown}}"
 }
-# Deliberately NOT the hub's app_packaging_setup_dependencies_for_container: that
-# one assumes the CI image already ships flatpak/flatpak-builder and installs
-# through a privilege helper. This script also runs on a dev box, where the
-# AUTO_INSTALL_FLATPAK knob and plain sudo apt are the right answer.
+# Not the hub's container helper: this also runs on a dev box, where AUTO_INSTALL_FLATPAK and sudo apt apply.
 ensure_flatpak_tools() {
   local -a missing_cmds=()
   if ! has_tool flatpak-builder; then
@@ -266,16 +214,7 @@ fi
 
 info "Building release with preset: ${CLANG_RELEASE_PRESET}"
 
-# ONE call now, where parse_args / prepare_env / run plus a hand-written
-# `cmake -B ... --preset` used to sit. --clean-build-dir is true again because
-# cmake_build_run cleans BEFORE it configures; the false plus a local wipe
-# existed only because the configure was issued down here. The lane still starts
-# from nothing, so the behaviour is unchanged.
-#
-# The two --configure-arg flags reach the CONFIGURE step only, in order, and are
-# NOT forwarded to `cmake --build`. CMAKE_BUILD_SAFE_DIRECTORY is set first
-# because cmake_build_main runs cmake_build_prepare_env, whose /workspace default
-# is wrong on a dev box: load_project_metadata's `git rev-parse` would refuse it.
+# The /workspace safe.directory default is wrong on a dev box, where `git rev-parse` would then refuse.
 CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
 cmake_build_main \
   --preset "${CLANG_RELEASE_PRESET}" \
@@ -296,18 +235,11 @@ if [[ "${DO_FLATPAK}" -eq 1 ]]; then
     warn "Skipping Flatpak build (required tools are unavailable)."
     warn "Install flatpak + flatpak-builder or run with --no-flatpak to suppress this warning."
   else
-    # The project name and the version suffix are ARGUMENTS to the hub packager,
-    # so the metadata read that used to sit inside build_flatpak happens here.
     load_project_metadata "${BUILD_RELEASE_DIR}"
-    # Not folded into the packager upstream, and deliberately so: installing a
-    # runtime is a side effect on the machine, and a caller that manages its own
-    # runtimes must be able to skip it.
+    # A separate step: installing a runtime changes the machine, so a caller must be able to skip it.
     app_packaging_ensure_flatpak_runtime \
       "${FLATPAK_ARCH}" "${FLATPAK_RUNTIME}" "${FLATPAK_SDK}" "${FLATPAK_RUNTIME_VERSION}"
-    # FLATPAK_ARCH is passed RAW, empty included. Empty means "this machine",
-    # which is what the local packager always did - it never passed --arch to
-    # flatpak-builder at all. Passing the RESOLVED arch instead would start
-    # pinning every default build to a spelling nobody asked for.
+    # FLATPAK_ARCH stays raw: empty means "this machine", with no --arch pinned.
     app_packaging_package_cmake_install_flatpak \
       "${BUILD_RELEASE_DIR}" "${FLATPAK_OUT_DIR}" "${APP_ID}" \
       "${PROJECT_NAME_META}" "${VERSION_SUFFIX_META}" \

@@ -1,27 +1,11 @@
-# This project's build POLICY: which options exist, what they default to, and
-# how the reusable modules are composed.
-#
-# The shared mechanism - the core option list and the per-target dispatch that
-# this file and BeschleunigerBallett/cmake/ProjectOptions.cmake had drifted into
-# near-copies of - was hoisted to ANTfrastructure on 2026-09-09 as
-# ProjectOptionsCommon and is included by name off CMAKE_MODULE_PATH (see the
-# top of the root CMakeLists.txt).
-#
-# What stays here is what another project would NOT want copied: the sanitizer
-# default policy (Debug-only UBSan, the ThreadSanitizer override), exceptions
-# behind myproject_DISABLE_EXCEPTIONS because the Python bindings need them,
-# C++23, C++ modules mandatory, and this project's build-type gating - static
-# analysis only in Debug, sanitizers and IWYU only outside Release.
+# This project's build policy; the shared option mechanism is ANTfrastructure's ProjectOptionsCommon.
 
 include(CMakeDependentOption)
 include(CheckCXXCompilerFlag)
 
 include(ProjectOptionsCommon)
 
-# include() above already fails hard when the module is not on CMAKE_MODULE_PATH.
-# This catches the other, quieter failure: a STALE same-named file in this repo's
-# own cmake/ directory, which is first on CMAKE_MODULE_PATH and would therefore
-# win - loading fine and then leaving every macro below undefined.
+# Catches a stale same-named file in cmake/, which shadows the module and leaves its macros undefined.
 if(NOT COMMAND myproject_define_core_options
    OR NOT DEFINED MYPROJECT_PROJECT_OPTIONS_COMMON_VERSION
    OR MYPROJECT_PROJECT_OPTIONS_COMMON_VERSION LESS 1)
@@ -29,10 +13,7 @@ if(NOT COMMAND myproject_define_core_options
                       "myproject_define_core_options (version >= 1). CMAKE_MODULE_PATH is: ${CMAKE_MODULE_PATH}")
 endif()
 
-# Deliberately NOT ANTfrastructure's SanitizerSupport::myproject_supports_sanitizers:
-# that one carries a GCC-15 UBSan carve-out and a different ASan matrix. Adopting
-# it would change this project's Debug sanitizer defaults, which is a separate
-# decision from hoisting the option list.
+# Not SanitizerSupport's version: its GCC-15 UBSan carve-out and ASan matrix would change these Debug defaults.
 macro(myproject_supports_sanitizers)
   if((CMAKE_CXX_COMPILER_ID MATCHES ".*Clang.*" OR CMAKE_CXX_COMPILER_ID MATCHES ".*GNU.*") AND NOT WIN32)
     set(SUPPORTS_UBSAN ON)
@@ -52,21 +33,13 @@ macro(myproject_setup_options)
   option(myproject_ENABLE_COVERAGE "Enable coverage reporting" OFF)
   option(myproject_DISABLE_EXCEPTIONS "Disable C++ exceptions" ON)
   option(myproject_ENABLE_GPROF "Enable profiling with gprof (adds -pg flags)" OFF)
-  # for now disable global hardening, as it is not supported by all dependencies
+  # Global hardening stays off: not every dependency (FUZZTEST) supports it.
   option(myproject_ENABLE_GLOBAL_HARDENING "Enable global hardening for all dependencies" OFF)
   if(myproject_ENABLE_GLOBAL_HARDENING)
     message(WARNING "Global hardening is enabled, but it is not supported by all dependencies.")
   else()
     message(STATUS "Global hardening is disabled")
   endif()
-
-  # namely FUZZTEST
-  # cmake_dependent_option(
-  #   myproject_ENABLE_GLOBAL_HARDENING
-  #   "Attempt to push hardening options to built dependencies"
-  #   OFF
-  #   myproject_ENABLE_HARDENING
-  #   OFF)
 
   myproject_supports_sanitizers()
 
@@ -160,8 +133,7 @@ macro(myproject_global_options)
 
   myproject_cpp_modules_supported()
 
-  # Policy, not mechanism: this project has no header-based fallback, so an
-  # unsupported toolchain is a hard stop rather than a degraded build.
+  # No header-based fallback exists, so an unsupported toolchain is a hard stop.
   if(NOT myproject_CPP_MODULES_SUPPORTED)
     message(
       FATAL_ERROR
@@ -181,17 +153,12 @@ macro(myproject_global_options)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /GL /std:c++23preview")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 /std:c++23preview")
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html
-    # https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
     set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -ggdb")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -DNDEBUG")
-    # https://clang.llvm.org/docs/UsersManual.html
-    # this is the clang-cl case
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
-    # clang-cl accepts -W... style options. These prevent unknown -W... options
-    # (or their escalation to errors) from breaking the build when deps inject GCC-only flags.
+    # Keeps GCC-only -W flags that dependencies inject from breaking the clang-cl build.
     set(_CLANG_CL_SAFE_WARNINGS
         "-fcolor-diagnostics -Wno-error=unused-command-line-argument -Wno-error=character-conversion -Wno-unknown-warning-option -Wno-error=unknown-warning-option"
     )
@@ -295,8 +262,7 @@ macro(myproject_local_options)
   myproject_apply_unity_pch_cache(myproject_options)
 
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    # Src/.* scopes build-gate clang-tidy to this repo's sources (the retired local
-    # StaticAnalyzers override hard-coded it; upstream now takes it as an argument).
+    # Scopes the clang-tidy build gate to this repo's sources.
     myproject_apply_static_analysis(myproject_options "Src/.*")
   endif()
 

@@ -1,6 +1,4 @@
-// FUZZTEST's current sources still construct Abseil lock guards from Mutex
-// references while the pinned top-level Abseil snapshot only accepts pointers.
-// Keep that API bridge in the project-owned compatibility overlay.
+// FUZZTEST builds Abseil lock guards from Mutex references; the pinned Abseil accepts only pointers.
 
 #ifndef KATAGLYPHIS_FUZZTEST_COMPAT_ABSL_SYNCHRONIZATION_MUTEX_H_
 #define KATAGLYPHIS_FUZZTEST_COMPAT_ABSL_SYNCHRONIZATION_MUTEX_H_

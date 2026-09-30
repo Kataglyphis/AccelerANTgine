@@ -584,9 +584,7 @@ auto WebRTCStreamer::set_error_callback(ErrorCallback callback) -> void
 auto WebRTCStreamer::set_bitrate(std::uint32_t bitrate_kbps) -> std::expected<void, WebRTCError>
 {
     impl_->config.bitrate_kbps = bitrate_kbps;
-    // NOTE: This only stores the config value. Runtime bitrate changes require
-    // accessing the encoder element via gst_bin_get_by_name() and setting the
-    // "bitrate" property while the pipeline is in PLAYING state.
+    // Only stored: a live change would need the encoder's "bitrate" property set while PLAYING.
     return {};
 }
 

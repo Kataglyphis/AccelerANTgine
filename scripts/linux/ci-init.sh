@@ -20,11 +20,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# No `git config --global --add safe.directory` here any more. It was registered
-# twice: cmake_build_prepare_env and ctest_run_prepare_env both do it, and
-# ci-build-and-test.sh points both at the real WORKSPACE_DIR (:84-85), as does
-# ci-release.sh. A second copy in the one script that runs no git command at all
-# was the copy most likely to drift from the others.
+# No safe.directory here: the build and ctest libraries register it for the real workspace.
 
 info "Compiler: ${COMPILER}"
 info "Runner: ${RUNNER}"

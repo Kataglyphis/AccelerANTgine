@@ -51,9 +51,7 @@ done
 info "=== CI Run All ==="
 info "Compiler: ${COMPILER}  Runner: ${RUNNER}  Arch: ${MATRIX_ARCH}"
 
-# No --gcc-toolchain here: the image's bare clang/clang++ select its source-built
-# GCC through the <native-triple>-clang{,++}.cfg beside the compiler (hub CON16),
-# so CC/CXX/CFLAGS/LDFLAGS are left as the caller set them.
+# No --gcc-toolchain: the image's clang finds its GCC through the <native-triple>-clang++.cfg.
 
 bash scripts/linux/ci-init.sh \
 	--workspace-dir "$(pwd)" \
@@ -61,9 +59,7 @@ bash scripts/linux/ci-init.sh \
 	--runner "${RUNNER}" \
 	--arch "${MATRIX_ARCH}"
 
-# One directory for the clang lane's raw coverage profiles, named once here:
-# ci-build-and-test.sh points LLVM_PROFILE_FILE into it, ci-coverage.sh merges
-# what is there.
+# Named once: ci-build-and-test.sh writes the raw profiles here and ci-coverage.sh merges them.
 PROFRAW_DIR="${BUILD_DIR}/profraw"
 
 bash scripts/linux/ci-build-and-test.sh \

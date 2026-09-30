@@ -1,13 +1,6 @@
-# Configuration file for the Sphinx documentation builder.
-#
-# For the full list of built-in configuration values, see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
+# Sphinx configuration: https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# ---------------------------------------------------------------------------
-# Import shared Kataglyphis theme baseline from ANTfrastructure template.
-# This keeps the look-and-feel in sync: when the template changes, this
-# project automatically picks up the new settings on the next build.
-# ---------------------------------------------------------------------------
+# The shared theme baseline is loaded at build time, so template changes land without edits here.
 import importlib.util
 import pathlib
 import sys
@@ -16,10 +9,7 @@ _DOCS_SOURCE_DIR = pathlib.Path(__file__).resolve().parent
 _REPO_ROOT = _DOCS_SOURCE_DIR.parents[1]
 _DOXYGEN_XML_DIR = _REPO_ROOT / "build" / "build" / "xml"
 
-# The shared Sphinx baseline moved out of ANTfrastructure on 2026-07-14 (e3e2d6d),
-# inverting the ownership: templates, theme and doc-generation scripts live in
-# DocumANTation, which ANTfrastructure vendors. Both directory names changed again
-# on 2026-09-05 — see AGENTS.md.
+# DocumANTation owns the templates; ANTfrastructure vendors it.
 _TEMPLATE_DIR = (
     pathlib.Path(__file__).resolve().parents[2]
     / "third_party"
@@ -43,7 +33,6 @@ _conf_base = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_conf_base)
 
 # -- Project information -----------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "AccelerANTgine"
 copyright = "2025, Jonas Heinle"
@@ -51,7 +40,6 @@ author = "Jonas Heinle"
 release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 # Start from the shared extensions, then add project-specific ones.
 extensions = list(_conf_base.SPHINX_EXTENSIONS) + [
@@ -65,11 +53,7 @@ if _DOXYGEN_XML_DIR.exists():
 else:
     exclude_patterns = ["api/**"]
 
-# coverage/index.html is staged by ci-coverage.sh, one lane EARLIER in the
-# ci-run-all chain - linkcheck can never validate it in a docs-only build (the
-# directory is empty then), and the chain is what guarantees it. A named
-# exception for a cross-lane artifact, not a muted failure: every other link
-# stays checked.
+# Staged by ci-coverage.sh in an earlier step, so a docs-only build cannot check it.
 linkcheck_ignore = [
     r"^coverage/index\.html$",
 ]
@@ -113,7 +97,6 @@ templates_path = ["_templates"]
 
 
 # -- Options for HTML output -------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 # Theme and appearance pulled from the shared baseline.
 html_theme = _conf_base.HTML_THEME
@@ -124,9 +107,7 @@ html_theme_options["repository_url"] = (
     "https://github.com/Kataglyphis/AccelerANTgine"
 )
 
-# Copy generated coverage assets into the built site root when available. NOT
-# test-results: those are Sphinx pages (ci-docs.sh renders them), and the HTML
-# builder drops every html_extra_path directory from its sources.
+# Not test-results: they are Sphinx pages, and html_extra_path directories are dropped from the sources.
 html_extra_path = [
     extra_dir.name
     for extra_dir in (_DOCS_SOURCE_DIR / "coverage",)
@@ -134,8 +115,7 @@ html_extra_path = [
 ]
 
 html_static_path = list(_conf_base.HTML_STATIC_PATH)
-# CSS is loaded from the shared baseline; the file itself is symlinked into
-# _static/css/ so any template update propagates automatically.
+# The CSS file is symlinked into _static/css/, so template updates propagate.
 html_css_files = list(_conf_base.HTML_CSS_FILES)
 
 graphviz_output_format = "svg"

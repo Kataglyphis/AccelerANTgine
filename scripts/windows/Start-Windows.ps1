@@ -2,35 +2,16 @@
 
 <#
 .SYNOPSIS
-  Runs what a Windows build produced, on the host: the CLI plus that
-  configuration's test suites.
+  Runs what a Windows build produced on the host: the CLI plus that configuration's test suites.
 
 .DESCRIPTION
-  One script for the three configurations that used to have one each -
-  Start-Debug.ps1, Start-Profile.ps1 and Start-Release.ps1. The three were 90%
-  the same file: identical local copies of Invoke-NativeOrThrow and
-  Invoke-WithBuildRuntimePath, identical "is the exe there / run it / collect
-  what was missing" shape, and only the build directory and the list of suites
-  differed. Both helpers now come from ANTfrastructure's WindowsTesting.Common
-  (Invoke-ManualTestExecutable, Invoke-WithRuntimePath), which also puts the
-  ASan runtime on PATH - Microsoft's as well as LLVM's - for the duration of
-  each run.
-
-  The build directory is NOT spelled out here either: it is read from
-  Build-Windows.config.psd1, the same table Build-Windows.ps1 builds into, so
-  the producer and the consumer of an artifact cannot disagree about where it is.
-
-  This script LAUNCHES THE APPLICATION. That is the distinction the Start-
-  prefix carries in this repo, which is why the container wrappers that merely
-  drive a build are named Invoke-*/Show-* instead.
+  The build directory comes from Build-Windows.config.psd1, so producer and consumer cannot disagree.
 
 .PARAMETER Config
-  Debug (CLI + fuzz-target report + commit and compile suites), Profile
-  (CLI + benchmarks) or Release (CLI only).
+  Debug (CLI, fuzz-target report, commit and compile suites), Profile (CLI, benchmarks) or Release (CLI only).
 
 .PARAMETER RunWebRtcSmoke
-  Debug only: start the CLI against a signalling server for five seconds and
-  fail if it exits non-zero before then.
+  Debug only: run the CLI against a signalling server for five seconds; fail if it exits non-zero sooner.
 #>
 
 [CmdletBinding()]
@@ -59,8 +40,7 @@ Import-BuildModule @(
     'WindowsTargetArch.Common'
 )
 
-# -Config -> a row of the build table. The row names are the same tokens
-# Build-Windows.ps1 takes in -BuildTargets.
+# The row names are the tokens Build-Windows.ps1 takes in -BuildTargets.
 $rowName = switch ($Config) {
     'Debug' { 'clangcl-debug' }
     'Profile' { 'clangcl-profile' }
@@ -78,8 +58,7 @@ if ($null -eq $row) {
     throw "Unknown build configuration '$rowName' in $configPathResolved."
 }
 
-# Same environment override the build side honours, so a lane that retargeted a
-# build directory does not have to tell this script about it twice.
+# The build side's environment override, so a retargeted build directory is found here too.
 $buildDirEnvItem = Get-Item -Path "Env:$($row['BuildDirEnv'])" -ErrorAction SilentlyContinue
 $buildDirName = Get-OrDefault $(if ($null -ne $buildDirEnvItem) { $buildDirEnvItem.Value } else { $null }) $row['BuildDir']
 $buildDir = Join-Path $ProjectRoot $buildDirName
@@ -94,13 +73,7 @@ Open-BuildLog -Context $ctx
 
 $script:missingArtifacts = @()
 
-# The staged runtime DLLs (ONNX Runtime, GStreamer) sit in <buildDir>\bin next to
-# the CLI, but the test suites are emitted at the build root, where the loader
-# would not find them - which is exactly what the deleted Invoke-WithBuildRuntimePath
-# existed to fix. Invoke-WithRuntimePath is the hub's version of that
-# save/override/restore; Invoke-ManualTestExecutable adds the ASan runtime
-# directories on top and returns $false (rather than throwing) for a missing
-# binary or a Windows loader mismatch.
+# The runtime DLLs sit in <buildDir>\bin, but the test suites live at the build root, out of the loader's reach.
 function Invoke-BuiltArtifact {
     param(
         [Parameter(Mandatory)]
@@ -125,11 +98,7 @@ function Invoke-BuiltArtifact {
     }
 }
 
-# The hub reports a start failure only as "loader/runtime mismatch": one message for
-# STATUS_DLL_NOT_FOUND and STATUS_ENTRYPOINT_NOT_FOUND. Walk the import closure the way
-# the loader searches (exe dir, System32, then PATH) and name what is missing, plus where
-# each runtime DLL resolves, since a runner's copy can be older than the build's (run
-# 36035275991: the Debug CLI would not start on the host, its placeholder suites would).
+# Names the missing or stale DLL behind the hub's one "loader/runtime mismatch" message, searching as the loader does.
 function Write-ImportClosureReport {
     param(
         [Parameter(Mandatory)][string]$Executable,
@@ -172,8 +141,7 @@ try {
     Invoke-BuiltArtifact -ExecutableName 'AccelerANTgine.exe'
 
     if ($Config -eq 'Debug') {
-        # Reported, never run: the registered fuzz tests are long-running and are
-        # started by hand. Its absence is not a missing artifact.
+        # Reported, never run: the fuzz tests are long-running and started by hand.
         $fuzzTest = Resolve-TestExecutable -BuildRoot $buildDir -ExecutableName 'first_fuzz_test.exe'
         if ($fuzzTest) {
             Write-BuildLog -Context $ctx -Message "FUZZTEST target available at: $fuzzTest (run it by hand)"
@@ -188,10 +156,7 @@ try {
         Invoke-BuiltArtifact -ExecutableName 'compileTestSuite.exe' -RelativeDirectory @('', 'bin')
 
         if ($RunWebRtcSmoke) {
-            # Not Invoke-ManualTestExecutable: this one must be killed after five
-            # seconds rather than waited on, so it keeps Start-Process. -AsanOptions ''
-            # because the CLI is a full application - the test-binary defaults
-            # (report_globals=1) produce noise it never has to answer for.
+            # Start-Process: this run is killed after five seconds, not waited on; the test-binary ASan defaults only add noise.
             Write-BuildLog -Context $ctx -Message "--- WebRTC test-pattern smoke (5s) against $ServerUri ---"
             $cliPath = Resolve-TestExecutable -BuildRoot $buildDir -ExecutableName 'AccelerANTgine.exe' -AdditionalRelativeDirectory 'bin'
             if (-not $cliPath) {

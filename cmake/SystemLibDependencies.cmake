@@ -1,16 +1,4 @@
-# # we depend on vulkan
-# find_package(Vulkan REQUIRED)
-# # configure vulkan version
-# set(VULKAN_VERSION_MAJOR 1)
-# set(VULKAN_VERSION_MINOR 3)
 find_package(Threads REQUIRED)
-
-# # we depend on OpenGL
-# find_package(OpenGL REQUIRED COMPONENTS OpenGL)
-# # configure OpenGL version
-# set(OPENGL_VERSION_MAJOR 4)
-# set(OPENGL_VERSION_MINOR 6)
-# set(OpenGL_GL_PREFERENCE GLVND)
 
 # GStreamer dependencies
 set(GSTREAMER_ROOT
@@ -46,12 +34,7 @@ pkg_check_modules(
   IMPORTED_TARGET
   glib-2.0>=2.70)
 
-# ONNX Runtime: the family's chain build ONLY (ANTfrastructure owner rule
-# 2026-09-23). One prefix is searched - ONNXRUNTIME_ROOT if given, else the image's
-# ($ENV{ONNX_ROOT} on Windows, /usr/local/lib/onnxruntime-cpu on Linux) - and it is
-# REQUIRED: no system, vendor, vcpkg or pkg-config fallback, and a runtime library
-# that does not embed the chain's ORT source root is refused. Not covered: which
-# copy the OS loader picks at run time; the packaging lanes stage the chain one.
+# ONNX Runtime: the family's chain build only, from one prefix, with no system, vendor or pkg-config fallback.
 set(ONNXRUNTIME_ROOT
     ""
     CACHE PATH "Chain-built ONNX Runtime prefix (default: the family image's)")
@@ -91,8 +74,7 @@ if(NOT _ONNXRUNTIME_LIB OR NOT _ONNXRUNTIME_INCLUDE_DIR)
   )
 endif()
 
-# ORT embeds its source paths; the chain's checkout is the hub's Build-OnnxFromSource.ps1
-# SourceDir (Windows) and onnxruntime/build/lib/common.sh ORT_SRC_DIR (Linux).
+# ORT embeds its source paths, so the chain build's checkout directory proves where a binary came from.
 if(WIN32)
   set(_ort_runtime "${_ort_root}/bin/onnxruntime.dll")
   set(_ort_chain_marker "temp.onnx-src.onnxruntime.core.")
@@ -122,8 +104,7 @@ message(STATUS "Found chain-built ONNX Runtime at: ${_ort_root}")
 message(STATUS "  Library: ${_ONNXRUNTIME_LIB}")
 message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
 
-# The proven chain ORT installs beside the exe, so every CPack installer carries it (else a client
-# loads System32's Windows ML copy). Build-Windows.ps1 runs G6 over the install tree before packing.
+# Installed beside the exe, or a client loads System32's Windows ML onnxruntime.dll instead.
 if(WIN32)
   set(_ort_install_files "${_ort_runtime}")
   foreach(_ort_companion onnxruntime_providers_shared.dll DirectML.dll)

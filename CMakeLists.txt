@@ -13,9 +13,6 @@ include(GNUInstallDirs)
 set(AUTHOR "Jonas Heinle")
 set(PROJECT_APP_ID "org.kataglyphis.accelerantgine")
 
-# Set WINDOWS_CI to OFF by default
-# WINDOWS CI is only able to verify successful compiling ... Windows ... lel
-# i will stay on linux ...
 set(WINDOWS_CI
     OFF
     CACHE BOOL "Enable Windows CI build options")
@@ -35,30 +32,15 @@ endif()
 
 option(KATAGLYPHIS_BUILD_PYTHON_BINDINGS "Build Python bindings with nanobind" OFF)
 if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
-  # nanobind requires C++ exceptions in the binding TU, and module BMIs re-emit
-  # exception flags into every importer — keep the whole project consistent.
+  # nanobind needs exceptions, and module BMIs re-emit exception flags into every importer.
   set(myproject_DISABLE_EXCEPTIONS
       OFF
       CACHE BOOL "Disable C++ exceptions (forced OFF: Python bindings need them)" FORCE)
 endif()
 
-# Reusable CMake modules live upstream in the ANTfrastructure submodule so every
-# consumer gets the same ones (AGENTS.md section 2, "CMake modules:
-# ANTfrastructure-first, local override wins"); this repo's own cmake/ keeps only
-# what encodes THIS project's choices.
-# Both dirs go on CMAKE_MODULE_PATH so every module is included by NAME -
-# `include(Sanitizers)`, not `include(cmake/Sanitizers.cmake)` - which is what
-# lets a module live in either directory without its callers caring.
-#
-# Local first: a project that needs to override an upstream module drops a
-# same-named file in cmake/ and wins, without editing ANTfrastructure. No local
-# override remains today: Cache, Tests, Sanitizers and StaticAnalyzers were all
-# reconciled upstream 2026-09-06 and their local copies are gone.
+# Local cmake/ comes first, so a same-named module there overrides ANTfrastructure's (AGENTS.md section 2).
 set(KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ANTfrastructure/cmake")
-# Probe CompilerWarnings.cmake, not just the directory: it is one of the modules
-# this repo now has NO local copy of, so its absence is exactly the failure an
-# uninitialised submodule causes - a confusing "Could not find a module" from
-# deep inside ProjectOptions instead of a message naming the real cause.
+# Probe a module with no local copy, so an uninitialised submodule fails here and not deep in ProjectOptions.
 if(NOT EXISTS "${KATAGLYPHIS_ANTFRASTRUCTURE_CMAKE_DIR}/CompilerWarnings.cmake")
   message(
     FATAL_ERROR
@@ -108,10 +90,7 @@ if(myproject_ENABLE_SANITIZER_ADDRESS)
       add_compile_options(/fsanitize=address /Zi)
       add_link_options(/INCREMENTAL:NO)
     endif()
-    # clang-cl: Sanitizers.cmake links clang_rt.asan_dynamic, which supports the
-    # dynamic CRT — keep CMAKE_MSVC_RUNTIME_LIBRARY as passed in (MultiThreadedDLL
-    # when embedding in Flutter). Forcing the static CRT here poisons every object
-    # with /MT vs /MD failifmismatch records.
+    # clang-cl keeps the CRT as passed in: asan_dynamic supports /MD, and forcing /MT breaks failifmismatch.
   else()
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
@@ -126,17 +105,14 @@ if(myproject_ENABLE_COVERAGE
    AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 
   if(MSVC)
-    # clang-cl on Windows: -fprofile-instr-generate/-fcoverage-mapping are not
-    # understood by lld-link.  Use /clang: prefix for compile flags and link the
-    # profile runtime explicitly.
+    # lld-link does not understand the profile flags, so pass them via /clang: and link the runtime explicitly.
     add_compile_options(/clang:-fprofile-instr-generate /clang:-fcoverage-mapping)
     execute_process(
       COMMAND ${CMAKE_CXX_COMPILER} --print-resource-dir
       RESULT_VARIABLE _GLOBAL_RESOURCE_DIR_RC
       OUTPUT_VARIABLE _GLOBAL_CLANG_RESOURCE_DIR
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-    # A build explicitly asked for coverage must instrument or fail loud here -
-    # a WARNING-and-continue silently produced uninstrumented "coverage" builds.
+    # A requested coverage build must instrument or fail; a warning let uninstrumented builds through.
     if(NOT
        _GLOBAL_RESOURCE_DIR_RC
        EQUAL
@@ -230,13 +206,8 @@ if(UNIX AND NOT APPLE)
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
     RENAME ${PROJECT_APP_ID}.png)
 endif()
-# we keep the relative paths in the install dir
-# keep in mind that install dir will be in front of this relative path ...
 
-# Every target exists by now: fail the configure, naming them, if any would link
-# another MSVC runtime than the project's (cmake/MsvcRuntime.cmake). This tree
-# only: embedded in a Flutter runner (OmniAccelerANT's native plugin
-# add_subdirectory()s it), CMAKE_SOURCE_DIR is the runner's, whose targets are not ours to judge.
+# This tree only: embedded in a Flutter runner, CMAKE_SOURCE_DIR is the runner's, whose targets are not ours.
 myproject_check_msvc_runtime("${CMAKE_CURRENT_SOURCE_DIR}")
 
 include(CPackOptions)

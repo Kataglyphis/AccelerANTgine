@@ -1,16 +1,6 @@
-# One MSVC runtime for the whole build.
-#
-# A dependency can pin its own CMAKE_MSVC_RUNTIME_LIBRARY in its directory scope:
-# abseil 20260526.0 sets "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" (its
-# CMakeLists.txt:64-67). Under the clang-cl ASAN Debug preset, where
-# ProjectOptions forces MultiThreadedDLL (clang_rt.asan_dynamic needs the release
-# CRT), every absl object then carried MDd, and the first link that mixed them
-# (FUZZTEST's grammar_domain_code_generator) died on lld-link /failifmismatch
-# 'RuntimeLibrary' after nine minutes of compiling. These helpers re-point such
-# targets, and fail the configure when anything would still link another runtime.
+# One MSVC runtime for the whole build: a dependency such as abseil pins its own in its directory scope.
 
-# The runtime a value selects for this (single-config) build, so that
-# "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" and "MultiThreadedDebugDLL" compare equal.
+# Resolves the Debug generator expression so equivalent runtime spellings compare equal.
 function(myproject_resolve_msvc_runtime value out_var)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(_debug "Debug")

@@ -1,8 +1,7 @@
 # do not track user specific vcpkg things
 CMakeUserPresets.json
 
-# The MSIX signing certificate lives at the repository root (Build-Windows.ps1's
-# MSIX step signs with it); a private key must never be committed.
+# The MSIX signing certificate sits at the repo root; a private key must never be committed.
 *.pfx
 
 .flatpak-builder
@@ -21,18 +20,11 @@ docs/test_results*.xml
 *.prof
 scan-build-reports/
 
-# Python bytecode. Test/python/__pycache__/*.pyc was tracked until 2026-09-15
-# even though pytest rewrites it on every run; a rule here would not have
-# stopped that on its own, because .gitignore does nothing once a path is
-# already in the index.
+# Python bytecode
 __pycache__/
 *.py[cod]
 
-# Large binaries. Two are tracked ON PURPOSE and re-included below; the
-# rationale is in AGENTS.md section 7 "Large tracked binaries". Everything else
-# of that shape stays out, which is the point of the pattern plus its two
-# exceptions: a second model dropped next to the first would otherwise be
-# committed unnoticed.
+# Large binaries; the two tracked on purpose are re-included (AGENTS.md section 7 "Large tracked binaries").
 *.onnx
 !models/yolo26n.onnx
 *.bmp
@@ -60,7 +52,6 @@ build-*/
 *.slo
 *.lo
 *.o
-# *.obj
 
 # Precompiled Headers
 *.gch
@@ -95,6 +86,5 @@ out/*
 
 
 
-# uv-managed Python env for the docs/quality tooling (repo-local, never tracked;
-# BeschleunigerBallett ignores the same path)
+# uv-managed Python env for the docs/quality tooling
 .venv/

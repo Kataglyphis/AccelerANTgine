@@ -209,8 +209,7 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-    // Ort::Value borrows input buffers, so the copied inputs must stay alive
-    // until Session::Run() has completed.
+    // Ort::Value borrows its buffer, so the copied inputs must outlive Session::Run().
     std::vector<std::vector<float>> owned_input_data;
     std::vector<std::vector<int64_t>> input_dims_storage;
     std::vector<Ort::Value> input_tensors;

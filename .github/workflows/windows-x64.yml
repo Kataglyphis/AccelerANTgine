@@ -1,14 +1,4 @@
-# .github/workflows/windows-x64.yml
-#
-# The Windows x64 lane: Build-Windows.ps1 builds, tests and packages the three
-# clang-cl configurations in the family image, the runner host then runs each of
-# them (Start-Windows.ps1), and dist/windows-x64 uploads as one artifact, like the
-# arm64 lane's dist/windows-arm64. A thin caller of ANTfrastructure's reusable
-# container-ci-windows.yml (the family's hub reusable lanes, 2026-09-25), which
-# owns the image, the checkout, the container run and the upload; the PowerShell
-# lint and the Pester suites are this repo's own jobs beside it.
-#
-# ALWAYS RUNS, like every lane here: no job-level `if:`.
+# Builds the three clang-cl configurations in the family image; the runner host then runs each one.
 name: Windows x64 · build + test
 
 on:
@@ -21,8 +11,7 @@ on:
 permissions:
   contents: read
 
-# A superseded run on a feature branch or PR is cancelled; runs on the default
-# branch always finish.
+# A superseded run is cancelled, except on the default branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
@@ -39,32 +28,19 @@ jobs:
         C:\ws
         -BuildTargets
         clangcl-debug,clangcl-profile,clangcl-release
-      # The container has no desktop, so the host runs what the build synced back
-      # into build-clangcl-<config>: the engine, the test suites and the fuzz test.
+      # The container has no desktop, so the host runs what the build synced back.
       host-command: |
         ./scripts/windows/Start-Windows.ps1 -Config Debug -ProjectRoot .
         ./scripts/windows/Start-Windows.ps1 -Config Profile -ProjectRoot .
         ./scripts/windows/Start-Windows.ps1 -Config Release -ProjectRoot .
       artifact-name: AccelerANTgine-windows-x64
-      # The portable bundle with the engine's DLL closure, the MSI, ZIP and NSIS
-      # installers, and the MSIX.
       artifact-dir: dist/windows-x64
-      # Measured: green runs took up to 78 min (2026-04), and a cold container
-      # build is priced at three hours. 240 still ends a hung step early.
+      # A cold container build takes about three hours; 240 still ends a hung step early.
       timeout-minutes: 240
     secrets:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
-  # PowerShell lint: a mandatory parse + AST-trap gate, and PSScriptAnalyzer,
-  # pinned exactly as BeschleunigerBallett and the hub pin it. Its own job, so a
-  # syntax error in scripts\windows\*.ps1 shows in minutes, beside the build
-  # rather than ahead of it.
-  #
-  # -Path points the hub's gate at THIS tree while its PSScriptAnalyzerSettings.psd1
-  # stays resolved against the script's own location, so the ruleset is consumed
-  # by reference. -FailOnAnalyzer is deliberately NOT passed: the step fails on a
-  # parse error or an AST-trap violation, and only PSScriptAnalyzer is advisory,
-  # the hub's documented ramp. Add it once this repo's findings are triaged.
+  # No -FailOnAnalyzer yet: parse and AST-trap errors fail, PSScriptAnalyzer stays advisory until triaged.
   lint-powershell:
     name: PowerShell lint (scripts)
     runs-on: windows-2025
@@ -89,10 +65,6 @@ jobs:
           pwsh -NoProfile -File third_party/ANTfrastructure/windows/scripts/Invoke-Lint.ps1
           -Path scripts
 
-  # CPU-only and container-free: this repo's own Pester suites under
-  # scripts/windows/tests. It builds nothing, finishes in minutes and therefore
-  # carries no opt-in condition - an invariant that only runs when somebody
-  # remembers to ask for it is not a gate.
   pester-tests:
     name: Pester suites (scripts/windows/tests)
     runs-on: windows-2025
@@ -100,22 +72,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      # `submodules: true` is top-level only, NOT recursive, and that matters
-      # here: a recursive checkout dies with "Filename too long" on the
-      # ANTfrastructure -> DocumANTation -> md2pdfLib -> latex/awesome-beamer
-      # chain. These suites read only ANTfrastructure's own
-      # windows/scripts/modules, which arrives at depth 1.
+      # Not recursive: a recursive checkout dies with "Filename too long" in ANTfrastructure's nested chain.
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
 
-      # Pinned, not the runner's default: the suites are written in Pester 3.4's
-      # dash-less assertion syntax (`Should Be 0`), which the Pester 5 shipped on
-      # the runner cannot parse. The install/run/report mechanics are generic and
-      # live in ANTfrastructure; run-pester-suite also refuses a vacuous pass
-      # (TotalCount == 0 -> exit 1), so this cannot go green over an empty
-      # directory.
+      # Pinned: the suites use Pester 3.4's dash-less `Should Be`, which the runner's Pester 5 cannot parse.
       - name: Run Pester suites (pinned 3.4.0)
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@develop
         with:

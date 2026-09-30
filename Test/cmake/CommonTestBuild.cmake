@@ -1,5 +1,4 @@
-# GoogleTest registration (discovery, the clang-cl opt-out and its add_test
-# fallback) lives in the hub: third_party/ANTfrastructure/cmake/GTestDiscovery.cmake.
+# See third_party/ANTfrastructure/cmake/GTestDiscovery.cmake for discovery and its clang-cl fallback.
 include(GTestDiscovery)
 
 function(
@@ -41,8 +40,7 @@ function(kataglyphis_add_config_module_to_target target_name project_src_dir)
   endif()
 endfunction()
 
-# Kept under its old name so the Test/*/CMakeLists.txt call sites stay as they
-# are; no WORKING_DIRECTORY on purpose (the module header says why).
+# Old name kept for the Test/*/CMakeLists.txt call sites; no WORKING_DIRECTORY on purpose (see the module header).
 function(kataglyphis_configure_gtest_discovery test_target)
   kataglyphis_register_gtest_target(${test_target})
 endfunction()
@@ -61,8 +59,7 @@ function(
   target_compile_definitions(${target_name} PRIVATE RELATIVE_RESOURCE_PATH="${resource_path}"
                                                     RELATIVE_INCLUDE_PATH="${include_path}")
 
-  # Test suites intentionally suppress their own warnings to keep signal focused
-  # on library code compiled through the main targets.
+  # Warnings are graded on the library targets; the suites' own would only add noise.
   if(MSVC)
     target_compile_options(${target_name} PRIVATE /w)
   else()

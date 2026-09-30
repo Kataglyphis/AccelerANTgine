@@ -1,5 +1,3 @@
-# Src/CMakeLists.txt
-# update current positions
 set(PROJECT_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(PROJECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(EXTERNAL_LIB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/")
@@ -11,8 +9,7 @@ file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
 list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
 
-# Conditionally exclude ONNX inference sources if ONNX Runtime is not available
-# This is handled after SystemLibDependencies.cmake determines ONNXRUNTIME_FOUND
+# ONNXRUNTIME_FOUND comes from SystemLibDependencies.cmake, which must run first.
 if(NOT ONNXRUNTIME_FOUND)
   message(STATUS "Excluding ONNX inference sources (ONNX Runtime not found)")
   list(
@@ -53,9 +50,7 @@ if(RUST_FEATURES)
       CXX=${RUST_CXX}
       CXXFLAGS=/EHsc)
   else()
-    # Native-only corrosion/toolchain setup (no cross-building).
-    # A bare clang++ finds the image's GCC by itself (its
-    # <native-triple>-clang++.cfg), cc-rs' --target=<native triple> included.
+    # Native only: a bare clang++ finds the image's GCC through its <native-triple>-clang++.cfg.
     set(RUST_CXXFLAGS "-fexceptions")
     if(DEFINED ENV{CXXFLAGS}
        AND NOT
@@ -94,7 +89,6 @@ set_target_properties(
              RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # Enable module scanning on project targets so CMake can generate dyndep/BMI ordering.
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_SCAN_FOR_MODULES ON)
-# add_executable(${PROJECT_NAME})
 
 if(PROJECT_IS_TOP_LEVEL)
   if(MYPROJECT_USE_CPP_MODULES)
@@ -126,8 +120,7 @@ else()
   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=0)
 endif()
 
-# Treat MSVC and clang-cl on Windows differently in a sense of deployment
-# https://clang.llvm.org/docs/UsersManual.html
+# MSVC deploys one directory deeper than clang-cl, hence the extra ../.
 if(WIN32 AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC))
   target_compile_definitions(${PROJECT_NAME} PRIVATE RELATIVE_RESOURCE_PATH="/../../Resources/"
                                                      RELATIVE_INCLUDE_PATH="/../../Src/")
