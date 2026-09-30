@@ -1,20 +1,5 @@
 #requires -Version 7.0
-# Build the engine inside the ANTfrastructure Windows developer image using
-# Stevedore's docker.exe (see third_party/ANTfrastructure/docs/windows-builds.md
-# for why nerdctl is not an option on Windows).
-#
-# Thin project wrapper: the transport decision (tar pipe vs bind mount), the
-# reusable container, the artifact streaming and the delivery verification all
-# live upstream in ANTfrastructure's WindowsContainerBuild.Reuse module
-# (Invoke-ContainerBuild). Rationale + measurements:
-# third_party/ANTfrastructure/docs/windows-container-build-performance.md.
-#
-# NAME: this was Start-Build.ps1, which promised something it never did - it
-# starts no application, it drives a build. It deliberately shares a name with
-# the upstream cmdlet it is a thin wrapper over, and that is unambiguous:
-# PowerShell resolves Invoke-ContainerBuild below to the imported FUNCTION,
-# because a script file is only found through PATH or an explicit path and the
-# working directory is on neither.
+# Builds in the ANTfrastructure Windows image; see third_party/ANTfrastructure/docs/windows-container-build-performance.md.
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -22,8 +7,7 @@ param(
     [string]$Image,
     # Comma-separated Build-Windows.ps1 targets (it splits the string itself).
     [string]$BuildTargets = "clangcl-debug,clangcl-profile,clangcl-release",
-    # Explicit docker.exe path; falls back to $env:DOCKER_EXE, the Stevedore
-    # install locations, then 'docker' on PATH (Resolve-DockerExe).
+    # Falls back to $env:DOCKER_EXE, the Stevedore install locations, then 'docker' on PATH.
     [string]$DockerExe,
     # Process isolation exposes all host CPUs; Hyper-V isolation defaults to 2.
     [ValidateSet("process", "hyperv")]
@@ -31,8 +15,7 @@ param(
     # Only applied under Hyper-V isolation (process isolation shares the host).
     [int]$CpuCount = 0,
     [int]$MemoryGb = 48,
-    # Opt into the bind-mount transport - measured slower on a Dev Drive host,
-    # see Invoke-ContainerBuild.
+    # Opt into the bind-mount transport, measured slower on a Dev Drive host.
     [switch]$UseBindMount,
     # Discard the reusable build container and start from a clean one.
     [switch]$FreshContainer
@@ -55,13 +38,11 @@ Write-Host "Using docker: $docker"
 Write-Host "Image: $Image"
 Write-Host "BuildTargets: $BuildTargets"
 
-# Build-Windows.ps1 syncs each target's artifacts to build-<target> in the
-# workspace; those (plus logs and the MSIX output) are what the host needs back.
+# Build-Windows.ps1 syncs each target's artifacts to build-<target>, which the host needs back.
 $targetList = @($BuildTargets -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $buildDirs = @($targetList | ForEach-Object { "build-$_" })
 
-# Arguments handed to the image entrypoint (VsDevCmd, then %*). Every token
-# must stay space-free: it travels docker CLI -> cmd /S /C -> %*.
+# Every token must stay space-free: it travels docker CLI -> cmd /S /C -> %*.
 $buildCommand = {
     param([string]$WorkspacePath)
     return @(
@@ -78,30 +59,20 @@ $build = @{
     ContainerName = "accelerantgine-build-persistent"
     RepoRoot      = $ProjectRoot
     BuildCommand  = $buildCommand
-    # The family workspace path. NOT the image-baked C:\workspace: mounting
-    # over a directory that exists in the image fails at CreateComputeSystem
-    # on host/image OS-build skew (see Invoke-ContainerBuild).
+    # Not the image-baked C:\workspace: mounting over an image directory fails on host/image OS-build skew.
     WorkspacePath = "C:\ws"
     IsolationArgs = (Get-ContainerIsolationArgs -Isolation $Isolation -CpuCount $CpuCount -MemoryGb $MemoryGb)
-    # Build-Windows.ps1 re-points SCCACHE_DIR under its fast-build dir
-    # (Initialize-BuildCacheEnvironment); the log/size entries still apply.
+    # Build-Windows.ps1 re-points SCCACHE_DIR; the log and size entries still apply.
     CacheEnv      = (Get-SccacheContainerEnv)
 
-    # Anchored (./...) so nested third_party files are not stripped -
-    # unanchored patterns match at every path depth in bsdtar.
+    # Anchored: unanchored bsdtar patterns match at every depth and would strip nested third_party files.
     InboundExclude = @(".git", "./logs", "./build", "./build-*", "./build_*", "./dist")
 
-    # No IncrementalDirs: the ninja tree lives in the reusable container at
-    # C:\kataglyphis_fast_build, so incrementality comes from container reuse;
-    # the host's build-* dirs hold synced artifacts, not a usable seed.
+    # No IncrementalDirs: incrementality comes from reusing the container, not from the synced build-* dirs.
     OutputDirs      = (@("logs", "dist") + $buildDirs)
     OutboundExclude = @("*/CMakeFiles", "*/_deps", "*/_CPack_Packages", "*.obj", "*.lib", "*.ilk")
 
-    # Each lane leaves at least one top-level exe in its build dir (test
-    # suites; the CPack installer for release), which is what the check reads.
-    # clangcl-* only: the msvc-* lanes use the Visual Studio multi-config
-    # generator, whose exes land in a per-config SUBdirectory, so the top-level
-    # probe would fail a green build there.
+    # clangcl-* only: the msvc lanes' multi-config generator puts exes in a per-config subdirectory.
     VerifyDirs = @($buildDirs | Where-Object { $_ -like "build-clangcl-*" })
 
     UseBindMount   = $UseBindMount
@@ -109,6 +80,7 @@ $build = @{
 }
 
 if ($PSCmdlet.ShouldProcess("$Image (container '$($build.ContainerName)')", "Invoke-ContainerBuild")) {
+    # The imported function, not this script: the working directory is not on PATH.
     $null = Invoke-ContainerBuild @build
     Write-Host "Container build finished successfully."
 } else {

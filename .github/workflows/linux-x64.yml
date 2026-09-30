@@ -7,8 +7,7 @@ on:
     branches: ["main", "develop"]
   workflow_dispatch:
 
-# The ceiling for the nested reusable-linux.yml job, which asks for exactly
-# this; a narrower grant here makes it refuse to start.
+# Exactly what the nested reusable-linux.yml job asks for; a narrower grant makes it refuse to start.
 permissions:
   contents: read
   packages: read

@@ -1,7 +1,6 @@
 name: Linux · reusable build
 
-# Called once per (arch x compiler) by linux-x64.yml and linux-arm64.yml - the
-# fleet naming convention (2026-09-24): one caller file per platform + arch.
+# Called once per (arch x compiler) by linux-x64.yml and linux-arm64.yml.
 
 on:
   workflow_call:
@@ -28,18 +27,14 @@ on:
       GHCR_PAT:
         required: true
 
-# No image env: each container action's `image:` input default IS the family ref,
-# and ANTfrastructure's verify_ci_image_refs.py gates it against versions.env.
+# No image env: each container action's default `image:` is the family ref, gated against versions.env.
 
 jobs:
   build:
-    runs-on: ${{ inputs.runner }} # Dynamically use input
-    # Measured: green runs took up to 48 min (x64 and arm64, 2026-03), recent
-    # ones 18-33 min. 120 bounds a hung step well short of the 6-hour default.
+    runs-on: ${{ inputs.runner }}
+    # Bounds a hung step well short of the 6-hour default; green runs take under an hour.
     timeout-minutes: 120
-    # Exactly the repository's restricted default (read, measured 2026-09-24),
-    # written down so a settings change cannot widen it. Every caller must
-    # grant at least this, or the nested job refuses to start.
+    # Written down so a settings change cannot widen it; every caller must grant at least this.
     permissions:
       contents: read
       packages: read
@@ -51,10 +46,6 @@ jobs:
 
     steps:
 
-      # ANTfrastructure's shared prologue: reclaim runner disk, check out, log in to
-      # ghcr and pull with retries. Replaces four hand-rolled steps including a
-      # copy of the retry loop, so the retry count and per-attempt timeout live
-      # in one place for every repo instead of drifting per workflow.
       - name: Prepare CI host
         uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-linux-ci-host@develop
         with:
@@ -63,36 +54,18 @@ jobs:
           fetch-depth: '0'
           submodules: recursive
 
-      # The compiler cache outlives the container: sccache for the clang presets,
-      # ccache for GCC (the hub's Cache.cmake forces it). Only pushes to develop
-      # save, so PR, dispatch and release runs spend no quota.
+      # sccache for clang, ccache for GCC; only pushes to develop save, so other runs spend no quota.
       - name: Restore compiler cache
         id: cc
         uses: Kataglyphis/ANTfrastructure/.github/actions/compiler-cache-restore@develop
         with:
           key: ${{ inputs.arch }}-${{ inputs.compiler }}
 
-      #################################################################################################################
-      ######################################## Prepare deps ###########################################################
-      #################################################################################################################
-      # run-in-linux-container instead of a hand-rolled `docker run`. extra-args
-      # is substituted verbatim into the action's docker command line, so the
-      # -e values are quoted here rather than passed through a step-level env:
-      # an action's own run block does not inherit the CALLER STEP's env, only
-      # the job's.
+      # Env goes in extra-args: an action's run block inherits the job's env, not the calling step's.
       - name: Run build/test/docs/package inside container
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
         with:
-          # CARGO_HOME muss auf einen SCHREIBBAREN Pfad zeigen. Der Image-Default
-          # ist /usr/local/cargo und gehoert root, waehrend der Container als
-          # Nicht-Root laeuft - cxxbridge-cmd scheiterte damit an
-          #   error: failed to create directory
-          #     `/usr/local/cargo/registry/cache/index.crates.io-...`
-          #     Permission denied (os error 13)
-          # Dieselbe Klasse wie UV_PYTHON=/opt/venv auf der Python-Seite: ein
-          # root-eigenes Shared-Verzeichnis als Default, in das ein Nicht-Root-
-          # Build schreiben will. /tmp ist im Container immer schreibbar; der
-          # Registry-Cache ist ohnehin nicht laufuebergreifend persistent.
+          # CARGO_HOME must be writable: the image default /usr/local/cargo is root-owned and the container runs as non-root.
           extra-args: >-
             --privileged --platform ${{ inputs.platform }}
             -e CARGO_HOME=/tmp/cargo
@@ -129,8 +102,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-packages
-          # ci-release.sh already asserts the artifacts exist; an empty upload
-          # here means that assertion was bypassed, so it fails the job.
+          # ci-release.sh asserts the artifacts exist, so an empty upload means that check was bypassed.
           if-no-files-found: error
           path: |
             build-release/*.tar.gz
@@ -139,9 +111,7 @@ jobs:
             build-release/*.AppImage
             build-release/*.flatpak
 
-      # The family's one FTP policy (upstream pin, permission fixup, empty-tree
-      # refusal): third_party/ANTfrastructure/docs/ftp-deploys.md. A manual
-      # dispatch (any branch) never deploys.
+      # See third_party/ANTfrastructure/docs/ftp-deploys.md; a manual dispatch never deploys.
       - name: Sync files to domain
         if: inputs.runner == 'ubuntu-26.04' && inputs.compiler == 'clang' && github.event_name != 'workflow_dispatch'
         uses: Kataglyphis/ANTfrastructure/.github/actions/deploy-over-ftp@develop

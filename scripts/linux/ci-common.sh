@@ -1,30 +1,12 @@
 #!/usr/bin/env bash
-# ci-common.sh - bootstrap shim for CI scripts
-#
-# Sources the ANTfrastructure core library, providing:
-#   Logging    : info, warn, err/die, log
-#   Platform   : arch_oci, is_amd64_arch, detect_system, deb_multiarch_triplet
-#   Parallelism: detect_available_cores, compute_jobs, compute_jobs_with_mem_cap
-#   Apt helpers: apt_install, apt_update_once, require_sudo
-#   Module load: source_module
-#
-# Usage (at the top of every CI script, after set -euo pipefail):
-#   _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-#   # shellcheck disable=SC1091
-#   source "${_SCRIPT_DIR}/ci-common.sh"
+# ci-common.sh - source after set -euo pipefail for ANTfrastructure's core library (info/die, arch_oci, compute_jobs, apt_install).
 
 [ -n "${_CI_COMMON_SH_LOADED:-}" ] && return 0
 _CI_COMMON_SH_LOADED=1
 
 _CI_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Resolve the ANTfrastructure core library.
-# Works from both the repo root and an arbitrary working directory.
-#
-# ANTFRASTRUCTURE_DIR comes from the canonical bootstrap — a verbatim copy of
-# upstream's shared/linux/templates/antfrastructure.sh — rather than a ../.. literal
-# spelled out here. Six repos each had their own version of that line and they
-# had drifted; see ANTfrastructure shared/linux/templates/README.md.
+# ANTFRASTRUCTURE_DIR comes from lib/antfrastructure.sh, a verbatim copy of the upstream template.
 # shellcheck disable=SC1091
 source "${_CI_COMMON_DIR}/lib/antfrastructure.sh"
 
@@ -40,8 +22,7 @@ if [ -f "${_ANTFRASTRUCTURE_CORE}/common.sh" ]; then
   fi
   info "ANTfrastructure core library loaded from ${_ANTFRASTRUCTURE_CORE}"
 else
-  # Minimal fallbacks so scripts still work outside the submodule tree
-  # (e.g. when running on a bare checkout without submodule init).
+  # Minimal fallbacks for a checkout without initialised submodules.
   info()  { printf '[INFO]  %s\n' "$*"; }
   warn()  { printf '[WARN]  %s\n' "$*" >&2; }
   err()   { printf '[ERROR] %s\n' "$*" >&2; exit 1; }

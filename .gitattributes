@@ -1,7 +1,4 @@
-# Shell scripts MUST be LF regardless of anyone's core.autocrlf. They run only
-# inside the Linux CI container, and a lone CR from a Windows checkout makes
-# bash read `\r` as a command - "$'\r': command not found", exit 127 - which
-# looks like a missing tool but is a line-ending fault.
+# Shell scripts must be LF whatever core.autocrlf says: a CR makes bash fail with "$'\r': command not found".
 *.sh    text eol=lf
 *.bash  text eol=lf
 

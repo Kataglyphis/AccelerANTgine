@@ -12,11 +12,6 @@ include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 
 set(PERF_TEST_SUITE perfTestSuite)
 
-# if(RUST_FEATURES)
-#   corrosion_import_crate(MANIFEST_PATH ${PROJECT_SRC_DIR}rusty_code/Cargo.toml)
-#   corrosion_add_cxxbridge(rusty_bridge_perf CRATE rusty_code FILES lib.rs)
-# endif()
-
 add_executable(${PERF_TEST_SUITE})
 
 target_compile_definitions(${PERF_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)

@@ -1,58 +1,12 @@
 #!/usr/bin/env bash
-# ci-docs.sh - project wrapper around ANTfrastructure's generic Sphinx docs builder
-# (linux/scripts/lib/docs-build.sh).
-#
-# What was hand-rolled here and now comes from upstream:
-#   * the venv bootstrap and the inline
-#     `uv pip install sphinx sphinx-book-theme ... breathe exhale ... junit2html`
-#     -> uv_venv_create / uv_pip_install_requirements / uv_venv_activate from
-#        ANTfrastructure 01-core/python_uv.sh, driven by this repo's OWN
-#        requirements.txt so the docs toolchain stops being pinned in two places
-#        (the inline list and requirements.txt had already drifted by a package).
-#   * the _static SVG copy       -> docs_build_copy_static_svg
-#   * the graphviz generator run -> docs_build_run_generator
-#   * `uv run make html`         -> docs_build_sphinx
-#
-# TWO GATES THIS TURNS ON. docs_build_sphinx defaults SPHINXOPTS to
-# "-W --keep-going" and its target list to (html linkcheck); this repo built with
-# neither, i.e. it shipped docs with Sphinx warnings tolerated and dead links
-# unchecked. Neither knob is overridden here, on purpose: if the build now fails,
-# it is failing on warnings that were always there.
-#
-# ORDERING FIX (the diagrams): the SVG copy used to run BEFORE the Doxygen step
-# below it, so a clean run copied nothing - build/build/html does not exist yet
-# at that point - and the site shipped without the Doxygen/Graphviz diagrams. In
-# the full ci-run-all chain it was merely one run stale, because ci-profile-bench
-# rebuilds build/ and doc_doxygen is an ALL target. The Doxygen block now runs
-# ahead of the library steps, so the SVGs that get staged are the ones this run
-# just produced.
-#
-# ORDERING FIX (the test results): the JUnit pages were rendered AFTER Sphinx and
-# copied into its source BEFORE it, so a fresh checkout built an empty
-# test-results toctree and -W failed on it (run 36035276548). The library's four
-# steps are now called one by one, and junit_to_markdown.py writes the pages
-# straight into the Sphinx source before Sphinx runs.
-#
-# THE VENV BOOTSTRAP IS TWO SHELL FUNCTIONS, NOT TWO SCRIPTS - and that is what
-# lets this file call the library's steps instead of re-implementing them.
-# docs_build_prepare_python_env runs DOCS_BUILD_UV_VENV_CREATE_SCRIPT and
-# DOCS_BUILD_UV_INSTALL_REQUIREMENTS_SCRIPT as commands, `(cd "${root}" && "$x")`.
-# A helper *script* would be wrong here: this repo is developed on Windows with
-# core.filemode=false, where git records a new .sh as 100644, so it would reach
-# the Linux container without its exec bit and die with "Permission denied" -
-# which is why every script in this directory is invoked as `bash <path>`. A
-# FUNCTION name is a command too, is inherited by the subshell, and has no file
-# mode at all. Same two steps, same order, no exec bit anywhere.
+# ci-docs.sh - Sphinx docs over ANTfrastructure's docs-build.sh; the venv steps are functions, since core.filemode=false drops a new script's exec bit.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
-# literal: it resolves under ANTFRASTRUCTURE_DIR (which the literal ignored, so the
-# bootstrap's environment override did nothing) and fails naming the probed path
-# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+# antfrastructure_source (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override.
 antfrastructure_source linux/scripts/lib/docs-build.sh
 antfrastructure_source linux/scripts/01-core/python_uv.sh
 
@@ -74,15 +28,7 @@ done
 if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   info "Building documentation"
 
-  # ---------------------------------------------------------------------------
-  # Python environment, handed to the library as two commands (see the header).
-  # uv_venv_create with an explicit empty version lets uv resolve the interpreter
-  # (honouring the container's UV_PYTHON) instead of pinning python_uv.sh's
-  # default, and uv_pip_install_requirements carries the load-bearing
-  # `--python .venv/bin/python` pin: uv honours UV_PYTHON OVER an activated venv,
-  # so a plain `uv pip install` targets the image's root-owned /opt/venv and dies
-  # with Permission denied for the non-root CI user.
-  # ---------------------------------------------------------------------------
+  # Not a plain `uv pip install`: uv honours UV_PYTHON over an active venv and would hit the root-owned /opt/venv.
   VENV_DIR="${WORKSPACE_DIR}/.venv"
   DOCS_BUILD_VENV_DIR="${VENV_DIR}"
 
@@ -94,20 +40,9 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   DOCS_BUILD_UV_VENV_CREATE_SCRIPT=docs_venv_create
   DOCS_BUILD_UV_INSTALL_REQUIREMENTS_SCRIPT=docs_venv_install_requirements
 
-  # ---------------------------------------------------------------------------
-  # Project-specific pre-Sphinx work, hoisted ahead of the library steps: Doxygen
-  # is what writes the SVGs docs_build_copy_static_svg stages, and the XML tree
-  # breathe/exhale read (docs/source/conf.py points at build/build/xml).
-  # ---------------------------------------------------------------------------
-  # Both steps here used to hide behind "if the file exists" guards, so a
-  # missing doxygen made this whole block vanish and the lane died twenty lines
-  # later on an unexplained `cp: cannot stat .../*.svg`. Both files MUST exist.
+  # Doxygen runs before the library steps: it writes the SVGs they stage and the XML breathe reads.
   [[ -f "CMakeLists.txt" ]] || die "CMakeLists.txt not found in $(pwd) - ci-docs.sh must run from the repo root (ci-run-all.sh does)."
-  # -G Ninja is load-bearing, not taste: this project scans C++ modules, which
-  # CMake supports only under Ninja/VS generators - the bare default (Unix
-  # Makefiles) fails generate. It never surfaced in the ci-run-all chain because
-  # ci-build-and-test.sh had already configured build/ with a Ninja preset and
-  # the cache pinned the generator; standalone (fresh build/) it reproduces.
+  # -G Ninja: CMake scans C++ modules only under Ninja/VS generators.
   cmake -S . -B build -G Ninja
 
   [[ -f "build/Doxyfile" ]] || die "build/Doxyfile missing after configure: enable_doxygen() (ANTfrastructure cmake/Doxygen.cmake, via cmake/ProjectOptions.cmake) only writes it when find_package(Doxygen) succeeds - is doxygen installed in this image? The SVG staging below hard-requires its output."
@@ -116,44 +51,28 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   rm -rf docs/source/api
   mkdir -p docs/source/api
 
-  # Also drop Sphinx's incremental state (docs/build holds doctrees + the
-  # environment pickle). breathe caches per-file Doxygen state in there, and a
-  # stale pickle against regenerated XML dies with "Extension error
-  # (breathe.file_state_cache)" - CI never sees it (fresh checkout), local
-  # reruns did. The full rebuild costs seconds; the failure cost a debug session.
+  # A stale breathe pickle against regenerated XML fails with "Extension error (breathe.file_state_cache)".
   rm -rf docs/build
 
   mkdir -p docs/source/coverage
   mkdir -p docs/source/test-results
 
-  # ---------------------------------------------------------------------------
-  # Library pipeline: stage the SVGs, generate the diagrams, run Sphinx.
-  # DOCS_BUILD_SPHINXOPTS and DOCS_BUILD_TARGETS stay at the library defaults.
-  # ---------------------------------------------------------------------------
+  # Library pipeline; SPHINXOPTS and targets stay at the library defaults (-W, linkcheck).
   DOCS_BUILD_PROJECT_ROOT="${WORKSPACE_DIR}"
-  # Anchored to WORKSPACE_DIR: docs_build_copy_static_svg resolves its
-  # DESTINATION against DOCS_BUILD_PROJECT_ROOT but its SOURCE against cwd, and
-  # --workspace-dir is a public flag, so a bare relative DOCS_OUT could read
-  # SVGs from one tree and stage them into another.
+  # Anchored: the library resolves the SVG source against cwd but the destination against the project root.
   case "${DOCS_OUT}" in
     /*) DOCS_BUILD_SVG_SOURCE_DIR="${DOCS_OUT}" ;;
     *)  DOCS_BUILD_SVG_SOURCE_DIR="${WORKSPACE_DIR}/${DOCS_OUT}" ;;
   esac
   DOCS_BUILD_GENERATOR_SCRIPT="graphviz_generator.py"
 
-  # docs_build_copy_static_svg is a bare `cp *.svg` - with no SVGs it dies with
-  # an unexplained "cannot stat", so name the real producer first.
+  # The library's bare `cp *.svg` fails with an unexplained "cannot stat", so name the producer first.
   compgen -G "${DOCS_BUILD_SVG_SOURCE_DIR}/*.svg" >/dev/null \
     || die "Doxygen wrote no SVGs to ${DOCS_BUILD_SVG_SOURCE_DIR}; HAVE_DOT=YES in Doxyfile.in needs graphviz (dot) in the image."
-  # The library's steps one by one, not docs_build_main: the test-result pages
-  # have to land before Sphinx reads them. See the header.
+  # Steps one by one, not docs_build_main: the test-result pages must land before Sphinx reads them.
   docs_build_prepare_python_env
 
-  # ---------------------------------------------------------------------------
-  # Test-result pages, one per report ci-build-and-test.sh wrote with
-  # `ctest --output-junit docs/test_results*.xml`. Kept local rather than pushed
-  # upstream: nothing else in the fleet puts JUnit XML on its docs site.
-  # ---------------------------------------------------------------------------
+  # Test-result pages, one per JUnit report ci-build-and-test.sh wrote.
   results_dir="${WORKSPACE_DIR}/docs/source/test-results"
   # Only generated pages match: the hand-written file here is index.rst.
   rm -f "${results_dir}"/*.md
@@ -165,8 +84,7 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
       "${report}" "${results_dir}/$(basename "${report}" .xml).md"
   done
   info "Test-result pages: rendered ${#reports[@]} JUnit report(s)"
-  # A build that found no report says so on a page: the toctree globs this
-  # directory, and -W fails an empty glob.
+  # The toctree globs this directory, and -W fails an empty glob.
   if [ ${#reports[@]} -eq 0 ]; then
     printf '# No test results\n\nThis documentation build found no JUnit XML to render.\n' \
       > "${results_dir}/no-results.md"
@@ -177,10 +95,7 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   docs_build_sphinx
   info "Sphinx build complete"
 
-  # The copy below used to end in `|| true`. The directory is checked on the
-  # line above it, so the only thing that swallowed was a real copy failure -
-  # and a site silently missing its coverage pages is exactly what this step
-  # exists to prevent. The test-result pages are Sphinx pages now, not a copy.
+  # No `|| true` on the copy: a site silently missing its coverage pages is what this step prevents.
   SITE_DIR="${WORKSPACE_DIR}/docs/build/html"
   mkdir -p "$SITE_DIR"
   if [[ -d "${WORKSPACE_DIR}/docs/coverage" ]]; then

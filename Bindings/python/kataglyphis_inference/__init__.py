@@ -2,9 +2,7 @@
 
 import os as _os
 
-# The extension module links against AccelerANTgine (and, depending on
-# the build, ONNX Runtime / GStreamer DLLs). The core DLL ships inside this
-# package; extra runtime DLL directories can be supplied via KATAGLYPHIS_DLL_PATH.
+# Python 3.8+ on Windows ignores PATH for extension DLLs; KATAGLYPHIS_DLL_PATH adds extra directories.
 if hasattr(_os, "add_dll_directory"):
     _pkg_dir = _os.path.dirname(_os.path.abspath(__file__))
     _os.add_dll_directory(_pkg_dir)

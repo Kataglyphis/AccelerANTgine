@@ -1,22 +1,6 @@
 #requires -Version 7.0
 
-# Guards against generated artifacts sneaking into this repo's git index.
-#
-# The check itself is generic and lives in ANTfrastructure's
-# WindowsRepoHygiene.Common (Get-TrackedIgnoredFile, Get-TrackedGeneratedArtifact,
-# each with its own suite upstream). Only this repo's root and its pathspec list
-# are local - what counts as "generated" is a property of THIS build.
-#
-# Why it exists here: this tree shipped docs/_build_validation/, docs/test-results/,
-# docs/test-results-md/, docs/test_results.xml, profile.prof and a
-# Test/python/__pycache__/*.pyc in the index, all of them rewritten by
-# ci-docs.sh / ci-profile-bench.sh / pytest on every run. Adding the .gitignore
-# rules fixed nothing on its own: .gitignore stops NEW files, and does nothing
-# once a path is already tracked. Both halves were needed, and this suite is what
-# keeps the second half from quietly regressing.
-#
-# NOTE: written for Pester 3.4.0 (what the Windows lane pins) - no BeforeAll
-# outside Describe, and the dash-less assertion syntax.
+# Keeps generated artifacts out of the index, where .gitignore no longer helps; Pester 3.4.0 syntax.
 
 Describe 'Repo generated artifacts' {
 
@@ -38,15 +22,7 @@ Describe 'Repo generated artifacts' {
     }
 
     It 'has no tracked file under a known generated-output path' {
-        # The check above only sees files that are tracked AND ignored. An
-        # artifact committed before anyone added the ignore rule is tracked and
-        # NOT ignored, so it is invisible to it - which is exactly how
-        # docs/test_results.xml and profile.prof survived here for months.
-        #
-        # These are git pathspecs. '**/__pycache__/*' rather than
-        # '**/__pycache__/': measured against this index, the trailing-slash
-        # form matches nothing, so it would have reported clean over the .pyc
-        # that was actually tracked.
+        # Catches what the check above cannot: tracked and not ignored; git pathspecs, and '**/__pycache__/' matches nothing.
         $generated = @(
             'logs/'                     # Build-Windows.ps1 / ci-* run output
             'target/'                   # cargo, Src/rusty_code

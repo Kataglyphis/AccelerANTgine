@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
-# Copied verbatim from ANTfrastructure
-# `shared/linux/templates/antfrastructure.sh` — do not hand-edit; sync from
-# upstream instead. This is the one build-tooling file that cannot be sourced
-# out of the submodule, because it is what *finds* the submodule.
-#
-# Entry points: antfrastructure_path / antfrastructure_source / antfrastructure_exec.
-# See ANTfrastructure shared/linux/templates/README.md.
-# Load guard: sourcing twice is free and common (a driver and its wrapper both
-# want the helpers).
+# Body synced verbatim from ANTfrastructure shared/linux/templates/antfrastructure.sh; never hand-edit below this line.
 [ -n "${_KATAGLYPHIS_ANTFRASTRUCTURE_SH_LOADED:-}" ] && return 0
 _KATAGLYPHIS_ANTFRASTRUCTURE_SH_LOADED=1
 

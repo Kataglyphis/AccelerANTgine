@@ -98,8 +98,7 @@ auto shape_from_array(const CpuFloatArray &array) -> kataglyphis::inference::Ten
     return shape;
 }
 
-// Hand the tensor's storage to NumPy without copying: the vector moves to the
-// heap and a capsule deletes it once the last array reference dies.
+// Zero-copy: the vector moves to the heap and a capsule frees it when the last array reference dies.
 auto tensor_to_numpy(kataglyphis::inference::TensorData &&tensor) -> nb::ndarray<nb::numpy, float>
 {
     auto data = std::make_unique<std::vector<float>>(std::move(tensor.data));

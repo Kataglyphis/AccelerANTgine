@@ -1,52 +1,6 @@
 name: Lint gates
 
-# ONE `uses:` LINE, because ANTfrastructure now ships the lane itself.
-# Seven consumers carried this job as a copy, every copy's header saying
-# "replace this with a `uses:` when the hub grows a reusable lint lane"; hub
-# commit 987f832a is that lane (.github/workflows/lint-gates.yml, workflow_call).
-# What the copy here did - checkout at fetch-depth 1 with submodules, install uv,
-# run the aggregator against an EXPLICIT consumer root - is exactly what the hub
-# job does, and the hub additionally pins actions/checkout by SHA rather than by
-# tag. The dev-box command is unchanged and still the same one:
-#
-#   bash scripts/linux/run-lint-gates.sh [--ratchets]
-#
-# The hub job runs the aggregator DIRECTLY out of third_party/ANTfrastructure
-# with "${GITHUB_WORKSPACE}" as the root rather than through that wrapper,
-# because the wrappers sit at different paths across the family and one consumer
-# has no submodule at all. Same script, same root, same verdict.
-#
-# submodules: 'recursive', which is the hub's default. This file briefly
-# overrode it to 'true' to skip a clone, on the argument that every scope drops
-# third_party/ so nothing below the top level is graded. That holds for the
-# SCOPES and not for the TREE: docs/source/_static/css/custom.css is a tracked
-# symlink into third_party/ANTfrastructure/third_party/DocumANTation, a NESTED
-# submodule, so a top-level-only checkout leaves it dangling. Every --root gate
-# builds its scope through gate_scope.tracked(), which refuses a tracked path
-# that is not on disk - os.path.exists() follows the link - so the ratchets went
-# red on a partial tree the day they were switched on, while a dev box with the
-# family checked out recursively stayed green. The recursion is nearly free
-# anyway: of the seven submodules only ANTfrastructure and nanobind nest at all,
-# one each.
-#
-# ratchets: true since 2026-09-15. The eight --root measurement gates plus
-# doc-links now grade this tree; comment-size.allow and shellcheck-warnings.allow
-# at the repo root are the seeded freeze files, and a new offender is red.
-#
-# NO CONTAINER IMAGE IS NAMED, unlike every other Linux lane here, and that is
-# correct rather than an oversight: the gate binaries are bootstrapped from
-# ANTfrastructure's own versions.env at pinned, SHA256-verified versions, so the
-# verdict does not depend on what kataglyphis_beschleuniger happens to ship - and
-# skipping the GHCR login and the multi-gigabyte pull is what makes this the
-# first lane to finish.
-#
-# A STANDALONE WORKFLOW, not a job inside reusable-linux.yml: that file is a
-# reusable workflow called once per (arch x compiler) by linux-x64.yml and
-# linux-arm64.yml, so a gate placed there would grade the same tree four times.
-# The tree is architecture-independent and so is its verdict.
-#
-# @develop, like every other ANTfrastructure reference in this repo: upstream is
-# pushed before the consumer change that needs it.
+# Standalone, not in reusable-linux.yml, so the tree is graded once; dev-box twin: scripts/linux/run-lint-gates.sh.
 
 on:
   push:
@@ -54,8 +8,7 @@ on:
   pull_request:
     branches: ["main", "develop"]
 
-# Read-only: this lane reports a verdict and writes nothing. Every other
-# workflow here declares its token scope too, since 2026-09-24.
+# Read-only: this lane reports a verdict and writes nothing.
 permissions:
   contents: read
 
@@ -64,5 +17,6 @@ jobs:
     name: shellcheck + actionlint + gitleaks + ruff + ratchets
     uses: Kataglyphis/ANTfrastructure/.github/workflows/lint-gates.yml@develop
     with:
+      # recursive: docs/source/_static/css/custom.css links into a nested submodule, and a dangling path fails the gates.
       submodules: 'recursive'
       ratchets: true

@@ -1,26 +1,12 @@
 #!/usr/bin/env bash
-# ci-profile-bench.sh - project wrapper around ANTfrastructure's generic CMake build
-# driver (linux/scripts/lib/cmake-build.sh) for the profiling/benchmark lane.
-#
-# The jobs computation and the configure+build pair this file used to duplicate
-# from ci-build-and-test.sh now come from cmake_build_jobs / cmake_build_run, and
-# the clean rebuild is cmake_build_run's --clean-build-dir instead of a local
-# `rm -rf`. cmake_build_prepare_env comes with them: CCACHE_SECONDARY_STORAGE
-# sanity plus the writable CARGO_HOME/SCCACHE_DIR/CCACHE_DIR fallbacks that this
-# repo had no equivalent of (see ci-build-and-test.sh for the incidents).
-#
-# What stays here is the profiling itself: perf record over the CLI binary and
-# the Google Benchmark suite.
+# ci-profile-bench.sh - perf over the CLI and the Google Benchmark suite, built with ANTfrastructure's cmake-build.sh.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# antfrastructure_source, not a "${_SCRIPT_DIR}/../../third_party/ANTfrastructure/..."
-# literal: it resolves under ANTFRASTRUCTURE_DIR (which the literal ignored, so the
-# bootstrap's environment override did nothing) and fails naming the probed path
-# and the fix. In scope because ci-common.sh sources lib/antfrastructure.sh.
+# antfrastructure_source (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override.
 antfrastructure_source linux/scripts/lib/cmake-build.sh
 
 PERF_TIMEOUT_SECONDS="180"
@@ -35,19 +21,9 @@ CLANG_PROFILE_PRESET="linux-profile-clang"
 LOGS_DIR="logs"
 PROFILE_OUTPUT=""
 
-# The binary perf profiles. Src/CMakeLists.txt builds the CLI as
-# ${PROJECT_NAME}_cli with OUTPUT_NAME ${PROJECT_NAME} into ${CMAKE_BINARY_DIR}/bin,
-# and PROJECT_NAME is AccelerANTgine since the rename (CMakeLists.txt:5). This
-# line still said "./KataglyphisCppProject" - the pre-rename name, and in the
-# wrong directory on top of it, so perf never had anything to record.
 PROFILE_BINARY="bin/AccelerANTgine"
 
-# The workload under the profiler. Without --webrtc the CLI prints its version
-# and exits 0 (Src/cli_main.cpp:168-175), so a bare invocation profiles process
-# startup and nothing else. The usage block in cli_main.cpp documents
-# `--webrtc --source test` as the headless no-camera path; it streams the
-# synthetic source until told to stop - as long as a signalling server answers,
-# which start_signalling_server provides.
+# Without --webrtc the CLI only prints its version; the headless test source streams until stopped.
 PROFILE_ARGS="--webrtc --source test"
 
 while [[ $# -gt 0 ]]; do
@@ -65,8 +41,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Deliberate word-splitting: --profile-args is a whole argv tail for the
-# profiled binary, not a single token.
+# Deliberate word-splitting: --profile-args is a whole argv tail, not a single token.
 read -r -a PROFILE_ARGS_ARR <<<"${PROFILE_ARGS}"
 
 WORKSPACE_DIR="$(pwd)"
@@ -82,28 +57,17 @@ fi
 CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
 
 info "Using profiling preset: ${PRESET}"
-# --mb-per-job 2000: the per-job RAM cap the pre-library jobs computation used
-# (parallelism.sh generic profile); cmake-build.sh's 4000 default would cut the
-# job count on memory-capped runners.
+# About 2 GB per TU; the 4000 MB default would cut the job count on memory-capped runners.
 cmake_build_main --preset "${PRESET}" --build-dir "${BUILD_DIR}" --clean-build-dir true --mb-per-job 2000
 
 if [[ ! -x "${BUILD_DIR}/${PROFILE_BINARY}" ]]; then
   die "Profiling target '${BUILD_DIR}/${PROFILE_BINARY}' is missing or not executable after building preset '${PRESET}'."
 fi
 
-# How perf records, shared by the probe and the real run so that a passing probe
-# vouches for exactly the options the real run uses (--call-graph dwarf needs a
-# perf built with DWARF unwinding, not just any perf).
+# Shared by the probe and the real run, so a passing probe vouches for exactly these options.
 PERF_RECORD_ARGS=(-F 99 --call-graph dwarf)
 
-# Can this host run perf at all? Sets PERF_SKIP_REASON when it cannot. The CI
-# image cannot: Ubuntu 26.04's linux-tools-common no longer ships /usr/bin/perf
-# (it moved to linux-perf, which the image does not install), and the bare
-# `timeout ... perf record` died with exit 127, "timeout: failed to execute
-# process" (run 35921977662). Such a host - or one whose perf_event_paranoid or
-# seccomp forbids perf_event_open - gets a WARN naming why. The probe records
-# `true` with the real options, so once it passes every exit of the real run but
-# 124 stays fatal. Detail: AGENTS.md section 4.
+# Sets PERF_SKIP_REASON when this host cannot run perf, as in the CI image (AGENTS.md section 4).
 perf_probe() {
   PERF_SKIP_REASON=""
   if ! command -v perf >/dev/null 2>&1; then
@@ -120,14 +84,7 @@ perf_probe() {
   fi
 }
 
-# The workload is a WebRTC producer and needs a signalling server to stream. With
-# none on its URI (default ws://127.0.0.1:8443) webrtcsink's signaller gets
-# "Connection refused", the state turns Error, and the CLI's loop
-# (Src/cli_main.cpp:250-258) breaks and returns 0 about 200 ms in - so with a
-# real perf the lane died "exited cleanly before the window closed". Unless
-# --profile-args names its own --server, this starts the image's
-# gst-webrtc-signalling-server on 127.0.0.1:${SIGNALLING_PORT} and points the
-# CLI at it; not 8443, where a dev box's own producer listens. AGENTS.md sec. 4.
+# With no signalling server the CLI exits cleanly about 200 ms in; not 8443, a dev box's own port (AGENTS.md section 4).
 SIGNALLING_PID=""
 WORKLOAD_ARGS=("${PROFILE_ARGS_ARR[@]}")
 
@@ -171,14 +128,7 @@ stop_signalling_server() {
   trap - EXIT
 }
 
-# run_workload <what> <window-seconds> [recorder argv...] - the workload under
-# `timeout`, behind the recorder when one is given. Exit 124 is timeout's own
-# and the EXPECTED end: the CLI streams until stopped, perf finalizes perf.data
-# on the TERM, and the CLI's SIGTERM handler (Src/cli_main.cpp:245-246) exits
-# cleanly, which lets gperftools dump CPUPROFILE. An early exit 0 means the
-# workload bailed out (bad flag, version-print, no signalling server) and only
-# startup was measured; any other exit is a failure. This used to warn on ANY
-# non-zero exit, so a lane that recorded nothing still went green.
+# run_workload <what> <window-seconds> [recorder argv...] - timeout's 124 is the expected end; an early 0 profiled nothing.
 run_workload() {
   local what="$1" window="$2" status=0
   shift 2
@@ -211,9 +161,7 @@ fi
 if [[ -s "${PROFILE_OUTPUT}" ]]; then
   info "gperftools CPU profile: ${PROFILE_OUTPUT}"
 else
-  # Named expected case, not an error: ProjectOptions.cmake links -lprofiler
-  # only when find_library(PROFILER_LIB profiler) succeeds; without it the
-  # build falls back to -pg and CPUPROFILE is inert.
+  # Expected without libprofiler: the build falls back to -pg and CPUPROFILE is inert.
   info "no gperftools profile at ${PROFILE_OUTPUT} (libprofiler not linked; ProjectOptions.cmake fell back to -pg)"
 fi
 

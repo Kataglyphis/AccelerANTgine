@@ -17,11 +17,6 @@ file(GLOB_RECURSE KataglyphisCppProject_COMMIT_TEST_FILTER "*.cpp")
 
 message("Commit test filter is: ${KataglyphisCppProject_COMMIT_TEST_FILTER}")
 
-# if(RUST_FEATURES)
-#   corrosion_import_crate(MANIFEST_PATH ${PROJECT_SRC_DIR}rusty_code/Cargo.toml)
-#   corrosion_add_cxxbridge(rusty_bridge_commit CRATE rusty_code FILES lib.rs)
-# endif()
-
 add_executable(${COMMIT_TEST_SUITE})
 
 set(_commit_resource_path "/../../../Resources/")

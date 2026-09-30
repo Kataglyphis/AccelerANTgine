@@ -1,5 +1,4 @@
-# Kataglyphis Inference Configuration
-# See: kataglyphis.toml_config module
+# Kataglyphis inference configuration; see the kataglyphis.toml_config module.
 
 [model]
 model_path = "models/yolo26n.onnx"

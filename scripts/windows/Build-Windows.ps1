@@ -2,27 +2,17 @@
 
 <#
 .SYNOPSIS
-  Configurable Windows container build script for the Kataglyphis project using the ANTfrastructure build framework.
+  Windows container build of the -BuildTargets configurations, on the ANTfrastructure build framework.
 
 .DESCRIPTION
-  Run with defaults or pass parameters to override workspace path and other options.
-  Accepts a -BuildTargets array to selectively build specific targets (e.g. clangcl-debug, clangcl-profile, clangcl-release).
-  Builds are executed outside the mounted workspace for performance, and artifacts are synced back upon completion.
-  clangcl-release packages to dist\windows-<x64|arm64>: a portable bundle, the MSI and ZIP, the MSIX, each
-  carrying the engine's DLL closure (the media stack, the chain ONNX Runtime, the VC++ runtime).
-  -TargetArch arm64 is the cross build of windows-arm64-cross.yml, run in the family image's arm64 bundle:
-  clangcl-release only, configured with the hub's cross arguments.
+  Builds outside the mounted workspace and syncs back; clangcl-release packages to dist\windows-<x64|arm64>.
+  -TargetArch arm64 cross-builds clangcl-release only (windows-arm64-cross.yml).
 #>
 
 param(
     [string]$WorkspaceDir = $PWD.Path,
     [string[]]$BuildTargets = @("clangcl-debug", "clangcl-profile", "clangcl-release"),
-    # Build directories, presets and their `cmake --build --config` values are
-    # NOT parameters any more: they are rows in Build-Windows.config.psd1, read
-    # through ANTfrastructure's WindowsConfig.Common. Retarget one row with its
-    # BuildDirEnv/PresetEnv environment variable, or point -ConfigPath at a
-    # different table. FastBuildDir and LogDir keep their parameters but take
-    # their defaults from that same file, so there is one place to look.
+    # Build dirs and presets are rows in Build-Windows.config.psd1, which also defaults FastBuildDir and LogDir.
     [string]$ConfigPath,
     [string]$FastBuildDir,
     [string]$LLVMBinPath = "C:\Program Files\LLVM\bin",
@@ -36,36 +26,16 @@ param(
     [switch]$SkipMSIX,
     [switch]$ContinueOnError,
     [switch]$StopOnError,
-    # amd64 (alias x64) or arm64. Empty: the image's WINDOWS_TARGET_ARCH, else amd64,
-    # resolved by the hub's Get-WindowsTargetArch, which throws on anything else.
+    # amd64 (alias x64) or arm64; empty means the image's WINDOWS_TARGET_ARCH, else amd64.
     [string]$TargetArch = ''
 )
 
 $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
 
-# ANTfrastructure build framework, resolved through the shared bootstrap (a
-# verbatim copy of ANTfrastructure's shared/windows/templates/Resolve-BuildModule.ps1)
-# rather than a hard-coded submodule path: a module that moves upstream is
-# picked up without editing this script, and a missing submodule reports the
-# exact `git submodule update` command instead of a bare path.
-#
-# WindowsLogging.Common is deliberately NOT listed any more: upstream folded it
-# into WindowsBuild.Common (b391a1d), which exports the Write-BuildLog*
-# wrappers this script actually uses. Importing it by name has been a hard
-# failure against any recent ANTfrastructure.
+# The shared bootstrap names the exact `git submodule update` fix when the submodule is missing.
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
 
-# Dependency order: Shared, then Build, then what builds on them.
-#
-# Nested imports inside a .psm1 are MODULE-PRIVATE, so every module this script
-# calls into must be named here explicitly - WindowsCMake.Common importing
-# WindowsBuild.Common does not put Write-BuildLog in this scope.
-#
-# WindowsToolchain.Common, WindowsTesting.Common, WindowsClang.Common and
-# WindowsConfig.Common are the four whose jobs this script used to hand-roll:
-# toolchain probing, ctest/manual-test execution with the ASan runtime
-# reachable, clang-tidy over a compile-commands database, and the build table
-# reader. BeschleunigerBallett has imported the same set for months.
+# Dependency order; nested .psm1 imports are module-private, so every module called here is listed.
 Import-BuildModule @(
     'WindowsScripts.Shared'
     'WindowsBuild.Common'
@@ -82,8 +52,7 @@ Import-BuildModule @(
     'WindowsMediaRuntime.Common'
     'WindowsTargetArch.Common'  # the target: accepted spellings, cross or not, the MSVC lib dir
 )
-# The cross configure arguments, the package arch and the DLL closure with its search order.
-# A hub pin older than the x64 closure (2026-09-25) lacks Get-ProductDllSearchPath and says so.
+# Cross arguments, package arch and the DLL closure; an older hub pin lacks Get-ProductDllSearchPath.
 try {
     Import-BuildModule @('WindowsCrossBundle.Common')
     $null = Get-Command -Name 'Get-ProductDllSearchPath' -ErrorAction Stop
@@ -93,27 +62,18 @@ try {
 $TargetArch = Get-WindowsTargetArch -Arch $TargetArch
 $isCross = Test-WindowsCrossTarget -Arch $TargetArch
 $packageArch = Get-WindowsPackageArch -Arch $TargetArch
-# Checked before the build log opens, so a refusal exits non-zero. Debug links an ASan
-# runtime the bundle has no aarch64 copy of and runs FuzzTest's grammar generator during
-# the build; Profile runs benchmarks and a PGO pass; MSVC's preset pins x64.
+# Before the log opens, so a refusal exits non-zero; Debug needs an aarch64 ASan runtime, Profile runs on the host, MSVC pins x64.
 $requestedTargets = @($BuildTargets -join ',' -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $notCross = @($requestedTargets | Where-Object { $_ -ne 'clangcl-release' })
 if ($isCross -and $notCross.Count -gt 0) {
     throw "-TargetArch $TargetArch builds clangcl-release only, not $($notCross -join ', ') (third_party/ANTfrastructure/docs/windows-cross-builds.md)."
 }
-# The G6 proof of every staged bin\, install tree and payload: the hub's WindowsOrtPayload.Common,
-# this repo's WindowsOrtBundle.Common until 2026-09-25. An older hub pin lacks it.
+# The G6 proof of every staged bin\, install tree and payload; an older hub pin lacks it.
 try { Import-BuildModule @('WindowsOrtPayload.Common') } catch {
     throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit ad08bc30 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
 }
 
-# ---------------------------------------------------------------------------
-# The build table. Import-PowerShellDataFile plus Get-ConfigValue/Get-OrDefault
-# (WindowsConfig.Common) rather than five script parameters with literal
-# defaults: a preset rename becomes a data edit, and every row carries its own
-# environment override, so a CI lane retargets one configuration without anyone
-# adding a parameter for it.
-# ---------------------------------------------------------------------------
+# The build table: a preset rename is a data edit, and every row carries its own environment override.
 $configPathResolved = Get-OrDefault $ConfigPath (Join-Path $PSScriptRoot 'Build-Windows.config.psd1')
 if (-not (Test-Path $configPathResolved)) {
     throw "Build config not found: $configPathResolved"
@@ -145,11 +105,7 @@ function Get-BuildConfiguration {
     }
 }
 
-# App-local VC++ runtime (Microsoft's supported local deployment) from the toolset that
-# built the tree. Start-Windows.ps1's host runs otherwise load the runner's redistributable,
-# and a VS 2022 runner's is older than the VS 2026 toolset these binaries import from: the
-# Debug CLI would not start there (run 36035275991). Build-tree only; the installers pack the
-# CMake install tree and MSIX names its files, so nothing here ships.
+# For host runs only: a VS 2022 runner's redistributable is older than the toolset the binaries import from.
 function Copy-AppLocalVcRuntime {
     param(
         [Parameter(Mandatory)][pscustomobject]$Context,
@@ -169,12 +125,7 @@ function Copy-AppLocalVcRuntime {
     Write-BuildLog -Context $Context -Message "App-local VC++ runtime: $($crt.Count) DLL(s) from $($crt[0].DirectoryName) -> $($Destination -join ', ')"
 }
 
-# The image's GStreamer core DLLs (glib, gobject, gstreamer-1.0, gstapp, ...) beside the
-# CLI. Copy-MediaRuntimeBundle finds GStreamer only in the SDK installer's locations, and
-# the image builds it into C:\runtime\bin, so a host run lacked every one of them (run
-# 36044940426: "gstreamer-1.0-0.dll (imported by AccelerANTgine.dll) -- NOT FOUND").
-# Same source and exclusion as OmniAccelerANT's runner bundling: never an ORT-family DLL,
-# which only the chain staging may supply, and G6 then proves the directory.
+# Copy-MediaRuntimeBundle misses the image's C:\runtime\bin; ORT-family DLLs stay the chain staging's alone.
 function Copy-ImageGStreamerRuntime {
     param(
         [Parameter(Mandatory)][pscustomobject]$Context,
@@ -227,8 +178,7 @@ try {
     # Fast Local Cache Initialization (Outside mounted dir)
     $fastLocalCache = Initialize-BuildCacheEnvironment -Context $Context -FastBuildDir $FastBuildDir
     
-    # One row per lane: build directory, preset and the --config value that also
-    # decides whether Invoke-CmakeConfigureAndBuild stages the sanitizer runtime.
+    # The --config value also decides whether Invoke-CmakeConfigureAndBuild stages the sanitizer runtime.
     $cfgMsvc = Get-BuildConfiguration -Name 'msvc-debug'
     $cfgClang = Get-BuildConfiguration -Name 'clangcl-debug'
     $cfgProfile = Get-BuildConfiguration -Name 'clangcl-profile'
@@ -253,32 +203,6 @@ try {
     $doProfile = $BuildTargets -contains "clangcl-profile"
     $doRelease = $BuildTargets -contains "clangcl-release"
 
-    # Get-LLVMRuntimePaths used to live here. It is gone, and nothing replaced it
-    # locally: the ASan runtime is found by WindowsTesting.Common
-    # (Get-AsanRuntimeDirs, which knows about Microsoft's runtime as well as
-    # LLVM's) and staged by WindowsCMake.Common's Invoke-CmakeConfigureAndBuild
-    # for any -Configuration Debug. Both its callers - the hand DLL copy after the
-    # ClangCL debug build and the PATH juggling around ctest - are gone with it.
-
-    # Add-ExistingDirectory, Get-RuntimeDependencyDirectories and
-    # Copy-RuntimeDependencies used to live here, under a comment saying the pair
-    # stayed "under the two-consumer rule". The rule is met, so they are
-    # WindowsMediaRuntime.Common's Get-MediaRuntimeDirectory and
-    # Copy-MediaRuntimeBundle now (ANTfrastructure f92f10ef) - a module whose
-    # signature was taken from the three call sites below, which is why they
-    # collapse to one exported call each.
-    #
-    # ONNX Runtime comes from the chain install only (ANTfrastructure owner rule
-    # 2026-09-23). A hub pin before that change probed NuGet runtimes\<rid>\native
-    # layouts alone, found nothing under the image's chain ONNX_ROOT, and left the
-    # exe to load System32's Windows ML onnxruntime.dll. From that change on the
-    # hub stages ONNX_ROOT\lib + \bin (Get-OnnxChainLayout) and byte-checks every
-    # ORT DLL it leaves; Assert-ChainOrtTree (WindowsOrtPayload.Common) then runs the
-    # hub's G6 census over each bin\ (chain bytes, and every importer resolving to
-    # them), and the import block above refuses a hub pin that predates it.
-    #
-    # The empty-payload guard the local comment was written for is upstream too,
-    # and pinned by its suite: the resolver returns an empty ARRAY, not $null.
     # --- Step 1: Environment Setup ---
     Invoke-BuildStep -Context $Context -StepName "Environment Setup" -Critical -Script {
         $finalPath = $LLVMBinPath
@@ -286,11 +210,6 @@ try {
             $clangCl = Get-Command clang-cl.exe -ErrorAction SilentlyContinue
             if ($clangCl) { $finalPath = Split-Path -Parent $clangCl.Source }
         }
-        # Add-DirectoriesToPath (WindowsScripts.Shared) prepends, de-duplicates and
-        # skips a directory that does not exist - the three things the two
-        # hand-written blocks here did between them. Add-DirectoryToPath, which the
-        # audit item named, is its unexported internal helper; the plural is the
-        # exported surface.
         Add-DirectoriesToPath @(
             $finalPath
             (Join-Path $env:USERPROFILE 'scoop\shims')
@@ -298,12 +217,7 @@ try {
         Write-BuildLog -Context $Context -Message "PATH front: $finalPath and the Scoop shims (when present)"
     }
 
-    # --- Step 2: Environment Check ---
-    # Invoke-ToolchainChecks (WindowsToolchain.Common) runs each probe, warns on
-    # the ones that fail and collects the names - the same "report, do not abort"
-    # behaviour the two -IgnoreExitCode calls had, minus the hand-rolling. Pass
-    # -RequiredTools/-FailOnMissingRequiredTools here the day a missing tool
-    # should stop the run.
+    # --- Step 2: Environment Check (reports, never aborts) ---
     Invoke-BuildStep -Context $Context -StepName "Environment Check" -Script {
         Invoke-ToolchainChecks -Context $Context -ToolArguments @{
             clang = @('--version')
@@ -311,40 +225,9 @@ try {
         }
     }
 
-    # --- Step 3: cmake-format ---
-    # Mirrors the Linux lane's cmake-format gate. Upstream Invoke-CmakeFormatStep
-    # creates/heals the uv venv itself and installs the requirements it is
-    # pointed at, so no separate venv step is needed; it throws when uv or
-    # cmake-format is missing.
-    #
-    # BOTH PARAMETERS BELOW ARE NEW IN 19286e9f, and each closes a gap against
-    # the Linux lane rather than adding a preference:
-    #
-    #   -RequirementsPath  without it the step installs this repo's WHOLE
-    #                      requirements.txt - sphinx, sphinx-book-theme,
-    #                      myst-parser, breathe, exhale, pre-commit - to obtain
-    #                      one formatter, and takes cmake-format unpinned, so a
-    #                      floating release could move a verdict with no commit
-    #                      to blame. The hub's cmake-format.requirements.txt is
-    #                      the pinned pair (cmake-format==0.6.13, pyyaml==6.0.3)
-    #                      that run-static-analysis-format.sh installs since the
-    #                      library gained its venv default, so the two lanes now
-    #                      format with the SAME cmake-format.
-    #
-    #   -ExcludePattern    the module's built-in excludes cover build*/,
-    #                      third_party/, _deps/ and vcpkg_installed/ but not
-    #                      .venv/, which the Linux side has always listed
-    #                      (CODE_QUALITY_CMAKE_EXCLUDE_PATHS). It bites only on
-    #                      the filesystem fallback - git ls-files never lists an
-    #                      untracked venv - which is exactly the dev box, where
-    #                      the venv the step itself just created holds cmake
-    #                      files it would then reformat.
-    #
-    # -Check is deliberately NOT passed. This repo's Linux gate also formats in
-    # place (run_gate cmake-format -> code_quality_run_cmake_format with no
-    # --check), and turning a build driver into a gate that fails on unformatted
-    # input is a policy change, not an adoption.
+    # --- Step 3: cmake-format, in place like the Linux gate (no -Check) ---
     if (-not $SkipFormat) {
+        # The Linux lane's pinned cmake-format; .venv is excluded because the step's own venv holds CMake files.
         $cmakeFormatRequirements = Join-Path $Workspace 'third_party\ANTfrastructure\linux\scripts\cmake-format.requirements.txt'
         Invoke-BuildStep -Context $Context -StepName "Python tooling + cmake-format" -Critical -Script {
             Invoke-CmakeFormatStep -Context $Context -WorkspacePath $Workspace `
@@ -352,10 +235,7 @@ try {
                 -ExcludePattern @('\\\.venv\\')
         }
 
-        # The other half of the Linux lane's format gate, which this script had
-        # never run: Invoke-ClangFormatStep formats every source
-        # Get-ProjectCppFiles finds against .clang-format, in place. It throws when
-        # clang-format is missing, and -SkipFormat opts out of both steps.
+        # The other half of the Linux format gate; -SkipFormat opts out of both.
         Invoke-BuildStep -Context $Context -StepName "clang-format" -Critical -Script {
             Invoke-ClangFormatStep -Context $Context -WorkspacePath $Workspace
         }
@@ -364,10 +244,7 @@ try {
     # --- MSVC Debug Build ---
     if ($doMsvc) {
         Invoke-BuildStep -Context $Context -StepName "MSVC Debug Build" -Script {
-            # Invoke-CmakeConfigureAndBuild builds `-B <path> --preset <name>` with
-            # NO -S, so the preset's own sourceDir applies and cwd has to be the
-            # workspace - hence Push-Location. It also picks the job count, wires
-            # sccache and streams the build output line by line.
+            # No -S is passed, so the preset's sourceDir applies and cwd must be the workspace.
             Push-Location $Workspace
             try {
                 Invoke-CmakeConfigureAndBuild -Context $Context `
@@ -376,9 +253,7 @@ try {
                     -Configuration $cfgMsvc.Configuration
             } finally { Pop-Location }
 
-            # --test-dir, so no Push-Location; -RuntimeFlavor Msvc because this lane
-            # links Microsoft's ASan runtime, not LLVM's, and the two are not
-            # interchangeable.
+            # This lane links Microsoft's ASan runtime, which is not interchangeable with LLVM's.
             Invoke-CtestDiscoveredTests -Context $Context `
                 -BuildRoot $fastBuildMsvcFull `
                 -Configuration $cfgMsvc.Configuration `
@@ -391,11 +266,7 @@ try {
     # --- ClangCL Debug Build ---
     if ($doClang) {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Build" -Critical -Script {
-            # -Configuration Debug is load-bearing, not cosmetic: it is the switch
-            # Invoke-CmakeConfigureAndBuild reads to stage the sanitizer runtime DLLs
-            # into the build root and its bin\ before and after the build. That is
-            # what the hand-written clang_rt.asan_dynamic-x86_64.dll copy that used to
-            # sit here did, only it looked in LLVM's tree alone.
+            # -Configuration Debug is what makes Invoke-CmakeConfigureAndBuild stage the sanitizer runtime DLLs.
             Push-Location $Workspace
             try {
                 Invoke-CmakeConfigureAndBuild -Context $Context `
@@ -405,18 +276,13 @@ try {
                     -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
             } finally { Pop-Location }
 
-            # $null = : the hub function RETURNS the staged DLL count so a caller
-            # can gate on it. This lane does not, and an unassigned int inside an
-            # Invoke-BuildStep script block lands in that step's output stream.
+            # $null =: the returned DLL count would otherwise land in the step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildClangFull "bin")
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildClangFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
         }
 
-        # Invoke-CtestDiscoveredTests puts the ASan runtime directories on PATH for
-        # the duration of the run and restores it afterwards, which is the
-        # save/override/restore block this step used to spell out by hand.
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
             Invoke-CtestDiscoveredTests -Context $Context `
                 -BuildRoot $fastBuildClangFull `
@@ -446,24 +312,7 @@ try {
 
         # Clang Tidy & Scan Build
         if (-not $SkipClangTidy) {
-            # Invoke-ClangTidyFixStep (WindowsClang.Common) owns the file discovery,
-            # the --header-filter, and - the part that matters here - the skip for
-            # any translation unit that imports a C++20 named module, which
-            # clang-tidy cannot analyse without the BMIs the compile-commands
-            # database does not carry.
-            #
-            # -Extension carries this project's module extensions on TOP of the
-            # module default (.cpp/.cc/.cxx). Leave the check disables on -Checks
-            # and NOT in .clang-tidy: that file is a SHARED config whose drift the
-            # lint gate checks against ANTfrastructure's copy (AGENTS.md section 2,
-            # "clang-format / clang-tidy / cmake-format and the canonical
-            # configs"), so a project-local disable belongs on the command line.
-            #
-            # The clang-tidy must be the compiler's own, or it refuses the BMIs
-            # ("built from a different branch"). With none beside the compiler,
-            # every TU that reads a BMI is skipped: implementation units and any
-            # import, not only the hub default's `import kataglyphis`. AGENTS.md
-            # section 4, "Every LLVM tool that reads clang's output".
+            # Disables go on -Checks, not the shared .clang-tidy; only the compiler's own clang-tidy reads its BMIs (AGENTS.md section 4).
             Invoke-BuildStep -Context $Context -StepName "clang-tidy Analysis" -Script {
                 $tidyArgs = @{
                     Context            = $Context
@@ -512,9 +361,7 @@ try {
                     -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
             } finally { Pop-Location }
 
-            # $null = : the hub function RETURNS the staged DLL count so a caller
-            # can gate on it. This lane does not, and an unassigned int inside an
-            # Invoke-BuildStep script block lands in that step's output stream.
+            # $null =: the returned DLL count would otherwise land in the step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildProfileFull "bin")
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildProfileFull "bin")
@@ -555,17 +402,7 @@ try {
     # --- Release Build ---
     if ($doRelease) {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Release Build" -Critical -Script {
-            # -CleanBuildRoot replaces the explicit Remove-BuildRoot that used to
-            # stand here, and it is passed on THIS lane only. The debug and profile
-            # lanes deliberately keep their trees: they live in the reusable
-            # container's C:\kataglyphis_fast_build, which is the only thing making
-            # a rerun incremental, and wiping them would turn every run into a
-            # from-scratch build. The release lane has always started clean, because
-            # a packaged artifact must not inherit anything.
-            # The packages' DLL closure (owner decision 2026-09-25: x64 exactly like arm64).
-            # CPack installs whatever this directory holds beside the executables
-            # (the hub's kataglyphis_install_package_dlls), so it is named here and
-            # filled below, after the build and before any install or package.
+            # Only this lane cleans, since a package must inherit nothing; CPack installs package-dlls beside the executables.
             $packageDlls = Join-Path $fastBuildReleaseDirFull 'package-dlls'
             Push-Location $Workspace
             try {
@@ -579,15 +416,12 @@ try {
                         @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
 
-            # $null = : the hub function RETURNS the staged DLL count so a caller
-            # can gate on it. This lane does not, and an unassigned int inside an
-            # Invoke-BuildStep script block lands in that step's output stream.
+            # $null =: the returned DLL count would otherwise land in the step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildReleaseDirFull "bin")
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildReleaseDirFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildReleaseDirFull "bin"), $fastBuildReleaseDirFull)
-            # Everything the engine imports, transitively, from the hub's search order (the
-            # chain ORT, the media stack, the target's VC++ runtime): what a clean machine lacks.
+            # Everything the engine imports transitively that a clean machine lacks.
             New-Item -ItemType Directory -Force -Path $packageDlls | Out-Null
             $engine = @('AccelerANTgine.exe', 'AccelerANTgine.dll') | ForEach-Object { Join-Path $fastBuildReleaseDirFull "bin\$_" }
             $closure = @(Copy-PeImportClosure -Path $engine -SearchDirectory @(Get-ProductDllSearchPath -Arch $TargetArch) -Destination $packageDlls -Arch $TargetArch)
@@ -601,11 +435,7 @@ try {
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
 
-        # The product in dist\windows-<x64|arm64>, the directory a Windows lane uploads: the
-        # install tree the installers pack, which carries the package DLL closure, so it runs
-        # on a clean machine of either arch (G6 proves the ORT in it); the installers beside
-        # it. NSIS's installer stub is x86 by design, which the arm64 lane's arch gate refuses
-        # in this tree, so only x64 ships the NSIS installer here.
+        # The uploaded install tree plus installers; NSIS's stub is x86, which the arm64 arch gate refuses.
         Invoke-BuildStep -Context $Context -StepName "Portable Bundle ($TargetArch)" -Critical -Script {
             $distArch = Join-Path $Workspace "dist\windows-$packageArch"
             $bundle = Join-Path $distArch 'bundle'
@@ -614,8 +444,7 @@ try {
             $bundleBin = Join-Path $bundle 'bin'
             $installed = @(Get-ChildItem -LiteralPath $bundleBin -File | ForEach-Object Name)
             $seeds = @(Get-ChildItem -LiteralPath $bundleBin -File | Where-Object { $_.Extension -in '.exe', '.dll' } | ForEach-Object FullName)
-            # The check that the installers carry the whole closure: this walks the install tree
-            # they pack, so a DLL it has to add is one the MSI, the ZIP and NSIS would all lack.
+            # The installers pack this tree, so a DLL this has to add is one they would all lack.
             $added = @(Copy-PeImportClosure -Path $seeds -SearchDirectory @(Get-ProductDllSearchPath -Arch $TargetArch) -Destination $bundleBin -Arch $TargetArch |
                 ForEach-Object { Split-Path $_ -Leaf } | Where-Object { $_ -notin $installed })
             if ($added.Count) {
@@ -640,52 +469,13 @@ try {
             Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $releaseBuildDir) -ExcludeCommonRustAndCppCache
         }
 
-        # MSIX Packaging
-        #
-        # STAGING IS THE CALLER'S; EVERYTHING AFTER IT IS THE HUB'S.
-        # Invoke-MsixPackage (WindowsMsix.Common, new in 19286e9f) is the
-        # orchestration three consumers had each written out - lay the assets
-        # out, expand the manifest template, pack, assert, optionally sign -
-        # and the only part that genuinely differs between them is WHAT GOES
-        # INTO the staging directory. Here that is the ClangCL release exe, its
-        # dll, and the three extra assets this project's AppxManifest names
-        # beyond the four the hub always writes: SmallTile, LargeTile and
-        # SplashScreen, referenced from uap:DefaultTile and uap:SplashScreen.
-        #
-        # Two things the 65 hand-rolled lines this replaces did NOT do:
-        #   * XML-ESCAPE the token values. Expand-XmlTemplateTokens runs each
-        #     one through SecurityElement::Escape; the .Replace chain put
-        #     __DESCRIPTION__ into an XML attribute raw, so a single ampersand
-        #     in it produces a manifest makeappx rejects with a parser error.
-        #   * ASSERT the output. makeappx has been seen to report success and
-        #     produce no file; the step then went green and the artifact upload
-        #     found nothing.
-        #
-        # The version literal goes with them. Get-PackageVersion reads
-        # VERSION.txt / version.txt and pads to the four components an
-        # AppxManifest requires (makeappx rejects three). This repo ships
-        # neither file today, so it returns the same 0.0.1.0 that was typed
-        # twice here - but from one place, and correctly the day a version file
-        # lands.
-        #
-        # The three warn-and-skip preconditions stay HERE rather than becoming
-        # the hub's throws. This step is not -Critical, a Windows box without
-        # the SDK is a dev box rather than a broken lane, and making that red is
-        # a policy change, not an adoption. -MakeAppxPath hands the tool this
-        # already resolved to the hub so it is not probed a second time.
-        #
-        # -Sign -SigningRoot $Workspace: the hub signs with the first *.pfx at the
-        # repository root (gitignored) and MSIX_PFX_PASSWORD, then verifies; with
-        # no .pfx it warns and the package stays unsigned. This repo called
-        # Invoke-MsixSign itself until the hub's -Sign stopped searching the
-        # staging directory's parent (hub, 2026-09-25).
+        # MSIX: staging is this repo's, the rest the hub's; a box without the SDK only warns (dev box, not a broken lane).
         if (-not $SkipMSIX) {
             Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Script {
                 $msixWorkspace = Join-Path $Workspace "packaging\msix"
                 $msixTemplate = Join-Path $msixWorkspace "AppxManifest.template.xml"
                 $msixOutput = Join-Path $Workspace "dist\windows-$packageArch\msix"
-                # The intermediates stay in the build tree: dist\windows-<arch> is uploaded
-                # whole (and graded by the arm64 lane's arch gate), so it holds products only.
+                # Intermediates stay in the build tree: dist\windows-<arch> is uploaded whole, so it holds products only.
                 $msixWork = Join-Path $fastBuildReleaseDirFull "msix"
                 $stagingRoot = Join-Path $msixWork "staging"
 
@@ -707,9 +497,7 @@ try {
                     return
                 }
 
-                # A fresh staging tree, then the three assets the hub does not
-                # know about. Invoke-MsixPackage creates both directories with
-                # -Force and never clears them, so what is put here survives.
+                # Invoke-MsixPackage never clears the staging tree, so the extra assets placed here survive.
                 if (Test-Path $stagingRoot) { Remove-Item $stagingRoot -Recurse -Force }
                 $stagingAssets = Join-Path $stagingRoot "Assets"
                 New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
@@ -721,9 +509,7 @@ try {
                 New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
                 $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_${packageArch}.msix"
 
-                # The package ships the portable bundle's bin\ whole, on both arches: the
-                # chain ORT (or a client loads System32's Windows ML copy) and the DLL closure
-                # a clean machine lacks. G6 proves the payload before it is packed.
+                # The bundle's bin\ whole: without the chain ORT a client loads System32's Windows ML copy.
                 $payloadDir = Join-Path $msixWork "payload"
                 if (Test-Path $payloadDir) { Remove-Item $payloadDir -Recurse -Force }
                 New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
@@ -759,8 +545,7 @@ try {
     }
 
 } catch {
-    # An error outside every build step is in no step's failure list, and this run used
-    # to exit 0 over it. Recorded, so the exit code below says so.
+    # An error outside every step is in no step's failure list, so record it for the exit code.
     $unhandledError = $true
     Write-BuildLogError -Context $Context -Message "Unhandled critical error: $($_.Exception.Message)"
 } finally {
