@@ -1,18 +1,4 @@
-# Build-Windows.config.psd1 - the build-directory / preset / configuration table
-# Build-Windows.ps1 used to carry as five parameters with literal defaults.
-#
-# It lives here, and is read through ANTfrastructure's WindowsConfig.Common
-# (Import-PowerShellDataFile + Get-ConfigValue / Get-OrDefault), for the reason
-# BeschleunigerBallett moved its own table out: a preset rename is a data edit,
-# not a script edit, and the environment-variable override per row lets a CI lane
-# retarget one configuration without a new script parameter.
-#
-# Precedence per row: the named environment variable, then the literal here.
-#
-# Configuration is what reaches `cmake --build --config`. It is also the switch
-# the hub's Invoke-CmakeConfigureAndBuild reads to decide whether to stage the
-# sanitizer runtime DLLs next to the binaries, so 'Debug' here is load-bearing
-# rather than cosmetic - the ClangCL debug lane links ASan.
+# Each *Env variable overrides its row; Configuration 'Debug' is load-bearing, it makes the hub stage the ASan runtime DLLs.
 @{
   Build = @{
     LogDir       = 'logs'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-static-analysis-format.sh - format, clang-tidy, scan-build; a missing tool is red (hub docs/shared-script-libraries.md, section "The third bucket").
+# run-static-analysis-format.sh - format, clang-tidy, scan-build; a missing tool is red (third_party/ANTfrastructure/docs/shared-script-libraries.md#the-third-bucket-a-gate-that-could-not-run).
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
