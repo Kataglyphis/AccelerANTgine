@@ -272,6 +272,16 @@ written out rather than linked.
   Linux analyses all 18 files. The image-side fix is adding
   `clang-tools-extra` to the hub's `Build-LlvmFromSource.ps1`, which re-keys the
   LLVM layer and everything built on it.
+- **Both module targets are PIC, and must stay so.** `nlohmann_json_modules`
+  and `tomlplusplus_modules` (`third_party/CMakeLists.txt`) are static
+  libraries linked into the SHARED `libAccelerANTgine`, and GCC writes the TLS
+  model of a template instantiated inside a module into the CMI. Built without
+  `-fPIC`, `json.cppm` gives `basic_json<>::nesting_depth()`'s `static
+  thread_local` local-exec, and every `-fPIC` importer inherits it: x86-64 then
+  fails the link with `R_X86_64_TPOFF32 … local-exec is incompatible with
+  -shared`, while aarch64 links `R_AARCH64_TLSLE_*` into the `.so` without a
+  word. Treat PIC like `-pthread` and `-fno-exceptions` there: a BMI flag the
+  importer must agree with. clang is not affected.
 - **perf is optional in `ci-profile-bench.sh`, the CI image has none, and perf
   alone is not a profile.** Ubuntu 26.04's `linux-tools-common`, which the image
   installs, no longer ships `/usr/bin/perf` — perf is the `linux-perf` package

@@ -220,6 +220,26 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-09-30 — **The Linux x64 gcc job links again; both module targets are
+  PIC.** Red since the NLOHMANN_JSON bump of 9ca179d (2026-09-28), which added
+  `basic_json::nesting_depth()` and its function-local `static thread_local`.
+  `nlohmann_json_modules` and `tomlplusplus_modules` are static libraries that
+  were compiled without `-fPIC`, and GCC 16.2.0 writes the TLS model of a
+  template instantiated inside the module (`basic_json<>`, through `using json`)
+  into the CMI: `json.cppm` picked local-exec, and `config_loader.cpp`, compiled
+  with `-fPIC`, took that model from the CMI instead of choosing its own, so
+  `libAccelerANTgine.so` died with `R_X86_64_TPOFF32 … local-exec is
+  incompatible with -shared`. A two-file reproducer shows it without CMake: the
+  importer's object carries `R_X86_64_TPOFF32` when the interface was built
+  without `-fPIC` and a PIC-safe access when it was built with it. aarch64 was
+  never fixed, only quiet: the same importer gets `R_AARCH64_TLSLE_*`, which
+  ld.bfd accepts in a shared object, so the green arm64 gcc job linked a TLS
+  access that assumes the executable's TLS block. clang decides the model in the
+  importer and was never affected. `POSITION_INDEPENDENT_CODE ON` on both
+  targets (`third_party/CMakeLists.txt`) is the fix, not a workaround: their
+  objects are linked into a shared library, and a BMI must be built with the
+  importer's code model like it must with its `-pthread`. No existing GCC bug
+  covers the CMI not recording `-fPIC`.
 - 2026-09-25 — **README, AGENTS.md and the Sphinx pages match the tree again.**
   What a reader would have hit: the README said to run
   `cmake --build --preset <name> .` from inside `build/`, which the image's
