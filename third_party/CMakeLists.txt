@@ -205,6 +205,9 @@ if(TARGET nlohmann_json_modules)
         target_link_options(nlohmann_json_modules PUBLIC -pthread)
     endif()
     target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
+    # PIC: GCC bakes a module-instantiated thread_local's TLS model into the CMI
+    # (AGENTS.md § 4, "Both module targets are PIC").
+    set_target_properties(nlohmann_json_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 # Src/toml_config.cpp is written against tomlplusplus' result-based
@@ -236,6 +239,8 @@ if(TARGET tomlplusplus_modules)
         target_link_options(tomlplusplus_modules PUBLIC -pthread)
     endif()
     target_compile_features(tomlplusplus_modules PUBLIC cxx_std_23)
+    # PIC, for the same reason as nlohmann_json_modules above.
+    set_target_properties(tomlplusplus_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
