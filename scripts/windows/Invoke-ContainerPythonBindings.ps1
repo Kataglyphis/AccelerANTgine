@@ -1,5 +1,5 @@
 #requires -Version 7.0
-# Builds the Python bindings in the ANTfrastructure Windows image; see its docs/windows-container-build-performance.md.
+# Builds the Python bindings in the ANTfrastructure Windows image; see third_party/ANTfrastructure/docs/windows-container-build-performance.md.
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
