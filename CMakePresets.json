@@ -159,6 +159,23 @@
       }
     },
     {
+      "name": "linux-riscv64-cross",
+      "displayName": "Linux riscv64 cross (Debug)",
+      "description": "riscv64 Debug build on the amd64 image; tests run under QEMU. Needs riscv64_cross_env (ANTfrastructure linux/scripts/lib/riscv64-cross.sh)",
+      "inherits": "linux-common",
+      "toolchainFile": "$env{RISCV64_CMAKE_TOOLCHAIN_FILE}",
+      "binaryDir": "${sourceDir}/build-riscv64/",
+      "installDir": "${sourceDir}/build-riscv64/",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "COMPILER_CACHE": "sccache",
+        "Rust_CARGO_TARGET": "riscv64gc-unknown-linux-gnu",
+        "myproject_ENABLE_COVERAGE": "OFF",
+        "myproject_ENABLE_SANITIZER_ADDRESS": "OFF",
+        "myproject_ENABLE_SANITIZER_UNDEFINED": "OFF"
+      }
+    },
+    {
       "name": "linux-debug-GNU",
       "displayName": "Linux Debug GNU",
       "description": "Linux Debug build with GCC",
