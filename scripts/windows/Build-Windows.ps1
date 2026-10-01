@@ -28,7 +28,7 @@ param(
     [switch]$StopOnError,
     # amd64 (alias x64) or arm64; empty means the image's WINDOWS_TARGET_ARCH, else amd64.
     [string]$TargetArch = '',
-    # Release also builds the commit/compile suites and stages them in dist\windows-<arch>-tests for the arm64 run job.
+    # Release also builds the four suites and stages them in dist\windows-<arch>-tests (arm64 run job, x64 host run).
     [switch]$StageTests
 )
 

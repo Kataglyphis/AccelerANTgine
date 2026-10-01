@@ -28,7 +28,8 @@ jobs:
         C:\ws
         -BuildTargets
         clangcl-debug,clangcl-profile,clangcl-release
-      # The container has no desktop, so the host runs what the build synced back.
+        -StageTests
+      # The container has no desktop, so the host runs what the build synced back; Release runs the staged suites.
       host-command: |
         ./scripts/windows/Start-Windows.ps1 -Config Debug -ProjectRoot .
         ./scripts/windows/Start-Windows.ps1 -Config Profile -ProjectRoot .

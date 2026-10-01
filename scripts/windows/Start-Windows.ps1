@@ -8,7 +8,7 @@
   The build directory comes from Build-Windows.config.psd1, so producer and consumer cannot disagree.
 
 .PARAMETER Config
-  Debug (CLI, commit, compile and fuzz suites), Profile (CLI, benchmarks) or Release (CLI only).
+  Debug (CLI, commit, compile and fuzz suites), Profile (CLI, benchmarks) or Release (CLI, then the suites -StageTests staged).
 
 .PARAMETER RunWebRtcSmoke
   Debug only: run the CLI against a signalling server for five seconds; fail if it exits non-zero sooner.
@@ -173,6 +173,21 @@ try {
     } elseif ($Config -eq 'Profile') {
         Write-BuildLog -Context $ctx -Message "--- Performance tests (Google Benchmark) ---"
         Invoke-BuiltArtifact -ExecutableName 'perfTestSuite.exe' -RelativeDirectory @('', 'bin')
+    } else {
+        # Build-Windows.ps1 -StageTests leaves the Release suites self-contained here; they run as the arm64 job runs them.
+        $staged = Join-Path $ProjectRoot "dist\windows-$(Get-WindowsPackageArch -Arch '')-tests"
+        $manifest = Join-Path $staged 'tests.json'
+        if (Test-Path -LiteralPath $manifest) {
+            Write-BuildLog -Context $ctx -Message "--- Release suites staged in $staged ---"
+            $verdicts = @(& (Join-Path $staged 'Invoke-StagedTests.ps1') -Manifest $manifest |
+                    Select-String -Pattern '^TESTS: passed=(\d+) failed=(\d+) skipped=(\d+)\s*$')
+            if ($verdicts.Count -ne 1) { throw "The staged Release suites printed $($verdicts.Count) TESTS lines, not one" }
+            $passed, $failed, $skipped = $verdicts[0].Matches[0].Groups[1..3].Value | ForEach-Object { [int]$_ }
+            Write-BuildLog -Context $ctx -Message "Release suites: passed $passed, failed $failed, skipped $skipped"
+            if ($failed -gt 0 -or $passed -lt 1) { throw "The staged Release suites failed: passed $passed, failed $failed" }
+        } else {
+            Write-BuildLog -Context $ctx -Message "No staged Release suites in $staged; build with -StageTests to run them"
+        }
     }
 
     if ($script:missingArtifacts.Count -gt 0) {
