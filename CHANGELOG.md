@@ -51,6 +51,10 @@ belongs in the **Changed** list below with that consequence spelled out.
     there; `Start-Windows.ps1 -Config Debug` runs the fuzz suite instead of reporting it.
   - Not enabled: `-RunWebRtcSmoke` on Windows x64. The Windows image has neither
     `webrtcsink` nor `gst-webrtc-signalling-server` (no gst-plugins-rs).
+  - The packaged Release tree stays clean with the suites in it: FuzzTest is added
+    `EXCLUDE_FROM_ALL` (its ANTLR install rule failed `cmake --install`, and its JSON
+    grammar ran an arm64 generator on the x64 host), and gtest gets `INSTALL_GTEST OFF`.
+    Since CON43 the arm64 install tree had carried gtest's headers and static libraries.
 
 - 2026-10-01 — The arm64 cross lane runs tests on `windows-11-arm` (hub CON43).
   - `Build-Windows.ps1 -StageTests` builds the commit and compile suites in

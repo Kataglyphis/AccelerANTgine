@@ -31,6 +31,10 @@ if(BUILD_TESTING)
   set(gtest_force_shared_crt
       ON
       CACHE BOOL "" FORCE)
+  # A Release tree with tests (KATAGLYPHIS_RELEASE_TESTS) is also the packaged one; gtest must not land in it.
+  set(INSTALL_GTEST
+      OFF
+      CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
 endif()
 # For Windows: Prevent overriding the parent project's compiler/linker settings
@@ -103,7 +107,8 @@ if(BUILD_TESTING
   set(_fuzztest_absl_compat_dir "${CMAKE_SOURCE_DIR}/cmake/fuzztest_compat")
   get_directory_property(_saved_external_include_dirs INCLUDE_DIRECTORIES)
   include_directories(BEFORE "${_fuzztest_absl_compat_dir}")
-  add_subdirectory(FUZZTEST)
+  # EXCLUDE_FROM_ALL also drops its install rules (ANTLR's names a runtime nobody builds) from the packaged Release tree.
+  add_subdirectory(FUZZTEST EXCLUDE_FROM_ALL)
   set_directory_properties(PROPERTIES INCLUDE_DIRECTORIES "${_saved_external_include_dirs}")
 
   # Newer FUZZTEST adds its grammar-codegen tooling unconditionally (the former

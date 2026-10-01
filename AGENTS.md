@@ -418,7 +418,11 @@ On a cross build the script:
   in Release (`KATAGLYPHIS_RELEASE_TESTS`) and stages them with their DLL closure, the hub's
   `Invoke-StagedTests.ps1` and a `tests.json` in `dist\windows-arm64-tests`. The three gtest
   binaries count by their summaries, the benchmarks by exit code
-  (`--benchmark_min_time=0.05s`).
+  (`--benchmark_min_time=0.05s`). That Release tree is also the packaged one, so the suites
+  must install nothing: FuzzTest is added `EXCLUDE_FROM_ALL`, which drops its install rules
+  (ANTLR's names a runtime nobody builds, and `cmake --install` died on it), and gtest gets
+  `INSTALL_GTEST OFF`. Measured on Linux: the install trees with and without the suites are
+  the same five files.
 
 **Both arches ship the same product (owner decision 2026-09-25: x64 was thinner).**
 clangcl-release configures `KATAGLYPHIS_PACKAGE_DLL_DIR`, the hub's
