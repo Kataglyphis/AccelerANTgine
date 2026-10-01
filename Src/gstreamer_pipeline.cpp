@@ -175,7 +175,7 @@ struct GStreamerPipeline::Impl
 
     GMainLoop *main_loop{ nullptr };
     std::thread main_loop_thread;
-    gulong new_sample_handler{ 0 };
+    bool callbacks_installed{ false };
 
     ~Impl() { cleanup(); }
 
@@ -193,11 +193,14 @@ struct GStreamerPipeline::Impl
         }
         // Both hold their own reference, so the pipeline below is only freed once they let go.
         if (appsink != nullptr) {
-            if (new_sample_handler != 0) { g_signal_handler_disconnect(appsink, new_sample_handler); }
+            if (callbacks_installed) {
+                GstAppSinkCallbacks none{};
+                gst_app_sink_set_callbacks(GST_APP_SINK(appsink), &none, nullptr, nullptr);
+            }
             gst_object_unref(appsink);
             appsink = nullptr;
         }
-        new_sample_handler = 0;
+        callbacks_installed = false;
         if (appsrc != nullptr) {
             gst_object_unref(appsrc);
             appsrc = nullptr;
@@ -213,23 +216,25 @@ struct GStreamerPipeline::Impl
     // No callback runs after the NULL state change; the lock makes that ordering visible to TSan as well.
     void wait_for_callbacks() { std::scoped_lock lock(callback_mutex); }
 
-    // Once per appsink: a second connection would deliver every sample twice.
+    // The C API, not the appsink signals, which delivered nothing on Windows (run 36902874261).
     void connect_buffer_callback()
     {
-        if (appsink == nullptr || new_sample_handler != 0) { return; }
+        if (appsink == nullptr || callbacks_installed) { return; }
         {
             std::scoped_lock lock(callback_mutex);
             if (!buffer_callback) { return; }
         }
-        g_object_set(appsink, "emit-signals", TRUE, nullptr);
-        new_sample_handler = g_signal_connect(appsink, "new-sample", G_CALLBACK(&Impl::on_new_sample), this);
+        GstAppSinkCallbacks callbacks{};
+        callbacks.new_sample = &Impl::on_new_sample;
+        gst_app_sink_set_callbacks(GST_APP_SINK(appsink), &callbacks, this, nullptr);
+        callbacks_installed = true;
     }
 
-    // appsink reads the handler's return value, and anything but GST_FLOW_OK stops the stream.
-    static auto on_new_sample(GstElement *sink, Impl *self) -> GstFlowReturn
+    // appsink stops the stream on anything but GST_FLOW_OK.
+    static auto on_new_sample(GstAppSink *sink, gpointer user_data) -> GstFlowReturn
     {
-        GstSample *sample = nullptr;
-        g_signal_emit_by_name(sink, "pull-sample", &sample);
+        auto *self = static_cast<Impl *>(user_data);
+        GstSample *sample = gst_app_sink_pull_sample(sink);
 
         if (sample != nullptr) {
             auto buffer_info = extract_buffer_info(sample);
@@ -420,7 +425,7 @@ auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms)
     GstSample *sample = nullptr;
 
     if (timeout_ms == 0) {
-        g_signal_emit_by_name(impl_->appsink, "pull-sample", &sample);
+        sample = gst_app_sink_pull_sample(GST_APP_SINK(impl_->appsink));
     } else {
         GstClockTime timeout = static_cast<GstClockTime>(timeout_ms) * GST_MSECOND;
         sample = gst_app_sink_try_pull_sample(GST_APP_SINK(impl_->appsink), timeout);
@@ -454,9 +459,8 @@ auto GStreamerPipeline::push_buffer(void *data, std::size_t size, const FrameMet
     GST_BUFFER_PTS(buffer) = metadata.timestamp_ns;
     GST_BUFFER_DURATION(buffer) = metadata.duration_ns;
 
-    GstFlowReturn ret;
-    g_signal_emit_by_name(impl_->appsrc, "push-buffer", buffer, &ret);
-    gst_buffer_unref(buffer);
+    // Takes the buffer's reference, unlike the push-buffer signal.
+    const GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(impl_->appsrc), buffer);
 
     if (ret != GST_FLOW_OK) { return std::unexpected(GStreamerError::StreamError); }
 
