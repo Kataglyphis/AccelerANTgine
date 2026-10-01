@@ -27,8 +27,7 @@ FetchContent_MakeAvailable(abseil-cpp)
 
 # include google test to project
 if(BUILD_TESTING)
-  FetchContent_Declare(googletest
-                       URL https://github.com/google/googletest/archive/56efe3983185e3f37e43415d1afa97e3860f187f.zip)
+  FetchContent_Declare(googletest URL https://github.com/google/googletest/archive/refs/tags/v1.18.0.zip)
   set(gtest_force_shared_crt
       ON
       CACHE BOOL "" FORCE)
@@ -266,10 +265,11 @@ if(RUST_FEATURES)
       "1.0.191"
       CACHE STRING "Lower bound for cxxbridge-cmd; cargo install resolves it as a caret range")
 
+  # A commit, not v0.6.1: that tag lacks the CARGO_HOME and cxxbridge-cmd fixes; move to the first tag after it.
   FetchContent_Declare(
     Corrosion
     GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG master)
+    GIT_TAG c4786e7ae2d5ade784aca29448df362c874ed04e)
   FetchContent_MakeAvailable(Corrosion)
 
   find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")

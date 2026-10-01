@@ -60,6 +60,13 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- 2026-10-01 — **Every CMake pin is reproducible, and the hub's Renovate preset reads it** (hub CON46).
+  - googletest moves from the archive of commit 56efe398 to the `v1.18.0` tag archive. That release
+    contains the commit, 100 commits later, and Renovate tracks a tag where it skips a commit.
+  - Corrosion moves from `GIT_TAG master` to commit `c4786e7a`, which is today's master.
+    v0.6.1 lacks the `CARGO_HOME` and cxxbridge-cmd fixes after it; move to the next tag.
+  - `.github/renovate.json` drops its own CMake manager: the preset reads the same pins,
+    and two managers would report each pin twice, which `--apply` refuses.
 - **The ONNX Runtime proof is the hub's `WindowsOrtPayload.Common`** (hub `ad08bc30`,
   2026-09-25). `WindowsOrtBundle.Common` and its cases moved there: `Copy-ChainOrtLib`
   is `Copy-ChainOrtBeside -All`, `Assert-BundleChainOrt` is `Assert-ChainOrtTree`
