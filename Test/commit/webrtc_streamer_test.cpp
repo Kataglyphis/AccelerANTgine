@@ -21,8 +21,6 @@ import kataglyphis.webrtc_streamer;
 
 namespace webrtc = kataglyphis::webrtc;
 namespace cfg = kataglyphis::config;
-using kataglyphis::test::error_of;
-using kataglyphis::test::kStreamTimeout;
 using kataglyphis::test::TempFile;
 
 namespace {
@@ -159,9 +157,9 @@ TEST(WebRtcStreamer, AnUnconfiguredStreamerRefusesToRun)
     EXPECT_EQ(streamer.get_state(), webrtc::StreamState::Idle);
     EXPECT_FALSE(streamer.is_streaming());
     EXPECT_TRUE(streamer.get_producer_id().empty());
-    EXPECT_EQ(error_of(streamer.start()), webrtc::WebRTCError::PipelineCreationFailed);
-    EXPECT_EQ(error_of(streamer.pause()), webrtc::WebRTCError::PipelineCreationFailed);
-    EXPECT_EQ(error_of(streamer.resume()), webrtc::WebRTCError::PipelineCreationFailed);
+    EXPECT_EQ(kataglyphis::test::error_of(streamer.start()), webrtc::WebRTCError::PipelineCreationFailed);
+    EXPECT_EQ(kataglyphis::test::error_of(streamer.pause()), webrtc::WebRTCError::PipelineCreationFailed);
+    EXPECT_EQ(kataglyphis::test::error_of(streamer.resume()), webrtc::WebRTCError::PipelineCreationFailed);
     EXPECT_TRUE(streamer.stop().has_value());
     EXPECT_TRUE(streamer.set_bitrate(4000).has_value());
 }
@@ -188,8 +186,8 @@ TEST(WebRtcStreamer, ConfigureRejectsIncompleteSettings)
     for (const auto &config :
       { zero_width, zero_height, zero_rate, no_server, v4l2_without_device, file_without_path, uri_without_uri }) {
         webrtc::WebRTCStreamer streamer;
-        EXPECT_EQ(error_of(streamer.configure(config)), webrtc::WebRTCError::InvalidConfiguration);
-        EXPECT_EQ(error_of(streamer.start()), webrtc::WebRTCError::PipelineCreationFailed);
+        EXPECT_EQ(kataglyphis::test::error_of(streamer.configure(config)), webrtc::WebRTCError::InvalidConfiguration);
+        EXPECT_EQ(kataglyphis::test::error_of(streamer.start()), webrtc::WebRTCError::PipelineCreationFailed);
     }
 }
 
@@ -255,7 +253,7 @@ TEST(WebRtcStreamer, AStartWithoutASignallingServerEndsInError)
     {
         std::unique_lock lock(mutex);
         // A PLAYING state change may still land after the error, so the history is checked, not the final state.
-        const bool failed = changed.wait_for(lock, kStreamTimeout, [&] {
+        const bool failed = changed.wait_for(lock, kataglyphis::test::kStreamTimeout, [&] {
             if (started.has_value()) { return reported.has_value(); }
             return std::ranges::find(states, webrtc::StreamState::Error) != states.end();
         });
@@ -280,8 +278,9 @@ TEST(WebRtcStreamer, FactoriesConfigureTheirSources)
     EXPECT_TRUE(test_stream->get_producer_id().starts_with("stream-"));
     EXPECT_EQ(test_stream->get_state(), webrtc::StreamState::Idle);
 
-    EXPECT_EQ(error_of(webrtc::create_v4l2_webrtc_stream("", "")), webrtc::WebRTCError::InvalidConfiguration);
-    EXPECT_EQ(error_of(webrtc::create_libcamera_webrtc_stream(std::string(kRefusingServer), 0)),
+    EXPECT_EQ(kataglyphis::test::error_of(webrtc::create_v4l2_webrtc_stream("", "")),
+      webrtc::WebRTCError::InvalidConfiguration);
+    EXPECT_EQ(kataglyphis::test::error_of(webrtc::create_libcamera_webrtc_stream(std::string(kRefusingServer), 0)),
       webrtc::WebRTCError::InvalidConfiguration);
 
     if (kataglyphis::test::missing_gstreamer_element({ "v4l2src" }).empty()) {
@@ -289,7 +288,8 @@ TEST(WebRtcStreamer, FactoriesConfigureTheirSources)
           webrtc::create_v4l2_webrtc_stream(std::string(kRefusingServer), "/dev/video0", 64, 48, 15).has_value());
     }
     if (!kataglyphis::test::missing_gstreamer_element({ "libcamerasrc" }).empty()) {
-        EXPECT_EQ(error_of(webrtc::create_libcamera_webrtc_stream(std::string(kRefusingServer), 64, 48, 15)),
+        EXPECT_EQ(
+          kataglyphis::test::error_of(webrtc::create_libcamera_webrtc_stream(std::string(kRefusingServer), 64, 48, 15)),
           webrtc::WebRTCError::PipelineCreationFailed);
     }
 }
