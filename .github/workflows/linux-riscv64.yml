@@ -1,0 +1,31 @@
+# riscv64: cross-built on amd64, the Debug commit/compile/fuzz suites run under QEMU; no sanitizers or coverage (AGENTS.md).
+name: Linux riscv64 · cross build + test
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # compiler-cache-save deletes its key's older cache entries.
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+jobs:
+  build-ubuntu26_04_clang-riscv64:
+    uses: Kataglyphis/ANTfrastructure/.github/workflows/container-ci-riscv64.yml@develop
+    with:
+      script: bash -lc 'bash scripts/linux/ci-riscv64-test.sh'
+      container-args: -e CARGO_HOME=/tmp/cargo-home
+      cache-lane: riscv64-clang
+      cache-mounts: 'sccache:/var/cache/sccache cargo-home:/tmp/cargo-home'
+      cache-env: 'SCCACHE_CACHE_SIZE=2G'
+      timeout-minutes: 90
+    secrets:
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}

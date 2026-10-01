@@ -46,6 +46,7 @@ reorganisation.
 | Cross-compilation chain and its failure classes | `docs/linux-cross-builds.md`, `docs/cross-build-verification.md` |
 | The Windows image, its entrypoint and known traps | `docs/windows-builds.md` |
 | The Windows arm64 cross lane: the arm64 bundle, the arch gate, the `windows-11-arm` run job, why Release only | `docs/windows-cross-builds.md` |
+| The riscv64 cross lane: the sysroot from the image's riscv64 child, the cross clang, QEMU binfmt, what cannot run under QEMU | `docs/riscv64-cross-test-lanes.md` |
 | ONNX Runtime's one source (the chain build) and the G6 census | `docs/onnxruntime-single-source.md` |
 | Bind mount vs tar-pipe, Dev Drive filter setup, container reuse | `docs/windows-container-build-performance.md` |
 | clang-format / clang-tidy / cmake-format and the canonical configs | `docs/code-quality-tooling.md` |
@@ -348,8 +349,8 @@ files, one file per platform + arch, display names `<Platform> <Arch> · <what>`
 `linux-x64.yml` and `linux-arm64.yml` (each calls the containerized
 `reusable-linux.yml` once per compiler), `windows-x64.yml` (the container build through
 the hub's `container-ci-windows.yml`, a `lint-powershell` job over `scripts/`, and a
-`pester-tests` job over `scripts/windows/tests/`), `windows-arm64-cross.yml`, `lint-gates.yml` and
-`submodule-pins.yml`. The four platform lanes run on every push and PR to `main`
+`pester-tests` job over `scripts/windows/tests/`), `windows-arm64-cross.yml`, `linux-riscv64.yml`,
+`lint-gates.yml` and `submodule-pins.yml`. The five platform lanes run on every push and PR to `main`
 and `develop`, with no path filter. Every job that owns a runner carries `timeout-minutes`, every workflow
 declares `permissions:`, and every upload sets `if-no-files-found: error` — the
 hub's workflow conventions (`verify_workflow_conventions.py`), measured at zero
@@ -401,6 +402,26 @@ same aggregator a dev box runs — `bash scripts/linux/run-lint-gates.sh
 --ratchets` — against the same explicit root; it reaches it from the hub
 checkout rather than through the wrapper, because the wrappers sit at different
 paths across the family.
+
+### The riscv64 lane
+
+**Cross-built on amd64, tested under QEMU** (owner decision 2026-10-01, hub CON48): an
+emulated riscv64 build is 20-30x slower than native and would not fit a 6 h job.
+`linux-riscv64.yml` ("Linux riscv64 · cross build + test") is one `uses:` onto the hub's
+`container-ci-riscv64.yml`, whose container half is `bash scripts/linux/ci-riscv64-test.sh`:
+the hub's `riscv64_cross_env`, then the `linux-riscv64-cross` preset (Debug, the hub's
+`$env{RISCV64_CMAKE_TOOLCHAIN_FILE}`, `Rust_CARGO_TARGET=riscv64gc-unknown-linux-gnu`), ctest,
+and `first_fuzz_test`. binfmt runs the riscv64 test binaries, so ctest, gtest discovery and
+FuzzTest's build-time tools need no emulator wrapper.
+
+- **What runs:** the native Debug suite: the 6 ctest entries (commit, compile, and the two
+  FuzzTest unit-mode tests) plus `first_fuzz_test`, against the image's riscv64 GStreamer
+  and ONNX Runtime. Measured 2026-10-01: 2 min 7 s end to end on a warm cargo home.
+- **What does not:** ASan/UBSan, coverage and the TSan build. The cross clang (the image's
+  distro clang 22; the image's own clang 23 is X86-only) has no riscv64 compiler-rt, so the
+  preset turns them off; the x64 and arm64 lanes keep them. No perf suite: timing under
+  QEMU measures QEMU.
+- **Locally:** the hub page has the sysroot and container commands.
 
 ## 6. Docs owned by this repo
 
