@@ -43,6 +43,14 @@ endfunction()
 # Old name kept for the Test/*/CMakeLists.txt call sites; no WORKING_DIRECTORY on purpose (see the module header).
 function(kataglyphis_configure_gtest_discovery test_target)
   kataglyphis_register_gtest_target(${test_target})
+  # The hub's ENVIRONMENT "PATH=a;b;..." splits at its own semicolons, leaving PATH=<exe dir>; bin\ holds the DLLs.
+  if(WIN32 AND TEST ${test_target})
+    file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/bin" _kataglyphis_bin_dir)
+    get_filename_component(_kataglyphis_compiler_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    file(TO_NATIVE_PATH "${_kataglyphis_compiler_dir}" _kataglyphis_compiler_dir)
+    set_property(TEST ${test_target} PROPERTY ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${_kataglyphis_bin_dir}"
+                                              "PATH=path_list_append:${_kataglyphis_compiler_dir}")
+  endif()
 endfunction()
 
 function(

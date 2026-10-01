@@ -307,6 +307,11 @@ belongs in the **Changed** list below with that consequence spelled out.
   - YOLO decoding indexed an empty output shape, read class scores from the next row when a
     row was shorter than `num_classes`, and let NaN or infinite values become boxes, which
     then broke `std::sort`'s ordering in NMS.
+  - On Windows every suite registered through the hub's `add_test` fallback ran with
+    `PATH=<exe dir>` only: its `ENVIRONMENT "PATH=a;b;..."` is a CMake list that ctest splits
+    at the semicolons. `kataglyphis_configure_gtest_discovery` puts `bin\` back through
+    `ENVIRONMENT_MODIFICATION`, and the Profile benchmarks run with `bin\` on `PATH`; both
+    died with `0xc0000135` once the suites imported `AccelerANTgine.dll`.
   - `WebRTCStreamer::initialize` called `gst_deinit()` when no WebRTC element exists, which
     no later `gst_init` can undo; `stop()` sent an EOS to a pipeline that never started (a
     leaked event and a one-second wait) and leaked the EOS message; the bus watch and its

@@ -281,6 +281,15 @@ written out rather than linked.
   runs on the runner host, which has neither. Linux covers the path:
   `ci-profile-bench.sh` streams the CLI against the image's signalling server, and the
   commit suite starts a stream against a refusing one.
+- **On Windows the suites find their DLLs through `ENVIRONMENT_MODIFICATION`.** clang-cl
+  registers each suite as one ctest test through the hub's `add_test` fallback
+  (`GTestDiscovery.cmake`), whose `ENVIRONMENT "PATH=<exe dir>;<build>/bin;..."` is a CMake
+  list: ctest splits it at those semicolons and the test runs with `PATH=<exe dir>` alone
+  (measured with a probe project). The placeholder suites never noticed, because they
+  imported nothing from `AccelerANTgine.dll`; the real ones died with `0xc0000135`.
+  `kataglyphis_configure_gtest_discovery` prepends `bin\` and appends the compiler's
+  directory through `ENVIRONMENT_MODIFICATION` until the hub fixes it. `Build-Windows.ps1`
+  runs the Profile benchmarks with `bin\` on `PATH` for the same reason.
 - **Every ctest run refuses an empty tree.** The Linux scripts pass `--no-tests=error`;
   `Build-Windows.ps1` sets `CTEST_NO_TESTS_ACTION=error`, because the hub's
   `Invoke-CtestDiscoveredTests` takes no extra ctest arguments.
