@@ -144,6 +144,32 @@ function Copy-ImageGStreamerRuntime {
     Write-BuildLog -Context $Context -Message "Image GStreamer runtime: $($dlls.Count) DLL(s) from $gstBin (ORT family excluded) -> $Destination"
 }
 
+# GStreamer looks for plugins in <dir of gstreamer-1.0-0.dll, minus a trailing bin>\lib\gstreamer-1.0; build\bin holds that DLL.
+function Copy-ImageGStreamerTestPlugins {
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Context,
+        [Parameter(Mandatory)][string]$BuildRoot
+    )
+    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
+    $pluginDir = Join-Path (Split-Path -Parent $gstBin) 'lib\gstreamer-1.0'
+    $destination = Join-Path $BuildRoot 'lib\gstreamer-1.0'
+    New-Item -ItemType Directory -Force -Path $destination | Out-Null
+    # The elements the GStreamer tests and benchmarks build pipelines from; their DLL closure is already in bin\.
+    $wanted = @('gstcoreelements', 'gstapp', 'gstvideotestsrc', 'gstvideoconvertscale')
+    $copied = @(foreach ($name in $wanted) {
+            $dll = Join-Path $pluginDir "$name.dll"
+            if (Test-Path -LiteralPath $dll -PathType Leaf) {
+                Copy-Item -LiteralPath $dll -Destination $destination -Force
+                $name
+            }
+        })
+    $missing = @($wanted | Where-Object { $_ -notin $copied })
+    if ($missing.Count) {
+        Write-BuildLogWarning -Context $Context -Message "GStreamer test plugins missing from ${pluginDir}: $($missing -join ', '); the tests that need them skip."
+    }
+    Write-BuildLog -Context $Context -Message "GStreamer test plugins: $($copied -join ', ') -> $destination"
+}
+
 $FastBuildDir = Get-OrDefault $FastBuildDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.FastBuildDir')
 $LogDir = Get-OrDefault $LogDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.LogDir')
 
@@ -176,6 +202,9 @@ try {
     Write-BuildLog -Context $Context -Message ("=" * 60)
 
     Set-Location -Path $Workspace
+
+    # ctest exits 0 on a tree that registered no test at all; every ctest run below must fail that instead.
+    $env:CTEST_NO_TESTS_ACTION = 'error'
 
     # Fast Local Cache Initialization (Outside mounted dir)
     $fastLocalCache = Initialize-BuildCacheEnvironment -Context $Context -FastBuildDir $FastBuildDir
@@ -281,6 +310,7 @@ try {
             # $null =: the returned DLL count would otherwise land in the step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildClangFull "bin")
+            Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildClangFull
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildClangFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
         }
@@ -366,6 +396,7 @@ try {
             # $null =: the returned DLL count would otherwise land in the step's output stream.
             $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
             Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildProfileFull "bin")
+            Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildProfileFull
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildProfileFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildProfileFull "bin"), $fastBuildProfileFull)
         }
@@ -473,7 +504,14 @@ try {
                 $tests = Join-Path $Workspace "dist\windows-$packageArch-tests"
                 if (Test-Path $tests) { Remove-Item -LiteralPath $tests -Recurse -Force }
                 New-Item -ItemType Directory -Force -Path $tests | Out-Null
-                $suites = @('commitTestSuite.exe', 'compileTestSuite.exe') | ForEach-Object { Join-Path $fastBuildReleaseDirFull $_ }
+                # The fuzz suite runs in FuzzTest's unit mode (a gtest binary); the benchmarks count by exit code, kept short.
+                $manifest = @(
+                    @{ exe = 'commitTestSuite.exe'; kind = 'gtest' }
+                    @{ exe = 'compileTestSuite.exe'; kind = 'gtest' }
+                    @{ exe = 'fuzzTestSuite.exe'; kind = 'gtest' }
+                    @{ exe = 'perfTestSuite.exe'; kind = 'exitcode'; args = @('--benchmark_min_time=0.05s') }
+                )
+                $suites = $manifest | ForEach-Object { Join-Path $fastBuildReleaseDirFull $_.exe }
                 $missing = @($suites | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
                 if ($missing.Count) { throw "The Release build made no $($missing -join ', '); KATAGLYPHIS_RELEASE_TESTS did not take" }
                 Copy-Item -LiteralPath $suites -Destination $tests
@@ -481,7 +519,7 @@ try {
                 $search = @(Join-Path $fastBuildReleaseDirFull 'bin') + @(Get-ProductDllSearchPath -Arch $TargetArch)
                 $closure = @(Copy-PeImportClosure -Path $suites -SearchDirectory $search -Destination $tests -Arch $TargetArch)
                 Copy-Item -LiteralPath (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Invoke-StagedTests.ps1') -Destination $tests
-                ConvertTo-Json -InputObject @($suites | ForEach-Object { @{ exe = (Split-Path $_ -Leaf); kind = 'gtest' } }) |
+                ConvertTo-Json -InputObject $manifest -Depth 3 |
                     Set-Content -LiteralPath (Join-Path $tests 'tests.json') -Encoding utf8
                 Write-BuildLog -Context $Context -Message "Staged $($suites.Count) suite(s) in $tests with $($closure.Count) closure DLL(s): $(@($closure | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
             }

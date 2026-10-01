@@ -3,8 +3,9 @@ module;
 #include <expected>
 #include <filesystem>
 #include <fstream>
-#include <string>
+#include <limits>
 #include <sstream>
+#include <string>
 
 module kataglyphis.config_loader;
 
@@ -32,7 +33,10 @@ auto assign_optional_uint(const json &object, const char *key, std::uint32_t &ta
 {
     const auto it = object.find(key);
     if (it == object.end()) { return {}; }
-    if (!it->is_number_unsigned()) { return std::unexpected(ConfigError::InvalidValue); }
+    // get<std::uint32_t>() would wrap a larger value silently.
+    if (!it->is_number_unsigned() || it->template get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max()) {
+        return std::unexpected(ConfigError::InvalidValue);
+    }
 
     target = it->template get<std::uint32_t>();
     return {};
@@ -78,6 +82,8 @@ auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRT
 {
     auto j = json::parse(json_content, nullptr, false);
     if (j.is_discarded()) { return std::unexpected(ConfigError::ParseError); }
+    // Valid JSON that is not an object has none of the keys, and would otherwise pass as all defaults.
+    if (!j.is_object()) { return std::unexpected(ConfigError::InvalidValue); }
 
     WebRTCConfig config;
     if (auto result = assign_optional_string(j, "signalingServerUrl", config.signaling_server_url); !result) {

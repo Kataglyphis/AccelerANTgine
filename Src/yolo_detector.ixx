@@ -123,13 +123,13 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
     std::unique_ptr<Impl> impl_;
 };
 
-[[nodiscard]] auto create_camera_detection_pipeline(const std::string &device,
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_camera_detection_pipeline(const std::string &device,
   const std::filesystem::path &model_path,
   std::uint32_t width = 640,
   std::uint32_t height = 480,
   std::uint32_t fps = 30) -> std::expected<VideoDetectorPipeline, OnnxError>;
 
-[[nodiscard]] auto create_video_detection_pipeline(const std::string &video_source,
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_video_detection_pipeline(const std::string &video_source,
   const std::filesystem::path &model_path,
   std::uint32_t width = 640,
   std::uint32_t height = 480) -> std::expected<VideoDetectorPipeline, OnnxError>;

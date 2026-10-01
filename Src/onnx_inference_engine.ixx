@@ -26,7 +26,8 @@ enum class OnnxError {
     OutputNotFound
 };
 
-struct TensorShape
+// Exported: a member defined in a module interface is not inline, so importers link against this one.
+struct KATAGLYPHIS_CPP_API TensorShape
 {
     std::vector<std::size_t> dimensions;
 

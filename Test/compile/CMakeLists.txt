@@ -12,7 +12,13 @@ include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 
 set(COMPILE_TEST_SUITE compileTestSuite)
 
-file(GLOB_RECURSE KataglyphisCppProject_COMPILE_TEST_FILTER "*.cpp")
+# The .c file proves the C API header still compiles as C.
+file(
+  GLOB_RECURSE
+  KataglyphisCppProject_COMPILE_TEST_FILTER
+  CONFIGURE_DEPENDS
+  "*.cpp"
+  "*.c")
 
 message("Compile test filter is: ${KataglyphisCppProject_COMPILE_TEST_FILTER}")
 
@@ -28,6 +34,7 @@ else()
 endif()
 
 kataglyphis_configure_common_test_target(${COMPILE_TEST_SUITE} "${_compile_resource_path}" "${_compile_include_path}")
+kataglyphis_configure_library_test_target(${COMPILE_TEST_SUITE})
 
 target_sources(${COMPILE_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMPILE_TEST_FILTER})
 

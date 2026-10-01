@@ -19,7 +19,7 @@ is the single fact that most shapes its tooling.
 | --- | --- |
 | `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `inference_demo`, plus `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) is built only when this is the top-level project |
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
-| `Test/` | Test sources |
+| `Test/` | The four C++ suites, `commit`, `compile`, `fuzz` and `perf` (README § Tests), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
 | `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, and the Pester suites in `tests/`. There is no project-local `modules/` any more: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
@@ -243,11 +243,47 @@ written out rather than linked.
   `ci-coverage.sh` merges every file there into one indexed profile before the
   hub's `coverage_llvm_report`, which takes ONE profile path and ONE object. The
   object is `lib/libAccelerANTgine.so`, where `Src/` lives — a test executable's
-  own mapping holds only `Test/`, which the ignore regex drops. The report
-  reading 0.00% for every `Src/` file is the truth, not a broken merge: the
-  `Test/` suites are placeholders that never call the library.
-  `linux-debug-GNU` does not set the option, so the GCC lane's gcovr step
-  reports `0 out of 0` lines.
+  own mapping holds only `Test/`, which the ignore regex drops. Until
+  2026-10-01 every `Src/` file read 0.00% because the suites were placeholders;
+  they call the library now (README § Tests). `linux-debug-GNU` sets the option
+  as well since then, so gcovr measures the GCC lane, where it reported `0 out
+  of 0` lines before. `inference_demo.cpp` stays at 0%: it is a `main` compiled
+  into the library that nothing calls.
+- **The tests generate their ONNX models.** `Test/common/kataglyphis_test_support.h`
+  hand-encodes a ModelProto (IR 8, opset 13): Relu, Add, Relu plus Neg, and a
+  Reshape from `images[1,3,H,W]` to `output[1,rows,values]`. With that one a test
+  writes the raw detector output as the input image, so the YOLO decoder runs end to
+  end without `models/yolo26n.onnx`. Nothing is staged for the Windows arm64 run job,
+  and the `*.onnx` guard in `.gitignore` stays as it is. The shipped
+  `resources/configs/inference_config.toml` is compiled into the suites
+  (`kataglyphis_embed_text_file`) for the same reason.
+- **A GStreamer test skips when an element is missing; Windows stages four plugins.**
+  `KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS` probes through the library and names the
+  missing element in its `GTEST_SKIP`. GStreamer looks for plugins in the directory of
+  `gstreamer-1.0-0.dll`, minus a trailing `bin`, plus `lib\gstreamer-1.0`. That DLL sits
+  in `build-*\bin`, so `Copy-ImageGStreamerTestPlugins` copies coreelements, app,
+  videotestsrc and videoconvertscale from the image into `build-*\lib\gstreamer-1.0` for
+  the Debug and Profile trees. The arm64 test tree gets none, because its import walk
+  would have to grade them, so those tests skip on `windows-11-arm`. The WebRTC tests
+  need `webrtcsink` (gst-plugins-rs), which only the Linux image has.
+- **The TSan run ignores uninstrumented modules.** GLib, GStreamer and ONNX Runtime
+  hand memory between threads through futex locks TSan cannot see, so
+  `ci-build-and-test.sh` sets `TSAN_OPTIONS=ignore_noninstrumented_modules=1` for the
+  TSan ctest; our code is instrumented and still reports. Its first run found two
+  real teardown races: `VideoDetectorPipeline` destroyed its callbacks before stopping
+  the stream that calls them, and the tests' `EventCounter` notified after unlocking.
+  `GStreamerPipeline` now takes its callback mutex after every NULL state change, which
+  makes the ordering GLib's thread join provides visible to TSan. Without
+  `--privileged` TSan dies at start (`unable to disable ASLR`); the CI container has it.
+- **`-RunWebRtcSmoke` stays opt-in on Windows.** The Windows image has no
+  gst-plugins-rs, so neither `webrtcsink` nor `gst-webrtc-signalling-server`: the hub's
+  mandatory plugin list carries `webrtcbin` only (checked 2026-10-01). The smoke also
+  runs on the runner host, which has neither. Linux covers the path:
+  `ci-profile-bench.sh` streams the CLI against the image's signalling server, and the
+  commit suite starts a stream against a refusing one.
+- **Every ctest run refuses an empty tree.** The Linux scripts pass `--no-tests=error`;
+  `Build-Windows.ps1` sets `CTEST_NO_TESTS_ACTION=error`, because the hub's
+  `Invoke-CtestDiscoveredTests` takes no extra ctest arguments.
 - **Every LLVM tool that reads clang's output must be the compiler's own.**
   On Linux the image does that now: `clang-tidy`, `llvm-profdata`, `llvm-cov`
   and the rest on PATH are clang's LLVM 23 (hub CON15, `:latest` of 2026-09-29),
@@ -377,7 +413,12 @@ On a cross build the script:
 - configures with the hub's `Get-CrossConfigureArgs -Corrosion`;
 - builds into `build-clangcl-release-arm64`;
 - ships the `aarch64` MSI and ZIP (not NSIS: its installer stub is x86) and the arm64 MSIX,
-  whose manifest takes `__ARCH__`.
+  whose manifest takes `__ARCH__`;
+- with `-StageTests`, which the lane passes, builds the commit, compile, fuzz and perf suites
+  in Release (`KATAGLYPHIS_RELEASE_TESTS`) and stages them with their DLL closure, the hub's
+  `Invoke-StagedTests.ps1` and a `tests.json` in `dist\windows-arm64-tests`. The three gtest
+  binaries count by their summaries, the benchmarks by exit code
+  (`--benchmark_min_time=0.05s`).
 
 **Both arches ship the same product (owner decision 2026-09-25: x64 was thinner).**
 clangcl-release configures `KATAGLYPHIS_PACKAGE_DLL_DIR`, the hub's
@@ -411,12 +452,13 @@ emulated riscv64 build is 20-30x slower than native and would not fit a 6 h job.
 `container-ci-riscv64.yml`, whose container half is `bash scripts/linux/ci-riscv64-test.sh`:
 the hub's `riscv64_cross_env`, then the `linux-riscv64-cross` preset (Debug, the hub's
 `$env{RISCV64_CMAKE_TOOLCHAIN_FILE}`, `Rust_CARGO_TARGET=riscv64gc-unknown-linux-gnu`), ctest,
-and `first_fuzz_test`. binfmt runs the riscv64 test binaries, so ctest, gtest discovery and
+and `fuzzTestSuite`. binfmt runs the riscv64 test binaries, so ctest, gtest discovery and
 FuzzTest's build-time tools need no emulator wrapper.
 
-- **What runs:** the native Debug suite: the 6 ctest entries (commit, compile, and the two
-  FuzzTest unit-mode tests) plus `first_fuzz_test`, against the image's riscv64 GStreamer
-  and ONNX Runtime. Measured 2026-10-01: 2 min 7 s end to end on a warm cargo home.
+- **What runs:** the native Debug suites: every ctest entry of the commit, compile and fuzz
+  suites, then `fuzzTestSuite` once more as a whole, against the image's riscv64 GStreamer
+  and ONNX Runtime. Measured 2026-10-01 with the placeholder suites: 2 min 7 s end to end on
+  a warm cargo home.
 - **What does not:** ASan/UBSan, coverage and the TSan build. The cross clang (the image's
   distro clang 22; the image's own clang 23 is X86-only) has no riscv64 compiler-rt, so the
   preset turns them off; the x64 and arm64 lanes keep them. No perf suite: timing under

@@ -229,6 +229,7 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
 
     const auto &output = raw_output.outputs[0];
     const auto &dims = output.shape.dimensions;
+    if (dims.empty()) { return result; }
 
     std::size_t num_detections = dims[0];
     std::size_t values_per_detection = dims.size() > 1 ? dims[1] : dims[0];
@@ -238,13 +239,18 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
         values_per_detection = dims[2];
     }
 
+    // A row is cx, cy, w, h, objectness, then class scores; anything shorter is not a detection layout.
+    if (values_per_detection < 5) { return result; }
+
     const float *data = output.data.data();
     auto data_size = static_cast<std::size_t>(output.data.size());
 
-    if (dims.empty()) { return result; }
-
     float scale_x = static_cast<float>(original_width) / static_cast<float>(impl_->config.input_width);
     float scale_y = static_cast<float>(original_height) / static_cast<float>(impl_->config.input_height);
+
+    // Class scores beyond the row would be read from the next detection.
+    const std::size_t class_count =
+      std::min(static_cast<std::size_t>(std::max(impl_->config.num_classes, 0)), values_per_detection - 5);
 
     std::vector<BoundingBox> all_boxes;
     all_boxes.reserve(num_detections);
@@ -252,34 +258,35 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
     for (std::size_t i = 0; i < num_detections; ++i) {
         std::size_t offset = i * values_per_detection;
 
-        if (offset + 4 >= data_size) { break; }
+        if (offset + values_per_detection > data_size) { break; }
 
-        float cx = data[offset + 0];
-        float cy = data[offset + 1];
-        float w = data[offset + 2];
-        float h = data[offset + 3];
-        float obj_conf = data[offset + 4];
+        const float *row = data + offset;
+        float cx = row[0];
+        float cy = row[1];
+        float w = row[2];
+        float h = row[3];
+        float obj_conf = row[4];
 
-        if (obj_conf < impl_->config.confidence_threshold) { continue; }
+        // NaN fails every comparison, so the thresholds test for acceptance, not rejection.
+        if (!(obj_conf >= impl_->config.confidence_threshold)) { continue; }
+        if (!std::isfinite(cx) || !std::isfinite(cy) || !std::isfinite(w) || !std::isfinite(h)) { continue; }
 
         int best_class = 0;
-        float best_class_conf = 0.0F;
+        float final_conf = obj_conf;
 
-        if (values_per_detection > 5) {
-            for (int c = 0; c < impl_->config.num_classes; ++c) {
-                if (offset + 5 + static_cast<std::size_t>(c) >= data_size) { break; }
-                float class_conf = data[offset + 5 + c];
+        if (class_count > 0) {
+            float best_class_conf = 0.0F;
+            for (std::size_t c = 0; c < class_count; ++c) {
+                const float class_conf = row[5 + c];
                 if (class_conf > best_class_conf) {
                     best_class_conf = class_conf;
-                    best_class = c;
+                    best_class = static_cast<int>(c);
                 }
             }
-        } else {
-            best_class_conf = obj_conf;
+            final_conf = obj_conf * best_class_conf;
         }
 
-        float final_conf = obj_conf * best_class_conf;
-        if (final_conf < impl_->config.confidence_threshold) { continue; }
+        if (!(final_conf >= impl_->config.confidence_threshold) || !std::isfinite(final_conf)) { continue; }
 
         BoundingBox box;
         box.x = (cx - (w / 2.0F)) * scale_x;
@@ -357,11 +364,12 @@ auto YoloDetector::get_coco_class_name(int class_id) -> std::string_view
 struct VideoDetectorPipeline::Impl
 {
     YoloDetector detector;
-    gstreamer::GStreamerPipeline pipeline;
     std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> detection_callback;
     std::function<void(const gstreamer::BufferInfo &)> frame_callback;
     std::atomic<bool> running{ false };
     VideoDetectionConfig config;
+    // Last, so it is destroyed first: its streaming thread calls into every member above.
+    gstreamer::GStreamerPipeline pipeline;
 
     void on_frame_received(const gstreamer::BufferInfo &buffer)
     {
@@ -403,8 +411,9 @@ auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config) -> st
     auto pipeline_result = impl_->pipeline.create_pipeline(config.gstreamer_config);
     if (!pipeline_result) { return std::unexpected(OnnxError::SessionCreationFailed); }
 
+    // The Impl, not `this`: the factories return the pipeline by move, which leaves `this` behind.
     impl_->pipeline.set_buffer_callback(
-      [this](const gstreamer::BufferInfo &buffer) -> void { impl_->on_frame_received(buffer); });
+      [impl = impl_.get()](const gstreamer::BufferInfo &buffer) -> void { impl->on_frame_received(buffer); });
 
     return {};
 }

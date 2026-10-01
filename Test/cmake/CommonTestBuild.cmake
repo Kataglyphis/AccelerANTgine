@@ -67,6 +67,39 @@ function(
   endif()
 endfunction()
 
+# Embeds a text file as `inline constexpr std::string_view <variable>` in <variable>.inc, so staged tests need no data.
+function(
+  kataglyphis_embed_text_file
+  target_name
+  source_file
+  variable)
+  set(_kataglyphis_embed_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+  file(READ "${source_file}" KATAGLYPHIS_EMBEDDED_CONTENT)
+  set(KATAGLYPHIS_EMBEDDED_VARIABLE "${variable}")
+  file(
+    CONFIGURE
+    OUTPUT
+    "${_kataglyphis_embed_dir}/${variable}.inc"
+    CONTENT
+    "inline constexpr std::string_view @KATAGLYPHIS_EMBEDDED_VARIABLE@ = R\"kgembed(@KATAGLYPHIS_EMBEDDED_CONTENT@)kgembed\";\n"
+    @ONLY)
+  set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY CMAKE_CONFIGURE_DEPENDS "${source_file}")
+  target_include_directories(${target_name} PRIVATE "${_kataglyphis_embed_dir}")
+endfunction()
+
+# A suite that calls the library: it imports its modules, includes the C header and reads the shipped config.
+function(kataglyphis_configure_library_test_target target_name)
+  set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
+  target_include_directories(${target_name} PRIVATE "${PROJECT_SOURCE_DIR}/Src" "${PROJECT_SOURCE_DIR}/Test/common")
+  target_compile_definitions(
+    ${target_name} PRIVATE KATAGLYPHIS_TEST_PROJECT_VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+  kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/resources/configs/inference_config.toml"
+                              kShippedInferenceConfig)
+endfunction()
+
 function(kataglyphis_link_rust_target_if_enabled target_name)
   if(RUST_FEATURES)
     target_link_libraries(${target_name} PUBLIC rusty_code)

@@ -8,6 +8,7 @@ module;
 #include <gst/analytics/gsttensor.h>
 #include <gst/analytics/gsttensormeta.h>
 #include <gst/app/gstappsink.h>
+#include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <mutex>
@@ -30,10 +31,13 @@ namespace {
     {
         GError *error = nullptr;
         GstElement *pipeline = gst_parse_launch(pipeline_description.c_str(), &error);
+        // gst_parse_launch hands out a floating reference; sinking it makes the later unref the matching release.
+        if (pipeline != nullptr) { gst_object_ref_sink(pipeline); }
 
         if (error != nullptr) {
             g_printerr("%s: %s\n", failure_context, error->message);
             g_error_free(error);
+            if (pipeline != nullptr) { gst_object_unref(pipeline); }
             return std::unexpected(GStreamerError::PipelineCreationFailed);
         }
 
@@ -43,6 +47,43 @@ namespace {
         }
 
         return pipeline;
+    }
+
+    // The first element of the given type in the pipeline (or the pipeline itself), with a reference the caller owns.
+    auto find_element_of_type(GstElement *root, GType type) -> GstElement *
+    {
+        if (G_TYPE_CHECK_INSTANCE_TYPE(root, type)) { return GST_ELEMENT(gst_object_ref(root)); }
+        if (!GST_IS_BIN(root)) { return nullptr; }
+
+        GstElement *found = nullptr;
+        GstIterator *iterator = gst_bin_iterate_recurse(GST_BIN(root));
+        GValue item = G_VALUE_INIT;
+        bool done = false;
+        while (!done) {
+            switch (gst_iterator_next(iterator, &item)) {
+            case GST_ITERATOR_OK: {
+                auto *element = GST_ELEMENT(g_value_get_object(&item));
+                if (found == nullptr && G_TYPE_CHECK_INSTANCE_TYPE(element, type)) {
+                    found = GST_ELEMENT(gst_object_ref(element));
+                }
+                g_value_reset(&item);
+                break;
+            }
+            case GST_ITERATOR_RESYNC:
+                if (found != nullptr) {
+                    gst_object_unref(found);
+                    found = nullptr;
+                }
+                gst_iterator_resync(iterator);
+                break;
+            default:
+                done = true;
+                break;
+            }
+        }
+        g_value_unset(&item);
+        gst_iterator_free(iterator);
+        return found;
     }
 
     void append_tensor_metadata(GstBuffer *buffer, BufferInfo &buffer_info)
@@ -70,15 +111,22 @@ namespace {
         if (caps != nullptr) {
             GstStructure *structure = gst_caps_get_structure(caps, 0);
             if (structure != nullptr) {
-                gst_structure_get_uint(structure, "width", &buffer_info.metadata.width);
-                gst_structure_get_uint(structure, "height", &buffer_info.metadata.height);
+                // Raw video caps carry width and height as G_TYPE_INT, which gst_structure_get_uint never matches.
+                gint width = 0;
+                gint height = 0;
+                if (gst_structure_get_int(structure, "width", &width) != 0 && width > 0) {
+                    buffer_info.metadata.width = static_cast<std::uint32_t>(width);
+                }
+                if (gst_structure_get_int(structure, "height", &height) != 0 && height > 0) {
+                    buffer_info.metadata.height = static_cast<std::uint32_t>(height);
+                }
 
-                guint fps_n = 0;
-                guint fps_d = 0;
-                if (gst_structure_get_fraction(
-                      structure, "framerate", reinterpret_cast<gint *>(&fps_n), reinterpret_cast<gint *>(&fps_d)) != 0) {
-                    buffer_info.metadata.fps_n = fps_n;
-                    buffer_info.metadata.fps_d = fps_d;
+                gint fps_n = 0;
+                gint fps_d = 0;
+                if (gst_structure_get_fraction(structure, "framerate", &fps_n, &fps_d) != 0 && fps_n >= 0
+                    && fps_d > 0) {
+                    buffer_info.metadata.fps_n = static_cast<std::uint32_t>(fps_n);
+                    buffer_info.metadata.fps_d = static_cast<std::uint32_t>(fps_d);
                 }
 
                 const gchar *format = gst_structure_get_string(structure, "format");
@@ -127,6 +175,7 @@ struct GStreamerPipeline::Impl
 
     GMainLoop *main_loop{ nullptr };
     std::thread main_loop_thread;
+    gulong new_sample_handler{ 0 };
 
     ~Impl() { cleanup(); }
 
@@ -140,12 +189,44 @@ struct GStreamerPipeline::Impl
         }
         if (pipeline != nullptr) {
             gst_element_set_state(pipeline, GST_STATE_NULL);
+            wait_for_callbacks();
+        }
+        // Both hold their own reference, so the pipeline below is only freed once they let go.
+        if (appsink != nullptr) {
+            if (new_sample_handler != 0) { g_signal_handler_disconnect(appsink, new_sample_handler); }
+            gst_object_unref(appsink);
+            appsink = nullptr;
+        }
+        new_sample_handler = 0;
+        if (appsrc != nullptr) {
+            gst_object_unref(appsrc);
+            appsrc = nullptr;
+        }
+        if (pipeline != nullptr) {
             gst_object_unref(pipeline);
             pipeline = nullptr;
         }
+        is_playing.store(false);
+        is_paused.store(false);
     }
 
-    static void on_new_sample(GstElement *sink, Impl *self)
+    // No callback runs after the NULL state change; the lock makes that ordering visible to TSan as well.
+    void wait_for_callbacks() { std::scoped_lock lock(callback_mutex); }
+
+    // Once per appsink: a second connection would deliver every sample twice.
+    void connect_buffer_callback()
+    {
+        if (appsink == nullptr || new_sample_handler != 0) { return; }
+        {
+            std::scoped_lock lock(callback_mutex);
+            if (!buffer_callback) { return; }
+        }
+        g_object_set(appsink, "emit-signals", TRUE, nullptr);
+        new_sample_handler = g_signal_connect(appsink, "new-sample", G_CALLBACK(&Impl::on_new_sample), this);
+    }
+
+    // appsink reads the handler's return value, and anything but GST_FLOW_OK stops the stream.
+    static auto on_new_sample(GstElement *sink, Impl *self) -> GstFlowReturn
     {
         GstSample *sample = nullptr;
         g_signal_emit_by_name(sink, "pull-sample", &sample);
@@ -158,6 +239,7 @@ struct GStreamerPipeline::Impl
             }
             gst_sample_unref(sample);
         }
+        return GST_FLOW_OK;
     }
 
     static auto on_pad_probe([[maybe_unused]] GstPad *pad,
@@ -213,7 +295,10 @@ auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::ex
     if (!pipeline) { return std::unexpected(pipeline.error()); }
     impl_->pipeline = *pipeline;
 
-    // Tensor metadata support will be implemented in a future release.
+    // Without these pull_sample, push_buffer and the buffer callback have nothing to talk to.
+    impl_->appsink = find_element_of_type(impl_->pipeline, GST_TYPE_APP_SINK);
+    impl_->appsrc = find_element_of_type(impl_->pipeline, GST_TYPE_APP_SRC);
+    impl_->connect_buffer_callback();
 
     return {};
 }
@@ -266,6 +351,7 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
     if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
 
     g_object_set(impl_->appsink, "emit-signals", TRUE, nullptr);
+    impl_->connect_buffer_callback();
 
     return {};
 }
@@ -288,6 +374,7 @@ auto GStreamerPipeline::stop() -> std::expected<void, GStreamerError>
     if (impl_->pipeline == nullptr) { return {}; }
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_NULL);
+    impl_->wait_for_callbacks();
 
     if (ret == GST_STATE_CHANGE_FAILURE) { return std::unexpected(GStreamerError::StateChangeFailed); }
 
@@ -321,9 +408,7 @@ auto GStreamerPipeline::set_buffer_callback(BufferCallback callback) -> void
         impl_->buffer_callback = std::move(callback);
     }
 
-    if (impl_->appsink != nullptr) {
-        g_signal_connect(impl_->appsink, "new-sample", G_CALLBACK(&Impl::on_new_sample), impl_.get());
-    }
+    impl_->connect_buffer_callback();
 }
 
 auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms)

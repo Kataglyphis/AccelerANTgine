@@ -215,17 +215,53 @@ cargo install cxxbridge-cmd
 ```
 
 # Tests
-I have five tests suites.
 
-1. Compilation Test Suite (`Test/compile`): built in every Debug configuration and run by ctest together with the commit suite. It is not run as part of the compilation itself.
+Four C++ suites link `AccelerANTgine` and import its modules, so they test the
+library itself; a fifth, `Test/python`, tests the Python bindings.
 
-2. Commit Test Suite (`Test/commit`): runs on every push and PR, wherever a lane builds Debug (the Linux lanes and Windows x64). More expensive tests are allowed :) 
+| Suite | Binary | What it covers |
+| --- | --- | --- |
+| `Test/commit` | `commitTestSuite` | The C API; the TOML and JSON config parsers, every rejection path included; the ONNX engine on models the tests generate (Relu, Add, two outputs, and a Reshape that turns the input into raw YOLO output); YOLO decoding (thresholds, classes, NMS, scaling, NaN and infinity, rows shorter than the class count); GStreamer frames from `videotestsrc` and `appsrc` through `appsink`, callbacks and state; the WebRTC stream config, its validation and a start against a refusing signalling server |
+| `Test/compile` | `compileTestSuite` | The embedder contract: the C header compiles as C17 and links, `import kataglyphis.c_api` reaches the same symbol, every module imports into one translation unit, the resource owners are move-only, the error codes keep their numbers, the defaults agree |
+| `Test/fuzz` | `fuzzTestSuite` | FuzzTest properties over the untrusted inputs: the settings JSON and the inference TOML on arbitrary bytes, unsigned fields that round-trip or are rejected, the stream-name mapping, the COCO table, and the YOLO decoder on arbitrary floats |
+| `Test/perf` | `perfTestSuite` | Google Benchmark over the hot paths: both parsers, `run_inference` at three sizes, YOLO detection with 0, 64 and 512 candidate boxes (NMS is quadratic), and `pull_sample` |
 
-3. Perf test suite (`Test/perf`, RelWithDebInfo builds): It is all about measurements of performance. We are C++ tho! 
+No model or media file is checked in for them:
+`Test/common/kataglyphis_test_support.h` writes the ONNX protobuf itself, and
+the GStreamer tests use `videotestsrc` and `appsrc`. A test that needs a
+GStreamer element the install lacks skips and names it; the WebRTC ones need
+`webrtcsink` (gst-plugins-rs), which the Linux image has and the Windows image
+has not.
 
-4. Fuzz testing suite (`Test/fuzz`, Debug builds with Clang or clang-cl)
+Commit, compile and fuzz build in Debug; perf in RelWithDebInfo; all four in
+Release with `-DKATAGLYPHIS_RELEASE_TESTS=ON`, which only the Windows arm64 lane
+sets. FuzzTest needs Clang or clang-cl. Every lane runs them:
 
-5. Python bindings test suite (`Test/python`), run against the built `kataglyphis_inference` module (see [Python bindings](#python-bindings): no CI lane runs it today).
+| Lane | Commit + compile | Fuzz (unit mode) | Perf |
+| --- | --- | --- | --- |
+| Linux x64, arm64 (clang) | ctest, ASan + UBSan with llvm-cov, then again under TSan | yes | `ci-profile-bench.sh` |
+| Linux x64, arm64 (GCC) | ctest, ASan + UBSan with gcovr | — (FuzzTest is Clang-only) | `ci-profile-bench.sh` |
+| Linux riscv64 | ctest under QEMU, no sanitizers | yes | — (QEMU timing) |
+| Windows x64 | ctest in the container (ASan), then on the runner host | yes | Profile build, container and host |
+| Windows arm64 | Release, on `windows-11-arm` | yes | yes, by exit code |
+
+Locally, in the family image:
+
+```sh
+cmake --preset linux-debug-clang && cmake --build build -j
+ctest --test-dir build --no-tests=error --output-on-failure
+./build/fuzzTestSuite                       # about a second per property
+FUZZTEST_FUZZ_FOR=60s ./build/fuzzTestSuite  # longer, still unit mode
+```
+
+Coverage: `scripts/linux/ci-coverage.sh` reports llvm-cov on the clang lane
+(over `lib/libAccelerANTgine.so`) and gcovr on the GCC lane, where
+`linux-debug-GNU` now builds with `myproject_ENABLE_COVERAGE`. The HTML lands
+in `docs/coverage/`.
+
+The Python bindings test suite (`Test/python`) runs against the built
+`kataglyphis_inference` module (see [Python bindings](#python-bindings): no CI
+lane runs it today).
 
 ## Performance tests
 

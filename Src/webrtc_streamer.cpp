@@ -137,6 +137,7 @@ struct WebRTCStreamer::Impl
     std::string producer_id;
 
     std::mutex callback_mutex;
+    bool bus_watch{ false };
 
     ~Impl() { cleanup(); }
 
@@ -157,6 +158,14 @@ struct WebRTCStreamer::Impl
             webrtcsink = nullptr;
         }
         if (pipeline != nullptr) {
+            // The watch source holds the bus, and its handlers point at this Impl, which may die first.
+            if (bus_watch) {
+                GstBus *bus = gst_element_get_bus(pipeline);
+                g_signal_handlers_disconnect_by_data(bus, this);
+                gst_bus_remove_signal_watch(bus);
+                gst_object_unref(bus);
+                bus_watch = false;
+            }
             gst_object_unref(pipeline);
             pipeline = nullptr;
         }
@@ -390,7 +399,7 @@ auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, 
         factory = gst_element_factory_find("webrtcbin");
         if (factory == nullptr) {
             g_printerr("Neither webrtcsink nor webrtcbin found!\n");
-            gst_deinit();
+            // No gst_deinit: it cannot be undone, and the process may still use GStreamer elsewhere.
             return std::unexpected(WebRTCError::InitializationFailed);
         }
         g_print("Using webrtcbin (manual signalling required)\n");
@@ -449,11 +458,14 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
 
     GError *error = nullptr;
     impl_->pipeline = gst_parse_launch(pipeline_desc.c_str(), &error);
+    // Floating on return; sinking it makes destroy_pipeline's unref the matching release.
+    if (impl_->pipeline != nullptr) { gst_object_ref_sink(impl_->pipeline); }
 
     if (error != nullptr) {
         std::string error_msg = error->message;
         g_printerr("Pipeline creation failed: %s\n", error_msg.c_str());
         g_error_free(error);
+        impl_->destroy_pipeline();
         return std::unexpected(WebRTCError::PipelineCreationFailed);
     }
 
@@ -471,6 +483,7 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
     g_signal_connect(bus, "message::eos", G_CALLBACK(Impl::on_bus_eos), impl_.get());
     g_signal_connect(bus, "message::element", G_CALLBACK(Impl::on_bus_element), impl_.get());
     gst_object_unref(bus);
+    impl_->bus_watch = true;
 
     return {};
 }
@@ -517,13 +530,17 @@ auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
 
     g_print("Stopping pipeline...\n");
 
-    // Send EOS to gracefully stop
-    gst_element_send_event(impl_->pipeline, gst_event_new_eos());
+    // Only a running pipeline drains an EOS; one that never started leaks it and would wait a second for nothing.
+    GstState current = GST_STATE_NULL;
+    gst_element_get_state(impl_->pipeline, &current, nullptr, 0);
+    if (current >= GST_STATE_PAUSED) {
+        gst_element_send_event(impl_->pipeline, gst_event_new_eos());
 
-    // Wait briefly for EOS to propagate
-    GstBus *bus = gst_element_get_bus(impl_->pipeline);
-    (void)gst_bus_timed_pop_filtered(bus, GST_SECOND, GST_MESSAGE_EOS);
-    gst_object_unref(bus);
+        GstBus *bus = gst_element_get_bus(impl_->pipeline);
+        GstMessage *eos = gst_bus_timed_pop_filtered(bus, GST_SECOND, GST_MESSAGE_EOS);
+        if (eos != nullptr) { gst_message_unref(eos); }
+        gst_object_unref(bus);
+    }
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_NULL);
 

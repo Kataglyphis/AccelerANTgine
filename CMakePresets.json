@@ -178,12 +178,13 @@
     {
       "name": "linux-debug-GNU",
       "displayName": "Linux Debug GNU",
-      "description": "Linux Debug build with GCC",
+      "description": "Linux Debug build with GCC, instrumented for gcovr coverage",
       "inherits": "linux-gnu",
       "binaryDir": "${sourceDir}/build/",
       "installDir": "${sourceDir}/build/",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "myproject_ENABLE_COVERAGE": "ON"
       }
     },
     {

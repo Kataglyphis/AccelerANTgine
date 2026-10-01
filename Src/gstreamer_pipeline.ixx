@@ -117,13 +117,13 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     std::unique_ptr<Impl> impl_;
 };
 
-[[nodiscard]] auto create_video_inference_pipeline(const std::string &video_source,
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_video_inference_pipeline(const std::string &video_source,
   const std::string &model_path,
   std::uint32_t width,
   std::uint32_t height,
   const std::string &output_sink = "appsink") -> std::expected<GStreamerPipeline, GStreamerError>;
 
-[[nodiscard]] auto create_camera_inference_pipeline(const std::string &device,
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_camera_inference_pipeline(const std::string &device,
   const std::string &model_path,
   std::uint32_t width,
   std::uint32_t height,

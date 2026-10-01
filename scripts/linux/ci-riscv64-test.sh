@@ -23,9 +23,9 @@ cmake_build_main --preset linux-riscv64-cross --build-dir "${BUILD_DIR}" --mb-pe
   ctest_run_main \
     --build-dir "${BUILD_DIR}" \
     --build-type Debug \
-    -- --output-junit "${WORKSPACE_DIR}/docs/test_results_riscv64.xml"
+    -- --output-junit "${WORKSPACE_DIR}/docs/test_results_riscv64.xml" --no-tests=error
 )
 
-FUZZ_TEST="${BUILD_DIR}/first_fuzz_test"
+FUZZ_TEST="${BUILD_DIR}/fuzzTestSuite"
 [[ -x "${FUZZ_TEST}" ]] || die "Fuzz test binary '${FUZZ_TEST}' is missing; the riscv64 preset is Debug + Clang, which builds Test/fuzz."
 "${FUZZ_TEST}"
