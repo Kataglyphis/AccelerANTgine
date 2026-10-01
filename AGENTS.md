@@ -394,9 +394,11 @@ findings here since the rename (again on 2026-09-25).
 
 **Both Windows lanes call the hub's reusable `container-ci-windows.yml`** (the family's
 thin-caller step, 2026-09-25, after OxidANT's). `windows-x64.yml` runs `Build-Windows.ps1
--WorkspaceDir C:\ws -BuildTargets clangcl-debug,clangcl-profile,clangcl-release` in the family
-image, and its `host-command` runs `Start-Windows.ps1` for each configuration on the runner
-host, which has the desktop the container lacks. `dist/windows-x64` then uploads as
+-WorkspaceDir C:\ws -BuildTargets clangcl-debug,clangcl-profile,clangcl-release -StageTests` in the
+family image, and its `host-command` runs `Start-Windows.ps1` for each configuration on the runner
+host, which has the desktop the container lacks. `-Config Release` then runs the suites
+`-StageTests` built in Release, from `dist\windows-x64-tests`, through the same
+`Invoke-StagedTests.ps1` the arm64 run job uses, and fails on a failed or an empty verdict. `dist/windows-x64` then uploads as
 `AccelerANTgine-windows-x64`. The container run is the hub's bind mount (`D:\ws` → `C:\ws`);
 `Invoke-ContainerBuild.ps1`'s tar-pipe stays the local entry point.
 

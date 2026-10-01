@@ -234,15 +234,15 @@ GStreamer element the install lacks skips and names it; the WebRTC ones need
 has not.
 
 Commit, compile and fuzz build in Debug; perf in RelWithDebInfo; all four in
-Release with `-DKATAGLYPHIS_RELEASE_TESTS=ON`, which only the Windows arm64 lane
-sets. FuzzTest needs Clang or clang-cl. Every lane runs them:
+Release with `-DKATAGLYPHIS_RELEASE_TESTS=ON`, which both Windows lanes set
+(`Build-Windows.ps1 -StageTests`). FuzzTest needs Clang or clang-cl. Every lane runs them:
 
 | Lane | Commit + compile | Fuzz (unit mode) | Perf |
 | --- | --- | --- | --- |
 | Linux x64, arm64 (clang) | ctest, ASan + UBSan with llvm-cov, then again under TSan | yes | `ci-profile-bench.sh` |
 | Linux x64, arm64 (GCC) | ctest, ASan + UBSan with gcovr | — (FuzzTest is Clang-only) | `ci-profile-bench.sh` |
 | Linux riscv64 | ctest under QEMU, no sanitizers | yes | — (QEMU timing) |
-| Windows x64 | ctest in the container (ASan), then on the runner host | yes | Profile build, container and host |
+| Windows x64 | Debug: ctest in the container (ASan), then on the runner host; Release: staged, on the host | yes, Debug and Release | Profile build, container and host; Release, by exit code |
 | Windows arm64 | Release, on `windows-11-arm` | yes | yes, by exit code |
 
 Locally, in the family image:

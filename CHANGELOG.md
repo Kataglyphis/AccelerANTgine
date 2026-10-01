@@ -37,8 +37,10 @@ belongs in the **Changed** list below with that consequence spelled out.
   - No model is checked in: `Test/common/kataglyphis_test_support.h` encodes the ONNX
     protobuf, and the shipped TOML config is compiled into the suites.
   - Every lane runs them: Linux x64/arm64 clang (ASan + UBSan, then TSan) and GCC, riscv64
-    under QEMU, Windows x64 in the container and on the host, and Windows arm64 in Release
-    (`KATAGLYPHIS_RELEASE_TESTS` now also builds fuzz and perf; `tests.json` lists all four).
+    under QEMU, Windows x64 in Debug (container and host) and in Release (staged, on the
+    host: `windows-x64.yml` passes `-StageTests` and `Start-Windows.ps1 -Config Release` runs
+    them), and Windows arm64 in Release (`KATAGLYPHIS_RELEASE_TESTS` now also builds fuzz and
+    perf; `tests.json` lists all four).
   - Measured locally in `:latest`: 111 ctest entries plus 8 fuzz properties under ASan +
     UBSan, 103 under TSan, 103 with GCC. `Src/` line coverage: llvm-cov 74.6% (1846 lines,
     `inference_demo.cpp`'s unreachable 259 included), gcovr 68.5% of 1655 lines (the CLI's
