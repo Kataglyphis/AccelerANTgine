@@ -27,7 +27,9 @@ param(
     [switch]$ContinueOnError,
     [switch]$StopOnError,
     # amd64 (alias x64) or arm64; empty means the image's WINDOWS_TARGET_ARCH, else amd64.
-    [string]$TargetArch = ''
+    [string]$TargetArch = '',
+    # Release also builds the commit/compile suites and stages them in dist\windows-<arch>-tests for the arm64 run job.
+    [switch]$StageTests
 )
 
 $ErrorActionPreference = if ($ContinueOnError) { "Continue" } else { "Stop" }
@@ -413,6 +415,7 @@ try {
                     -CleanBuildRoot `
                     -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON',
                             "-DKATAGLYPHIS_PACKAGE_DLL_DIR=$($packageDlls -replace '\\', '/')") +
+                        @(if ($StageTests) { '-DBUILD_TESTING=ON', '-DKATAGLYPHIS_RELEASE_TESTS=ON' }) +
                         @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
 
@@ -462,6 +465,26 @@ try {
             }
             $installers | Copy-Item -Destination $packages
             Write-BuildLog -Context $Context -Message "Portable bundle $bundle; the install tree carries its whole DLL closure ($($installed.Count) file(s) in bin)"
+        }
+
+        # Beside the product, not in it: the run job downloads both, and the hub grades this tree with the same arch gate.
+        if ($StageTests) {
+            Invoke-BuildStep -Context $Context -StepName "Stage Tests ($TargetArch)" -Critical -Script {
+                $tests = Join-Path $Workspace "dist\windows-$packageArch-tests"
+                if (Test-Path $tests) { Remove-Item -LiteralPath $tests -Recurse -Force }
+                New-Item -ItemType Directory -Force -Path $tests | Out-Null
+                $suites = @('commitTestSuite.exe', 'compileTestSuite.exe') | ForEach-Object { Join-Path $fastBuildReleaseDirFull $_ }
+                $missing = @($suites | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
+                if ($missing.Count) { throw "The Release build made no $($missing -join ', '); KATAGLYPHIS_RELEASE_TESTS did not take" }
+                Copy-Item -LiteralPath $suites -Destination $tests
+                # The build's own bin first, so a suite that imports the engine gets this build's AccelerANTgine.dll.
+                $search = @(Join-Path $fastBuildReleaseDirFull 'bin') + @(Get-ProductDllSearchPath -Arch $TargetArch)
+                $closure = @(Copy-PeImportClosure -Path $suites -SearchDirectory $search -Destination $tests -Arch $TargetArch)
+                Copy-Item -LiteralPath (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Invoke-StagedTests.ps1') -Destination $tests
+                ConvertTo-Json -InputObject @($suites | ForEach-Object { @{ exe = (Split-Path $_ -Leaf); kind = 'gtest' } }) |
+                    Set-Content -LiteralPath (Join-Path $tests 'tests.json') -Encoding utf8
+                Write-BuildLog -Context $Context -Message "Staged $($suites.Count) suite(s) in $tests with $($closure.Count) closure DLL(s): $(@($closure | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
+            }
         }
 
         # Sync Release Artifacts

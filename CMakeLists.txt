@@ -62,6 +62,8 @@ myproject_setup_options()
 myproject_global_options()
 
 option(KATAGLYPHIS_ENABLE_TIME_TRACE "Enable Clang -ftime-trace for build profiling" OFF)
+# The arm64 cross lane builds Release only, and its windows-11-arm job is the only place an arm64 test can run.
+option(KATAGLYPHIS_RELEASE_TESTS "Also build the commit and compile suites in Release (the arm64 cross lane)" OFF)
 if(KATAGLYPHIS_ENABLE_TIME_TRACE AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
   message(STATUS "=== ENABLING CLANG TIME TRACE PROFILING ===")
   message(STATUS "Look for .json trace files next to the compiled objects.")
@@ -170,6 +172,10 @@ if(BUILD_TESTING)
   elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_subdirectory(Test/perf)
     message(STATUS "Building test suite: perf (RelWithDebInfo)")
+  elseif(CMAKE_BUILD_TYPE STREQUAL "Release" AND KATAGLYPHIS_RELEASE_TESTS)
+    add_subdirectory(Test/commit)
+    add_subdirectory(Test/compile)
+    message(STATUS "Building test suites: commit, compile (Release, KATAGLYPHIS_RELEASE_TESTS)")
   else()
     message(
       STATUS

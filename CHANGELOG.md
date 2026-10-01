@@ -19,6 +19,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- 2026-10-01 — The arm64 cross lane runs tests on `windows-11-arm` (hub CON43).
+  - `Build-Windows.ps1 -StageTests` builds the commit and compile suites in
+    Release (new CMake option `KATAGLYPHIS_RELEASE_TESTS`, default OFF).
+  - It stages them with their DLL closure in `dist\windows-<arch>-tests`,
+    together with the hub's `Invoke-StagedTests.ps1` and a `tests.json`.
+  - `windows-arm64-cross.yml` passes `-StageTests`, `test-artifact-dir` and
+    `test-command`.
+  - The product and its installers are unchanged: the suites install nothing.
+  - Measured on x64 in `:winamd64`: 2 suites with 3 closure DLLs,
+    `TESTS: passed=4 failed=0 skipped=0`.
+
 - 2026-09-25 — `.github/workflows/windows-arm64-cross.yml` ("Windows arm64 · cross
   build + run", owner decision 2026-09-25), a thin caller of ANTfrastructure's
   reusable `container-ci-windows.yml`. `Build-Windows.ps1 -TargetArch arm64
