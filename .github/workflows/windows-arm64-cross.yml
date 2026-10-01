@@ -1,5 +1,5 @@
 # Cross-builds arm64 on amd64, then runs it on windows-11-arm; why Release only: third_party/ANTfrastructure/docs/windows-cross-builds.md.
-name: Windows arm64 · cross build + run
+name: Windows arm64 · cross build + test
 
 on:
   push:
