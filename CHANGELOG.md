@@ -19,6 +19,39 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- 2026-10-01 — **Test suites that test the library** (owner decision 2026-10-01). The old
+  ones were placeholders (`EXPECT_EQ(1, 1)`, a fuzz test of `1 + 2 == 2 + 1`, benchmarks of
+  `std::string`); none called the library, and llvm-cov read `Src/` at 0.00% on every lane.
+  - `Test/commit` (`commitTestSuite`, 96 tests): the C API; the TOML and JSON config
+    parsers, every rejection path included; the ONNX engine on models the tests write
+    themselves; YOLO decoding; GStreamer frames through `appsink` and `appsrc`; and the
+    WebRTC stream config, its validation and a start against a refusing server.
+  - `Test/compile` (`compileTestSuite`, 7 tests): the embedder contract. The C header
+    compiles as C17, `import kataglyphis.c_api` reaches the same symbol, every module imports
+    into one TU, the owners are move-only and the error codes keep their numbers.
+  - `Test/fuzz` (`fuzzTestSuite`, was `first_fuzz_test`, 8 FuzzTest properties): both config
+    parsers on arbitrary bytes, unsigned settings that round-trip or are rejected, the
+    stream-name mapping, the COCO table, and the YOLO decoder on arbitrary floats.
+  - `Test/perf`: benchmarks of both parsers, `run_inference`, YOLO detection with NMS at
+    0/64/512 candidates, and `pull_sample`.
+  - No model is checked in: `Test/common/kataglyphis_test_support.h` encodes the ONNX
+    protobuf, and the shipped TOML config is compiled into the suites.
+  - Every lane runs them: Linux x64/arm64 clang (ASan + UBSan, then TSan) and GCC, riscv64
+    under QEMU, Windows x64 in the container and on the host, and Windows arm64 in Release
+    (`KATAGLYPHIS_RELEASE_TESTS` now also builds fuzz and perf; `tests.json` lists all four).
+  - Measured locally in `:latest`: 111 ctest entries plus 8 fuzz properties under ASan +
+    UBSan, 103 under TSan, 103 with GCC. `Src/` line coverage: llvm-cov 74.6% (1846 lines,
+    `inference_demo.cpp`'s unreachable 259 included), gcovr 68.5% of 1655 lines (the CLI's
+    152 included); before: 0.00% and `0 out of 0`.
+  - `linux-debug-GNU` sets `myproject_ENABLE_COVERAGE`, so the GCC lane's gcovr step measures.
+  - Every ctest run refuses an empty tree: `--no-tests=error` in the Linux scripts,
+    `CTEST_NO_TESTS_ACTION=error` in `Build-Windows.ps1`.
+  - The Windows Debug and Profile trees get four GStreamer plugins in
+    `lib\gstreamer-1.0`, where GStreamer looks beside `bin\`, so the frame-path tests run
+    there; `Start-Windows.ps1 -Config Debug` runs the fuzz suite instead of reporting it.
+  - Not enabled: `-RunWebRtcSmoke` on Windows x64. The Windows image has neither
+    `webrtcsink` nor `gst-webrtc-signalling-server` (no gst-plugins-rs).
+
 - 2026-10-01 — The arm64 cross lane runs tests on `windows-11-arm` (hub CON43).
   - `Build-Windows.ps1 -StageTests` builds the commit and compile suites in
     Release (new CMake option `KATAGLYPHIS_RELEASE_TESTS`, default OFF).
@@ -60,6 +93,17 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+
+- 2026-10-01 — **The C++ module API exports what it declares.** The eight factory functions
+  (`create_{video,camera}_inference_pipeline`, `create_{camera,video}_detection_pipeline`,
+  `create_{libcamera,v4l2,test}_webrtc_stream`, `create_webrtc_stream_from_config`) and
+  `TensorShape` were exported from their modules but not from the shared library, so an
+  importer failed to link them (`total_elements()` is defined in the interface and is not
+  inline there). The C ABI (`kataglyphis_add`) is unchanged.
+- 2026-10-01 — `parse_webrtc_config` rejects valid JSON that is not an object
+  (`InvalidValue`); before, `[]` or `42` parsed as all defaults.
+- 2026-10-01 — A five-value YOLO row (no class scores) reports its objectness as the
+  confidence; it used to report the square.
 - 2026-10-01 — **Every CMake pin is reproducible, and the hub's Renovate preset reads it** (hub CON46).
   - googletest moves from the archive of commit 56efe398 to the `v1.18.0` tag archive. That release
     contains the commit, 100 commits later, and Renovate tracks a tag where it skips a commit.
@@ -237,6 +281,30 @@ belongs in the **Changed** list below with that consequence spelled out.
   36568033223 was green on this image.
 
 ### Fixed
+
+- 2026-10-01 — Found by the new tests, each with one that fails without the fix:
+  - `OnnxInferenceEngine` called the ONNX Runtime C++ wrapper under `ORT_NO_EXCEPTIONS`, so a
+    missing or corrupt model, a wrong input name or shape, or a CUDA request on a CPU build
+    `abort()`ed the process. It goes through the C API now and returns `ModelLoadFailed`,
+    `InferenceFailed` or `SessionCreationFailed`; a failed `initialize` leaves no half session.
+  - `GStreamerPipeline::create_pipeline` never looked up the `appsink` or `appsrc`, so
+    `pull_sample`, `push_buffer` and the buffer callback did nothing for a pipeline built from
+    a description; that includes every `VideoDetectorPipeline`. Frame metadata read width and
+    height with `gst_structure_get_uint`, which never matches raw-video caps (`G_TYPE_INT`),
+    so every frame said 0x0. The `new-sample` handler returned `void` where appsink reads a
+    `GstFlowReturn`; it returns `GST_FLOW_OK`. The parsed pipeline's floating reference is
+    sunk, a partly parsed pipeline is released, and the element references are dropped.
+  - `VideoDetectorPipeline`'s frame callback captured `this`, which the factories leave
+    behind when they return the pipeline by move; it captures the Impl. The Impl also
+    destroyed its callbacks before stopping the stream that calls them (found by TSan).
+  - `parse_webrtc_config` wrapped unsigned values above 2^32-1 instead of rejecting them.
+  - YOLO decoding indexed an empty output shape, read class scores from the next row when a
+    row was shorter than `num_classes`, and let NaN or infinite values become boxes, which
+    then broke `std::sort`'s ordering in NMS.
+  - `WebRTCStreamer::initialize` called `gst_deinit()` when no WebRTC element exists, which
+    no later `gst_init` can undo; `stop()` sent an EOS to a pipeline that never started (a
+    leaked event and a one-second wait) and leaked the EOS message; the bus watch and its
+    handlers outlived the streamer.
 
 - 2026-09-30 — **The Linux x64 gcc job links again; both module targets are
   PIC.** Red since the NLOHMANN_JSON bump of 9ca179d (2026-09-28), which added

@@ -13,7 +13,11 @@ include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 
 set(COMMIT_TEST_SUITE commitTestSuite)
 
-file(GLOB_RECURSE KataglyphisCppProject_COMMIT_TEST_FILTER "*.cpp")
+file(
+  GLOB_RECURSE
+  KataglyphisCppProject_COMMIT_TEST_FILTER
+  CONFIGURE_DEPENDS
+  "*.cpp")
 
 message("Commit test filter is: ${KataglyphisCppProject_COMMIT_TEST_FILTER}")
 
@@ -29,6 +33,7 @@ else()
 endif()
 
 kataglyphis_configure_common_test_target(${COMMIT_TEST_SUITE} "${_commit_resource_path}" "${_commit_include_path}")
+kataglyphis_configure_library_test_target(${COMMIT_TEST_SUITE})
 
 target_sources(${COMMIT_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
 

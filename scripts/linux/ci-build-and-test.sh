@@ -72,12 +72,12 @@ fi
   ctest_run_main \
     --build-dir "${BUILD_DIR}" \
     --build-type "${BUILD_TYPE}" \
-    -- --output-junit "${WORKSPACE_DIR}/docs/test_results.xml"
+    -- --output-junit "${WORKSPACE_DIR}/docs/test_results.xml" --no-tests=error
 )
 
 if [[ "${COMPILER}" == "clang" ]]; then
   # Not optional: the clang debug preset always configures Test/fuzz, so a missing binary is a broken build.
-  FUZZ_TEST="${BUILD_DIR}/first_fuzz_test"
+  FUZZ_TEST="${BUILD_DIR}/fuzzTestSuite"
   if [[ ! -x "${FUZZ_TEST}" ]]; then
     die "Fuzz test binary '${FUZZ_TEST}' is missing or not executable, but preset '${PRESET}' configures Test/fuzz for Clang+Debug. The build did not produce it."
   fi
@@ -93,11 +93,13 @@ if [[ "${COMPILER}" == "clang" ]]; then
     cmake_build_main --preset "${CLANG_TSAN_PRESET}" --build-dir "${TSAN_BUILD_DIR}" --mb-per-job 2000
   )
 
+  # GLib and GStreamer are uninstrumented and hand buffers between threads through futexes TSan cannot see.
   (
+    export TSAN_OPTIONS="ignore_noninstrumented_modules=1${TSAN_OPTIONS:+:${TSAN_OPTIONS}}"
     ctest_run_main \
       --build-dir "${TSAN_BUILD_DIR}" \
       --build-type "${BUILD_TYPE}" \
-      -- --output-junit "${WORKSPACE_DIR}/docs/test_results_tsan.xml"
+      -- --output-junit "${WORKSPACE_DIR}/docs/test_results_tsan.xml" --no-tests=error
   )
 else
   info "Compiled with GCC so no fuzz testing or TSan!"

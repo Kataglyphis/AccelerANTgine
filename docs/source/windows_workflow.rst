@@ -63,7 +63,7 @@ This script:
 - starts the CLI from ``build-clangcl-debug\bin\AccelerANTgine.exe``
 - performs a stable local CLI version check by default
 - runs ``commitTestSuite.exe`` and ``compileTestSuite.exe``
-- reports the presence of ``first_fuzz_test.exe`` without running it
+- runs ``fuzzTestSuite.exe`` in FuzzTest's unit mode (about a second per property)
 
 A missing or unstartable binary fails the run. For one that exists but will not
 start, the script first walks its imports and names every DLL the loader cannot

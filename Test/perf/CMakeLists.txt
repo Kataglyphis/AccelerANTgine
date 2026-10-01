@@ -14,8 +14,6 @@ set(PERF_TEST_SUITE perfTestSuite)
 
 add_executable(${PERF_TEST_SUITE})
 
-target_compile_definitions(${PERF_TEST_SUITE} PRIVATE KATAGLYPHIS_EXPORTS)
-
 set(_perf_resource_path "/../Resources/")
 set(_perf_include_path "/../Src/")
 if(WIN32 AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC))
@@ -24,6 +22,7 @@ if(WIN32 AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC))
 endif()
 
 kataglyphis_configure_common_test_target(${PERF_TEST_SUITE} "${_perf_resource_path}" "${_perf_include_path}")
+kataglyphis_configure_library_test_target(${PERF_TEST_SUITE})
 
 target_sources(${PERF_TEST_SUITE} PRIVATE ${PERF_TEST_FILTER})
 

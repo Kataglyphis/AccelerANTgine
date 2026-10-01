@@ -62,8 +62,9 @@ endif()
 
 add_subdirectory(GOOGLE_BENCHMARK)
 
+# Release too under KATAGLYPHIS_RELEASE_TESTS: the arm64 cross lane runs the fuzz suite in unit mode on windows-11-arm.
 if(BUILD_TESTING
-   AND CMAKE_BUILD_TYPE STREQUAL "Debug"
+   AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR KATAGLYPHIS_RELEASE_TESTS)
    AND CMAKE_CXX_COMPILER_ID MATCHES ".*Clang"
    AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32))
   message(STATUS "Adding FuzzTest")

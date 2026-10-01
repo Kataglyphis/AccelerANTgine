@@ -8,7 +8,7 @@
   The build directory comes from Build-Windows.config.psd1, so producer and consumer cannot disagree.
 
 .PARAMETER Config
-  Debug (CLI, fuzz-target report, commit and compile suites), Profile (CLI, benchmarks) or Release (CLI only).
+  Debug (CLI, commit, compile and fuzz suites), Profile (CLI, benchmarks) or Release (CLI only).
 
 .PARAMETER RunWebRtcSmoke
   Debug only: run the CLI against a signalling server for five seconds; fail if it exits non-zero sooner.
@@ -141,19 +141,15 @@ try {
     Invoke-BuiltArtifact -ExecutableName 'AccelerANTgine.exe'
 
     if ($Config -eq 'Debug') {
-        # Reported, never run: the fuzz tests are long-running and started by hand.
-        $fuzzTest = Resolve-TestExecutable -BuildRoot $buildDir -ExecutableName 'first_fuzz_test.exe'
-        if ($fuzzTest) {
-            Write-BuildLog -Context $ctx -Message "FUZZTEST target available at: $fuzzTest (run it by hand)"
-        } else {
-            Write-BuildLogWarning -Context $ctx -Message "FUZZTEST target not found under $buildDir"
-        }
-
         Write-BuildLog -Context $ctx -Message "--- Commit tests ---"
         Invoke-BuiltArtifact -ExecutableName 'commitTestSuite.exe' -RelativeDirectory @('', 'bin')
 
         Write-BuildLog -Context $ctx -Message "--- Compile tests ---"
         Invoke-BuiltArtifact -ExecutableName 'compileTestSuite.exe' -RelativeDirectory @('', 'bin')
+
+        # Unit mode: each FUZZ_TEST runs for about a second, so this is a test run, not a fuzzing campaign.
+        Write-BuildLog -Context $ctx -Message "--- Fuzz tests (FuzzTest unit mode) ---"
+        Invoke-BuiltArtifact -ExecutableName 'fuzzTestSuite.exe' -RelativeDirectory @('', 'bin')
 
         if ($RunWebRtcSmoke) {
             # Start-Process: this run is killed after five seconds, not waited on; the test-binary ASan defaults only add noise.

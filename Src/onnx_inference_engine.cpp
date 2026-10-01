@@ -7,6 +7,7 @@ module;
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <expected>
 #include <filesystem>
 #include <memory>
@@ -23,6 +24,15 @@ namespace kataglyphis::inference {
 namespace {
 
 using InferenceClock = std::chrono::high_resolution_clock;
+
+// Under ORT_NO_EXCEPTIONS the C++ wrapper aborts on an error status, so every fallible call goes through the C API.
+auto ort_succeeded(OrtStatus *status) -> bool
+{
+    if (status == nullptr) { return true; }
+    std::fprintf(stderr, "ONNX Runtime: %s\n", Ort::GetApi().GetErrorMessage(status));
+    Ort::GetApi().ReleaseStatus(status);
+    return false;
+}
 
 template <typename NameGetter>
 void populate_name_cache(std::size_t count,
@@ -87,6 +97,51 @@ auto make_inference_result(const std::vector<Ort::Value> &output_tensors,
     return result;
 }
 
+// ORT only borrows the buffer, so it must outlive the Run that reads it.
+auto make_float_tensor(const OrtMemoryInfo *memory_info, std::vector<float> &data, const std::vector<int64_t> &dims)
+  -> std::expected<Ort::Value, OnnxError>
+{
+    OrtValue *value = nullptr;
+    if (!ort_succeeded(Ort::GetApi().CreateTensorWithDataAsOrtValue(memory_info,
+          data.data(),
+          data.size() * sizeof(float),
+          dims.data(),
+          dims.size(),
+          ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+          &value))) {
+        return std::unexpected(OnnxError::InputAllocationFailed);
+    }
+    return Ort::Value{ value };
+}
+
+auto run_session(OrtSession *session,
+  const std::vector<const char *> &input_names,
+  const std::vector<Ort::Value> &inputs,
+  const std::vector<const char *> &output_names) -> std::expected<std::vector<Ort::Value>, OnnxError>
+{
+    std::vector<const OrtValue *> input_values;
+    input_values.reserve(inputs.size());
+    for (const auto &input : inputs) { input_values.push_back(input); }
+
+    std::vector<OrtValue *> outputs(output_names.size(), nullptr);
+    const bool succeeded = ort_succeeded(Ort::GetApi().Run(session,
+      nullptr,
+      input_names.data(),
+      input_values.data(),
+      input_values.size(),
+      output_names.data(),
+      output_names.size(),
+      outputs.data()));
+
+    std::vector<Ort::Value> owned;
+    owned.reserve(outputs.size());
+    for (auto *output : outputs) {
+        if (output != nullptr) { owned.emplace_back(output); }
+    }
+    if (!succeeded || owned.size() != output_names.size()) { return std::unexpected(OnnxError::InferenceFailed); }
+    return owned;
+}
+
 template <typename TypeInfoGetter>
 auto get_named_shape(const std::vector<std::string> &names, const std::string &name, TypeInfoGetter &&get_type_info)
   -> std::expected<TensorShape, OnnxError>
@@ -114,6 +169,18 @@ struct OnnxInferenceEngine::Impl
     std::vector<std::string> output_names_cache;
     std::vector<const char *> input_name_ptrs;
     std::vector<const char *> output_name_ptrs;
+
+    void reset()
+    {
+        initialized = false;
+        input_name_ptrs.clear();
+        output_name_ptrs.clear();
+        input_names_cache.clear();
+        output_names_cache.clear();
+        session.reset();
+        session_options.reset();
+        env.reset();
+    }
 };
 
 OnnxInferenceEngine::OnnxInferenceEngine() : impl_(std::make_unique<Impl>()) {}
@@ -126,41 +193,53 @@ auto OnnxInferenceEngine::operator=(OnnxInferenceEngine &&) noexcept -> OnnxInfe
 
 auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expected<void, OnnxError>
 {
+    // A failed initialisation leaves the engine uninitialised, never with a half-replaced session.
+    impl_->reset();
     impl_->config = config;
 
+    const OrtApi &api = Ort::GetApi();
     impl_->env = std::make_unique<Ort::Env>(OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING, "KataglyphisOnnxRuntime");
-
     impl_->session_options = std::make_unique<Ort::SessionOptions>();
+    OrtSessionOptions *options = *impl_->session_options;
 
-    impl_->session_options->SetIntraOpNumThreads(config.intra_op_num_threads);
-    impl_->session_options->SetInterOpNumThreads(config.inter_op_num_threads);
-
-    if (config.execution_mode == ExecutionMode::Parallel) {
-        impl_->session_options->SetExecutionMode(ORT_PARALLEL);
-    } else {
-        impl_->session_options->SetExecutionMode(ORT_SEQUENTIAL);
+    const auto execution_mode = config.execution_mode == ExecutionMode::Parallel ? ORT_PARALLEL : ORT_SEQUENTIAL;
+    if (!ort_succeeded(api.SetIntraOpNumThreads(options, config.intra_op_num_threads))
+        || !ort_succeeded(api.SetInterOpNumThreads(options, config.inter_op_num_threads))
+        || !ort_succeeded(api.SetSessionExecutionMode(options, execution_mode))
+        || (config.enable_memory_pattern && !ort_succeeded(api.EnableMemPattern(options)))) {
+        impl_->reset();
+        return std::unexpected(OnnxError::SessionCreationFailed);
     }
-
-    if (config.enable_memory_pattern) { impl_->session_options->EnableMemPattern(); }
 
     if (config.enable_cuda) {
-        OrtCUDAProviderOptions cuda_options;
+        OrtCUDAProviderOptions cuda_options{};
         cuda_options.device_id = 0;
-        impl_->session_options->AppendExecutionProvider_CUDA(cuda_options);
+        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options))) {
+            impl_->reset();
+            return std::unexpected(OnnxError::SessionCreationFailed);
+        }
     }
 
-    impl_->session =
-      std::make_unique<Ort::Session>(*impl_->env, config.model_path.c_str(), *impl_->session_options);
+    OrtSession *session = nullptr;
+    if (!ort_succeeded(api.CreateSession(*impl_->env, config.model_path.c_str(), options, &session))) {
+        impl_->reset();
+        return std::unexpected(OnnxError::ModelLoadFailed);
+    }
+    impl_->session = std::make_unique<Ort::Session>(session);
 
     populate_name_cache(impl_->session->GetInputCount(),
       impl_->input_names_cache,
       impl_->input_name_ptrs,
-      [this](std::size_t index) -> Ort::AllocatedStringPtr { return impl_->session->GetInputNameAllocated(index, impl_->allocator); });
+      [this](std::size_t index) -> Ort::AllocatedStringPtr {
+          return impl_->session->GetInputNameAllocated(index, impl_->allocator);
+      });
 
     populate_name_cache(impl_->session->GetOutputCount(),
       impl_->output_names_cache,
       impl_->output_name_ptrs,
-      [this](std::size_t index) -> Ort::AllocatedStringPtr { return impl_->session->GetOutputNameAllocated(index, impl_->allocator); });
+      [this](std::size_t index) -> Ort::AllocatedStringPtr {
+          return impl_->session->GetOutputNameAllocated(index, impl_->allocator);
+      });
 
     impl_->initialized = true;
 
@@ -184,21 +263,18 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-      memory_info, mutable_input.data(), mutable_input.size(), input_dims.data(), input_dims.size());
+    auto input_tensor = make_float_tensor(memory_info, mutable_input, input_dims);
+    if (!input_tensor) { return std::unexpected(input_tensor.error()); }
 
-    const char *input_name_ptr = input_name.c_str();
+    std::vector<Ort::Value> inputs;
+    inputs.push_back(std::move(*input_tensor));
 
     const auto start_time = InferenceClock::now();
 
-    const auto output_tensors = impl_->session->Run(Ort::RunOptions{ nullptr },
-      &input_name_ptr,
-      &input_tensor,
-      1,
-      impl_->output_name_ptrs.data(),
-      impl_->output_name_ptrs.size());
+    auto output_tensors = run_session(*impl_->session, { input_name.c_str() }, inputs, impl_->output_name_ptrs);
+    if (!output_tensors) { return std::unexpected(output_tensors.error()); }
 
-    return make_inference_result(output_tensors, start_time, InferenceClock::now());
+    return make_inference_result(*output_tensors, start_time, InferenceClock::now());
 }
 
 auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<std::string, TensorData>> &inputs)
@@ -209,7 +285,7 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-    // Ort::Value borrows its buffer, so the copied inputs must outlive Session::Run().
+    // Ort::Value borrows its buffer, so the copied inputs must outlive the Run.
     std::vector<std::vector<float>> owned_input_data;
     std::vector<std::vector<int64_t>> input_dims_storage;
     std::vector<Ort::Value> input_tensors;
@@ -228,23 +304,19 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
         auto &mutable_data = owned_input_data.emplace_back(tensor_data.data.begin(), tensor_data.data.end());
         auto &dims = input_dims_storage.emplace_back(to_ort_dimensions(tensor_data.shape));
 
-        auto input_tensor = Ort::Value::CreateTensor<float>(
-          memory_info, mutable_data.data(), mutable_data.size(), dims.data(), dims.size());
+        auto input_tensor = make_float_tensor(memory_info, mutable_data, dims);
+        if (!input_tensor) { return std::unexpected(input_tensor.error()); }
 
-        input_tensors.push_back(std::move(input_tensor));
+        input_tensors.push_back(std::move(*input_tensor));
         input_names.push_back(name.c_str());
     }
 
     const auto start_time = InferenceClock::now();
 
-    const auto output_tensors = impl_->session->Run(Ort::RunOptions{ nullptr },
-      input_names.data(),
-      input_tensors.data(),
-      input_tensors.size(),
-      impl_->output_name_ptrs.data(),
-      impl_->output_name_ptrs.size());
+    auto output_tensors = run_session(*impl_->session, input_names, input_tensors, impl_->output_name_ptrs);
+    if (!output_tensors) { return std::unexpected(output_tensors.error()); }
 
-    return make_inference_result(output_tensors, start_time, InferenceClock::now());
+    return make_inference_result(*output_tensors, start_time, InferenceClock::now());
 }
 
 auto OnnxInferenceEngine::get_input_names() const -> std::vector<std::string> { return impl_->input_names_cache; }
@@ -255,16 +327,18 @@ auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std:
 {
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
-    return get_named_shape(
-      impl_->input_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo { return impl_->session->GetInputTypeInfo(index); });
+    return get_named_shape(impl_->input_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo {
+        return impl_->session->GetInputTypeInfo(index);
+    });
 }
 
 auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
 {
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
-    return get_named_shape(
-      impl_->output_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo { return impl_->session->GetOutputTypeInfo(index); });
+    return get_named_shape(impl_->output_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo {
+        return impl_->session->GetOutputTypeInfo(index);
+    });
 }
 
 KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig

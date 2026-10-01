@@ -132,7 +132,7 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer {
 };
 
 // Factory function for easy creation
-[[nodiscard]] auto create_libcamera_webrtc_stream(
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_libcamera_webrtc_stream(
     const std::string& signalling_server,
     std::uint32_t width = 1280,
     std::uint32_t height = 720,
@@ -140,7 +140,7 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer {
 ) -> std::expected<WebRTCStreamer, WebRTCError>;
 
 // Factory for V4L2 camera source
-[[nodiscard]] auto create_v4l2_webrtc_stream(
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_v4l2_webrtc_stream(
     const std::string& signalling_server,
     const std::string& device = "/dev/video0",
     std::uint32_t width = 1280,
@@ -149,7 +149,7 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer {
 ) -> std::expected<WebRTCStreamer, WebRTCError>;
 
 // Factory for test pattern (useful for debugging)
-[[nodiscard]] auto create_test_webrtc_stream(
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_test_webrtc_stream(
     const std::string& signalling_server
 ) -> std::expected<WebRTCStreamer, WebRTCError>;
 
@@ -163,7 +163,7 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer {
 ) -> StreamConfig;
 
 // Load config from JSON file and create a configured WebRTCStreamer
-[[nodiscard]] auto create_webrtc_stream_from_config(
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_webrtc_stream_from_config(
     const std::filesystem::path& config_path,
     VideoSource source = VideoSource::Libcamera,
     VideoEncoder encoder = VideoEncoder::H264_Hardware,

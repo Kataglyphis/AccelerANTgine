@@ -11,10 +11,17 @@ Project Layout
 --------------
 
 - ``Src/``: core library, CLI entry point, and platform/runtime integration code
-- ``Test/compile``: compilation-level regression tests built in debug mode
-- ``Test/commit``: broader debug-mode test suite intended for regular validation
-- ``Test/fuzz``: fuzz targets enabled for debug Clang builds on Linux and Windows
-- ``Test/perf``: benchmark suite built in ``RelWithDebInfo`` profile builds
+- ``Test/commit``: unit tests against the library: the C API, both config
+  parsers, the ONNX engine on generated models, YOLO decoding, GStreamer frames
+  and the WebRTC streamer
+- ``Test/compile``: the embedder contract: the C header as C17, the module
+  imports, move-only owners and stable error codes
+- ``Test/fuzz``: FuzzTest properties over the parsers and the YOLO decoder,
+  built with Clang or clang-cl and run in unit mode
+- ``Test/perf``: Google Benchmark over the parsers, inference, detection and
+  ``pull_sample``, built in ``RelWithDebInfo`` profile builds
+- ``Test/common``: the helpers the suites share, including the ONNX model
+  writer that keeps test models out of the repository
 - ``Bindings/python``: the ``kataglyphis_inference`` Python module, tested by
   ``Test/python``
 - ``docs/source``: Sphinx content and generated API integration points
@@ -45,9 +52,10 @@ Test Suite Selection
 
 Top-level CMake selects test suites by build type:
 
-- ``Debug``: ``commit``, ``compile``, and usually ``fuzz``
+- ``Debug``: ``commit``, ``compile``, and ``fuzz`` with Clang or clang-cl
 - ``RelWithDebInfo``: ``perf``
-- ``Release``: no default test suite build
+- ``Release``: none, unless ``KATAGLYPHIS_RELEASE_TESTS`` is on, which builds all
+  four (the Windows arm64 lane runs them on ``windows-11-arm``)
 
 This means the most useful local loops are:
 

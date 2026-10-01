@@ -8,7 +8,7 @@ Write-Host "Available scripts:" -ForegroundColor White
 Write-Host "  Invoke-ContainerBuild.ps1          - Build in the Windows container" -ForegroundColor Yellow
 Write-Host "  Invoke-ContainerPythonBindings.ps1 - Build the Python bindings in it" -ForegroundColor Yellow
 Write-Host "  Start-Windows.ps1                  - Run what a build produced, on the host" -ForegroundColor Yellow
-Write-Host "      -Config Debug      ASan CLI check, fuzz-target report, commit + compile suites" -ForegroundColor Gray
+Write-Host "      -Config Debug      ASan CLI check, commit + compile + fuzz suites" -ForegroundColor Gray
 Write-Host "      -Config Profile    CLI check plus the Google Benchmark perf suite" -ForegroundColor Gray
 Write-Host "      -Config Release    CLI check only" -ForegroundColor Gray
 Write-Host ""
