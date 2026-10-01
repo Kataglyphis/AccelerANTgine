@@ -316,10 +316,17 @@ try {
         }
 
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
-            Invoke-CtestDiscoveredTests -Context $Context `
-                -BuildRoot $fastBuildClangFull `
-                -Configuration $cfgClang.Configuration `
-                -RuntimeFlavor Clang
+            # The hub logs sanitizer reports to files beside the tests; a later log_path wins, so they reach ctest's output.
+            $savedAsanOptions = $env:ASAN_OPTIONS
+            $env:ASAN_OPTIONS = 'log_path=stderr'
+            try {
+                Invoke-CtestDiscoveredTests -Context $Context `
+                    -BuildRoot $fastBuildClangFull `
+                    -Configuration $cfgClang.Configuration `
+                    -RuntimeFlavor Clang
+            } finally {
+                $env:ASAN_OPTIONS = $savedAsanOptions
+            }
         }
 
         # Code Coverage

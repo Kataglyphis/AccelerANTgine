@@ -298,8 +298,12 @@ belongs in the **Changed** list below with that consequence spelled out.
     a description; that includes every `VideoDetectorPipeline`. Frame metadata read width and
     height with `gst_structure_get_uint`, which never matches raw-video caps (`G_TYPE_INT`),
     so every frame said 0x0. The `new-sample` handler returned `void` where appsink reads a
-    `GstFlowReturn`; it returns `GST_FLOW_OK`. The parsed pipeline's floating reference is
-    sunk, a partly parsed pipeline is released, and the element references are dropped.
+    `GstFlowReturn`. appsink and appsrc are now driven through the C API
+    (`gst_app_sink_set_callbacks`, `gst_app_sink_pull_sample`, `gst_app_src_push_buffer`): on
+    Windows the `new-sample`, `pull-sample` and `push-buffer` signals delivered nothing while
+    `gst_app_sink_try_pull_sample` worked (run 36902874261). The parsed pipeline's floating
+    reference is sunk, a partly parsed pipeline is released, and the element references are
+    dropped.
   - `VideoDetectorPipeline`'s frame callback captured `this`, which the factories leave
     behind when they return the pipeline by move; it captures the Impl. The Impl also
     destroyed its callbacks before stopping the stream that calls them (found by TSan).
