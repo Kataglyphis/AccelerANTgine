@@ -110,6 +110,10 @@ if(BUILD_TESTING
   # FUZZTEST_BUILD_GRAMMAR_TOOLS switch is gone), dragging in an ANTLR runtime
   # that does not compile under clang-cl. Our fuzz targets do not use grammar
   # domains, so keep those targets out of the default/install build graph.
+  # json_grammar runs the generator at build time, which a cross build cannot execute; only FuzzTest's own tests use it.
+  if(TARGET json_grammar)
+    set_target_properties(json_grammar PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  endif()
   foreach(_grammar_target antlr4_static antlr4_shared grammar_domain_code_generator)
     if(TARGET ${_grammar_target})
       set_target_properties(${_grammar_target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
