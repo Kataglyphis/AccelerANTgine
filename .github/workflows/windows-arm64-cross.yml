@@ -32,6 +32,7 @@ jobs:
         -BuildTargets
         clangcl-release
         -SkipFormat
+        -StageTests
       artifact-name: AccelerANTgine-windows-arm64
       artifact-dir: dist/windows-arm64
       # The exe, its DLL, the chain ONNX Runtime and the VC++ runtime at the least.
@@ -39,5 +40,9 @@ jobs:
       # With no flag the CLI prints its version, which proves the loader resolved every import.
       run-command: |
         ./bundle/bin/AccelerANTgine.exe
+      # The commit and compile suites, built in Release for arm64 and run natively (hub CON43).
+      test-artifact-dir: dist/windows-arm64-tests
+      test-command: |
+        & ./Invoke-StagedTests.ps1
     secrets:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
