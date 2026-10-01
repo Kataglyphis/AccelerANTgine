@@ -299,7 +299,12 @@ written out rather than linked.
   imported nothing from `AccelerANTgine.dll`; the real ones died with `0xc0000135`.
   `kataglyphis_configure_gtest_discovery` prepends `bin\` and appends the compiler's
   directory through `ENVIRONMENT_MODIFICATION` until the hub fixes it. `Build-Windows.ps1`
-  runs the Profile benchmarks with `bin\` on `PATH` for the same reason.
+  runs the Profile benchmarks with `bin\` on `PATH` for the same reason. On the runner host
+  `PATH` is not enough for ONNX Runtime: the loader looks in System32 before `PATH`, and a
+  desktop Windows has Windows ML's `onnxruntime.dll` 1.17 there, so every ORT test died with
+  `requested API version [30] is not available` (run 36921988802). The Debug and Profile
+  trees therefore also get the chain ORT beside the suites at the build root
+  (`Copy-ChainOrtBeside`), as the staged Release suites already have it.
 - **Every ctest run refuses an empty tree.** The Linux scripts pass `--no-tests=error`;
   `Build-Windows.ps1` sets `CTEST_NO_TESTS_ACTION=error`, because the hub's
   `Invoke-CtestDiscoveredTests` takes no extra ctest arguments.

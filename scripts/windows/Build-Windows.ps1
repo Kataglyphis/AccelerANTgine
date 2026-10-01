@@ -313,6 +313,8 @@ try {
             Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildClangFull
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildClangFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
+            # The suites sit at the build root, where a desktop host's loader finds Windows ML's onnxruntime.dll (System32) before bin\.
+            $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $fastBuildClangFull
         }
 
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
@@ -406,6 +408,8 @@ try {
             Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildProfileFull
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildProfileFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildProfileFull "bin"), $fastBuildProfileFull)
+            # The suites sit at the build root, where a desktop host's loader finds Windows ML's onnxruntime.dll (System32) before bin\.
+            $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $fastBuildProfileFull
         }
 
         Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {

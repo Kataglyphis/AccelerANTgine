@@ -321,7 +321,9 @@ belongs in the **Changed** list below with that consequence spelled out.
     `PATH=<exe dir>` only: its `ENVIRONMENT "PATH=a;b;..."` is a CMake list that ctest splits
     at the semicolons. `kataglyphis_configure_gtest_discovery` puts `bin\` back through
     `ENVIRONMENT_MODIFICATION`, and the Profile benchmarks run with `bin\` on `PATH`; both
-    died with `0xc0000135` once the suites imported `AccelerANTgine.dll`.
+    died with `0xc0000135` once the suites imported `AccelerANTgine.dll`. On the runner host
+    the loader then took Windows ML's `onnxruntime.dll` 1.17 from System32, ahead of `PATH`;
+    the Debug and Profile build roots get the chain ORT beside the suites.
   - `WebRTCStreamer::initialize` called `gst_deinit()` when no WebRTC element exists, which
     no later `gst_init` can undo; `stop()` sent an EOS to a pipeline that never started (a
     leaked event and a one-second wait) and leaked the EOS message; the bus watch and its
