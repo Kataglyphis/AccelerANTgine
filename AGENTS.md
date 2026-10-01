@@ -263,9 +263,19 @@ written out rather than linked.
   `gstreamer-1.0-0.dll`, minus a trailing `bin`, plus `lib\gstreamer-1.0`. That DLL sits
   in `build-*\bin`, so `Copy-ImageGStreamerTestPlugins` copies coreelements, app,
   videotestsrc and videoconvertscale from the image into `build-*\lib\gstreamer-1.0` for
-  the Debug and Profile trees. The arm64 test tree gets none, because its import walk
-  would have to grade them, so those tests skip on `windows-11-arm`. The WebRTC tests
-  need `webrtcsink` (gst-plugins-rs), which only the Linux image has.
+  the Debug and Profile trees. The staged Release suites (`dist\windows-<arch>-tests`, a
+  flat directory) get them in their own `lib\gstreamer-1.0`, with the plugins' imports
+  beside the suites; the hub's import walk resolves a name anywhere in the tree. The WebRTC
+  tests need `webrtcsink` (gst-plugins-rs), which only the Linux image has.
+- **On clang-cl the fuzz suite is built without sanitizers.** absl's swisstable layout
+  depends on ASan (`ABSL_SWISSTABLE_ENABLE_GENERATIONS`), and clang-cl applies ASan only
+  through `myproject_options`, so absl and FuzzTest are not instrumented there while the
+  suite was. Its absl COMDATs then won over absl's own and crashed a static initialiser
+  (`FLAGS_nofuzz`, run 36913668933); a Linux probe with the mismatch the other way round
+  crashed in `CommonFieldsGenerationInfoEnabled::generation()`. Linux keeps ASan on the suite,
+  because there `-fsanitize=address` is global and absl is instrumented too. Importing the
+  ASan-built module BMIs from the unsanitized suite compiles: clang treats sanitizer
+  differences as compatible.
 - **The TSan run ignores uninstrumented modules.** GLib, GStreamer and ONNX Runtime
   hand memory between threads through futex locks TSan cannot see, so
   `ci-build-and-test.sh` sets `TSAN_OPTIONS=ignore_noninstrumented_modules=1` for the

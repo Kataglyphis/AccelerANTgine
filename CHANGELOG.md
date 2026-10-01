@@ -50,7 +50,9 @@ belongs in the **Changed** list below with that consequence spelled out.
     `CTEST_NO_TESTS_ACTION=error` in `Build-Windows.ps1`.
   - The Windows Debug and Profile trees get four GStreamer plugins in
     `lib\gstreamer-1.0`, where GStreamer looks beside `bin\`, so the frame-path tests run
-    there; `Start-Windows.ps1 -Config Debug` runs the fuzz suite instead of reporting it.
+    there, and so do the staged Release suites (arm64 and x64) in their own
+    `lib\gstreamer-1.0`; `Start-Windows.ps1 -Config Debug` runs the fuzz suite instead of
+    reporting it.
   - Not enabled: `-RunWebRtcSmoke` on Windows x64. The Windows image has neither
     `webrtcsink` nor `gst-webrtc-signalling-server` (no gst-plugins-rs).
   - The packaged Release tree stays clean with the suites in it: FuzzTest is added
@@ -307,6 +309,10 @@ belongs in the **Changed** list below with that consequence spelled out.
   - `VideoDetectorPipeline`'s frame callback captured `this`, which the factories leave
     behind when they return the pipeline by move; it captures the Impl. The Impl also
     destroyed its callbacks before stopping the stream that calls them (found by TSan).
+  - On clang-cl the fuzz suite crashed before `main` with an ASan access violation in absl's
+    flag registry: absl's swisstable layout follows ASan, which clang-cl applies through
+    `myproject_options` only, so the instrumented suite and the uninstrumented absl disagreed.
+    The suite is built with `-fno-sanitize=address,undefined` there, like absl.
   - `parse_webrtc_config` wrapped unsigned values above 2^32-1 instead of rejecting them.
   - YOLO decoding indexed an empty output shape, read class scores from the next row when a
     row was shorter than `num_classes`, and let NaN or infinite values become boxes, which

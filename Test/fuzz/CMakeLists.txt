@@ -15,6 +15,12 @@ if(COMMAND link_fuzztest)
   kataglyphis_configure_library_test_target(${FUZZ_TEST_SUITE})
   # myproject_options carries the sanitizer and exception flags the library's module BMIs were built with.
   target_link_libraries(${FUZZ_TEST_SUITE} PRIVATE myproject_options ${PROJECT_NAME})
+  if(MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # absl's swisstable layout follows ASan, which clang-cl leaves off absl and FuzzTest: the suite must match them.
+    add_library(kataglyphis_fuzz_unsanitized INTERFACE)
+    target_compile_options(kataglyphis_fuzz_unsanitized INTERFACE -fno-sanitize=address,undefined)
+    target_link_libraries(${FUZZ_TEST_SUITE} PRIVATE kataglyphis_fuzz_unsanitized)
+  endif()
 
   link_fuzztest(${FUZZ_TEST_SUITE})
   kataglyphis_configure_gtest_discovery(${FUZZ_TEST_SUITE})

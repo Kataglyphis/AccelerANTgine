@@ -528,6 +528,12 @@ try {
                 # The build's own bin first, so a suite that imports the engine gets this build's AccelerANTgine.dll.
                 $search = @(Join-Path $fastBuildReleaseDirFull 'bin') + @(Get-ProductDllSearchPath -Arch $TargetArch)
                 $closure = @(Copy-PeImportClosure -Path $suites -SearchDirectory $search -Destination $tests -Arch $TargetArch)
+                # GStreamer looks for plugins in <flat dir>\lib\gstreamer-1.0; their own imports join the closure beside the suites.
+                Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $tests
+                $plugins = @(Get-ChildItem -LiteralPath (Join-Path $tests 'lib\gstreamer-1.0') -Filter '*.dll' -File | ForEach-Object FullName)
+                if ($plugins.Count) {
+                    $closure += @(Copy-PeImportClosure -Path $plugins -SearchDirectory $search -Destination $tests -Arch $TargetArch)
+                }
                 Copy-Item -LiteralPath (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Invoke-StagedTests.ps1') -Destination $tests
                 ConvertTo-Json -InputObject $manifest -Depth 3 |
                     Set-Content -LiteralPath (Join-Path $tests 'tests.json') -Encoding utf8
