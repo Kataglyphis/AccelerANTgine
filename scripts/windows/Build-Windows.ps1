@@ -372,7 +372,9 @@ try {
                 try {
                     if ($ownTidy -and (Test-Path $ownTidy)) {
                         $env:PATH = "$(Split-Path -Parent $ownTidy);$env:PATH"
-                        Write-BuildLog -Context $Context -Message "clang-tidy: the compiler's own, $ownTidy"
+                        # The compiler's own tidy reads the BMIs it built (hub CON10), so no TU needs the BMI skip.
+                        $tidyArgs.ModuleImportPattern = '(?!)'
+                        Write-BuildLog -Context $Context -Message "clang-tidy: the compiler's own, $ownTidy; every Src/ TU analysed"
                     } else {
                         $tidyArgs.ModuleImportPattern = '(?m)^\s*((export\s+)?import\s+[\w.:<>"/]+|module\s+[\w.:]+)\s*;'
                         Write-BuildLog -Context $Context -Message "clang-tidy: none beside the compiler ($(if ($compilerLine) { $compilerLine.Matches[0].Groups[1].Value } else { "no CMAKE_CXX_COMPILER in $cache" })); every TU that needs a BMI is skipped"

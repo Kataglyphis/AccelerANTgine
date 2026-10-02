@@ -102,7 +102,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
-- 2026-10-01 — **The C++ module API exports what it declares.** The eight factory functions
+- 2026-10-02 - **clang-tidy analyses every `Src/` TU again** (hub CON10). The image's
+  patched LLVM ships `clang-tidy.exe` beside `clang-cl.exe` and reads clang-cl C++23 BMIs, so
+  `Build-Windows.ps1`'s own-tidy branch sets `ModuleImportPattern = '(?!)'` instead of leaving
+  the `import kataglyphis` skip: module implementation units and importers are analysed too.
+  Without a sibling tidy the step keeps the broad BMI skip (the PATH tidy cannot read them).
+- 2026-10-01 - **The C++ module API exports what it declares.** The eight factory functions
   (`create_{video,camera}_inference_pipeline`, `create_{camera,video}_detection_pipeline`,
   `create_{libcamera,v4l2,test}_webrtc_stream`, `create_webrtc_stream_from_config`) and
   `TensorShape` were exported from their modules but not from the shared library, so an

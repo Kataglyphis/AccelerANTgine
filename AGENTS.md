@@ -323,17 +323,15 @@ written out rather than linked.
   cxx crate's `cc` build passes `--target=<native triple>`, which loads the
   same file.
   Windows has the same trap with a different pair: the image compiles with its
-  patched LLVM (`C:/llvm-patched/bin/clang-cl.exe`, built `clang;lld` only), so
+  patched LLVM (`C:/llvm-patched/bin/clang-cl.exe`), so
   the `clang-tidy` on PATH is scoop's, and it refuses the BMIs with `module file
   … built from a different branch () than the compiler`. `Build-Windows.ps1`'s
   clang-tidy step reads `CMAKE_CXX_COMPILER` from the build's `CMakeCache.txt`
-  and uses a `clang-tidy.exe` beside it when there is one. There is none today,
-  so it skips every TU that reads a BMI: the implementation units
-  (`module kataglyphis.x;`) and anything that imports, `export import`
-  included. That leaves the six `.ixx` interfaces that import nothing, where
-  Linux analyses all 18 files. The image-side fix is adding
-  `clang-tools-extra` to the hub's `Build-LlvmFromSource.ps1`, which re-keys the
-  LLVM layer and everything built on it.
+  and uses the `clang-tidy.exe` beside it - the image ships one since hub CON10
+  (2026-10-01), and it reads clang-cl C++23 BMIs, so the step sets
+  `ModuleImportPattern` to `'(?!)'` and analyses every `Src/` TU, module
+  importers included. A compiler with no sibling tidy keeps the broad BMI skip,
+  because the PATH tidy cannot read them.
 - **Both module targets are PIC, and must stay so.** `nlohmann_json_modules`
   and `tomlplusplus_modules` (`third_party/CMakeLists.txt`) are static
   libraries linked into the SHARED `libAccelerANTgine`, and GCC writes the TLS
