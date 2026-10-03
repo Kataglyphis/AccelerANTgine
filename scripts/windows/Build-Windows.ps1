@@ -547,7 +547,7 @@ try {
                     $closure += @(Copy-PeImportClosure -Path $plugins -SearchDirectory $search -Destination $tests -Arch $TargetArch)
                 }
                 # The Debug (ASan) suite cannot run in the container on a cross build; it rides along, runtime DLLs beside it.
-                if ($doClang) {
+                if ($isCross -and $doClang) {
                     $debugSuite = Join-Path $fastBuildClangFull 'commitTestSuite.exe'
                     if (-not (Test-Path -LiteralPath $debugSuite -PathType Leaf)) { throw "The Debug build made no $debugSuite" }
                     Copy-Item -LiteralPath $debugSuite -Destination (Join-Path $tests 'commitTestSuite-debug.exe')
