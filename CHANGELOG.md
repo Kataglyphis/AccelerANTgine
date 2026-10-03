@@ -19,6 +19,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- 2026-10-03 — **The arm64 lane runs the Debug (ASan) suite on a device and gates the runtime
+  bundle per push.** `windows-arm64-cross.yml` builds `clangcl-debug` too (VS 2026's toolset
+  carries Microsoft's aarch64 ASan runtime, which the hub's `Sanitizers.cmake` picks by
+  `CMAKE_SYSTEM_PROCESSOR`), stages `commitTestSuite-debug.exe` with that runtime beside it for
+  `windows-11-arm`, and sets `bundle-artifact-name`: the hub's build job packs the image's
+  `C:\runtime` and a third job runs `Test-Arm64Bundle.ps1` over it - the bundle's device half,
+  previously a manual run.
 - 2026-10-01 — **Test suites that test the library** (owner decision 2026-10-01). The old
   ones were placeholders (`EXPECT_EQ(1, 1)`, a fuzz test of `1 + 2 == 2 + 1`, benchmarks of
   `std::string`); none called the library, and llvm-cov read `Src/` at 0.00% on every lane.
