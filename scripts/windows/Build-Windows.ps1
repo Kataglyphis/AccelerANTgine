@@ -64,11 +64,11 @@ try {
 $TargetArch = Get-WindowsTargetArch -Arch $TargetArch
 $isCross = Test-WindowsCrossTarget -Arch $TargetArch
 $packageArch = Get-WindowsPackageArch -Arch $TargetArch
-# Before the log opens, so a refusal exits non-zero; Debug needs an aarch64 ASan runtime, Profile runs on the host, MSVC pins x64.
+# Before the log opens, so a refusal exits non-zero; Debug's aarch64 ASan runtime exists since 2026-10-03, Profile runs on the host, MSVC pins x64.
 $requestedTargets = @($BuildTargets -join ',' -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$notCross = @($requestedTargets | Where-Object { $_ -ne 'clangcl-release' })
+$notCross = @($requestedTargets | Where-Object { $_ -notin 'clangcl-release', 'clangcl-debug' })
 if ($isCross -and $notCross.Count -gt 0) {
-    throw "-TargetArch $TargetArch builds clangcl-release only, not $($notCross -join ', ') (third_party/ANTfrastructure/docs/windows-cross-builds.md)."
+    throw "-TargetArch $TargetArch builds clangcl-release and clangcl-debug, not $($notCross -join ', ') (third_party/ANTfrastructure/docs/windows-cross-builds.md)."
 }
 # The G6 proof of every staged bin\, install tree and payload; an older hub pin lacks it.
 try { Import-BuildModule @('WindowsOrtPayload.Common') } catch {
@@ -304,7 +304,8 @@ try {
                     -BuildPath $fastBuildClangFull `
                     -Preset $cfgClang.Preset `
                     -Configuration $cfgClang.Configuration `
-                    -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+                    -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON') +
+                        @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
 
             # $null =: the returned DLL count would otherwise land in the step's output stream.
@@ -317,17 +318,20 @@ try {
             $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $fastBuildClangFull
         }
 
-        Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
-            # The hub logs sanitizer reports to files beside the tests; a later log_path wins, so they reach ctest's output.
-            $savedAsanOptions = $env:ASAN_OPTIONS
-            $env:ASAN_OPTIONS = 'log_path=stderr'
-            try {
-                Invoke-CtestDiscoveredTests -Context $Context `
-                    -BuildRoot $fastBuildClangFull `
-                    -Configuration $cfgClang.Configuration `
-                    -RuntimeFlavor Clang
-            } finally {
-                $env:ASAN_OPTIONS = $savedAsanOptions
+        # A cross build stages the instrumented suite for the arm64 runner instead: the container cannot execute it.
+        if (-not $isCross) {
+            Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
+                # The hub logs sanitizer reports to files beside the tests; a later log_path wins, so they reach ctest's output.
+                $savedAsanOptions = $env:ASAN_OPTIONS
+                $env:ASAN_OPTIONS = 'log_path=stderr'
+                try {
+                    Invoke-CtestDiscoveredTests -Context $Context `
+                        -BuildRoot $fastBuildClangFull `
+                        -Configuration $cfgClang.Configuration `
+                        -RuntimeFlavor Clang
+                } finally {
+                    $env:ASAN_OPTIONS = $savedAsanOptions
+                }
             }
         }
 
@@ -388,7 +392,9 @@ try {
         
         # Sync Debug Artifacts
         Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Debug Artifacts" -Script {
-            Sync-BuildArtifacts -Context $Context -Source $fastBuildClangFull -Destination (Join-Path $Workspace $cfgClang.BuildDir) -ExcludeCommonRustAndCppCache
+            # A cross build keeps its own tree beside the host's, so neither clobbers the other.
+            $debugBuildDir = if ($isCross) { "$($cfgClang.BuildDir)-$TargetArch" } else { $cfgClang.BuildDir }
+            Sync-BuildArtifacts -Context $Context -Source $fastBuildClangFull -Destination (Join-Path $Workspace $debugBuildDir) -ExcludeCommonRustAndCppCache
         }
     }
 
@@ -539,6 +545,14 @@ try {
                 $plugins = @(Get-ChildItem -LiteralPath (Join-Path $tests 'lib\gstreamer-1.0') -Filter '*.dll' -File | ForEach-Object FullName)
                 if ($plugins.Count) {
                     $closure += @(Copy-PeImportClosure -Path $plugins -SearchDirectory $search -Destination $tests -Arch $TargetArch)
+                }
+                # The Debug (ASan) suite cannot run in the container on a cross build; it rides along, runtime DLLs beside it.
+                if ($doClang) {
+                    $debugSuite = Join-Path $fastBuildClangFull 'commitTestSuite.exe'
+                    if (-not (Test-Path -LiteralPath $debugSuite -PathType Leaf)) { throw "The Debug build made no $debugSuite" }
+                    Copy-Item -LiteralPath $debugSuite -Destination (Join-Path $tests 'commitTestSuite-debug.exe')
+                    $manifest += @{ exe = 'commitTestSuite-debug.exe'; kind = 'gtest' }
+                    & (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Copy-Arm64VsRuntime.ps1') -InstallDir $tests -Flat
                 }
                 Copy-Item -LiteralPath (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Invoke-StagedTests.ps1') -Destination $tests
                 ConvertTo-Json -InputObject $manifest -Depth 3 |
