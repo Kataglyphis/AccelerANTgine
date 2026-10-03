@@ -30,7 +30,7 @@ jobs:
         -TargetArch
         arm64
         -BuildTargets
-        clangcl-release
+        clangcl-release,clangcl-debug
         -SkipFormat
         -StageTests
       artifact-name: AccelerANTgine-windows-arm64
@@ -43,6 +43,12 @@ jobs:
       # The commit, compile, fuzz and perf suites, built in Release for arm64 and run natively (hub CON43).
       test-artifact-dir: dist/windows-arm64-tests
       test-command: |
+        # A Debug (/MDd) ASan suite needs the runner's own debug CRT and ucrtbased.dll: neither is redistributable, so neither travels.
+        $crt = @(Get-ChildItem 'C:\Program Files*\Microsoft Visual Studio\*\*\VC\Redist\MSVC\*\debug_nonredist\arm64\Microsoft.VC*.DebugCRT' -Directory -ErrorAction SilentlyContinue | Select-Object -First 1)
+        if ($crt.Count -eq 0) { throw 'no arm64 debug CRT under the runner VS; the staged ASan suite is a /MDd build' }
+        $ucrt = @(Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\arm64\ucrt\ucrtbased.dll' -File -ErrorAction SilentlyContinue | Select-Object -First 1)
+        if ($ucrt.Count -eq 0) { throw 'no arm64 ucrtbased.dll under the Windows SDK' }
+        $env:PATH = "$($crt[0].FullName);$($ucrt[0].DirectoryName);$env:PATH"
         & ./Invoke-StagedTests.ps1
     secrets:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}

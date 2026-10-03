@@ -45,7 +45,7 @@ reorganisation.
 | Linux container builds | `docs/linux-build-basics.md` |
 | Cross-compilation chain and its failure classes | `docs/linux-cross-builds.md`, `docs/cross-build-verification.md` |
 | The Windows image, its entrypoint and known traps | `docs/windows-builds.md` |
-| The Windows arm64 cross lane: the arm64 bundle, the arch gate, the `windows-11-arm` run job, why Release only | `docs/windows-cross-builds.md` |
+| The Windows arm64 cross lane: the arm64 bundle, the arch gate, the `windows-11-arm` run job, why Release, Profile and the Debug (ASan) build | `docs/windows-cross-builds.md` |
 | The riscv64 cross lane: the sysroot from the image's riscv64 child, the cross clang, QEMU binfmt, what cannot run under QEMU | `docs/riscv64-cross-test-lanes.md` |
 | ONNX Runtime's one source (the chain build) and the G6 census | `docs/onnxruntime-single-source.md` |
 | Bind mount vs tar-pipe, Dev Drive filter setup, container reuse | `docs/windows-container-build-performance.md` |
@@ -431,9 +431,12 @@ steps are the x64 lane's: they read the source, not the target). The hub's arch 
 grades `dist/windows-arm64`, and `windows-11-arm` runs `bundle/bin/AccelerANTgine.exe`.
 On a cross build the script:
 
-- refuses every target but clangcl-release, before the log opens. Debug links an x64-only
-  ASan runtime and runs FuzzTest's grammar generator at build time, and Profile runs
-  benchmarks and PGO;
+- refuses every target but clangcl-release and clangcl-debug, before the log opens. Debug's
+  aarch64 ASan runtime exists since 2026-10-03 (VS 2026's toolset, the hub's Sanitizers.cmake
+  picks it by CMAKE_SYSTEM_PROCESSOR); Profile runs benchmarks and PGO, which stay host-only;
+- stages the Debug (ASan) suite as `commitTestSuite-debug.exe` with Microsoft's aarch64 ASan
+  runtime beside it; the runner supplies the /MDd debug CRT and ucrtbased.dll from its own VS
+  and SDK, neither is redistributable;
 - configures with the hub's `Get-CrossConfigureArgs -Corrosion`;
 - builds into `build-clangcl-release-arm64`;
 - ships the `aarch64` MSI and ZIP (not NSIS: its installer stub is x86) and the arm64 MSIX,
