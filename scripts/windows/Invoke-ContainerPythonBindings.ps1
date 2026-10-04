@@ -44,9 +44,10 @@ $buildCommand = {
 
 # Root build outputs stay out of the transfer: bsdtar --exclude matches at every depth,
 # and a './build_*' pattern stripped third_party/FUZZTEST/build_defs before.
-$inboundItems = @(Get-ChildItem -LiteralPath $ProjectRoot -Force |
-    Where-Object { $_.Name -notin @("logs", "dist") -and $_.Name -notlike "build" -and $_.Name -notlike "build-*" -and $_.Name -notlike "build_*" } |
-    ForEach-Object Name)
+# Raw enumeration: Get-ChildItem would answer with WhatIf records under -WhatIf.
+$inboundItems = @([System.IO.Directory]::GetFileSystemEntries($ProjectRoot) |
+    ForEach-Object { [System.IO.Path]::GetFileName($_) } |
+    Where-Object { $_ -notin @("logs", "dist") -and $_ -notlike "build" -and $_ -notlike "build-*" -and $_ -notlike "build_*" })
 
 # Not Invoke-ContainerBuild.ps1's container: the two lanes must never race for one.
 # No VerifyDirs: the package ships no executables for the delivery check.
