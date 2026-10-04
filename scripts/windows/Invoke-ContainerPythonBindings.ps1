@@ -42,9 +42,7 @@ $buildCommand = {
     )
 }.GetNewClosure()
 
-# Root build outputs stay out of the transfer: bsdtar --exclude matches at every depth,
-# and a './build_*' pattern stripped third_party/FUZZTEST/build_defs before.
-# Raw enumeration: Get-ChildItem would answer with WhatIf records under -WhatIf.
+# Root build dirs leave the list, not a pattern (bsdtar matches everywhere); raw enumeration dodges WhatIf records.
 $inboundItems = @([System.IO.Directory]::GetFileSystemEntries($ProjectRoot) |
     ForEach-Object { [System.IO.Path]::GetFileName($_) } |
     Where-Object { $_ -notin @("logs", "dist") -and $_ -notlike "build" -and $_ -notlike "build-*" -and $_ -notlike "build_*" })
