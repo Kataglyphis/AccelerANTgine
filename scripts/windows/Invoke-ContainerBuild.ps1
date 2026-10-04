@@ -26,16 +26,10 @@ Set-StrictMode -Version Latest
 
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 
-# Standard import shim: upstream ANTfrastructure modules win over any vendored copy.
-. (Join-Path $PSScriptRoot "Resolve-BuildModule.ps1")
-Import-BuildModule @("WindowsContainerBuild.Reuse", "WindowsContainerImage.Common")
+# The container plumbing has one owner: the hub's Invoke-RepoContainerBuild.ps1.
+$runner = Join-Path $ProjectRoot 'third_party\ANTfrastructure\windows\scripts\build\Invoke-RepoContainerBuild.ps1'
+if (-not (Test-Path -LiteralPath $runner)) { throw "Required script not found: $runner (run: git submodule update --init --recursive third_party/ANTfrastructure)" }
 
-# The image ref comes from ANTfrastructure's versions.env, never from here.
-if (-not $Image) { $Image = Get-CiImageReference -Windows }
-
-$docker = Resolve-DockerExe -Override $DockerExe
-Write-Host "Using docker: $docker"
-Write-Host "Image: $Image"
 Write-Host "BuildTargets: $BuildTargets"
 
 # Build-Windows.ps1 syncs each target's artifacts to build-<target>, which the host needs back.
@@ -53,39 +47,18 @@ $buildCommand = {
     )
 }.GetNewClosure()
 
-$build = @{
-    DockerExe     = $docker
-    Image         = $Image
-    ContainerName = "accelerantgine-build-persistent"
-    RepoRoot      = $ProjectRoot
-    BuildCommand  = $buildCommand
-    # Not the image-baked C:\workspace: mounting over an image directory fails on host/image OS-build skew.
-    WorkspacePath = "C:\ws"
-    IsolationArgs = (Get-ContainerIsolationArgs -Isolation $Isolation -CpuCount $CpuCount -MemoryGb $MemoryGb)
-    # Build-Windows.ps1 re-points SCCACHE_DIR; the log and size entries still apply.
-    CacheEnv      = (Get-SccacheContainerEnv)
+# Root build outputs stay out of the transfer: bsdtar --exclude matches at every depth,
+# and a './build_*' pattern stripped third_party/FUZZTEST/build_defs before.
+$inboundItems = @(Get-ChildItem -LiteralPath $ProjectRoot -Force |
+    Where-Object { $_.Name -notin @("logs", "dist") -and $_.Name -notlike "build" -and $_.Name -notlike "build-*" -and $_.Name -notlike "build_*" } |
+    ForEach-Object Name)
 
-    # Anchored: unanchored bsdtar patterns match at every depth and would strip nested third_party files.
-    InboundExclude = @(".git", "./logs", "./build", "./build-*", "./build_*", "./dist")
+& $runner -RepoRoot $ProjectRoot -ContainerName "accelerantgine-build-persistent" `
+    -BuildCommand $buildCommand -Image $Image -DockerExe $DockerExe -Isolation $Isolation -CpuCount $CpuCount -MemoryGb $MemoryGb `
+    -InboundItems $inboundItems -InboundExclude @(".git") `
+    -OutputDirs (@("logs", "dist") + $buildDirs) `
+    -OutboundExclude @("*/CMakeFiles", "*/_deps", "*/_CPack_Packages", "*.obj", "*.lib", "*.ilk") `
+    -VerifyDirs @($buildDirs | Where-Object { $_ -like "build-clangcl-*" }) `
+    -UseBindMount:$UseBindMount -FreshContainer:$FreshContainer -WhatIf:$WhatIfPreference
 
-    # No IncrementalDirs: incrementality comes from reusing the container, not from the synced build-* dirs.
-    OutputDirs      = (@("logs", "dist") + $buildDirs)
-    OutboundExclude = @("*/CMakeFiles", "*/_deps", "*/_CPack_Packages", "*.obj", "*.lib", "*.ilk")
-
-    # clangcl-* only: the msvc lanes' multi-config generator puts exes in a per-config subdirectory.
-    VerifyDirs = @($buildDirs | Where-Object { $_ -like "build-clangcl-*" })
-
-    UseBindMount   = $UseBindMount
-    FreshContainer = $FreshContainer
-}
-
-if ($PSCmdlet.ShouldProcess("$Image (container '$($build.ContainerName)')", "Invoke-ContainerBuild")) {
-    # The imported function, not this script: the working directory is not on PATH.
-    $null = Invoke-ContainerBuild @build
-    Write-Host "Container build finished successfully."
-} else {
-    # -WhatIf: show the exact in-container command the config assembles to.
-    $argv = Resolve-ContainerBuildCommand -BuildCommand $buildCommand -WorkspacePath $build.WorkspacePath
-    Write-Host ("Would run in {0}: {1}" -f $build.WorkspacePath, ($argv -join " "))
-    Write-Host ("OutputDirs: {0} | VerifyDirs: {1}" -f ($build.OutputDirs -join ", "), ($build.VerifyDirs -join ", "))
-}
+if (-not $WhatIfPreference) { Write-Host "Container build finished successfully." }

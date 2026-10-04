@@ -25,16 +25,10 @@ Set-StrictMode -Version Latest
 
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 
-# Standard import shim: upstream ANTfrastructure modules win over any vendored copy.
-. (Join-Path $PSScriptRoot "Resolve-BuildModule.ps1")
-Import-BuildModule @("WindowsContainerBuild.Reuse", "WindowsContainerImage.Common")
+# The container plumbing has one owner: the hub's Invoke-RepoContainerBuild.ps1.
+$runner = Join-Path $ProjectRoot 'third_party\ANTfrastructure\windows\scripts\build\Invoke-RepoContainerBuild.ps1'
+if (-not (Test-Path -LiteralPath $runner)) { throw "Required script not found: $runner (run: git submodule update --init --recursive third_party/ANTfrastructure)" }
 
-# The image ref comes from ANTfrastructure's versions.env, never from here.
-if (-not $Image) { $Image = Get-CiImageReference -Windows }
-
-$docker = Resolve-DockerExe -Override $DockerExe
-Write-Host "Using docker: $docker"
-Write-Host "Image: $Image"
 Write-Host "Preset: $Preset"
 
 # Every token must stay space-free: it travels docker CLI -> cmd /S /C -> %*.
@@ -48,35 +42,18 @@ $buildCommand = {
     )
 }.GetNewClosure()
 
-$build = @{
-    DockerExe     = $docker
-    Image         = $Image
-    # Not Invoke-ContainerBuild.ps1's container: the two lanes must never race for one.
-    ContainerName = "accelerantgine-python-persistent"
-    RepoRoot      = $ProjectRoot
-    BuildCommand  = $buildCommand
-    # Not the image-baked C:\workspace: mounting over an image directory fails on host/image OS-build skew.
-    WorkspacePath = "C:\ws"
-    IsolationArgs = (Get-ContainerIsolationArgs -Isolation $Isolation -CpuCount $CpuCount -MemoryGb $MemoryGb)
-    # The preset compiles through sccache (COMPILER_CACHE in CMakePresets.json).
-    CacheEnv      = (Get-SccacheContainerEnv)
+# Root build outputs stay out of the transfer: bsdtar --exclude matches at every depth,
+# and a './build_*' pattern stripped third_party/FUZZTEST/build_defs before.
+$inboundItems = @(Get-ChildItem -LiteralPath $ProjectRoot -Force |
+    Where-Object { $_.Name -notin @("logs", "dist") -and $_.Name -notlike "build" -and $_.Name -notlike "build-*" -and $_.Name -notlike "build_*" } |
+    ForEach-Object Name)
 
-    # Anchored: unanchored bsdtar patterns match at every depth and would strip nested third_party files.
-    InboundExclude = @(".git", "./logs", "./build", "./build-*", "./build_*", "./dist")
+# Not Invoke-ContainerBuild.ps1's container: the two lanes must never race for one.
+# No VerifyDirs: the package ships no executables for the delivery check.
+& $runner -RepoRoot $ProjectRoot -ContainerName "accelerantgine-python-persistent" `
+    -BuildCommand $buildCommand -Image $Image -DockerExe $DockerExe -Isolation $Isolation -CpuCount $CpuCount -MemoryGb $MemoryGb `
+    -InboundItems $inboundItems -InboundExclude @(".git") `
+    -OutputDirs @("build-python") `
+    -UseBindMount:$UseBindMount -FreshContainer:$FreshContainer -WhatIf:$WhatIfPreference
 
-    # No VerifyDirs: the package ships no executables for the delivery check.
-    OutputDirs = @("build-python")
-
-    UseBindMount   = $UseBindMount
-    FreshContainer = $FreshContainer
-}
-
-if ($PSCmdlet.ShouldProcess("$Image (container '$($build.ContainerName)')", "Invoke-ContainerBuild")) {
-    $null = Invoke-ContainerBuild @build
-    Write-Host "Python bindings build finished successfully."
-} else {
-    # -WhatIf: show the exact in-container command the config assembles to.
-    $argv = Resolve-ContainerBuildCommand -BuildCommand $buildCommand -WorkspacePath $build.WorkspacePath
-    Write-Host ("Would run in {0}: {1}" -f $build.WorkspacePath, ($argv -join " "))
-    Write-Host ("OutputDirs: {0}" -f ($build.OutputDirs -join ", "))
-}
+if (-not $WhatIfPreference) { Write-Host "Python bindings build finished successfully." }

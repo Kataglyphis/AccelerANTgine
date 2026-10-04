@@ -392,8 +392,10 @@ it reads that build directory from `Build-Windows.config.psd1` — the same tabl
 `Invoke-ContainerBuild.ps1`, `Invoke-ContainerPythonBindings.ps1` and
 `Show-BuildHelp.ps1` are the other entry points — named for what they do, because
 none of them starts the application. The first two run their
-`Build-*.ps1` inside the ANTfrastructure Windows image via `Invoke-ContainerBuild`
-(`WindowsContainerBuild.Reuse`, imported through `Resolve-BuildModule.ps1`):
+`Build-*.ps1` inside the ANTfrastructure Windows image through the hub's
+`Invoke-RepoContainerBuild.ps1`, which owns the plumbing
+(`WindowsContainerBuild.Reuse` + `WindowsContainerImage.Common`, the image ref
+from `versions.env`):
 tar-pipe transport into a reusable per-lane build container at `C:\ws` by
 default, `-UseBindMount` to opt into a bind mount, `-FreshContainer` to reset,
 `-WhatIf` to print the assembled in-container command without building. Build
