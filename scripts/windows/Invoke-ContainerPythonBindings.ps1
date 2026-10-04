@@ -47,8 +47,7 @@ $inboundItems = @([System.IO.Directory]::GetFileSystemEntries($ProjectRoot) |
     ForEach-Object { [System.IO.Path]::GetFileName($_) } |
     Where-Object { $_ -notin @("logs", "dist") -and $_ -notlike "build" -and $_ -notlike "build-*" -and $_ -notlike "build_*" })
 
-# Not Invoke-ContainerBuild.ps1's container: the two lanes must never race for one.
-# No VerifyDirs: the package ships no executables for the delivery check.
+# Not Invoke-ContainerBuild.ps1's container (the two lanes must never race); no VerifyDirs, nothing to deliver-check.
 & $runner -RepoRoot $ProjectRoot -ContainerName "accelerantgine-python-persistent" `
     -BuildCommand $buildCommand -Image $Image -DockerExe $DockerExe -Isolation $Isolation -CpuCount $CpuCount -MemoryGb $MemoryGb `
     -InboundItems $inboundItems -InboundExclude @(".git") `
