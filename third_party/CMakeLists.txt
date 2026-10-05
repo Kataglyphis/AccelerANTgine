@@ -179,6 +179,9 @@ set(SPDLOG_FMT_EXTERNAL
     CACHE BOOL "Use external fmt" FORCE)
 
 add_subdirectory(SPDLOG)
+# PIC and hidden: spdlog is linked into libAccelerANTgine.so, whose own symbols are hidden too (Src/CMakeLists.txt).
+set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_VISIBILITY_PRESET hidden
+                                        VISIBILITY_INLINES_HIDDEN ON)
 
 set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "" FORCE)
 add_subdirectory(NLOHMANN_JSON)
