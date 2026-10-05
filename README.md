@@ -123,6 +123,12 @@ This enumeration also includes submodules.
 **C17** or higher required.<br />
 **CMake 3.31.6** or higher required.<br />
 
+### Searching the tree
+
+Search the tree with [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`):
+`winget install --id BurntSushi.ripgrep.MSVC -e --scope user` on Windows,
+`apt install ripgrep` on Linux.
+
 ### Installation
 
 1. Clone the repo
