@@ -53,6 +53,7 @@ reorganisation.
 | Job counts, per-job memory, why a build got OOM-killed | `docs/build-parallelism-memory-tuning.md` |
 | The five shell-safety bug classes | `third_party/ANTfrastructure/AGENTS.md` § *Shell safety conventions* |
 | Code comments: one line, only the why; API docs short; gated | `third_party/ANTfrastructure/AGENTS.md` § *Comments: one line, only the why* |
+| Searching the tree: `rg`, not `grep -r` | `third_party/ANTfrastructure/AGENTS.md` § *Searching the tree: ripgrep (`rg`)* |
 
 **These scripts are wrappers, not implementations** — change behaviour upstream,
 not here:
