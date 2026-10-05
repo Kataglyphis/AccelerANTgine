@@ -108,6 +108,12 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- **spdlog is built PIC and hidden (2026-10-05)**, like the nlohmann and toml module targets:
+  it is linked into `libAccelerANTgine.so`, whose own symbols are hidden. GNU ld, lld and
+  mold 3 had accepted the non-PIC objects by binding them locally; mold 2.x refused them.
+  Measured in `:latest`, before and after alike: Release exports 179 symbols and Debug 604,
+  no spdlog/fmt symbol among them, no TEXTREL, 111/111 Debug (ASan + UBSan) tests, under all
+  three linkers.
 
 - 2026-10-02 - **clang-tidy analyses every `Src/` TU again** (hub CON10). The image's
   patched LLVM ships `clang-tidy.exe` beside `clang-cl.exe` and reads clang-cl C++23 BMIs, so
