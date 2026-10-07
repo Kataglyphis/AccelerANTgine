@@ -108,6 +108,15 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- **GSL v4.2.2 → v5.0.1 (major), nlohmann/json to its develop tip 367336c8,
+  upload-artifact v7.0.1 → v7.0.2 (2026-10-07, the evening Renovate report).**
+  - GSL 5 keeps the `GSL` target and `Microsoft.GSL::GSL` alias, and no source here
+    includes a GSL header, so the major needed no code change.
+  - `requirements.txt` is pinned with `==`, to the versions uv resolves for it today. Unpinned,
+    Renovate skipped all ten rows as `invalid-value` and never checked them.
+  - Measured in `:latest` (x64), privileged as CI runs it: `ci-build-and-test.sh --compiler
+    clang` passes 111/111 Debug tests under ASan + UBSan, `fuzzTestSuite` 8/8 and 103/103
+    under TSan, and the fetched tree is GSL 5.0.1. `run-lint-gates.sh` passes.
 - **abseil 20260526.0 → 20260817.0, GSL v4.2.1 → v4.2.2, cxxbridge-cmd's floor 1.0.191 →
   1.0.202 (2026-10-07, from the Renovate report).**
   - The abseil pin now sits above the 20260526.0 that FuzzTest 2026-06-29 pins. The
