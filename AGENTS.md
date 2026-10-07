@@ -110,11 +110,16 @@ commits CI builds green. `git submodule update --checkout --recursive` restores
 every pin. If a drifted submodule is what you actually want, update the gitlink
 **and** fix the fallout in the same change.
 
-- `third_party/FUZZTEST` and the abseil `FetchContent` pin in
-  `third_party/CMakeLists.txt` MUST move together: the `GIT_TAG` there tracks
-  the version FUZZTEST's `MODULE.bazel` declares, and a mismatch breaks e.g.
-  `absl::random_mocking_access`. `cmake/fuzztest_compat/` papers over the
-  header gap between the current pair — re-check it on every move.
+- The abseil `FetchContent` pin in `third_party/CMakeLists.txt` must stay **at or
+  above** the `absl_TAG` that `third_party/FUZZTEST/cmake/BuildDependencies.cmake`
+  pins. This declaration comes first and wins, and an older Abseil lacks targets
+  FuzzTest links (e.g. `absl::random_mocking_access`). Moving abseil up is safe for
+  that constraint, as BeschleunigerBallett's identical pair already documents; moving
+  FUZZTEST up may raise the floor. `cmake/fuzztest_compat/` papers over the header gap
+  between the current pair — re-check it on every move of either. Measured
+  2026-10-07: abseil 20260817.0 against FuzzTest 2026-06-29 (which pins 20260526.0)
+  passes the clang Debug suites (ASan + UBSan), `fuzzTestSuite`, the TSan build and
+  the GCC suites in `:latest`.
 - `third_party/ANTfrastructure`'s **own** nested submodule is a build input here,
   not just a transitive detail: `docs/source/conf.py` (:23-43) loads `conf_base.py`
   from
@@ -198,7 +203,7 @@ written out rather than linked.
   is none on the Windows host. All seven `.gitmodules` entries declare a
   `branch =` since 9a5653d, so none of them comes back **REFUSED** any more and
   `--apply` moves the gitlink of every one that is behind — `FUZZTEST` included,
-  which must move together with the abseil pin (§ 3). Since hub d04631ed
+  which may raise the abseil pin's floor (§ 3). Since hub d04631ed
   (2026-09-11) the Python, Rust and pre-commit pins are no longer report-only:
   `--apply` rewrites each reported one in place and refreshes its lock. The
   `custom.regex` manager that reads the CMake pins in
