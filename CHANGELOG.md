@@ -108,6 +108,18 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- **abseil 20260526.0 → 20260817.0, GSL v4.2.1 → v4.2.2, cxxbridge-cmd's floor 1.0.191 →
+  1.0.202 (2026-10-07, from the Renovate report).**
+  - The abseil pin now sits above the 20260526.0 that FuzzTest 2026-06-29 pins. The
+    coupling in AGENTS.md § 3 is restated as what it is, a floor, as BeschleunigerBallett
+    already words it: "must move together" was stricter than the failure it guards
+    against, which is an Abseil older than FuzzTest's.
+  - The cxxbridge-cmd floor now equals the cxx both locks resolve (1.0.202 in
+    `Src/rusty_code` and in OxidANT).
+  - Measured in `:latest` (x64): `ci-build-and-test.sh --compiler clang` (111/111 Debug
+    tests under ASan + UBSan, `fuzzTestSuite` 8/8, 103/103 under TSan) and
+    `--compiler gcc` (103/103). The configure step installed and used cxxbridge-cmd 1.0.202,
+    and the fetched trees are GSL v4.2.2 and abseil 20260817.0.
 - **spdlog is built PIC and hidden (2026-10-05)**, like the nlohmann and toml module targets:
   it is linked into `libAccelerANTgine.so`, whose own symbols are hidden. GNU ld, lld and
   mold 3 had accepted the non-PIC objects by binding them locally; mold 2.x refused them.

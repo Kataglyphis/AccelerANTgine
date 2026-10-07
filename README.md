@@ -78,7 +78,7 @@ This enumeration also includes submodules.
 * [ONNX Runtime](https://onnxruntime.ai/) — inference
 * [GStreamer](https://gstreamer.freedesktop.org/) — media pipelines
 * [WebRTC](https://webrtc.org/) — realtime transport, through GStreamer's `webrtcsink`
-* [abseil](https://github.com/abseil/abseil-cpp) — pinned to the version FUZZTEST declares (`AGENTS.md` § 3)
+* [abseil](https://github.com/abseil/abseil-cpp) — pinned at or above the version FUZZTEST pins (`AGENTS.md` § 3)
 * [GSL](https://github.com/microsoft/GSL)
 * [nlohmann_json](https://github.com/nlohmann/json)
 * [tomlplusplus](https://github.com/marzer/tomlplusplus)
