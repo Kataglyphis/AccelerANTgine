@@ -54,7 +54,7 @@ fi
 code_quality_ensure_cmake_format
 
 # Every tool up front, the missing ones named together.
-require_tools cmake cmake-format clang-format clang-tidy scan-build-21 clang++
+require_tools cmake cmake-format clang-format clang-tidy scan-build clang++
 
 # Every analysis runs, failures are recorded, and assert_gates decides once.
 gate_reset "static-analysis"
@@ -71,7 +71,7 @@ run_gate clang-format code_quality_run_clang_format "${FORMAT_FILES[@]}"
 run_scan_build() {
   [[ -d "${BUILD_DIR}" ]] || err "Build directory '${BUILD_DIR}' not found - scan-build needs a configured tree."
   mkdir -p scan-build-reports
-  scan-build-21 -o scan-build-reports cmake --build "${BUILD_DIR}"
+  scan-build -o scan-build-reports cmake --build "${BUILD_DIR}"
 }
 
 # The remapped DB copy is removed whatever the verdict.
