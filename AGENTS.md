@@ -154,7 +154,7 @@ written out rather than linked.
   `run-static-analysis-format.sh` runs it (and scan-build) only when
   `COMPILER=clang`. That is not an oversight and re-enabling it produces a wall
   of parse errors, not findings.
-- **Two analyses stay local rather than going upstream:** `scan-build-21`, which
+- **Two analyses stay local rather than going upstream:** `scan-build` (the pinned LLVM's), which
   the clang lane runs, and `clang++ --analyze` with the `-DUSE_RUST=1` define it
   needs, which runs only under `--direct-analyze` (no lane passes it).
   No other ANTfrastructure consumer runs them, and one consumer is not enough to
