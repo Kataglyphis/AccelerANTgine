@@ -343,6 +343,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-10-11 — **The docs build no longer reads `Test/python/onnx_models.py`.** Breathe parsed its
+  `list[int]` annotations as C++ and failed the warnings-as-errors Sphinx build on Linux x64 (run 38142935942);
+  `EXCLUDE_PATTERNS` in `Doxyfile.in` drops that helper, the binding and threading tests stay documented.
+
 - 2026-10-11 — **`OnnxInferenceEngine` and `YoloDetector` survive concurrent calls.**
   `initialize` reset the session while a `run_inference` that had released the GIL was still
   using it. That was a use-after-free on the GIL build as well: `test_threading.py` segfaulted

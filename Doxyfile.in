@@ -1076,7 +1076,8 @@ EXCLUDE_SYMLINKS       = NO
 # Note that the wildcards are matched against the file with absolute path, so to
 # exclude all test directories for example use the pattern */test/*
 
-EXCLUDE_PATTERNS       =
+# Breathe parses Python signatures as C++ and fails on list[int] (warnings are errors in the docs build).
+EXCLUDE_PATTERNS       = */Test/python/onnx_models.py
 
 # The EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names
 # (namespaces, classes, functions, etc.) that should be excluded from the
