@@ -58,8 +58,7 @@ static auto run_onnx_inference_example(const std::string &model_path) -> int
         if (shape) {
             std::cout << "  " << name << ": [";
             for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
-                if (i > 0) { std::cout << ", ";
-}
+                if (i > 0) { std::cout << ", "; }
                 std::cout << shape->dimensions[i];
             }
             std::cout << "]\n";
@@ -72,8 +71,7 @@ static auto run_onnx_inference_example(const std::string &model_path) -> int
         if (shape) {
             std::cout << "  " << name << ": [";
             for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
-                if (i > 0) { std::cout << ", ";
-}
+                if (i > 0) { std::cout << ", "; }
                 std::cout << shape->dimensions[i];
             }
             std::cout << "]\n";
@@ -102,8 +100,7 @@ static auto run_onnx_inference_example(const std::string &model_path) -> int
         const auto &output = result->outputs[i];
         std::cout << "  Output " << i << " shape: [";
         for (std::size_t j = 0; j < output.shape.dimensions.size(); ++j) {
-            if (j > 0) { std::cout << ", ";
-}
+            if (j > 0) { std::cout << ", "; }
             std::cout << output.shape.dimensions[j];
         }
         std::cout << "] (" << output.data.size() << " elements)\n";

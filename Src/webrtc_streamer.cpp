@@ -55,9 +55,7 @@ namespace {
     }
 
     auto make_default_producer_id() -> std::string
-    {
-        return "stream-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count() % 100000);
-    }
+    { return "stream-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count() % 100000); }
 
     auto quote_pipeline_value(const std::string &value) -> std::string
     {
@@ -109,7 +107,7 @@ namespace {
         return fallback;
     }
 
-    auto create_configured_streamer(const StreamConfig& config) -> std::expected<WebRTCStreamer, WebRTCError>
+    auto create_configured_streamer(const StreamConfig &config) -> std::expected<WebRTCStreamer, WebRTCError>
     {
         auto init_result = WebRTCStreamer::initialize();
         if (!init_result) { return std::unexpected(init_result.error()); }
@@ -202,8 +200,8 @@ struct WebRTCStreamer::Impl
     auto build_raw_video_caps() const -> std::string
     {
         std::ostringstream ss;
-        ss << "video/x-raw,width=" << config.width << ",height=" << config.height
-           << ",framerate=" << config.framerate << "/1";
+        ss << "video/x-raw,width=" << config.width << ",height=" << config.height << ",framerate=" << config.framerate
+           << "/1";
         return ss.str();
     }
 
@@ -301,10 +299,8 @@ struct WebRTCStreamer::Impl
         g_printerr("Pipeline error: %s\n", error_message.c_str());
         impl->report_error(WebRTCError::MediaError, error_message);
 
-        if (error != nullptr) { g_error_free(error);
-}
-        if (debug_info != nullptr) { g_free(debug_info);
-}
+        if (error != nullptr) { g_error_free(error); }
+        if (debug_info != nullptr) { g_free(debug_info); }
 
         return TRUE;
     }
@@ -316,7 +312,7 @@ struct WebRTCStreamer::Impl
 
         if (GST_MESSAGE_SRC(msg) != GST_OBJECT(impl->pipeline)) { return TRUE; }
 
-GstState old_state;
+        GstState old_state;
         GstState new_state;
         gst_message_parse_state_changed(msg, &old_state, &new_state, nullptr);
 
@@ -347,8 +343,7 @@ GstState old_state;
         auto *impl = static_cast<Impl *>(user_data);
 
         const GstStructure *structure = gst_message_get_structure(msg);
-        if (structure == nullptr) { return TRUE;
-}
+        if (structure == nullptr) { return TRUE; }
 
         const gchar *name = gst_structure_get_name(structure);
         if (g_str_has_prefix(name, "webrtcsink") != 0) {

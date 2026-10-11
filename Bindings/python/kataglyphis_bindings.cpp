@@ -86,9 +86,7 @@ auto onnx_error_name(kataglyphis::inference::OnnxError error) -> const char *
 }
 
 [[noreturn]] void raise_onnx(const char *context, kataglyphis::inference::OnnxError error)
-{
-    throw std::runtime_error(std::format("{} failed: {}", context, onnx_error_name(error)));
-}
+{ throw std::runtime_error(std::format("{} failed: {}", context, onnx_error_name(error))); }
 
 using CpuFloatArray = nb::ndarray<const float, nb::c_contig, nb::device::cpu>;
 
@@ -156,7 +154,9 @@ void bind_onnx(nb::module_ &m)
       .def_rw("enable_memory_pattern", &SessionConfig::enable_memory_pattern, nb::lock_self())
       .def_rw("execution_mode", &SessionConfig::execution_mode, nb::lock_self());
 
-    m.def("default_session_config", &create_default_session_config, "model_path"_a,
+    m.def("default_session_config",
+      &create_default_session_config,
+      "model_path"_a,
       "Create a SessionConfig with sensible defaults for the given model.");
 
     nb::class_<PyInferenceResult>(m, "InferenceResult")
@@ -177,7 +177,8 @@ void bind_onnx(nb::module_ &m)
             }
             if (!result) { raise_onnx("initialize", result.error()); }
         },
-        "config"_a.lock(), "Load the model in config. Releases the GIL while the session is created.")
+        "config"_a.lock(),
+        "Load the model in config. Releases the GIL while the session is created.")
       .def("is_initialized", &OnnxInferenceEngine::is_initialized)
       .def(
         "run_inference",
@@ -192,7 +193,8 @@ void bind_onnx(nb::module_ &m)
             if (!result) { raise_onnx("run_inference", result.error()); }
             return make_py_result(std::move(*result));
         },
-        "input"_a, "input_name"_a = "input",
+        "input"_a,
+        "input_name"_a = "input",
         "Run inference on a float32 array; shape is taken from the array. Releases the GIL while running.")
       .def(
         "run_inference_multi_input",
@@ -216,7 +218,8 @@ void bind_onnx(nb::module_ &m)
             if (!result) { raise_onnx("run_inference_multi_input", result.error()); }
             return make_py_result(std::move(*result));
         },
-        "inputs"_a, "Run inference with a dict mapping input names to float32 arrays.")
+        "inputs"_a,
+        "Run inference with a dict mapping input names to float32 arrays.")
       .def("get_input_names", &OnnxInferenceEngine::get_input_names)
       .def("get_output_names", &OnnxInferenceEngine::get_output_names)
       .def(
@@ -254,7 +257,12 @@ void bind_yolo(nb::module_ &m)
         "__repr__",
         [](const BoundingBox &box) {
             return std::format("BoundingBox(x={}, y={}, width={}, height={}, confidence={:.3f}, class='{}')",
-              box.x, box.y, box.width, box.height, box.confidence, box.class_name);
+              box.x,
+              box.y,
+              box.width,
+              box.height,
+              box.confidence,
+              box.class_name);
         },
         nb::lock_self());
 
@@ -287,7 +295,8 @@ void bind_yolo(nb::module_ &m)
             }
             if (!result) { raise_onnx("YoloDetector.initialize", result.error()); }
         },
-        "config"_a.lock(), "Load the model in config. Releases the GIL while the session is created.")
+        "config"_a.lock(),
+        "Load the model in config. Releases the GIL while the session is created.")
       .def("is_initialized", &YoloDetector::is_initialized)
       .def(
         "detect",
@@ -306,7 +315,9 @@ void bind_yolo(nb::module_ &m)
             if (!result) { raise_onnx("detect", result.error()); }
             return std::move(*result);
         },
-        "image"_a, "width"_a = 0, "height"_a = 0,
+        "image"_a,
+        "width"_a = 0,
+        "height"_a = 0,
         "Detect objects in a float32 image. Width/height default to the array's (H, W) shape. Releases the GIL.")
       .def_static("get_coco_class_name", &YoloDetector::get_coco_class_name, "class_id"_a);
 }
@@ -368,15 +379,16 @@ void bind_config(nb::module_ &m)
       [](const std::filesystem::path &config_path) {
           return unwrap_config(load_webrtc_config(config_path), "load_webrtc_config");
       },
-      "config_path"_a, "Load WebRTC configuration from a JSON file.");
+      "config_path"_a,
+      "Load WebRTC configuration from a JSON file.");
     m.def(
       "parse_webrtc_config",
       [](const std::string &json_content) {
           return unwrap_config(parse_webrtc_config(json_content), "parse_webrtc_config");
       },
-      "json_content"_a, "Parse WebRTC configuration from a JSON string.");
-    m.def("get_default_webrtc_config", &get_default_webrtc_config,
-      "Get the default WebRTC configuration.");
+      "json_content"_a,
+      "Parse WebRTC configuration from a JSON string.");
+    m.def("get_default_webrtc_config", &get_default_webrtc_config, "Get the default WebRTC configuration.");
 }
 
 }// namespace

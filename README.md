@@ -331,9 +331,14 @@ They cover cmake-format and clang-format everywhere, plus clang-tidy and
 `scan-build` on the Linux clang lane and clang-tidy in the Windows `clangcl-debug`
 build, over the files the project actually compiles (`.ixx`, `.cppm` and `.mxx`
 included). `clang++ --analyze` runs only when asked for (`--direct-analyze`).
-Both formatters rewrite in place rather than failing on unformatted input. Every
-one of them is a gate: a tool that is not installed fails the lane rather than
-being skipped.
+cmake-format rewrites in place, and so does clang-format on Windows. On Linux,
+clang-format checks and does not rewrite. It covers every C/C++ file under `Src/`,
+`Test/`, `Bindings/` and `cmake/`, and fails the lane when one of them deviates
+from `.clang-format`. It also refuses any clang-format but the hub's `LLVM_RELEASE`
+(23.1.3), because each release formats differently. To fix a file, run that
+release's `clang-format -i` on it; the image's `clang-format` is that release.
+Every tool here is a gate: a tool that is not installed fails the lane rather
+than being skipped.
 
 `.clang-format` and `.cmake-format.yaml` here are **shared** configs, and
 `scripts/linux/run-lint-gates.sh` checks them against ANTfrastructure's copies

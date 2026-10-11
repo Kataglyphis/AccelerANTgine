@@ -17,59 +17,60 @@ using json = nlohmann::json;
 
 namespace {
 
-auto assign_optional_string(const json &object, const char *key, std::string &target)
-  -> std::expected<void, ConfigError>
-{
-    const auto it = object.find(key);
-    if (it == object.end()) { return {}; }
-    if (!it->is_string()) { return std::unexpected(ConfigError::InvalidValue); }
+    auto assign_optional_string(const json &object, const char *key, std::string &target)
+      -> std::expected<void, ConfigError>
+    {
+        const auto it = object.find(key);
+        if (it == object.end()) { return {}; }
+        if (!it->is_string()) { return std::unexpected(ConfigError::InvalidValue); }
 
-    target = it->template get<std::string>();
-    return {};
-}
-
-auto assign_optional_uint(const json &object, const char *key, std::uint32_t &target)
-  -> std::expected<void, ConfigError>
-{
-    const auto it = object.find(key);
-    if (it == object.end()) { return {}; }
-    // get<std::uint32_t>() would wrap a larger value silently.
-    if (!it->is_number_unsigned() || it->template get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max()) {
-        return std::unexpected(ConfigError::InvalidValue);
+        target = it->template get<std::string>();
+        return {};
     }
 
-    target = it->template get<std::uint32_t>();
-    return {};
-}
+    auto assign_optional_uint(const json &object, const char *key, std::uint32_t &target)
+      -> std::expected<void, ConfigError>
+    {
+        const auto it = object.find(key);
+        if (it == object.end()) { return {}; }
+        // get<std::uint32_t>() would wrap a larger value silently.
+        if (!it->is_number_unsigned()
+            || it->template get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max()) {
+            return std::unexpected(ConfigError::InvalidValue);
+        }
 
-auto assign_optional_string_array(const json &object, const char *key, std::vector<std::string> &target)
-  -> std::expected<void, ConfigError>
-{
-    const auto it = object.find(key);
-    if (it == object.end()) { return {}; }
-    if (!it->is_array()) { return std::unexpected(ConfigError::InvalidValue); }
-
-    target.clear();
-    target.reserve(it->size());
-    for (const auto &value : *it) {
-        if (!value.is_string()) { return std::unexpected(ConfigError::InvalidValue); }
-        target.push_back(value.template get<std::string>());
+        target = it->template get<std::uint32_t>();
+        return {};
     }
 
-    return {};
-}
+    auto assign_optional_string_array(const json &object, const char *key, std::vector<std::string> &target)
+      -> std::expected<void, ConfigError>
+    {
+        const auto it = object.find(key);
+        if (it == object.end()) { return {}; }
+        if (!it->is_array()) { return std::unexpected(ConfigError::InvalidValue); }
 
-template <typename Parser>
-auto parse_optional_object(const json &object, const char *key, Parser &&parser) -> std::expected<void, ConfigError>
-{
-    const auto it = object.find(key);
-    if (it == object.end()) { return {}; }
-    if (!it->is_object()) { return std::unexpected(ConfigError::InvalidValue); }
+        target.clear();
+        target.reserve(it->size());
+        for (const auto &value : *it) {
+            if (!value.is_string()) { return std::unexpected(ConfigError::InvalidValue); }
+            target.push_back(value.template get<std::string>());
+        }
 
-    return parser(*it);
-}
+        return {};
+    }
 
-}  // namespace
+    template<typename Parser>
+    auto parse_optional_object(const json &object, const char *key, Parser &&parser) -> std::expected<void, ConfigError>
+    {
+        const auto it = object.find(key);
+        if (it == object.end()) { return {}; }
+        if (!it->is_object()) { return std::unexpected(ConfigError::InvalidValue); }
+
+        return parser(*it);
+    }
+
+}// namespace
 
 auto get_default_webrtc_config() -> WebRTCConfig
 {
@@ -99,83 +100,92 @@ auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRT
         return std::unexpected(result.error());
     }
 
-    if (auto result = parse_optional_object(j, "video", [&](const json &video) -> std::expected<void, ConfigError> {
-            if (auto value = assign_optional_uint(video, "defaultWidth", config.video.default_width); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_uint(video, "defaultHeight", config.video.default_height); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_uint(video, "defaultFramerate", config.video.default_framerate); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_uint(video, "defaultBitrateKbps", config.video.default_bitrate_kbps);
+    if (auto result = parse_optional_object(j,
+          "video",
+          [&](const json &video) -> std::expected<void, ConfigError> {
+              if (auto value = assign_optional_uint(video, "defaultWidth", config.video.default_width); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_uint(video, "defaultHeight", config.video.default_height); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_uint(video, "defaultFramerate", config.video.default_framerate);
                 !value) {
-                return std::unexpected(value.error());
-            }
-            return {};
-        });
-        !result) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_uint(video, "defaultBitrateKbps", config.video.default_bitrate_kbps);
+                !value) {
+                  return std::unexpected(value.error());
+              }
+              return {};
+          });
+      !result) {
         return std::unexpected(result.error());
     }
 
-    if (auto result = parse_optional_object(j, "texture", [&](const json &texture) -> std::expected<void, ConfigError> {
-            if (auto value = assign_optional_uint(texture, "width", config.texture.width); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_uint(texture, "height", config.texture.height); !value) {
-                return std::unexpected(value.error());
-            }
-            return {};
-        });
-        !result) {
+    if (auto result = parse_optional_object(j,
+          "texture",
+          [&](const json &texture) -> std::expected<void, ConfigError> {
+              if (auto value = assign_optional_uint(texture, "width", config.texture.width); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_uint(texture, "height", config.texture.height); !value) {
+                  return std::unexpected(value.error());
+              }
+              return {};
+          });
+      !result) {
         return std::unexpected(result.error());
     }
 
-    if (auto result = parse_optional_object(j, "android", [&](const json &android) -> std::expected<void, ConfigError> {
-            if (auto value = assign_optional_uint(android, "width", config.android.width); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_uint(android, "height", config.android.height); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_uint(android, "fps", config.android.fps); !value) {
-                return std::unexpected(value.error());
-            }
-            return {};
-        });
-        !result) {
+    if (auto result = parse_optional_object(j,
+          "android",
+          [&](const json &android) -> std::expected<void, ConfigError> {
+              if (auto value = assign_optional_uint(android, "width", config.android.width); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_uint(android, "height", config.android.height); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_uint(android, "fps", config.android.fps); !value) {
+                  return std::unexpected(value.error());
+              }
+              return {};
+          });
+      !result) {
         return std::unexpected(result.error());
     }
 
-    if (auto result = parse_optional_object(j, "stream", [&](const json &stream) -> std::expected<void, ConfigError> {
-            if (auto value = assign_optional_string(stream, "source", config.stream.source); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_string(stream, "encoder", config.stream.encoder); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_string(stream, "device", config.stream.device); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_string(stream, "cameraId", config.stream.camera_id); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_string(stream, "inputPath", config.stream.input_path); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_string(stream, "inputUri", config.stream.input_uri); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_string(stream, "peerId", config.stream.peer_id); !value) {
-                return std::unexpected(value.error());
-            }
-            if (auto value = assign_optional_string(stream, "producerId", config.stream.producer_id); !value) {
-                return std::unexpected(value.error());
-            }
-            return {};
-        });
-        !result) {
+    if (auto result = parse_optional_object(j,
+          "stream",
+          [&](const json &stream) -> std::expected<void, ConfigError> {
+              if (auto value = assign_optional_string(stream, "source", config.stream.source); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_string(stream, "encoder", config.stream.encoder); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_string(stream, "device", config.stream.device); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_string(stream, "cameraId", config.stream.camera_id); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_string(stream, "inputPath", config.stream.input_path); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_string(stream, "inputUri", config.stream.input_uri); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_string(stream, "peerId", config.stream.peer_id); !value) {
+                  return std::unexpected(value.error());
+              }
+              if (auto value = assign_optional_string(stream, "producerId", config.stream.producer_id); !value) {
+                  return std::unexpected(value.error());
+              }
+              return {};
+          });
+      !result) {
         return std::unexpected(result.error());
     }
 

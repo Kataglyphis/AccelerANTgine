@@ -13,13 +13,10 @@ ABSL_NAMESPACE_BEGIN
 
 using FastTypeIdType = base_internal::FastTypeIdType;
 
-template <typename Type>
-constexpr inline FastTypeIdType FastTypeId() {
-  return base_internal::FastTypeId<Type>();
-}
+template<typename Type> constexpr inline FastTypeIdType FastTypeId() { return base_internal::FastTypeId<Type>(); }
 
 ABSL_NAMESPACE_END
-}  // namespace absl
+}// namespace absl
 #endif
 #else
 #include "absl/base/config.h"
@@ -30,13 +27,10 @@ ABSL_NAMESPACE_BEGIN
 
 using FastTypeIdType = base_internal::FastTypeIdType;
 
-template <typename Type>
-constexpr inline FastTypeIdType FastTypeId() {
-  return base_internal::FastTypeId<Type>();
-}
+template<typename Type> constexpr inline FastTypeIdType FastTypeId() { return base_internal::FastTypeId<Type>(); }
 
 ABSL_NAMESPACE_END
-}  // namespace absl
+}// namespace absl
 #endif
 
-#endif  // KATAGLYPHIS_FUZZTEST_COMPAT_ABSL_BASE_FAST_TYPE_ID_H_
+#endif// KATAGLYPHIS_FUZZTEST_COMPAT_ABSL_BASE_FAST_TYPE_ID_H_

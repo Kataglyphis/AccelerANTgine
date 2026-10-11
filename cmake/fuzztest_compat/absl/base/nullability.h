@@ -11,17 +11,14 @@
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
-template <typename T>
-using Nonnull = nullability_internal::NonnullImpl<T>;
+template<typename T> using Nonnull = nullability_internal::NonnullImpl<T>;
 
-template <typename T>
-using Nullable = nullability_internal::NullableImpl<T>;
+template<typename T> using Nullable = nullability_internal::NullableImpl<T>;
 
-template <typename T>
-using NullabilityUnknown = nullability_internal::NullabilityUnknownImpl<T>;
+template<typename T> using NullabilityUnknown = nullability_internal::NullabilityUnknownImpl<T>;
 
 ABSL_NAMESPACE_END
-}  // namespace absl
+}// namespace absl
 
 #if ABSL_HAVE_FEATURE(nullability_on_classes)
 #define ABSL_NULLABILITY_COMPATIBLE _Nullable
@@ -36,17 +33,14 @@ ABSL_NAMESPACE_END
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
-template <typename T>
-using Nonnull = nullability_internal::NonnullImpl<T>;
+template<typename T> using Nonnull = nullability_internal::NonnullImpl<T>;
 
-template <typename T>
-using Nullable = nullability_internal::NullableImpl<T>;
+template<typename T> using Nullable = nullability_internal::NullableImpl<T>;
 
-template <typename T>
-using NullabilityUnknown = nullability_internal::NullabilityUnknownImpl<T>;
+template<typename T> using NullabilityUnknown = nullability_internal::NullabilityUnknownImpl<T>;
 
 ABSL_NAMESPACE_END
-}  // namespace absl
+}// namespace absl
 
 #if ABSL_HAVE_FEATURE(nullability_on_classes)
 #define ABSL_NULLABILITY_COMPATIBLE _Nullable
@@ -67,4 +61,4 @@ ABSL_NAMESPACE_END
 #define absl_nullability_unknown
 #endif
 
-#endif  // KATAGLYPHIS_FUZZTEST_COMPAT_ABSL_BASE_NULLABILITY_H_
+#endif// KATAGLYPHIS_FUZZTEST_COMPAT_ABSL_BASE_NULLABILITY_H_

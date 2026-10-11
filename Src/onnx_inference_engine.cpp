@@ -25,138 +25,138 @@ namespace kataglyphis::inference {
 
 namespace {
 
-using InferenceClock = std::chrono::high_resolution_clock;
+    using InferenceClock = std::chrono::high_resolution_clock;
 
-// Under ORT_NO_EXCEPTIONS the C++ wrapper aborts on an error status, so every fallible call goes through the C API.
-auto ort_succeeded(OrtStatus *status) -> bool
-{
-    if (status == nullptr) { return true; }
-    std::fprintf(stderr, "ONNX Runtime: %s\n", Ort::GetApi().GetErrorMessage(status));
-    Ort::GetApi().ReleaseStatus(status);
-    return false;
-}
-
-template <typename NameGetter>
-void populate_name_cache(std::size_t count,
-  std::vector<std::string> &name_cache,
-  std::vector<const char *> &name_ptrs,
-  NameGetter &&get_name)
-{
-    name_cache.clear();
-    name_ptrs.clear();
-    name_cache.reserve(count);
-
-    for (std::size_t i = 0; i < count; ++i) {
-        auto name = get_name(i);
-        name_cache.emplace_back(name.get());
+    // Under ORT_NO_EXCEPTIONS the C++ wrapper aborts on an error status, so every fallible call goes through the C API.
+    auto ort_succeeded(OrtStatus *status) -> bool
+    {
+        if (status == nullptr) { return true; }
+        std::fprintf(stderr, "ONNX Runtime: %s\n", Ort::GetApi().GetErrorMessage(status));
+        Ort::GetApi().ReleaseStatus(status);
+        return false;
     }
 
-    name_ptrs.reserve(name_cache.size());
-    for (const auto &name : name_cache) { name_ptrs.push_back(name.c_str()); }
-}
+    template<typename NameGetter>
+    void populate_name_cache(std::size_t count,
+      std::vector<std::string> &name_cache,
+      std::vector<const char *> &name_ptrs,
+      NameGetter &&get_name)
+    {
+        name_cache.clear();
+        name_ptrs.clear();
+        name_cache.reserve(count);
 
-auto to_ort_dimensions(const TensorShape &shape) -> std::vector<int64_t>
-{
-    std::vector<int64_t> dims;
-    dims.reserve(shape.dimensions.size());
-    for (const auto dim : shape.dimensions) { dims.push_back(static_cast<int64_t>(dim)); }
-    return dims;
-}
+        for (std::size_t i = 0; i < count; ++i) {
+            auto name = get_name(i);
+            name_cache.emplace_back(name.get());
+        }
 
-auto to_tensor_shape(std::span<const int64_t> dims) -> TensorShape
-{
-    TensorShape shape;
-    shape.dimensions.reserve(dims.size());
-    for (const auto dim : dims) { shape.dimensions.push_back(static_cast<std::size_t>(dim)); }
-    return shape;
-}
-
-auto to_tensor_data(const Ort::Value &tensor) -> TensorData
-{
-    TensorData tensor_data;
-    const auto type_info = tensor.GetTensorTypeAndShapeInfo();
-    const auto shape = type_info.GetShape();
-
-    tensor_data.shape = to_tensor_shape(shape);
-
-    const auto total_elements = type_info.GetElementCount();
-    const auto *tensor_data_ptr = tensor.GetTensorData<float>();
-
-    tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
-    return tensor_data;
-}
-
-auto make_inference_result(const std::vector<Ort::Value> &output_tensors,
-  const InferenceClock::time_point start_time,
-  const InferenceClock::time_point end_time) -> InferenceResult
-{
-    InferenceResult result;
-    result.inference_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    result.outputs.reserve(output_tensors.size());
-
-    for (const auto &tensor : output_tensors) { result.outputs.push_back(to_tensor_data(tensor)); }
-
-    return result;
-}
-
-// ORT only borrows the buffer, so it must outlive the Run that reads it.
-auto make_float_tensor(const OrtMemoryInfo *memory_info, std::vector<float> &data, const std::vector<int64_t> &dims)
-  -> std::expected<Ort::Value, OnnxError>
-{
-    OrtValue *value = nullptr;
-    if (!ort_succeeded(Ort::GetApi().CreateTensorWithDataAsOrtValue(memory_info,
-          data.data(),
-          data.size() * sizeof(float),
-          dims.data(),
-          dims.size(),
-          ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
-          &value))) {
-        return std::unexpected(OnnxError::InputAllocationFailed);
+        name_ptrs.reserve(name_cache.size());
+        for (const auto &name : name_cache) { name_ptrs.push_back(name.c_str()); }
     }
-    return Ort::Value{ value };
-}
 
-auto run_session(OrtSession *session,
-  const std::vector<const char *> &input_names,
-  const std::vector<Ort::Value> &inputs,
-  const std::vector<const char *> &output_names) -> std::expected<std::vector<Ort::Value>, OnnxError>
-{
-    std::vector<const OrtValue *> input_values;
-    input_values.reserve(inputs.size());
-    for (const auto &input : inputs) { input_values.push_back(input); }
-
-    std::vector<OrtValue *> outputs(output_names.size(), nullptr);
-    const bool succeeded = ort_succeeded(Ort::GetApi().Run(session,
-      nullptr,
-      input_names.data(),
-      input_values.data(),
-      input_values.size(),
-      output_names.data(),
-      output_names.size(),
-      outputs.data()));
-
-    std::vector<Ort::Value> owned;
-    owned.reserve(outputs.size());
-    for (auto *output : outputs) {
-        if (output != nullptr) { owned.emplace_back(output); }
+    auto to_ort_dimensions(const TensorShape &shape) -> std::vector<int64_t>
+    {
+        std::vector<int64_t> dims;
+        dims.reserve(shape.dimensions.size());
+        for (const auto dim : shape.dimensions) { dims.push_back(static_cast<int64_t>(dim)); }
+        return dims;
     }
-    if (!succeeded || owned.size() != output_names.size()) { return std::unexpected(OnnxError::InferenceFailed); }
-    return owned;
-}
 
-template <typename TypeInfoGetter>
-auto get_named_shape(const std::vector<std::string> &names, const std::string &name, TypeInfoGetter &&get_type_info)
-  -> std::expected<TensorShape, OnnxError>
-{
-    const auto it = std::ranges::find(names, name);
-    if (it == names.end()) { return std::unexpected(OnnxError::OutputNotFound); }
+    auto to_tensor_shape(std::span<const int64_t> dims) -> TensorShape
+    {
+        TensorShape shape;
+        shape.dimensions.reserve(dims.size());
+        for (const auto dim : dims) { shape.dimensions.push_back(static_cast<std::size_t>(dim)); }
+        return shape;
+    }
 
-    const auto index = static_cast<std::size_t>(std::distance(names.begin(), it));
-    const auto type_info = get_type_info(index);
-    return to_tensor_shape(type_info.GetTensorTypeAndShapeInfo().GetShape());
-}
+    auto to_tensor_data(const Ort::Value &tensor) -> TensorData
+    {
+        TensorData tensor_data;
+        const auto type_info = tensor.GetTensorTypeAndShapeInfo();
+        const auto shape = type_info.GetShape();
 
-}  // namespace
+        tensor_data.shape = to_tensor_shape(shape);
+
+        const auto total_elements = type_info.GetElementCount();
+        const auto *tensor_data_ptr = tensor.GetTensorData<float>();
+
+        tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
+        return tensor_data;
+    }
+
+    auto make_inference_result(const std::vector<Ort::Value> &output_tensors,
+      const InferenceClock::time_point start_time,
+      const InferenceClock::time_point end_time) -> InferenceResult
+    {
+        InferenceResult result;
+        result.inference_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+        result.outputs.reserve(output_tensors.size());
+
+        for (const auto &tensor : output_tensors) { result.outputs.push_back(to_tensor_data(tensor)); }
+
+        return result;
+    }
+
+    // ORT only borrows the buffer, so it must outlive the Run that reads it.
+    auto make_float_tensor(const OrtMemoryInfo *memory_info, std::vector<float> &data, const std::vector<int64_t> &dims)
+      -> std::expected<Ort::Value, OnnxError>
+    {
+        OrtValue *value = nullptr;
+        if (!ort_succeeded(Ort::GetApi().CreateTensorWithDataAsOrtValue(memory_info,
+              data.data(),
+              data.size() * sizeof(float),
+              dims.data(),
+              dims.size(),
+              ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+              &value))) {
+            return std::unexpected(OnnxError::InputAllocationFailed);
+        }
+        return Ort::Value{ value };
+    }
+
+    auto run_session(OrtSession *session,
+      const std::vector<const char *> &input_names,
+      const std::vector<Ort::Value> &inputs,
+      const std::vector<const char *> &output_names) -> std::expected<std::vector<Ort::Value>, OnnxError>
+    {
+        std::vector<const OrtValue *> input_values;
+        input_values.reserve(inputs.size());
+        for (const auto &input : inputs) { input_values.push_back(input); }
+
+        std::vector<OrtValue *> outputs(output_names.size(), nullptr);
+        const bool succeeded = ort_succeeded(Ort::GetApi().Run(session,
+          nullptr,
+          input_names.data(),
+          input_values.data(),
+          input_values.size(),
+          output_names.data(),
+          output_names.size(),
+          outputs.data()));
+
+        std::vector<Ort::Value> owned;
+        owned.reserve(outputs.size());
+        for (auto *output : outputs) {
+            if (output != nullptr) { owned.emplace_back(output); }
+        }
+        if (!succeeded || owned.size() != output_names.size()) { return std::unexpected(OnnxError::InferenceFailed); }
+        return owned;
+    }
+
+    template<typename TypeInfoGetter>
+    auto get_named_shape(const std::vector<std::string> &names, const std::string &name, TypeInfoGetter &&get_type_info)
+      -> std::expected<TensorShape, OnnxError>
+    {
+        const auto it = std::ranges::find(names, name);
+        if (it == names.end()) { return std::unexpected(OnnxError::OutputNotFound); }
+
+        const auto index = static_cast<std::size_t>(std::distance(names.begin(), it));
+        const auto type_info = get_type_info(index);
+        return to_tensor_shape(type_info.GetTensorTypeAndShapeInfo().GetShape());
+    }
+
+}// namespace
 
 struct OnnxInferenceEngine::Impl
 {

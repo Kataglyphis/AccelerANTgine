@@ -36,9 +36,7 @@ namespace {
 constexpr YoloReshapeGeometry kTwoClasses{ 2, 7, 6, 7 };
 
 struct Row
-{
-    float cx, cy, w, h, objectness, person, bicycle;
-};
+{ float cx, cy, w, h, objectness, person, bicycle; };
 
 auto flatten(std::initializer_list<Row> rows) -> std::vector<float>
 {

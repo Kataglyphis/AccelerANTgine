@@ -122,6 +122,24 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- **The hand-written C++ is formatted with clang-format 23.1.3, and the Linux lanes fail on
+  format drift (2026-10-11, hub CON71).**
+  - The image's `clang-format` moved from LLVM 21 to the pinned LLVM 23.1.3. Under it, 20 of
+    the 39 tracked C/C++ files under `Src/`, `Test/`, `Bindings/` and `cmake/` deviated from
+    `.clang-format`; under 21.1.8 it was 17. All 39 pass now, and a second run changes nothing.
+  - The diff is whitespace only. In all 20 files, clang's raw token stream is identical,
+    including every literal. No space appeared or vanished inside a macro argument, where `#`
+    would stringify it. No `#define` switched between object-like and function-like.
+  - `run-static-analysis-format.sh` used to rewrite `Src/` in place. Now it checks all 39 files
+    with the hub's `code_quality_check_clang_format`. It fails on one deviating file, and on
+    any clang-format other than the hub's `LLVM_RELEASE`, because 21.1.8 still flags 7 of the
+    swept files. Windows' `Build-Windows.ps1` still rewrites in place.
+  - Measured in `:latest` (x64), privileged as CI runs it:
+    - `ci-build-and-test.sh --compiler clang` passes 111/111 Debug tests under ASan + UBSan,
+      `fuzzTestSuite` 8/8, and 103/103 under TSan.
+    - `run-static-analysis-format.sh` passes all four gates.
+    - `ci-python-bindings.sh` builds both wheels and passes `Test/python` on each.
+    - `run-lint-gates.sh --ratchets` passes.
 - **GSL v4.2.2 → v5.0.1 (major), nlohmann/json to its develop tip 367336c8,
   upload-artifact v7.0.1 → v7.0.2 (2026-10-07, the evening Renovate report).**
   - GSL 5 keeps the `GSL` target and `Microsoft.GSL::GSL` alias, and no source here

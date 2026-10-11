@@ -23,9 +23,7 @@ auto initialized_engine(const TempFile &model) -> inference::OnnxInferenceEngine
 }
 
 auto shape(std::vector<std::size_t> dims) -> inference::TensorShape
-{
-    return inference::TensorShape{ std::move(dims) };
-}
+{ return inference::TensorShape{ std::move(dims) }; }
 
 }// namespace
 

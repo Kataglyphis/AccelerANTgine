@@ -322,7 +322,9 @@ written out rather than linked.
   profile format 11 (`no profile can be merged`) and its module PCMs (`module
   file … uses a newer format that cannot be read`); should either message come
   back, it is an image regression, not something to paper over here again.
-  `clang-format` stays 21 on purpose — a format verdict of its own.
+  `clang-format` is the pinned release too since hub CON71. The Linux format gate in
+  `run-static-analysis-format.sh` fails on any other version, because releases format
+  differently: 21.1.8 flags 7 of the 39 files that 23.1.3 passes.
   The same image lets a bare `clang`/`clang++` select `/opt/gcc-16.2.0` through
   the `<native-triple>-clang{,++}.cfg` beside the compiler (hub CON16), so
   neither CMake nor `ci-run-all.sh` injects `--gcc-toolchain` any more; the

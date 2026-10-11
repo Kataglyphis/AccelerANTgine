@@ -51,10 +51,7 @@ struct InferenceResult
     double inference_time_ms{};
 };
 
-enum class ExecutionMode {
-    Sequential,
-    Parallel
-};
+enum class ExecutionMode { Sequential, Parallel };
 
 struct SessionConfig
 {

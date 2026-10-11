@@ -30,9 +30,7 @@ class ProtoWriter
     }
 
     void key(std::uint32_t field, std::uint32_t wire_type)
-    {
-        varint((static_cast<std::uint64_t>(field) << 3U) | wire_type);
-    }
+    { varint((static_cast<std::uint64_t>(field) << 3U) | wire_type); }
 
     void int_field(std::uint32_t field, std::int64_t value)
     {
@@ -138,9 +136,7 @@ inline auto build_onnx_model(const std::vector<ValueSpec> &inputs,
 
 // X[1,4] -> Relu -> Y[1,4]
 inline auto relu_model() -> std::string
-{
-    return build_onnx_model({ { "X", { 1, 4 } } }, { { "Y", { 1, 4 } } }, { { "Relu", { "X" }, { "Y" } } });
-}
+{ return build_onnx_model({ { "X", { 1, 4 } } }, { { "Y", { 1, 4 } } }, { { "Relu", { "X" }, { "Y" } } }); }
 
 // A[2,3] + B[2,3] -> C[2,3]
 inline auto add_model() -> std::string
@@ -216,9 +212,7 @@ template<typename Expected> auto error_of(const Expected &result) -> std::option
 
 // A path in the temp directory that nothing created.
 inline auto missing_path(std::string_view name) -> std::filesystem::path
-{
-    return std::filesystem::temp_directory_path() / "kataglyphis-test-does-not-exist" / std::string(name);
-}
+{ return std::filesystem::temp_directory_path() / "kataglyphis-test-does-not-exist" / std::string(name); }
 
 }// namespace kataglyphis::test
 

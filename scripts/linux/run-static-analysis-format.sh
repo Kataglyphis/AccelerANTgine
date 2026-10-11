@@ -42,12 +42,18 @@ CODE_QUALITY_CMAKE_FORMAT_CONFIG=".cmake-format.yaml"
 CODE_QUALITY_CMAKE_SEARCH_ROOT="."
 CODE_QUALITY_CMAKE_EXCLUDE_PATHS=('./build*/*' './.venv/*' './third_party/*')
 
-mapfile -t FORMAT_FILES < <(code_quality_find_cpp_files Src)
+# Every hand-written C/C++ root, so the format gate grades the files Windows' Get-ProjectCppFiles lists.
+FORMAT_ROOTS=(Src Test Bindings cmake)
+
+mapfile -t FORMAT_FILES < <(code_quality_find_cpp_files "${FORMAT_ROOTS[@]}")
 mapfile -t SRC_FILES    < <(code_quality_find_clang_tidy_files Src)
 
 if [[ ${#SRC_FILES[@]} -eq 0 ]]; then
   # Src/ exists and is full of modules, so an empty set is a discovery bug.
   die "No C++ source/module files found under Src/ - check the extension lists above."
+fi
+if [[ ${#FORMAT_FILES[@]} -eq 0 ]]; then
+  die "No C/C++ files found under ${FORMAT_ROOTS[*]} - the format gate would grade nothing."
 fi
 
 # The library's default bootstrap pins the cmake-format version, so a verdict cannot move under a new release.
@@ -65,7 +71,21 @@ if [[ ${#CMAKE_FILES[@]} -eq 0 ]]; then
   die "cmake-format discovery found no CMake files - check CODE_QUALITY_CMAKE_SEARCH_ROOT/excludes."
 fi
 run_gate cmake-format code_quality_run_cmake_format "${CMAKE_FILES[@]}"
-run_gate clang-format code_quality_run_clang_format "${FORMAT_FILES[@]}"
+
+# Releases format differently, so only the hub's LLVM_RELEASE (loaded from versions.env by ci-common.sh) may grade.
+check_clang_format() {
+  [[ -n "${LLVM_RELEASE:-}" ]] || err "LLVM_RELEASE is unset: ANTfrastructure's versions.env no longer publishes it."
+  local version
+  version="$(clang-format --version)"
+  if ! grep -Eq "clang-format version ${LLVM_RELEASE//./\\.}([^0-9.]|\$)" <<<"${version}"; then
+    err "clang-format reports '${version}', not the hub's LLVM_RELEASE ${LLVM_RELEASE}."
+  fi
+  code_quality_check_clang_format "${FORMAT_FILES[@]}"
+  if [[ "${CODE_QUALITY_CLANG_FORMAT_DEVIATIONS}" -gt 0 ]]; then
+    err "${CODE_QUALITY_CLANG_FORMAT_DEVIATIONS} file(s) deviate from .clang-format; rewrite them with clang-format ${LLVM_RELEASE} -i."
+  fi
+}
+run_gate clang-format check_clang_format
 
 # Project-specific analyses: no other consumer runs these.
 run_scan_build() {

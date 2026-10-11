@@ -250,9 +250,7 @@ struct GStreamerPipeline::Impl
     static auto on_pad_probe([[maybe_unused]] GstPad *pad,
       [[maybe_unused]] GstPadProbeInfo *info,
       [[maybe_unused]] gpointer user_data) -> GstPadProbeReturn
-    {
-        return GST_PAD_PROBE_OK;
-    }
+    { return GST_PAD_PROBE_OK; }
 };
 
 GStreamerPipeline::GStreamerPipeline() : impl_(std::make_unique<Impl>()) {}
@@ -416,8 +414,7 @@ auto GStreamerPipeline::set_buffer_callback(BufferCallback callback) -> void
     impl_->connect_buffer_callback();
 }
 
-auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms)
-  -> std::expected<BufferInfo, GStreamerError>
+auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms) -> std::expected<BufferInfo, GStreamerError>
 {
 
     if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
@@ -498,7 +495,8 @@ auto GStreamerPipeline::seek(std::uint64_t timestamp_ns) -> std::expected<void, 
     if (gst_element_seek_simple(impl_->pipeline,
           GST_FORMAT_TIME,
           static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
-          static_cast<gint64>(timestamp_ns)) == 0) {
+          static_cast<gint64>(timestamp_ns))
+        == 0) {
         return std::unexpected(GStreamerError::ResourceNotFound);
     }
 

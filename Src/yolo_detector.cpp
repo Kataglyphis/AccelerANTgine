@@ -105,8 +105,7 @@ namespace {
         "hair drier",
         "toothbrush" };
 
-    auto copy_buffer_to_float_data(const gstreamer::BufferInfo &buffer)
-      -> std::expected<std::vector<float>, OnnxError>
+    auto copy_buffer_to_float_data(const gstreamer::BufferInfo &buffer) -> std::expected<std::vector<float>, OnnxError>
     {
         if (buffer.data.empty()) { return std::unexpected(OnnxError::InputAllocationFailed); }
         if (buffer.size % sizeof(float) != 0) { return std::unexpected(OnnxError::InvalidInputShape); }
@@ -144,13 +143,14 @@ namespace {
             pipeline_desc = "filesrc location=" + video_source + " ! decodebin ! ";
         }
 
-        pipeline_desc += "videoconvert ! videoscale ! "
-                         "video/x-raw,format=RGB,width="
-                         + std::to_string(width) + ",height=" + std::to_string(height)
-                         + " ! appsink name=detector_sink emit-signals=true sync=false";
+        pipeline_desc +=
+          "videoconvert ! videoscale ! "
+          "video/x-raw,format=RGB,width="
+          + std::to_string(width) + ",height=" + std::to_string(height)
+          + " ! appsink name=detector_sink emit-signals=true sync=false";
         return pipeline_desc;
     }
-}  // namespace
+}// namespace
 
 struct YoloDetector::Impl
 {
@@ -317,19 +317,16 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
 auto YoloDetector::apply_nms(std::vector<BoundingBox> &boxes, float nms_threshold) -> void
 {
 
-    std::ranges::sort(boxes, [](const BoundingBox &a, const BoundingBox &b) -> bool {
-        return a.confidence > b.confidence;
-    });
+    std::ranges::sort(
+      boxes, [](const BoundingBox &a, const BoundingBox &b) -> bool { return a.confidence > b.confidence; });
 
     std::vector<bool> suppressed(boxes.size(), false);
 
     for (std::size_t i = 0; i < boxes.size(); ++i) {
-        if (suppressed[i]) { continue;
-}
+        if (suppressed[i]) { continue; }
 
         for (std::size_t j = i + 1; j < boxes.size(); ++j) {
-            if (suppressed[j]) { continue;
-}
+            if (suppressed[j]) { continue; }
 
             if (boxes[i].class_id == boxes[j].class_id) {
                 float iou = calculate_iou(boxes[i], boxes[j]);
@@ -387,8 +384,7 @@ struct VideoDetectorPipeline::Impl
             auto float_data = copy_buffer_to_float_data(buffer);
             if (!float_data) { return; }
 
-            auto detection = detector.detect(
-              std::span<const float>(float_data->data(), float_data->size()),
+            auto detection = detector.detect(std::span<const float>(float_data->data(), float_data->size()),
               buffer.metadata.width,
               buffer.metadata.height);
 
@@ -440,20 +436,14 @@ auto VideoDetectorPipeline::stop() -> std::expected<void, gstreamer::GStreamerEr
 }
 
 auto VideoDetectorPipeline::pause() -> std::expected<void, gstreamer::GStreamerError>
-{
-    return impl_->pipeline.pause();
-}
+{ return impl_->pipeline.pause(); }
 
 auto VideoDetectorPipeline::set_detection_callback(
   std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> callback) -> void
-{
-    impl_->detection_callback = std::move(callback);
-}
+{ impl_->detection_callback = std::move(callback); }
 
 auto VideoDetectorPipeline::set_frame_callback(std::function<void(const gstreamer::BufferInfo &)> callback) -> void
-{
-    impl_->frame_callback = std::move(callback);
-}
+{ impl_->frame_callback = std::move(callback); }
 
 auto VideoDetectorPipeline::is_running() const -> bool { return impl_->running.load(); }
 
@@ -471,7 +461,8 @@ auto create_camera_detection_pipeline(const std::string &device,
     config.yolo_config.input_width = width;
     config.yolo_config.input_height = height;
 
-    config.gstreamer_config.pipeline_description = build_camera_detection_pipeline_description(device, width, height, fps);
+    config.gstreamer_config.pipeline_description =
+      build_camera_detection_pipeline_description(device, width, height, fps);
 
     config.gstreamer_config.enable_tensor_meta = true;
 
@@ -494,7 +485,8 @@ auto create_video_detection_pipeline(const std::string &video_source,
     config.yolo_config.input_width = width;
     config.yolo_config.input_height = height;
 
-    config.gstreamer_config.pipeline_description = build_video_detection_pipeline_description(video_source, width, height);
+    config.gstreamer_config.pipeline_description =
+      build_video_detection_pipeline_description(video_source, width, height);
     config.gstreamer_config.enable_tensor_meta = true;
 
     auto result = pipeline.initialize(config);
