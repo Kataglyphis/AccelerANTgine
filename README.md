@@ -195,7 +195,19 @@ runs it inside the ANTfrastructure Windows image) builds it on Windows and stage
 package, with its GStreamer and chain ONNX Runtime DLLs, into `build-python/python`.
 It does not run `Test/python`: that is the `python_bindings` ctest, registered only by a
 `KATAGLYPHIS_BUILD_PYTHON_BINDINGS=ON` configure with `BUILD_TESTING` on and pytest
-importable, which no CI lane builds today.
+importable.
+
+On Linux the clang leg of both Linux lanes builds two wheels with
+`scripts/linux/ci-python-bindings.sh`: `cp314-cp314` for the GIL interpreter and
+`cp314-cp314t` for the image's free-threaded 3.14t. Each is installed into its own venv
+and runs `Test/python`. The free-threaded one first goes through ANTfrastructure's
+`free-threaded-wheel.py prove`, which fails when loading the module re-enables the GIL.
+The wheels upload as `python-wheels-<arch>`. They are `linux_<arch>` wheels: GStreamer
+and ONNX Runtime come from the image, not from the wheel.
+
+Without the GIL the module stays safe because `OnnxInferenceEngine` and `YoloDetector`
+lock themselves: runs share a `std::shared_mutex`, and `initialize` takes it alone. Every
+bound field also takes its Python object's lock (`nb::lock_self()`).
 
 ### Upgrades
 
@@ -266,9 +278,9 @@ Coverage: `scripts/linux/ci-coverage.sh` reports llvm-cov on the clang lane
 `linux-debug-GNU` now builds with `myproject_ENABLE_COVERAGE`. The HTML lands
 in `docs/coverage/`.
 
-The Python bindings test suite (`Test/python`) runs against the built
-`kataglyphis_inference` module (see [Python bindings](#python-bindings): no CI
-lane runs it today).
+The Python bindings test suite (`Test/python`) runs against both installed
+wheels, GIL and free-threaded (see [Python bindings](#python-bindings)).
+`test_threading.py` calls one engine, detector and config from eight threads at once.
 
 ## Performance tests
 

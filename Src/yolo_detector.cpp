@@ -9,7 +9,9 @@ module;
 #include <expected>
 #include <filesystem>
 #include <functional>
+#include <mutex>
 #include <numeric>
+#include <shared_mutex>
 #include <span>
 #include <utility>
 
@@ -152,6 +154,8 @@ namespace {
 
 struct YoloDetector::Impl
 {
+    // detect reads config while initialize rewrites it; the engine guards only its own session.
+    mutable std::shared_mutex mutex;
     inference::OnnxInferenceEngine engine;
     YoloConfig config;
     bool initialized{ false };
@@ -167,7 +171,8 @@ auto YoloDetector::operator=(YoloDetector &&) noexcept -> YoloDetector & = defau
 
 auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, OnnxError>
 {
-
+    const std::unique_lock lock(impl_->mutex);
+    impl_->initialized = false;
     impl_->config = config;
 
     auto session_config = inference::create_default_session_config(config.model_path);
@@ -179,12 +184,16 @@ auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, O
     return {};
 }
 
-auto YoloDetector::is_initialized() const -> bool { return impl_->initialized; }
+auto YoloDetector::is_initialized() const -> bool
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->initialized;
+}
 
 auto YoloDetector::detect(std::span<const float> image_data, std::uint32_t width, std::uint32_t height)
   -> std::expected<DetectionResult, OnnxError>
 {
-
+    const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     inference::TensorShape input_shape;
@@ -200,8 +209,7 @@ auto YoloDetector::detect(std::span<const float> image_data, std::uint32_t width
 auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline, std::uint32_t timeout_ms)
   -> std::expected<DetectionResult, OnnxError>
 {
-
-    if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+    if (!is_initialized()) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     auto buffer_result = pipeline.pull_sample(timeout_ms);
     if (!buffer_result) { return std::unexpected(OnnxError::InputAllocationFailed); }

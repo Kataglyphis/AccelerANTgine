@@ -89,6 +89,14 @@ bash scripts/linux/ci-profile-bench.sh \
 	--gcc-profile-preset "${GCC_PROFILE_PRESET}" \
 	--clang-profile-preset "${CLANG_PROFILE_PRESET}"
 
+# One leg is enough: the wheels do not depend on the lane's compiler, and the clang leg uploads them.
+if [[ "${COMPILER}" == "clang" ]]; then
+	bash scripts/linux/ci-python-bindings.sh \
+		--workspace-dir "$(pwd)" \
+		--compiler "${COMPILER}" \
+		--out-dir "dist/python"
+fi
+
 bash scripts/linux/ci-docs.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \

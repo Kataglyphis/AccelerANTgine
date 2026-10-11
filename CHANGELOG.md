@@ -19,6 +19,20 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- 2026-10-11 — **Linux builds and ships the Python bindings twice: `cp314-cp314` and the
+  free-threaded `cp314-cp314t`.** No Linux lane built them before. Now the clang leg of
+  `linux-x64.yml` and `linux-arm64.yml` runs `scripts/linux/ci-python-bindings.sh`, which builds
+  both wheels with scikit-build-core against the image's interpreters (`3.14+gil`, and `3.14t`
+  from `/opt/python-freethreaded`). Each wheel goes into its own venv and runs `Test/python`, and
+  they upload as `python-wheels-<arch>`. Before its tests, the free-threaded wheel must pass the
+  hub's `free-threaded-wheel.py prove`, and `test_import_keeps_the_gil_disabled` asserts
+  `sys._is_gil_enabled() is False`. Both fail without `FREE_THREADED`, which
+  `nanobind_add_module` now passes: measured, the prover named `kataglyphis_inference._core` as
+  re-enabling the GIL. `pyproject.toml` declares `Free Threading :: 2 - Beta`. It also builds
+  `kataglyphis_python_stub`, since the install rules ship `_core.pyi`, which a wheel build never
+  wrote before (`file INSTALL cannot find .../_core.pyi`). GStreamer and ONNX Runtime come
+  from the image, so the wheels are `linux_<arch>`, not auditwheel-repaired.
+
 - 2026-10-03 — **The arm64 lane runs the Debug (ASan) suite on a device and gates the runtime
   bundle per push.** `windows-arm64-cross.yml` builds `clangcl-debug` too (VS 2026's toolset
   carries Microsoft's aarch64 ASan runtime, which the hub's `Sanitizers.cmake` picks by
@@ -328,6 +342,21 @@ belongs in the **Changed** list below with that consequence spelled out.
   36568033223 was green on this image.
 
 ### Fixed
+
+- 2026-10-11 — **`OnnxInferenceEngine` and `YoloDetector` survive concurrent calls.**
+  `initialize` reset the session while a `run_inference` that had released the GIL was still
+  using it. That was a use-after-free on the GIL build as well: `test_threading.py` segfaulted
+  in `test_reinitialize_while_other_threads_run` on the cp314 wheel. Both classes now hold a
+  `std::shared_mutex`: runs, getters and `is_initialized` share it, since ORT's `Run` is
+  thread-safe, and `initialize` takes it alone. `YoloDetector::initialize` also clears
+  `initialized` first, so a failed re-initialisation no longer reports a ready detector. In the
+  bindings:
+  - every `def_rw` field and `BoundingBox.__repr__` take `nb::lock_self()`;
+  - both `initialize` methods copy their config under the argument's lock, then release the GIL;
+  - `run_inference_multi_input` iterates a copy of its dict.
+
+  On the pre-fix sources with the 3.14t wheel, the config, re-initialise and detect tests failed
+  or crashed in 3 of 3 runs each. With the fix, both wheels passed 10 of 10 runs.
 
 - 2026-10-01 — Found by the new tests, each with one that fails without the fix:
   - `OnnxInferenceEngine` called the ONNX Runtime C++ wrapper under `ORT_NO_EXCEPTIONS`, so a

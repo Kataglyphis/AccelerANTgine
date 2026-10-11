@@ -369,6 +369,19 @@ written out rather than linked.
   with no consumer attached the producer mostly idles: 150 to 230 samples in a
   20 s window were measured, not a hot loop.
 
+- **The Python module runs without the GIL on 3.14t, so its locks are load-bearing.**
+  `nanobind_add_module(... FREE_THREADED ...)` marks it `Py_MOD_GIL_NOT_USED`; against a GIL
+  Python nanobind ignores the flag. On Linux `ci-python-bindings.sh` ships a `cp314` and a
+  `cp314t` wheel, and the hub's `free-threaded-wheel.py prove` fails the lane when the second
+  re-enables the GIL. The flag is only safe because of three locks:
+  - `OnnxInferenceEngine` and `YoloDetector` each hold a `std::shared_mutex`, shared by runs and
+    taken alone by `initialize`;
+  - every bound field takes `nb::lock_self()`;
+  - binding code copies Python arguments before it releases the GIL.
+
+  A new bound class with mutable state needs the same. `Test/python/test_threading.py` crashes
+  without them, on the GIL wheel too, because the runs release the GIL.
+
 ## 5. Build, run, test
 
 The whole Linux CI chain, in order:
@@ -378,8 +391,8 @@ bash scripts/linux/ci-run-all.sh
 ```
 
 which runs `ci-init.sh` → `ci-build-and-test.sh` → `ci-coverage.sh` →
-`run-static-analysis-format.sh` → `ci-profile-bench.sh` → `ci-docs.sh` →
-`ci-release.sh` → `ci-finalize.sh`. Each is runnable on its own with the same
+`run-static-analysis-format.sh` → `ci-profile-bench.sh` → `ci-python-bindings.sh`
+(clang only) → `ci-docs.sh` → `ci-release.sh` → `ci-finalize.sh`. Each is runnable on its own with the same
 arguments `ci-run-all.sh` passes it.
 
 Windows:

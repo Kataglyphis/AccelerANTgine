@@ -26,6 +26,8 @@ import kataglyphis.yolo_detector;
 namespace nb = nanobind;
 using namespace nb::literals;
 
+// Fields carry nb::lock_self(): without the GIL two threads could write one std::string at once.
+
 namespace {
 
 auto config_error_name(kataglyphis::config::ConfigError error) -> const char *
@@ -147,12 +149,12 @@ void bind_onnx(nb::module_ &m)
 
     nb::class_<SessionConfig>(m, "SessionConfig")
       .def(nb::init<>())
-      .def_rw("model_path", &SessionConfig::model_path)
-      .def_rw("intra_op_num_threads", &SessionConfig::intra_op_num_threads)
-      .def_rw("inter_op_num_threads", &SessionConfig::inter_op_num_threads)
-      .def_rw("enable_cuda", &SessionConfig::enable_cuda)
-      .def_rw("enable_memory_pattern", &SessionConfig::enable_memory_pattern)
-      .def_rw("execution_mode", &SessionConfig::execution_mode);
+      .def_rw("model_path", &SessionConfig::model_path, nb::lock_self())
+      .def_rw("intra_op_num_threads", &SessionConfig::intra_op_num_threads, nb::lock_self())
+      .def_rw("inter_op_num_threads", &SessionConfig::inter_op_num_threads, nb::lock_self())
+      .def_rw("enable_cuda", &SessionConfig::enable_cuda, nb::lock_self())
+      .def_rw("enable_memory_pattern", &SessionConfig::enable_memory_pattern, nb::lock_self())
+      .def_rw("execution_mode", &SessionConfig::execution_mode, nb::lock_self());
 
     m.def("default_session_config", &create_default_session_config, "model_path"_a,
       "Create a SessionConfig with sensible defaults for the given model.");
@@ -166,10 +168,16 @@ void bind_onnx(nb::module_ &m)
       .def(
         "initialize",
         [](OnnxInferenceEngine &self, const SessionConfig &config) {
-            auto result = self.initialize(config);
+            // Copied under the argument's lock: releasing the GIL below also releases that lock.
+            const SessionConfig snapshot = config;
+            std::expected<void, OnnxError> result;
+            {
+                nb::gil_scoped_release release;
+                result = self.initialize(snapshot);
+            }
             if (!result) { raise_onnx("initialize", result.error()); }
         },
-        "config"_a)
+        "config"_a.lock(), "Load the model in config. Releases the GIL while the session is created.")
       .def("is_initialized", &OnnxInferenceEngine::is_initialized)
       .def(
         "run_inference",
@@ -189,9 +197,11 @@ void bind_onnx(nb::module_ &m)
       .def(
         "run_inference_multi_input",
         [](OnnxInferenceEngine &self, const nb::dict &inputs) {
+            // A cast may suspend the iteration's critical section, so iterate a copy no other thread can shrink.
+            const auto snapshot = nb::cast<nb::dict>(inputs.attr("copy")());
             std::vector<std::pair<std::string, TensorData>> converted;
-            converted.reserve(inputs.size());
-            for (auto [key, value] : inputs) {
+            converted.reserve(snapshot.size());
+            for (auto [key, value] : snapshot) {
                 auto array = nb::cast<CpuFloatArray>(value);
                 TensorData tensor;
                 tensor.shape = shape_from_array(array);
@@ -233,17 +243,20 @@ void bind_yolo(nb::module_ &m)
 
     nb::class_<BoundingBox>(m, "BoundingBox")
       .def(nb::init<>())
-      .def_rw("x", &BoundingBox::x)
-      .def_rw("y", &BoundingBox::y)
-      .def_rw("width", &BoundingBox::width)
-      .def_rw("height", &BoundingBox::height)
-      .def_rw("confidence", &BoundingBox::confidence)
-      .def_rw("class_id", &BoundingBox::class_id)
-      .def_rw("class_name", &BoundingBox::class_name)
-      .def("__repr__", [](const BoundingBox &box) {
-          return std::format("BoundingBox(x={}, y={}, width={}, height={}, confidence={:.3f}, class='{}')",
-            box.x, box.y, box.width, box.height, box.confidence, box.class_name);
-      });
+      .def_rw("x", &BoundingBox::x, nb::lock_self())
+      .def_rw("y", &BoundingBox::y, nb::lock_self())
+      .def_rw("width", &BoundingBox::width, nb::lock_self())
+      .def_rw("height", &BoundingBox::height, nb::lock_self())
+      .def_rw("confidence", &BoundingBox::confidence, nb::lock_self())
+      .def_rw("class_id", &BoundingBox::class_id, nb::lock_self())
+      .def_rw("class_name", &BoundingBox::class_name, nb::lock_self())
+      .def(
+        "__repr__",
+        [](const BoundingBox &box) {
+            return std::format("BoundingBox(x={}, y={}, width={}, height={}, confidence={:.3f}, class='{}')",
+              box.x, box.y, box.width, box.height, box.confidence, box.class_name);
+        },
+        nb::lock_self());
 
     nb::class_<DetectionResult>(m, "DetectionResult")
       .def_ro("boxes", &DetectionResult::boxes)
@@ -254,22 +267,27 @@ void bind_yolo(nb::module_ &m)
 
     nb::class_<YoloConfig>(m, "YoloConfig")
       .def(nb::init<>())
-      .def_rw("model_path", &YoloConfig::model_path)
-      .def_rw("confidence_threshold", &YoloConfig::confidence_threshold)
-      .def_rw("nms_threshold", &YoloConfig::nms_threshold)
-      .def_rw("input_width", &YoloConfig::input_width)
-      .def_rw("input_height", &YoloConfig::input_height)
-      .def_rw("num_classes", &YoloConfig::num_classes);
+      .def_rw("model_path", &YoloConfig::model_path, nb::lock_self())
+      .def_rw("confidence_threshold", &YoloConfig::confidence_threshold, nb::lock_self())
+      .def_rw("nms_threshold", &YoloConfig::nms_threshold, nb::lock_self())
+      .def_rw("input_width", &YoloConfig::input_width, nb::lock_self())
+      .def_rw("input_height", &YoloConfig::input_height, nb::lock_self())
+      .def_rw("num_classes", &YoloConfig::num_classes, nb::lock_self());
 
     nb::class_<YoloDetector>(m, "YoloDetector")
       .def(nb::init<>())
       .def(
         "initialize",
         [](YoloDetector &self, const YoloConfig &config) {
-            auto result = self.initialize(config);
+            const YoloConfig snapshot = config;
+            std::expected<void, OnnxError> result;
+            {
+                nb::gil_scoped_release release;
+                result = self.initialize(snapshot);
+            }
             if (!result) { raise_onnx("YoloDetector.initialize", result.error()); }
         },
-        "config"_a)
+        "config"_a.lock(), "Load the model in config. Releases the GIL while the session is created.")
       .def("is_initialized", &YoloDetector::is_initialized)
       .def(
         "detect",
@@ -307,43 +325,43 @@ void bind_config(nb::module_ &m)
 
     nb::class_<VideoConfig>(m, "VideoConfig")
       .def(nb::init<>())
-      .def_rw("default_width", &VideoConfig::default_width)
-      .def_rw("default_height", &VideoConfig::default_height)
-      .def_rw("default_framerate", &VideoConfig::default_framerate)
-      .def_rw("default_bitrate_kbps", &VideoConfig::default_bitrate_kbps);
+      .def_rw("default_width", &VideoConfig::default_width, nb::lock_self())
+      .def_rw("default_height", &VideoConfig::default_height, nb::lock_self())
+      .def_rw("default_framerate", &VideoConfig::default_framerate, nb::lock_self())
+      .def_rw("default_bitrate_kbps", &VideoConfig::default_bitrate_kbps, nb::lock_self());
 
     nb::class_<TextureConfig>(m, "TextureConfig")
       .def(nb::init<>())
-      .def_rw("width", &TextureConfig::width)
-      .def_rw("height", &TextureConfig::height);
+      .def_rw("width", &TextureConfig::width, nb::lock_self())
+      .def_rw("height", &TextureConfig::height, nb::lock_self());
 
     nb::class_<AndroidConfig>(m, "AndroidConfig")
       .def(nb::init<>())
-      .def_rw("width", &AndroidConfig::width)
-      .def_rw("height", &AndroidConfig::height)
-      .def_rw("fps", &AndroidConfig::fps);
+      .def_rw("width", &AndroidConfig::width, nb::lock_self())
+      .def_rw("height", &AndroidConfig::height, nb::lock_self())
+      .def_rw("fps", &AndroidConfig::fps, nb::lock_self());
 
     nb::class_<StreamSettingsConfig>(m, "StreamSettingsConfig")
       .def(nb::init<>())
-      .def_rw("source", &StreamSettingsConfig::source)
-      .def_rw("encoder", &StreamSettingsConfig::encoder)
-      .def_rw("device", &StreamSettingsConfig::device)
-      .def_rw("camera_id", &StreamSettingsConfig::camera_id)
-      .def_rw("input_path", &StreamSettingsConfig::input_path)
-      .def_rw("input_uri", &StreamSettingsConfig::input_uri)
-      .def_rw("peer_id", &StreamSettingsConfig::peer_id)
-      .def_rw("producer_id", &StreamSettingsConfig::producer_id);
+      .def_rw("source", &StreamSettingsConfig::source, nb::lock_self())
+      .def_rw("encoder", &StreamSettingsConfig::encoder, nb::lock_self())
+      .def_rw("device", &StreamSettingsConfig::device, nb::lock_self())
+      .def_rw("camera_id", &StreamSettingsConfig::camera_id, nb::lock_self())
+      .def_rw("input_path", &StreamSettingsConfig::input_path, nb::lock_self())
+      .def_rw("input_uri", &StreamSettingsConfig::input_uri, nb::lock_self())
+      .def_rw("peer_id", &StreamSettingsConfig::peer_id, nb::lock_self())
+      .def_rw("producer_id", &StreamSettingsConfig::producer_id, nb::lock_self());
 
     nb::class_<WebRTCConfig>(m, "WebRTCConfig")
       .def(nb::init<>())
-      .def_rw("signaling_server_url", &WebRTCConfig::signaling_server_url)
-      .def_rw("reconnection_timeout_ms", &WebRTCConfig::reconnection_timeout_ms)
-      .def_rw("stun_servers", &WebRTCConfig::stun_servers)
-      .def_rw("turn_servers", &WebRTCConfig::turn_servers)
-      .def_rw("video", &WebRTCConfig::video)
-      .def_rw("texture", &WebRTCConfig::texture)
-      .def_rw("android", &WebRTCConfig::android)
-      .def_rw("stream", &WebRTCConfig::stream);
+      .def_rw("signaling_server_url", &WebRTCConfig::signaling_server_url, nb::lock_self())
+      .def_rw("reconnection_timeout_ms", &WebRTCConfig::reconnection_timeout_ms, nb::lock_self())
+      .def_rw("stun_servers", &WebRTCConfig::stun_servers, nb::lock_self())
+      .def_rw("turn_servers", &WebRTCConfig::turn_servers, nb::lock_self())
+      .def_rw("video", &WebRTCConfig::video, nb::lock_self())
+      .def_rw("texture", &WebRTCConfig::texture, nb::lock_self())
+      .def_rw("android", &WebRTCConfig::android, nb::lock_self())
+      .def_rw("stream", &WebRTCConfig::stream, nb::lock_self());
 
     m.def(
       "load_webrtc_config",

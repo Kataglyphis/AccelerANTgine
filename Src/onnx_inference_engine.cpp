@@ -11,6 +11,8 @@ module;
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <span>
 #include <string>
 #include <vector>
@@ -158,6 +160,8 @@ auto get_named_shape(const std::vector<std::string> &names, const std::string &n
 
 struct OnnxInferenceEngine::Impl
 {
+    // Run is thread-safe in ORT, so runs share the lock; initialize replaces the session and takes it alone.
+    mutable std::shared_mutex mutex;
     std::unique_ptr<Ort::Env> env;
     std::unique_ptr<Ort::Session> session;
     std::unique_ptr<Ort::SessionOptions> session_options;
@@ -193,6 +197,7 @@ auto OnnxInferenceEngine::operator=(OnnxInferenceEngine &&) noexcept -> OnnxInfe
 
 auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expected<void, OnnxError>
 {
+    const std::unique_lock lock(impl_->mutex);
     // A failed initialisation leaves the engine uninitialised, never with a half-replaced session.
     impl_->reset();
     impl_->config = config;
@@ -246,13 +251,17 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     return {};
 }
 
-auto OnnxInferenceEngine::is_initialized() const -> bool { return impl_->initialized; }
+auto OnnxInferenceEngine::is_initialized() const -> bool
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->initialized;
+}
 
 auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
   const TensorShape &input_shape,
   const std::string &input_name) -> std::expected<InferenceResult, OnnxError>
 {
-
+    const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     const auto expected_size = input_shape.total_elements();
@@ -280,7 +289,7 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
 auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<std::string, TensorData>> &inputs)
   -> std::expected<InferenceResult, OnnxError>
 {
-
+    const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -319,12 +328,21 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
     return make_inference_result(*output_tensors, start_time, InferenceClock::now());
 }
 
-auto OnnxInferenceEngine::get_input_names() const -> std::vector<std::string> { return impl_->input_names_cache; }
+auto OnnxInferenceEngine::get_input_names() const -> std::vector<std::string>
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->input_names_cache;
+}
 
-auto OnnxInferenceEngine::get_output_names() const -> std::vector<std::string> { return impl_->output_names_cache; }
+auto OnnxInferenceEngine::get_output_names() const -> std::vector<std::string>
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->output_names_cache;
+}
 
 auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
 {
+    const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     return get_named_shape(impl_->input_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo {
@@ -334,6 +352,7 @@ auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std:
 
 auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
 {
+    const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     return get_named_shape(impl_->output_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo {

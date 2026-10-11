@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Jonas Heinle" }]
 dependencies = ["numpy>=1.26"]
+classifiers = ["Programming Language :: Python :: Free Threading :: 2 - Beta"]
 
 [project.optional-dependencies]
 test = ["pytest"]
@@ -21,7 +22,8 @@ Homepage = "https://jonasheinle.de/"
 [tool.scikit-build]
 minimum-version = "0.11"
 cmake.version = ">=3.31.6"
-build.targets = ["kataglyphis_python"]
+# The stub target too: the install rules ship _core.pyi and py.typed, which only it writes.
+build.targets = ["kataglyphis_python", "kataglyphis_python_stub"]
 install.components = ["python_bindings"]
 wheel.packages = []
 
