@@ -361,6 +361,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-10-11 — **The Windows arm64 lane starts again.** Hub 5343096f dropped `bundle-artifact-name`
+  and the bundle-gate job from `container-ci-windows.yml`, because the hub now gates its `:winarm64`
+  bundle in its own `windows-arm64.yml`. This lane still passed the input, so GitHub refused the
+  workflow before any job ran (`startup_failure`, run 38174233712). The input is gone. The build,
+  the arch gate and the device run are unchanged.
+
 - 2026-10-11 — **The docs build no longer reads `Test/python/onnx_models.py`.** Breathe parsed its
   `list[int]` annotations as C++ and failed the warnings-as-errors Sphinx build on Linux x64 (run 38142935942);
   `EXCLUDE_PATTERNS` in `Doxyfile.in` drops that helper, the binding and threading tests stay documented.

@@ -451,10 +451,10 @@ host, which has the desktop the container lacks. `-Config Release` then runs the
 workflow. The job runs `Build-Windows.ps1 -TargetArch arm64
 -BuildTargets clangcl-release,clangcl-debug -SkipFormat` in the family image's arm64 bundle (the format
 steps are the x64 lane's: they read the source, not the target). The hub's arch gate then
-grades `dist/windows-arm64`, and `windows-11-arm` runs `bundle/bin/AccelerANTgine.exe`. The lane
-sets `bundle-artifact-name`, so the same build job packs the image's runtime bundle and a third
-job gates it with `Test-Arm64Bundle.ps1` on `windows-11-arm` (the device half its docs -
-Verification describe).
+grades `dist/windows-arm64`, and `windows-11-arm` runs `bundle/bin/AccelerANTgine.exe`. The
+image's runtime bundle as a whole is not this lane's to gate: since hub 5343096f the hub proves
+it in its own `windows-arm64.yml`, and `container-ci-windows.yml` no longer takes
+`bundle-artifact-name`.
 On a cross build the script:
 
 - refuses every target but clangcl-release and clangcl-debug, before the log opens. Debug's
