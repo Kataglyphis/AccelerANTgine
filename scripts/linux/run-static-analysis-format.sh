@@ -37,7 +37,7 @@ CODE_QUALITY_CLANG_TIDY_ARGS=(
   -header-filter=^Src/
 )
 
-# Without the excludes the walk reformats ANTfrastructure itself.
+# Without the excludes the walk grades ANTfrastructure itself.
 CODE_QUALITY_CMAKE_FORMAT_CONFIG=".cmake-format.yaml"
 CODE_QUALITY_CMAKE_SEARCH_ROOT="."
 CODE_QUALITY_CMAKE_EXCLUDE_PATHS=('./build*/*' './.venv/*' './third_party/*')
@@ -70,7 +70,8 @@ if [[ ${#CMAKE_FILES[@]} -eq 0 ]]; then
   # The root CMakeLists.txt always exists, so an empty set is a discovery bug.
   die "cmake-format discovery found no CMake files - check CODE_QUALITY_CMAKE_SEARCH_ROOT/excludes."
 fi
-run_gate cmake-format code_quality_run_cmake_format "${CMAKE_FILES[@]}"
+# --check: in place it rewrote the CI checkout and stayed green over a drifted file (2026-10-12).
+run_gate cmake-format code_quality_run_cmake_format --check "${CMAKE_FILES[@]}"
 
 # Releases format differently, so only the hub's LLVM_RELEASE (loaded from versions.env by ci-common.sh) may grade.
 check_clang_format() {

@@ -3,7 +3,11 @@
 option(KATAGLYPHIS_PYTHON_STUBS "Generate .pyi stubs for the Python bindings" ON)
 
 # FREE_THREADED takes effect only against a free-threaded Python (3.14t); a GIL build is unchanged.
-nanobind_add_module(kataglyphis_python NB_STATIC FREE_THREADED kataglyphis_bindings.cpp)
+nanobind_add_module(
+  kataglyphis_python
+  NB_STATIC
+  FREE_THREADED
+  kataglyphis_bindings.cpp)
 
 set_target_properties(
   kataglyphis_python

@@ -361,6 +361,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-10-12 — **The cmake-format gate fails on drift instead of rewriting it.**
+  `run-static-analysis-format.sh` ran the hub's cmake-format in place, so every CI run reformatted
+  its own checkout and passed. `Bindings/python/CMakeLists.txt` had drifted that way since 5ce2d8d
+  (a one-line `nanobind_add_module`). The gate now passes `--check`, and that file is formatted. In
+  `:latest` the script exits 0 on this tree and 1 with one planted deviation.
+
 - 2026-10-11 — **The Windows arm64 lane starts again.** Hub 5343096f dropped `bundle-artifact-name`
   and the bundle-gate job from `container-ci-windows.yml`, because the hub now gates its `:winarm64`
   bundle in its own `windows-arm64.yml`. This lane still passed the input, so GitHub refused the
