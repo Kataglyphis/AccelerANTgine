@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci-python-bindings.sh - the Python wheels, GIL (cp314) and free-threaded (cp314t), each installed and tested.
+# ci-python-bindings.sh - the Python wheels, GIL (cp3XY) and free-threaded (cp3XYt), each installed and tested.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,7 +9,8 @@ source "${_SCRIPT_DIR}/ci-common.sh"
 WORKSPACE_DIR="$(pwd)"
 OUT_DIR="dist/python"
 BUILD_ROOT="/tmp/kataglyphis-pywheels"
-PYTHON_VERSION="3.14"
+# The image's own X.Y, else the hub pin's: a Python upgrade needs no edit here.
+PYTHON_VERSION="${PYTHON_MAJOR_MINOR:-$(sed -n 's/^PYTHON_VERSION=\([0-9]*\.[0-9]*\)\..*/\1/p' "$(antfrastructure_path linux/scripts/01-core/versions.env)")}"
 COMPILER="clang"
 
 while [[ $# -gt 0 ]]; do
