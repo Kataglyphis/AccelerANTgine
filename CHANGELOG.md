@@ -122,6 +122,16 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- **pre-commit 4.6.2 → 4.7.0, `Src/rusty_code/Cargo.lock` to its newest in-range releases,
+  cxxbridge-cmd floor 1.0.205 (2026-10-13, the Renovate report).**
+  - `cargo update` moves 20 packages, among them cxx and cxx-build 1.0.202 → 1.0.205, cc
+    1.8.0 and syn 3.0.9. OxidANT's lock resolves cxx 1.0.205 the same day, so the
+    `CXXBRIDGE_CMD_VERSION` floor in `third_party/CMakeLists.txt` follows both locks again.
+  - Measured in `:latest` (x64), privileged as CI runs it: `ci-build-and-test.sh --compiler
+    clang` passes 111/111 Debug tests under ASan + UBSan, `fuzzTestSuite` 8/8 and 103/103
+    under TSan, with `cargo install` taking cxxbridge-cmd 1.0.205. `cargo test --locked` and a
+    release build of `Src/rusty_code` pass, pre-commit 4.7.0 installs from `requirements.txt`
+    and validates `.pre-commit-config.yaml`, and `run-lint-gates.sh --ratchets` passes.
 - **The hand-written C++ is formatted with clang-format 23.1.3, and the Linux lanes fail on
   format drift (2026-10-11, hub CON71).**
   - The image's `clang-format` moved from LLVM 21 to the pinned LLVM 23.1.3. Under it, 20 of

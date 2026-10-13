@@ -265,17 +265,17 @@ endif()
 if(RUST_FEATURES)
 
   # This is a LOWER BOUND, not a pin, and the docstring used to claim otherwise.
-  # `cargo install --version <v>` takes a VersionReq, so a bare 1.0.202 means
-  # ^1.0.202 and the newest 1.x is what lands.
+  # `cargo install --version <v>` takes a VersionReq, so a bare 1.0.205 means
+  # ^1.0.205 and the newest 1.x is what lands.
   # The cxx crate it has to match lives in two locks: Src/rusty_code's and
-  # OxidANT's Cargo.lock both resolve cxx 1.0.202 (2026-10-07), but they drifted
+  # OxidANT's Cargo.lock both resolve cxx 1.0.205 (2026-10-13), but they drifted
   # apart before. A true pin would need BOTH
   # `--version =${CXXBRIDGE_CMD_VERSION}` below AND one agreed version across
   # the two locks. Left as it is deliberately; the annotation makes the drift
   # visible instead of silent.
   set(CXXBRIDGE_CMD_VERSION
       # renovate: datasource=crate depName=cxxbridge-cmd versioning=semver
-      "1.0.202"
+      "1.0.205"
       CACHE STRING "Lower bound for cxxbridge-cmd; cargo install resolves it as a caret range")
 
   # A commit, not v0.6.1: that tag lacks the CARGO_HOME and cxxbridge-cmd fixes; move to the first tag after it.
