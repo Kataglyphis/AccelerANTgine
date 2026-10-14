@@ -178,6 +178,8 @@ static auto run_yolo_detection_example(const std::string &model_path) -> int
     config.confidence_threshold = 0.25F;
     config.nms_threshold = 0.45F;
     config.num_classes = 80;
+    // The default model, DEIM-D-FINE-N, is an end-to-end export.
+    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
 
     std::cout << "Initializing YOLO detector with model: " << model_path << "\n";
 

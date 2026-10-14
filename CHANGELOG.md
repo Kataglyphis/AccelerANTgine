@@ -126,8 +126,14 @@ belongs in the **Changed** list below with that consequence spelled out.
   The AGPL-3.0 `models/yolo26n.onnx` left the tree; the demo's default and the shipped
   `inference_config.toml` name `models/deim_dfine_n_coco.onnx`, which `models/README.md`
   fetches from [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release and checks by
-  SHA-256. `.gitignore` keeps `*.onnx` without an exception. `YoloDetector`'s decoder still
-  reads the YOLOv5 row layout, which neither model emits; the README says so.
+  SHA-256. `.gitignore` keeps `*.onnx` without an exception.
+- **`YoloDetector` reads end-to-end exports** (2026-10-14). `YoloConfig::output_layout` picks
+  the row layout: `CenterObjectnessScores` (YOLOv5, the default and the old behaviour) or
+  `CornersScoreClass` (x1, y1, x2, y2, score, class index: DEIM, YOLOv10), which the demo
+  sets for its default model. A corner row needs a finite score over the threshold, a known
+  class and ordered finite corners; `CornerRowsDecodeScoreClassAndScale` proves each case on
+  a generated model. Before, the YOLO26n default was decoded as YOLOv5 rows and gave no
+  usable box.
 - **pre-commit 4.6.2 → 4.7.0, `Src/rusty_code/Cargo.lock` to its newest in-range releases,
   cxxbridge-cmd floor 1.0.205 (2026-10-13, the Renovate report).**
   - `cargo update` moves 20 packages, among them cxx and cxx-build 1.0.202 → 1.0.205, cc
