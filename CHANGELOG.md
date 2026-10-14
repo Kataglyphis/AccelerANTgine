@@ -122,6 +122,13 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+
+- 2026-10-15 — **The Linux test lane fails on a skipped test and on any UBSan report.**
+  ctest's "100% tests passed" counts a gtest skip as a pass, and the Debug presets build
+  UBSan recoverable, so a report printed and the test passed. `ci-build-and-test.sh` now
+  exports `UBSAN_OPTIONS=halt_on_error=1` and fails on any `<skipped>` in its JUnit file,
+  naming the tests; on Linux the image carries every dependency. Checked on a two-test
+  ctest project in `:latest`: one skip, "100% tests passed", and the new check counts it.
 - **No model is tracked; the default is DEIM-D-FINE-N (Apache-2.0)** (2026-10-14, owner).
   The AGPL-3.0 `models/yolo26n.onnx` left the tree; the demo's default and the shipped
   `inference_config.toml` name `models/deim_dfine_n_coco.onnx`, which `models/README.md`

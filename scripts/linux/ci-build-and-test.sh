@@ -67,6 +67,9 @@ if [[ "${COMPILER}" == "clang" ]]; then
   info "Coverage profiles go to ${LLVM_PROFILE_FILE}"
 fi
 
+# The Debug presets build UBSan recoverable, so without this a report prints and the test still passes.
+export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1${UBSAN_OPTIONS:+:${UBSAN_OPTIONS}}"
+
 # Subshell: ctest_run_execute cds in the caller's shell, and the TSan run must start from the root.
 (
   ctest_run_main \
@@ -74,6 +77,12 @@ fi
     --build-type "${BUILD_TYPE}" \
     -- --output-junit "${WORKSPACE_DIR}/docs/test_results.xml" --no-tests=error
 )
+# The image carries every Linux dependency, so a skip here means one went missing; ctest marks gtest's [  SKIPPED ].
+skipped="$(grep -c '<skipped' "${WORKSPACE_DIR}/docs/test_results.xml" || true)"
+if [[ "${skipped}" -gt 0 ]]; then
+  grep -B2 '<skipped' "${WORKSPACE_DIR}/docs/test_results.xml" | grep -o 'testcase name="[^"]*"' >&2 || true
+  die "${skipped} test(s) skipped on Linux (listed above): a dependency the image should carry is missing."
+fi
 
 if [[ "${COMPILER}" == "clang" ]]; then
   # Not optional: the clang debug preset always configures Test/fuzz, so a missing binary is a broken build.

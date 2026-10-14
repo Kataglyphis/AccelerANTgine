@@ -273,6 +273,12 @@ written out rather than linked.
   flat directory) get them in their own `lib\gstreamer-1.0`, with the plugins' imports
   beside the suites; the hub's import walk resolves a name anywhere in the tree. The WebRTC
   tests need `webrtcsink` (gst-plugins-rs), which only the Linux image has.
+- **On Linux no test may skip, and UBSan is fatal** (2026-10-15). ctest counts a gtest
+  `[  SKIPPED ]` as passed in its "100% tests passed" line, so `ci-build-and-test.sh` fails
+  the lane on any `<skipped>` in its JUnit file and names the tests: the image carries every
+  element, so a skip there means one went missing. Windows keeps its skips (`webrtcsink`).
+  The Debug presets build UBSan recoverable, so the same script exports
+  `UBSAN_OPTIONS=halt_on_error=1`; a report used to print and the test still passed.
 - **On clang-cl the fuzz suite is built without sanitizers.** absl's swisstable layout
   depends on ASan (`ABSL_SWISSTABLE_ENABLE_GENERATIONS`), and clang-cl applies ASan only
   through `myproject_options`, so absl and FuzzTest are not instrumented there while the
