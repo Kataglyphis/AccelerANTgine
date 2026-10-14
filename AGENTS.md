@@ -175,17 +175,17 @@ written out rather than linked.
   `third_party/ANTfrastructure/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`.
   It raises a clear error if that path is missing, which in practice means the
   nested submodule was not initialised recursively.
-- **Two binaries are tracked on purpose, and one of them is big.**
-  `models/yolo26n.onnx` is 9.5 MiB — the YOLO weights `Src/inference_demo.cpp`
-  and `resources/configs/inference_config.toml` name by default (no `Test/`
-  suite loads them), with no download step anywhere in the build, so a fresh
-  clone that did not carry it would fail at runtime rather than at configure time.
+- **One binary is tracked on purpose; models never are.**
   `images/Engine_logo.bmp` (156 KiB) is the NSIS installer header image
   (`cmake/CPackOptions.cmake`), which CPack reads as a literal path at package
-  time. Both predate this note and **stay** — the history is not rewritten and
-  no LFS is introduced. `.gitignore` carries `*.onnx` / `*.bmp` with exactly
-  these two re-included, so a *second* model or bitmap dropped beside them is
-  not committed unnoticed; that is the guard, not a size limit.
+  time. It **stays** — the history is not rewritten and no LFS is introduced.
+  The AGPL-3.0 `models/yolo26n.onnx` (9.5 MiB) left the tree on 2026-10-14 (owner):
+  `Src/inference_demo.cpp` and `resources/configs/inference_config.toml` now name
+  `models/deim_dfine_n_coco.onnx` (Apache-2.0), which `models/README.md` fetches
+  by checksum from [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release.
+  No `Test/` suite loads it. `.gitignore` carries `*.onnx` with no exception and
+  `*.bmp` with the logo re-included, so a model or bitmap dropped here is not
+  committed unnoticed; that is the guard, not a size limit.
 - **Dependency upgrades are Renovate as a local CLI, and nothing else.** The
   Renovate GitHub App is installed on no repo in this family and will not be, and
   there is no `.github/dependabot.yml` here, so this wrapper is the only
@@ -259,7 +259,7 @@ written out rather than linked.
   hand-encodes a ModelProto (IR 8, opset 13): Relu, Add, Relu plus Neg, and a
   Reshape from `images[1,3,H,W]` to `output[1,rows,values]`. With that one a test
   writes the raw detector output as the input image, so the YOLO decoder runs end to
-  end without `models/yolo26n.onnx`. Nothing is staged for the Windows arm64 run job,
+  end without any model file. Nothing is staged for the Windows arm64 run job,
   and the `*.onnx` guard in `.gitignore` stays as it is. The shipped
   `resources/configs/inference_config.toml` is compiled into the suites
   (`kataglyphis_embed_text_file`) for the same reason.

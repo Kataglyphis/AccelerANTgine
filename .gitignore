@@ -24,9 +24,9 @@ scan-build-reports/
 __pycache__/
 *.py[cod]
 
-# Large binaries; the two tracked on purpose are re-included (AGENTS.md section 7 "Large tracked binaries").
+# Large binaries; the one tracked on purpose is re-included (AGENTS.md, "One binary is tracked").
+# Models are never tracked: models/README.md fetches them by checksum.
 *.onnx
-!models/yolo26n.onnx
 *.bmp
 !images/Engine_logo.bmp
 

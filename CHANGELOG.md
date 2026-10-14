@@ -122,6 +122,12 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+- **No model is tracked; the default is DEIM-D-FINE-N (Apache-2.0)** (2026-10-14, owner).
+  The AGPL-3.0 `models/yolo26n.onnx` left the tree; the demo's default and the shipped
+  `inference_config.toml` name `models/deim_dfine_n_coco.onnx`, which `models/README.md`
+  fetches from [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release and checks by
+  SHA-256. `.gitignore` keeps `*.onnx` without an exception. `YoloDetector`'s decoder still
+  reads the YOLOv5 row layout, which neither model emits; the README says so.
 - **pre-commit 4.6.2 → 4.7.0, `Src/rusty_code/Cargo.lock` to its newest in-range releases,
   cxxbridge-cmd floor 1.0.205 (2026-10-13, the Renovate report).**
   - `cargo update` moves 20 packages, among them cxx and cxx-build 1.0.202 → 1.0.205, cc

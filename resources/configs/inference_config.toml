@@ -1,7 +1,7 @@
 # Kataglyphis inference configuration; see the kataglyphis.toml_config module.
 
 [model]
-model_path = "models/yolo26n.onnx"
+model_path = "models/deim_dfine_n_coco.onnx"
 framework = "onnx"
 input_width = 640
 input_height = 640

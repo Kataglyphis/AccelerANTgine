@@ -243,7 +243,7 @@ static void print_usage(const char *program_name)
 {
     std::cout << "Usage: " << program_name << " [options]\n\n"
               << "Options:\n"
-              << "  --model <path>     Path to ONNX model (default: models/yolo26n.onnx)\n"
+              << "  --model <path>     Path to ONNX model (default: models/deim_dfine_n_coco.onnx, see models/README.md)\n"
               << "  --onnx-only        Run only ONNX inference example\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
               << "  --yolo-only        Run only YOLO detection example\n"
@@ -251,13 +251,13 @@ static void print_usage(const char *program_name)
               << "  --all              Run all examples\n"
               << "  --help             Show this help message\n\n"
               << "Examples:\n"
-              << "  " << program_name << " --model models/yolo26n.onnx --all\n"
+              << "  " << program_name << " --model models/deim_dfine_n_coco.onnx --all\n"
               << "  " << program_name << " --onnx-only\n";
 }
 
 auto main(int argc, char *argv[]) -> int
 {
-    std::string model_path = "models/yolo26n.onnx";
+    std::string model_path = "models/deim_dfine_n_coco.onnx";
     bool run_onnx = false;
     bool run_gstreamer = false;
     bool run_yolo = false;
