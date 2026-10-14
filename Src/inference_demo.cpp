@@ -243,7 +243,7 @@ static void print_usage(const char *program_name)
 {
     std::cout << "Usage: " << program_name << " [options]\n\n"
               << "Options:\n"
-              << "  --model <path>     Path to ONNX model (default: models/deim_dfine_n_coco.onnx, see models/README.md)\n"
+              << "  --model <path>     ONNX model (default: models/deim_dfine_n_coco.onnx, models/README.md)\n"
               << "  --onnx-only        Run only ONNX inference example\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
               << "  --yolo-only        Run only YOLO detection example\n"
