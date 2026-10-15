@@ -7,7 +7,12 @@ include(cmake/SetSourceGroups.cmake)
 
 file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
-list(REMOVE_ITEM KataglyphisCppProject_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp")
+# Programs with their own main(): the library must carry none, or every embedder links a dead one.
+list(
+  REMOVE_ITEM
+  KataglyphisCppProject_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/inference_demo.cpp")
 
 # ONNXRUNTIME_FOUND comes from SystemLibDependencies.cmake, which must run first.
 if(NOT ONNXRUNTIME_FOUND)
@@ -16,8 +21,7 @@ if(NOT ONNXRUNTIME_FOUND)
     REMOVE_ITEM
     KataglyphisCppProject_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/onnx_inference_engine.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/inference_demo.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.cpp")
   list(
     REMOVE_ITEM
     KataglyphisCppProject_MODULES
@@ -96,6 +100,12 @@ if(PROJECT_IS_TOP_LEVEL)
     set_target_properties(${PROJECT_NAME}_cli PROPERTIES OUTPUT_NAME "${PROJECT_NAME}" RUNTIME_OUTPUT_DIRECTORY
                                                                                        "${CMAKE_BINARY_DIR}/bin")
     set_target_properties(${PROJECT_NAME}_cli PROPERTIES CXX_SCAN_FOR_MODULES ON)
+    # The demo models/README.md runs; it needs the ONNX modules the library drops without ONNX Runtime.
+    if(ONNXRUNTIME_FOUND)
+      add_executable(${PROJECT_NAME}_demo inference_demo.cpp)
+      set_target_properties(${PROJECT_NAME}_demo PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+                                                            CXX_SCAN_FOR_MODULES ON)
+    endif()
   else()
     message(STATUS "Skipping ${PROJECT_NAME}_cli: requires C++ modules")
   endif()
@@ -104,6 +114,9 @@ endif()
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 if(TARGET ${PROJECT_NAME}_cli)
   target_compile_features(${PROJECT_NAME}_cli PRIVATE cxx_std_23)
+endif()
+if(TARGET ${PROJECT_NAME}_demo)
+  target_compile_features(${PROJECT_NAME}_demo PRIVATE cxx_std_23)
 endif()
 
 # Define export macro for building the DLL
@@ -175,6 +188,9 @@ endif()
 
 if(TARGET ${PROJECT_NAME}_cli)
   target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME} absl::flags_parse)
+endif()
+if(TARGET ${PROJECT_NAME}_demo)
+  target_link_libraries(${PROJECT_NAME}_demo PRIVATE ${PROJECT_NAME})
 endif()
 
 if(UNIX AND NOT APPLE)

@@ -123,6 +123,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- 2026-10-15 — **The library carries no `main()` any more.** `Src/inference_demo.cpp`, the demo
+  `models/README.md` runs, was compiled into `libAccelerANTgine` (and every embedder, the
+  OmniAccelerANT plugin among them) as an unreachable `main` at 0 % coverage. It is the
+  `AccelerANTgine_demo` program now, built like the CLI when this is the top-level project and
+  ONNX Runtime is found. Checked in OmniAccelerANT's plugin build: the rebuilt
+  `libAccelerANTgine.so` has no `main` symbol, and the plugin's seven gtests pass.
+
 - 2026-10-15 — **The Linux test lane fails on a skipped test and on any UBSan report.**
   ctest's "100% tests passed" counts a gtest skip as a pass, and the Debug presets build
   UBSan recoverable, so a report printed and the test passed. `ci-build-and-test.sh` now

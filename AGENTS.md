@@ -17,7 +17,7 @@ is the single fact that most shapes its tooling.
 
 | Path | What lives there |
 | --- | --- |
-| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `inference_demo`, plus `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) is built only when this is the top-level project |
+| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, plus `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | The four C++ suites, `commit`, `compile`, `fuzz` and `perf` (README § Tests), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
@@ -253,8 +253,9 @@ written out rather than linked.
   2026-10-01 every `Src/` file read 0.00% because the suites were placeholders;
   they call the library now (README § Tests). `linux-debug-GNU` sets the option
   as well since then, so gcovr measures the GCC lane, where it reported `0 out
-  of 0` lines before. `inference_demo.cpp` stays at 0%: it is a `main` compiled
-  into the library that nothing calls.
+  of 0` lines before. `inference_demo.cpp` read 0% while it was a `main` compiled
+  into the library that nothing called; since 2026-10-15 it is the `AccelerANTgine_demo`
+  program and outside the library's figure.
 - **The tests generate their ONNX models.** `Test/common/kataglyphis_test_support.h`
   hand-encodes a ModelProto (IR 8, opset 13): Relu, Add, Relu plus Neg, and a
   Reshape from `images[1,3,H,W]` to `output[1,rows,values]`. With that one a test

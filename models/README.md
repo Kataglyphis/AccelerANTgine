@@ -2,7 +2,7 @@
 
 No model is tracked here. The default, `deim_dfine_n_coco.onnx` (DEIM-D-FINE-N, Apache-2.0,
 COCO 80 classes), is built and released by [ModelANT](https://github.com/Kataglyphis/ModelANT).
-Fetch it and check its SHA-256 before running `Src/inference_demo.cpp` or
+Fetch it and check its SHA-256 before running the `AccelerANTgine_demo` program (`Src/inference_demo.cpp`) or
 `resources/configs/inference_config.toml`'s default:
 
 ```bash
