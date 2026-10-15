@@ -39,6 +39,12 @@ struct DetectionResult
     std::uint32_t original_height{ 0 };
 };
 
+// How the model's output rows are laid out; the export decides, so the caller names it.
+enum class YoloOutputLayout {
+    CenterObjectnessScores,// YOLOv5: cx, cy, w, h, objectness, one score per class
+    CornersScoreClass,// end-to-end exports (DEIM, YOLOv10): x1, y1, x2, y2, score, class index
+};
+
 struct YoloConfig
 {
     std::filesystem::path model_path;
@@ -47,6 +53,7 @@ struct YoloConfig
     std::uint32_t input_width{ 640 };
     std::uint32_t input_height{ 640 };
     int num_classes{ 80 };
+    YoloOutputLayout output_layout{ YoloOutputLayout::CenterObjectnessScores };
 };
 
 class KATAGLYPHIS_CPP_API YoloDetector

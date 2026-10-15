@@ -169,7 +169,7 @@ TEST(TomlConfig, TheShippedConfigParses)
 {
     const auto config = cfg::parse_inference_config(std::string(kShippedInferenceConfig));
     ASSERT_TRUE(config.has_value());
-    EXPECT_EQ(config->model.model_path, "models/yolo26n.onnx");
+    EXPECT_EQ(config->model.model_path, "models/deim_dfine_n_coco.onnx");
     EXPECT_EQ(config->model.framework, "onnx");
     EXPECT_EQ(config->model.input_width, 640U);
     EXPECT_EQ(config->model.input_height, 640U);

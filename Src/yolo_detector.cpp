@@ -150,6 +150,104 @@ namespace {
           + " ! appsink name=detector_sink emit-signals=true sync=false";
         return pipeline_desc;
     }
+
+    // Frame pixels per model-input pixel, by which every decoded box is scaled.
+    struct Scale
+    {
+        float x;
+        float y;
+    };
+
+    auto labelled_box(float x, float y, float width, float height, float confidence, int class_id) -> BoundingBox
+    {
+        BoundingBox box;
+        box.x = x;
+        box.y = y;
+        box.width = width;
+        box.height = height;
+        box.confidence = confidence;
+        box.class_id = class_id;
+        box.class_name = YoloDetector::get_coco_class_name(class_id);
+        return box;
+    }
+
+    auto decode_center_rows(std::span<const float> data,
+      std::size_t rows,
+      std::size_t values,
+      const YoloConfig &config,
+      Scale scale) -> std::vector<BoundingBox>
+    {
+        std::vector<BoundingBox> boxes;
+        // A row is cx, cy, w, h, objectness, then class scores; anything shorter is not a detection layout.
+        if (values < 5) { return boxes; }
+        // Class scores beyond the row would be read from the next detection.
+        const std::size_t class_count = std::min(static_cast<std::size_t>(std::max(config.num_classes, 0)), values - 5);
+
+        for (std::size_t i = 0; i < rows && (i + 1) * values <= data.size(); ++i) {
+            const auto row = data.subspan(i * values, values);
+            const float cx = row[0];
+            const float cy = row[1];
+            const float w = row[2];
+            const float h = row[3];
+            const float obj_conf = row[4];
+
+            // NaN fails every comparison, so the thresholds test for acceptance, not rejection.
+            if (!(obj_conf >= config.confidence_threshold)) { continue; }
+            if (!std::isfinite(cx) || !std::isfinite(cy) || !std::isfinite(w) || !std::isfinite(h)) { continue; }
+
+            int best_class = 0;
+            float final_conf = obj_conf;
+            if (class_count > 0) {
+                float best_class_conf = 0.0F;
+                for (std::size_t c = 0; c < class_count; ++c) {
+                    if (row[5 + c] > best_class_conf) {
+                        best_class_conf = row[5 + c];
+                        best_class = static_cast<int>(c);
+                    }
+                }
+                final_conf = obj_conf * best_class_conf;
+            }
+            if (!(final_conf >= config.confidence_threshold) || !std::isfinite(final_conf)) { continue; }
+
+            boxes.push_back(labelled_box((cx - (w / 2.0F)) * scale.x,
+              (cy - (h / 2.0F)) * scale.y,
+              w * scale.x,
+              h * scale.y,
+              final_conf,
+              best_class));
+        }
+        return boxes;
+    }
+
+    // An end-to-end row worth a box: a finite score over the threshold, a known class, ordered finite corners.
+    auto corner_row_is_usable(std::span<const float> row, const YoloConfig &config) -> bool
+    {
+        if (!(row[4] >= config.confidence_threshold) || !std::isfinite(row[4])) { return false; }
+        if (!(row[5] >= 0.0F) || !(row[5] < static_cast<float>(config.num_classes))) { return false; }
+        const bool finite = std::ranges::all_of(row.first(4), [](float v) -> bool { return std::isfinite(v); });
+        return finite && row[2] >= row[0] && row[3] >= row[1];
+    }
+
+    auto decode_corner_rows(std::span<const float> data,
+      std::size_t rows,
+      std::size_t values,
+      const YoloConfig &config,
+      Scale scale) -> std::vector<BoundingBox>
+    {
+        std::vector<BoundingBox> boxes;
+        if (values < 6) { return boxes; }
+        for (std::size_t i = 0; i < rows && (i + 1) * values <= data.size(); ++i) {
+            const auto row = data.subspan(i * values, values);
+            if (!corner_row_is_usable(row, config)) { continue; }
+            boxes.push_back(labelled_box(row[0] * scale.x,
+              row[1] * scale.y,
+              (row[2] - row[0]) * scale.x,
+              (row[3] - row[1]) * scale.y,
+              row[4],
+              static_cast<int>(row[5])));
+        }
+        return boxes;
+    }
 }// namespace
 
 struct YoloDetector::Impl
@@ -247,66 +345,12 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
         values_per_detection = dims[2];
     }
 
-    // A row is cx, cy, w, h, objectness, then class scores; anything shorter is not a detection layout.
-    if (values_per_detection < 5) { return result; }
-
-    const float *data = output.data.data();
-    auto data_size = static_cast<std::size_t>(output.data.size());
-
-    float scale_x = static_cast<float>(original_width) / static_cast<float>(impl_->config.input_width);
-    float scale_y = static_cast<float>(original_height) / static_cast<float>(impl_->config.input_height);
-
-    // Class scores beyond the row would be read from the next detection.
-    const std::size_t class_count =
-      std::min(static_cast<std::size_t>(std::max(impl_->config.num_classes, 0)), values_per_detection - 5);
-
-    std::vector<BoundingBox> all_boxes;
-    all_boxes.reserve(num_detections);
-
-    for (std::size_t i = 0; i < num_detections; ++i) {
-        std::size_t offset = i * values_per_detection;
-
-        if (offset + values_per_detection > data_size) { break; }
-
-        const float *row = data + offset;
-        float cx = row[0];
-        float cy = row[1];
-        float w = row[2];
-        float h = row[3];
-        float obj_conf = row[4];
-
-        // NaN fails every comparison, so the thresholds test for acceptance, not rejection.
-        if (!(obj_conf >= impl_->config.confidence_threshold)) { continue; }
-        if (!std::isfinite(cx) || !std::isfinite(cy) || !std::isfinite(w) || !std::isfinite(h)) { continue; }
-
-        int best_class = 0;
-        float final_conf = obj_conf;
-
-        if (class_count > 0) {
-            float best_class_conf = 0.0F;
-            for (std::size_t c = 0; c < class_count; ++c) {
-                const float class_conf = row[5 + c];
-                if (class_conf > best_class_conf) {
-                    best_class_conf = class_conf;
-                    best_class = static_cast<int>(c);
-                }
-            }
-            final_conf = obj_conf * best_class_conf;
-        }
-
-        if (!(final_conf >= impl_->config.confidence_threshold) || !std::isfinite(final_conf)) { continue; }
-
-        BoundingBox box;
-        box.x = (cx - (w / 2.0F)) * scale_x;
-        box.y = (cy - (h / 2.0F)) * scale_y;
-        box.width = w * scale_x;
-        box.height = h * scale_y;
-        box.confidence = final_conf;
-        box.class_id = best_class;
-        box.class_name = get_coco_class_name(best_class);
-
-        all_boxes.push_back(box);
-    }
+    const std::span<const float> data(output.data.data(), output.data.size());
+    const Scale scale{ static_cast<float>(original_width) / static_cast<float>(impl_->config.input_width),
+        static_cast<float>(original_height) / static_cast<float>(impl_->config.input_height) };
+    auto all_boxes = impl_->config.output_layout == YoloOutputLayout::CornersScoreClass
+                       ? decode_corner_rows(data, num_detections, values_per_detection, impl_->config, scale)
+                       : decode_center_rows(data, num_detections, values_per_detection, impl_->config, scale);
 
     apply_nms(all_boxes, impl_->config.nms_threshold);
 

@@ -47,6 +47,18 @@ auto flatten(std::initializer_list<Row> rows) -> std::vector<float>
     return data;
 }
 
+struct Corner
+{ float x1, y1, x2, y2, score, class_index; };
+
+auto flatten_corners(std::initializer_list<Corner> rows) -> std::vector<float>
+{
+    std::vector<float> data;
+    for (const auto &row : rows) {
+        data.insert(data.end(), { row.x1, row.y1, row.x2, row.y2, row.score, row.class_index });
+    }
+    return data;
+}
+
 auto two_class_config(const TempFile &model) -> detection::YoloConfig
 {
     detection::YoloConfig config;
@@ -183,6 +195,44 @@ TEST(YoloDetector, FiveValueRowsUseTheObjectnessAsConfidence)
     ASSERT_EQ(result->boxes.size(), 1U);
     EXPECT_FLOAT_EQ(result->boxes[0].confidence, 0.6F);
     EXPECT_EQ(result->boxes[0].class_id, 0);
+}
+
+TEST(YoloDetector, CornerRowsDecodeScoreClassAndScale)
+{
+    // x1, y1, x2, y2, score, class: the DEIM and YOLOv10 layout, six rows of six values.
+    constexpr YoloReshapeGeometry kCorners{ 2, 6, 6, 6 };
+    const TempFile model("kataglyphis-corners", ".onnx", kataglyphis::test::yolo_reshape_model(kCorners));
+    detection::YoloDetector detector;
+    detection::YoloConfig config;
+    config.model_path = model.path();
+    config.input_width = 6;
+    config.input_height = 2;
+    config.confidence_threshold = 0.5F;
+    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    ASSERT_TRUE(detector.initialize(config).has_value());
+
+    const auto rows = flatten_corners({
+      { 1, 0.5F, 3, 1.5F, 0.9F, 15 },// cat: kept
+      { 1, 0.5F, 3, 1.5F, 0.3F, 15 },// under the threshold: dropped
+      { 4, 0, 5, 1, 0.7F, 0 },// person: kept
+      { 4, 0, 5, 1, 0.6F, 0 },// the same person again: suppressed
+      { 0, 0, 1, 1, 0.8F, 80 },// no such class: dropped
+      { 2, 0, 1, 1, 0.8F, 2 },// x2 before x1: dropped
+    });
+    // The frame is twice the input's size each way.
+    const auto result = detector.detect(rows, 12, 4);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->boxes.size(), 2U);
+    const auto &cat = result->boxes[0];
+    EXPECT_EQ(cat.class_id, 15);
+    EXPECT_EQ(cat.class_name, "cat");
+    EXPECT_FLOAT_EQ(cat.confidence, 0.9F);
+    EXPECT_FLOAT_EQ(cat.x, 2.0F);
+    EXPECT_FLOAT_EQ(cat.y, 1.0F);
+    EXPECT_FLOAT_EQ(cat.width, 4.0F);
+    EXPECT_FLOAT_EQ(cat.height, 2.0F);
+    EXPECT_EQ(result->boxes[1].class_name, "person");
+    EXPECT_FLOAT_EQ(result->boxes[1].confidence, 0.7F);
 }
 
 TEST(YoloDetector, ShortRowsNeverReadTheNextRowsValues)

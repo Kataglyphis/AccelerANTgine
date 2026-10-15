@@ -122,6 +122,32 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+
+- 2026-10-15 — **The library carries no `main()` any more.** `Src/inference_demo.cpp`, the demo
+  `models/README.md` runs, was compiled into `libAccelerANTgine` (and every embedder, the
+  OmniAccelerANT plugin among them) as an unreachable `main` at 0 % coverage. It is the
+  `AccelerANTgine_demo` program now, built like the CLI when this is the top-level project and
+  ONNX Runtime is found. Checked in OmniAccelerANT's plugin build: the rebuilt
+  `libAccelerANTgine.so` has no `main` symbol, and the plugin's seven gtests pass.
+
+- 2026-10-15 — **The Linux test lane fails on a skipped test and on any UBSan report.**
+  ctest's "100% tests passed" counts a gtest skip as a pass, and the Debug presets build
+  UBSan recoverable, so a report printed and the test passed. `ci-build-and-test.sh` now
+  exports `UBSAN_OPTIONS=halt_on_error=1` and fails on any `<skipped>` in its JUnit file,
+  naming the tests; on Linux the image carries every dependency. Checked on a two-test
+  ctest project in `:latest`: one skip, "100% tests passed", and the new check counts it.
+- **No model is tracked; the default is DEIM-D-FINE-N (Apache-2.0)** (2026-10-14, owner).
+  The AGPL-3.0 `models/yolo26n.onnx` left the tree; the demo's default and the shipped
+  `inference_config.toml` name `models/deim_dfine_n_coco.onnx`, which `models/README.md`
+  fetches from [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release and checks by
+  SHA-256. `.gitignore` keeps `*.onnx` without an exception.
+- **`YoloDetector` reads end-to-end exports** (2026-10-14). `YoloConfig::output_layout` picks
+  the row layout: `CenterObjectnessScores` (YOLOv5, the default and the old behaviour) or
+  `CornersScoreClass` (x1, y1, x2, y2, score, class index: DEIM, YOLOv10), which the demo
+  sets for its default model. A corner row needs a finite score over the threshold, a known
+  class and ordered finite corners; `CornerRowsDecodeScoreClassAndScale` proves each case on
+  a generated model. Before, the YOLO26n default was decoded as YOLOv5 rows and gave no
+  usable box.
 - **pre-commit 4.6.2 → 4.7.0, `Src/rusty_code/Cargo.lock` to its newest in-range releases,
   cxxbridge-cmd floor 1.0.205 (2026-10-13, the Renovate report).**
   - `cargo update` moves 20 packages, among them cxx and cxx-build 1.0.202 → 1.0.205, cc

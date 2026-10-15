@@ -17,7 +17,7 @@ is the single fact that most shapes its tooling.
 
 | Path | What lives there |
 | --- | --- |
-| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `inference_demo`, plus `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) is built only when this is the top-level project |
+| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, plus `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | The four C++ suites, `commit`, `compile`, `fuzz` and `perf` (README § Tests), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
@@ -175,17 +175,17 @@ written out rather than linked.
   `third_party/ANTfrastructure/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`.
   It raises a clear error if that path is missing, which in practice means the
   nested submodule was not initialised recursively.
-- **Two binaries are tracked on purpose, and one of them is big.**
-  `models/yolo26n.onnx` is 9.5 MiB — the YOLO weights `Src/inference_demo.cpp`
-  and `resources/configs/inference_config.toml` name by default (no `Test/`
-  suite loads them), with no download step anywhere in the build, so a fresh
-  clone that did not carry it would fail at runtime rather than at configure time.
+- **One binary is tracked on purpose; models never are.**
   `images/Engine_logo.bmp` (156 KiB) is the NSIS installer header image
   (`cmake/CPackOptions.cmake`), which CPack reads as a literal path at package
-  time. Both predate this note and **stay** — the history is not rewritten and
-  no LFS is introduced. `.gitignore` carries `*.onnx` / `*.bmp` with exactly
-  these two re-included, so a *second* model or bitmap dropped beside them is
-  not committed unnoticed; that is the guard, not a size limit.
+  time. It **stays** — the history is not rewritten and no LFS is introduced.
+  The AGPL-3.0 `models/yolo26n.onnx` (9.5 MiB) left the tree on 2026-10-14 (owner):
+  `Src/inference_demo.cpp` and `resources/configs/inference_config.toml` now name
+  `models/deim_dfine_n_coco.onnx` (Apache-2.0), which `models/README.md` fetches
+  by checksum from [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release.
+  No `Test/` suite loads it. `.gitignore` carries `*.onnx` with no exception and
+  `*.bmp` with the logo re-included, so a model or bitmap dropped here is not
+  committed unnoticed; that is the guard, not a size limit.
 - **Dependency upgrades are Renovate as a local CLI, and nothing else.** The
   Renovate GitHub App is installed on no repo in this family and will not be, and
   there is no `.github/dependabot.yml` here, so this wrapper is the only
@@ -253,13 +253,14 @@ written out rather than linked.
   2026-10-01 every `Src/` file read 0.00% because the suites were placeholders;
   they call the library now (README § Tests). `linux-debug-GNU` sets the option
   as well since then, so gcovr measures the GCC lane, where it reported `0 out
-  of 0` lines before. `inference_demo.cpp` stays at 0%: it is a `main` compiled
-  into the library that nothing calls.
+  of 0` lines before. `inference_demo.cpp` read 0% while it was a `main` compiled
+  into the library that nothing called; since 2026-10-15 it is the `AccelerANTgine_demo`
+  program and outside the library's figure.
 - **The tests generate their ONNX models.** `Test/common/kataglyphis_test_support.h`
   hand-encodes a ModelProto (IR 8, opset 13): Relu, Add, Relu plus Neg, and a
   Reshape from `images[1,3,H,W]` to `output[1,rows,values]`. With that one a test
   writes the raw detector output as the input image, so the YOLO decoder runs end to
-  end without `models/yolo26n.onnx`. Nothing is staged for the Windows arm64 run job,
+  end without any model file. Nothing is staged for the Windows arm64 run job,
   and the `*.onnx` guard in `.gitignore` stays as it is. The shipped
   `resources/configs/inference_config.toml` is compiled into the suites
   (`kataglyphis_embed_text_file`) for the same reason.
@@ -273,6 +274,12 @@ written out rather than linked.
   flat directory) get them in their own `lib\gstreamer-1.0`, with the plugins' imports
   beside the suites; the hub's import walk resolves a name anywhere in the tree. The WebRTC
   tests need `webrtcsink` (gst-plugins-rs), which only the Linux image has.
+- **On Linux no test may skip, and UBSan is fatal** (2026-10-15). ctest counts a gtest
+  `[  SKIPPED ]` as passed in its "100% tests passed" line, so `ci-build-and-test.sh` fails
+  the lane on any `<skipped>` in its JUnit file and names the tests: the image carries every
+  element, so a skip there means one went missing. Windows keeps its skips (`webrtcsink`).
+  The Debug presets build UBSan recoverable, so the same script exports
+  `UBSAN_OPTIONS=halt_on_error=1`; a report used to print and the test still passed.
 - **On clang-cl the fuzz suite is built without sanitizers.** absl's swisstable layout
   depends on ASan (`ABSL_SWISSTABLE_ENABLE_GENERATIONS`), and clang-cl applies ASan only
   through `myproject_options`, so absl and FuzzTest are not instrumented there while the
