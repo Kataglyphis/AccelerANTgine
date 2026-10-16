@@ -67,6 +67,12 @@ fi
 # Shared by the probe and the real run, so a passing probe vouches for exactly these options.
 PERF_RECORD_ARGS=(-F 99 --call-graph dwarf)
 
+# gperftools' default libgcc walker segfaulted 6 of 140 arm64 starts at 4 kHz in its SIGPROF handler; generic_fp 0 of 210.
+STACK_WALKER="${TCMALLOC_STACKTRACE_METHOD:-}"
+if [[ -z "${STACK_WALKER}" && "$(uname -m)" == "aarch64" ]]; then
+  STACK_WALKER="generic_fp"
+fi
+
 # Sets PERF_SKIP_REASON when this host cannot run perf, as in the CI image (AGENTS.md section 4).
 perf_probe() {
   PERF_SKIP_REASON=""
@@ -135,7 +141,8 @@ run_workload() {
   start_signalling_server
   (
     cd "${BUILD_DIR}" && timeout "${window}" \
-      "$@" env CPUPROFILE="${PROFILE_OUTPUT}" "./${PROFILE_BINARY}" "${WORKLOAD_ARGS[@]}"
+      "$@" env CPUPROFILE="${PROFILE_OUTPUT}" ${STACK_WALKER:+"TCMALLOC_STACKTRACE_METHOD=${STACK_WALKER}"} \
+      "./${PROFILE_BINARY}" "${WORKLOAD_ARGS[@]}"
   ) || status=$?
   stop_signalling_server
 
@@ -159,7 +166,7 @@ else
 fi
 
 if [[ -s "${PROFILE_OUTPUT}" ]]; then
-  info "gperftools CPU profile: ${PROFILE_OUTPUT}"
+  info "gperftools CPU profile: ${PROFILE_OUTPUT} (stack walker: ${STACK_WALKER:-the gperftools default})"
 else
   # Expected without libprofiler: the build falls back to -pg and CPUPROFILE is inert.
   info "no gperftools profile at ${PROFILE_OUTPUT} (libprofiler not linked; ProjectOptions.cmake fell back to -pg)"

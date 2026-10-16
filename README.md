@@ -304,8 +304,16 @@ this project's subject — the upstream install instructions for
 [valgrind](https://valgrind.org/docs/manual/cl-manual.html) and
 [perf](https://perfwiki.github.io/main/) are the ones that stay correct. The CI
 image does NOT carry the whole set: it has no `perf` (so the lane warns, runs
-the workload for a short window without a recorder, then runs the benchmarks)
-and no gperftools `libprofiler` (configure falls back to `-pg`).
+the workload for a short window without a recorder, then runs the benchmarks).
+It does carry gperftools' `libprofiler` (2.18.1, checked 2026-10-16), so that
+window writes `logs/profile.prof` on both arches; a host without it falls back
+to `-pg`. **On arm64 the script picks gperftools' `generic_fp` stack walker**:
+the default, `libgcc`, unwinds from inside the profiler's signal handler and
+crashed the workload with a segfault in 6 of 140 starts at 4 kHz on a Pi 5 (one
+CI run on 2026-10-16), while `generic_fp` crashed in none of 210 and gave
+slightly deeper stacks, since clang keeps arm64's frame records at `-O3`. x86_64
+keeps the default, where clang drops frame pointers. Setting
+`TCMALLOC_STACKTRACE_METHOD` yourself overrides the choice.
 
 A `perf` binary alone does not make a profile. The profiled workload is the
 CLI's WebRTC producer on its synthetic source (`--webrtc --source test`), which

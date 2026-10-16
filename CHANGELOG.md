@@ -405,6 +405,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- 2026-10-16 — **The arm64 profile workload no longer segfaults now and then.** The clang leg of
+  `linux-arm64.yml` failed in `ci-profile-bench.sh` with exit 139 about 0.2 s into the CLI's
+  WebRTC workload (run 38842056562), on the same image and code as a green run the day before.
+  Reproduced on a Pi 5 in the same image: only with `CPUPROFILE` set, and only with gperftools'
+  default `libgcc` stack walker, which unwinds from inside its SIGPROF handler (6 crashes in 140
+  starts at 4 kHz, one in 82 at CI's 100 Hz, 0 in 80 without the profiler). `generic_fp` crashed in none of 210 starts and
+  gave a mean stack depth of 17.3 against 15.7, so the script sets it on arm64, unless
+  `TCMALLOC_STACKTRACE_METHOD` is set already. The README also stops saying the CI image has no
+  `libprofiler`: it has carried one, and every profile run has used it.
+
 - 2026-10-12 — **The cmake-format gate fails on drift instead of rewriting it.**
   `run-static-analysis-format.sh` ran the hub's cmake-format in place, so every CI run reformatted
   its own checkout and passed. `Bindings/python/CMakeLists.txt` had drifted that way since 5ce2d8d
