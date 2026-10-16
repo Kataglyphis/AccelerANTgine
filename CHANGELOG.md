@@ -20,6 +20,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-10-16
+
 ### Added
 
 - 2026-10-11 — **Linux builds and ships the Python bindings twice: `cp314-cp314` and the
