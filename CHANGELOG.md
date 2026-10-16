@@ -5,13 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**No release has been made yet.** `CMakeLists.txt` declares `VERSION 0.0.1`,
-which is what CPack stamps into every artifact, and since 2026-10-16 every push
-to `main` releases `v<that version>` once every lane is green (`release.yml`),
-with this file's `## [<version>]` section as the notes. So before a merge, raise
-the version and turn `## [Unreleased]` into that section; until the first
-release the link at the bottom points at the commit log rather than at a
-`compare/` range that would 404.
+`CMakeLists.txt` declares the `VERSION` CPack stamps into every artifact, and
+every push to `main` releases `v<that version>` once every lane is green
+(`release.yml`, first run 2026-10-16 for 0.0.1), with this file's
+`## [<version>]` section as the notes. So before a merge, raise the version and
+turn `## [Unreleased]` into that section.
 
 A change here surfaces in OmniAccelerANT only once its
 `third_party/AccelerANTgine` pin is bumped (and thus in the in-tree
@@ -19,6 +17,20 @@ A change here surfaces in OmniAccelerANT only once its
 belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
+
+### Fixed
+
+- 2026-10-16 — **The Linux packages start outside the build image.** 0.0.1's `.deb`, tarball and
+  AppImage started nowhere else: the executable had no RUNPATH to its own `lib/`, and GCC 16.2's
+  `libstdc++` (`GLIBCXX_3.4.36`, newer than any distro's) and the chain ONNX Runtime were neither
+  bundled nor declared. ANTfrastructure's `kataglyphis_install_linux_closure` now puts them in
+  `lib/accelerantgine/` (ORT byte for byte, as G6 grades it), and the `.deb` declares what it
+  takes from the distro: glibc 2.43 and GStreamer 1.28. The packages run on Ubuntu 26.04 and
+  newer; Debian 13 and Ubuntu 24.04 have an older glibc (ANTfrastructure BACKLOG CON97). 12 MB
+  each instead of 0.3 MB.
+- 2026-10-16 — **A clean-host job proves it**: after each Linux lane, `ubuntu-26.04` and
+  `ubuntu-26.04-arm` install the `.deb` with apt, check every installed ELF with `ldd`, and start
+  `AccelerANTgine --version` from the `.deb`, the unpacked tarball and the AppImage.
 
 ## [0.0.1] - 2026-10-16
 
