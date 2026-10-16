@@ -7,4 +7,5 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/antfrastructure.sh
 source "${_SCRIPT_DIR}/lib/antfrastructure.sh"
 
-antfrastructure_exec linux/scripts/run-lint-gates.sh "${KATAGLYPHIS_REPO_ROOT}" "$@"
+# Matches lint-gates.yml's `ratchets: true`; without it the doc-link and ratchet gates never ran here.
+antfrastructure_exec linux/scripts/run-lint-gates.sh "${KATAGLYPHIS_REPO_ROOT}" --ratchets "$@"

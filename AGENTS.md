@@ -69,7 +69,7 @@ not here:
 | `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` — its four steps called one by one rather than `docs_build_main`, so the test-result pages `junit_to_markdown.py` renders are in place before Sphinx reads them, with the venv bootstrap handed over as two shell *functions* over `01-core/python_uv.sh`. Why functions and not helper scripts is one owner, the file header: git records a new `.sh` as 100644 under `core.filemode=false`, and a function name is a command with no file mode |
 | `scripts/linux/ci-release.sh` | `linux/scripts/lib/cmake-build.sh` + `lib/app-packaging.sh` — job count, container env repair, flatpak arch mapping and the artifact assertion. The configure line is upstream too now: `cmake_build_main` with two repeatable `--configure-arg` flags, where a hand-written `cmake -B … --preset` used to sit. So is the whole flatpak bundle: `app_packaging_ensure_flatpak_runtime` + `app_packaging_package_cmake_install_flatpak`, which stage container-native and let `ostree` — not flatpak-builder's exit code — decide. `load_project_metadata` and `ensure_flatpak_tools` stay local, the latter for its apt/`AUTO_INSTALL_FLATPAK` knob alone: tool PRESENCE, `ostree` included, is `app_packaging_require_flatpak_tools` since 604294e2 |
 | `scripts/linux/ci-finalize.sh` | `linux/scripts/01-core/bind-mount-ownership.sh` — `fix_bind_mount_ownership`, which this file carried locally and asked to have moved. Upstream kept the split that is the point of it: selective chown, never `-R`; tolerated and explained as non-root; fatal as root; a missing target is not an error |
-| `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` — shellcheck, actionlint (with the CI image-ref check), gitleaks, ruff, the shared-config drift check (the rows of `.antfrastructure-shared.manifest`) and the consumer pin-forwarding check, at pinned and SHA256-verified versions; passes this repo's root, which upstream refuses to infer. `--ratchets` adds the eight `--root` measurement gates plus doc-links, frozen in `comment-size.allow` and `shellcheck-warnings.allow` at the repo root; CI passes it |
+| `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` — shellcheck, actionlint (with the CI image-ref check), gitleaks, ruff, the shared-config drift check (the rows of `.antfrastructure-shared.manifest`) and the consumer pin-forwarding check, at pinned and SHA256-verified versions; passes this repo's root, which upstream refuses to infer. `--ratchets` adds the eight `--root` measurement gates plus doc-links, frozen in `comment-size.allow` and `shellcheck-warnings.allow` at the repo root; CI passes it, and so does the wrapper itself since 2026-10-16, so a dev box runs CI's seven gates |
 
 CI jobs use ANTfrastructure's composite actions (`prepare-linux-ci-host`,
 `run-in-linux-container`, `deploy-over-ftp`, `run-pester-suite`) and reusable
@@ -510,8 +510,10 @@ An error outside every build step now exits 1: it used to be logged and exit 0.
 ANTfrastructure's reusable workflows; only this repo's `on:` filters and their
 inputs (`submodules: 'recursive'` and `ratchets: true` for the lint gates,
 `pester-version: '3.4.0'` for the pins) stay local. `lint-gates.yml` runs the
-same aggregator a dev box runs — `bash scripts/linux/run-lint-gates.sh
---ratchets` — against the same explicit root; it reaches it from the hub
+same aggregator a dev box runs — `bash scripts/linux/run-lint-gates.sh`, which adds
+`--ratchets` itself — against the same explicit root. The doc-link gate needs the hub's
+`third_party/DocumANTation` checked out, since `docs/source/_static/css/custom.css`
+links into it. It reaches the aggregator from the hub
 checkout rather than through the wrapper, because the wrappers sit at different
 paths across the family.
 
