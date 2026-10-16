@@ -49,6 +49,7 @@ reorganisation.
 | The riscv64 cross lane: the sysroot from the image's riscv64 child, the cross clang, QEMU binfmt, what cannot run under QEMU | `docs/riscv64-cross-test-lanes.md` |
 | ONNX Runtime's one source (the chain build) and the G6 census | `docs/onnxruntime-single-source.md` |
 | Bind mount vs tar-pipe, Dev Drive filter setup, container reuse | `docs/windows-container-build-performance.md` |
+| sccache across build hosts: the host's dufs plus a shared S3 bucket, the key as BuildKit secrets or by name on a reused container's `docker exec`, and the fallback when the bucket stalls; the bucket's server runbook | `docs/windows-build-resources.md` § *Two cache levels*, `linux/sccache-s3/README.md` |
 | clang-format / clang-tidy / cmake-format and the canonical configs | `docs/code-quality-tooling.md` |
 | Job counts, per-job memory, why a build got OOM-killed | `docs/build-parallelism-memory-tuning.md` |
 | The five shell-safety bug classes | `third_party/ANTfrastructure/AGENTS.md` § *Shell safety conventions* |
