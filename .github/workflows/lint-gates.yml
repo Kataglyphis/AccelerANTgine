@@ -7,6 +7,7 @@ on:
     branches: ["main", "develop"]
   pull_request:
     branches: ["main", "develop"]
+  workflow_dispatch:
 
 # Read-only: this lane reports a verdict and writes nothing.
 permissions:

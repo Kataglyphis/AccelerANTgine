@@ -1,10 +1,9 @@
 name: Linux arm64 · build + test
 
+# On request only (https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md): on-request.yml or by hand.
 on:
-  push:
-    branches: ["main", "develop"]
-  pull_request:
-    branches: ["main", "develop"]
+  workflow_dispatch:
+  workflow_call:
 
 # Exactly what the nested reusable-linux.yml job asks for; a narrower grant makes it refuse to start.
 permissions:
@@ -12,6 +11,11 @@ permissions:
   packages: read
   # compiler-cache-save deletes its key's older cache entries.
   actions: write
+
+# Per lane and caller: the literal name keeps lanes apart, github.workflow (the caller's when called) keeps callers apart.
+concurrency:
+  group: linux-arm64-${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
   build-ubuntu26_04_gcc-arm:

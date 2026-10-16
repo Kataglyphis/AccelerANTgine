@@ -1,5 +1,6 @@
 name: Linux x64 · build + test
 
+# The one build lane every push runs (the family's rule, docs/branch-and-release-strategy.md in ANTfrastructure).
 on:
   push:
     branches: ["main", "develop"]
@@ -13,6 +14,11 @@ permissions:
   packages: read
   # compiler-cache-save deletes its key's older cache entries.
   actions: write
+
+# Per lane and caller: the literal name keeps lanes apart, github.workflow (the caller's when called) keeps callers apart.
+concurrency:
+  group: linux-x64-${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
   build-ubuntu26_04_gcc-x64:

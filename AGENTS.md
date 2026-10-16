@@ -438,8 +438,15 @@ files, one file per platform + arch, display names `<Platform> <Arch> · <what>`
 `reusable-linux.yml` once per compiler), `windows-x64.yml` (the container build through
 the hub's `container-ci-windows.yml`, a `lint-powershell` job over `scripts/`, and a
 `pester-tests` job over `scripts/windows/tests/`), `windows-arm64-cross.yml`, `linux-riscv64.yml`,
-`lint-gates.yml` and `submodule-pins.yml`. The five platform lanes run on every push and PR to `main`
-and `develop`, with no path filter. Every job that owns a runner carries `timeout-minutes`, every workflow
+`lint-gates.yml` and `submodule-pins.yml`. **A push or PR runs Linux x64 and the gates; the other four
+platform lanes run on request** (owner rule 2026-10-15 for the whole family, ANTfrastructure's
+[`branch-and-release-strategy.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md)): `on-request.yml` reads `[ci <lane>]` in the pushed
+commit messages, so `[ci windows]` runs both Windows lanes, `[ci arm64]` both arm64 ones,
+`[ci riscv64]` the riscv64 lane and `[ci all]` all four; each lane's Run workflow button (or
+`gh workflow run <lane>.yml --ref <branch>`) starts one by hand. A token in a commit message
+starts lanes, so never quote one in prose. Each lane's concurrency group is
+`<lane>-${{ github.ref }}-${{ github.workflow }}`, one per lane and caller. A lane's README
+badge shows only its runs started by hand; a requested run is listed under *On request*. Every job that owns a runner carries `timeout-minutes`, every workflow
 declares `permissions:`, and every upload sets `if-no-files-found: error` — the
 hub's workflow conventions (`verify_workflow_conventions.py`), measured at zero
 findings here since the rename (again on 2026-09-25).

@@ -123,6 +123,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- 2026-10-16 — **A push runs Linux x64 and the gates; Linux arm64, Linux riscv64, Windows x64 and
+  Windows arm64 run on request**, the family's CI rule ([ANTfrastructure's
+  `branch-and-release-strategy.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md)) that OmniAccelerANT and OxidANT already follow.
+  `on-request.yml` starts the lanes a pushed commit message asks for with the ci token
+  (`windows`, `arm64`, `riscv64`, `all`), and every lane keeps its Run workflow button. Each
+  lane's concurrency group names the lane and its caller, so a push, a request and a run by hand
+  never cancel each other.
+
 - 2026-10-15 — **The library carries no `main()` any more.** `Src/inference_demo.cpp`, the demo
   `models/README.md` runs, was compiled into `libAccelerANTgine` (and every embedder, the
   OmniAccelerANT plugin among them) as an unreachable `main` at 0 % coverage. It is the
