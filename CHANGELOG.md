@@ -24,10 +24,11 @@ belongs in the **Changed** list below with that consequence spelled out.
   AppImage started nowhere else: the executable had no RUNPATH to its own `lib/`, and GCC 16.2's
   `libstdc++` (`GLIBCXX_3.4.36`, newer than any distro's) and the chain ONNX Runtime were neither
   bundled nor declared. ANTfrastructure's `kataglyphis_install_linux_closure` now puts them in
-  `lib/accelerantgine/` (ORT byte for byte, as G6 grades it), and the `.deb` declares what it
-  takes from the distro: glibc 2.43 and GStreamer 1.28. The packages run on Ubuntu 26.04 and
-  newer; Debian 13 and Ubuntu 24.04 have an older glibc (ANTfrastructure BACKLOG CON97). 12 MB
-  each instead of 0.3 MB.
+  `lib/accelerantgine/` (ORT byte for byte, as G6 grades it) together with the image's loader
+  and glibc 2.43, and `bin/AccelerANTgine` is a launcher that starts the program through them
+  (`LOADER`, 2026-10-17). The `.deb` takes only GStreamer ≥ 1.26 from the distro. Measured on a
+  Raspberry Pi 5 with Debian 13 (glibc 2.41): the `.deb`, the tarball and the AppImage start;
+  and in Ubuntu 26.04. 14 MB each instead of 0.3 MB.
 - 2026-10-16 — **A clean-host job proves it**: after each Linux lane, `ubuntu-26.04` and
   `ubuntu-26.04-arm` install the `.deb` with apt, check every installed ELF with `ldd`, and start
   `AccelerANTgine --version` from the `.deb`, the unpacked tarball and the AppImage.

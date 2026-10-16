@@ -31,15 +31,16 @@ kataglyphis_cpack_common(
   # Under /usr the .desktop file and icon land where a desktop looks for them.
   UNIX_INSTALL_PREFIX
   "/usr"
-  # The packages bundle neither glibc nor GStreamer: they need the image's base, Ubuntu 26.04, or newer.
+  # glibc travels (LOADER below), GStreamer is the distro's: 1.26 is Debian 13's, measured 2026-10-17.
   DEBIAN_DEPENDS
-  "libc6 (>= 2.43), libgstreamer1.0-0 (>= 1.28), libgstreamer-plugins-base1.0-0 (>= 1.28), libgstreamer-plugins-bad1.0-0 (>= 1.28)"
+  "libgstreamer1.0-0 (>= 1.26), libgstreamer-plugins-base1.0-0 (>= 1.26), libgstreamer-plugins-bad1.0-0 (>= 1.26)"
   # NSIS resolves against MAX_PATH, which the full descriptive name overruns in deep workspaces.
   SHORT_WINDOWS_FILE_NAME)
 
-# The compiler's libstdc++ and the chain ORT: GCC 16.2's GLIBCXX_3.4.36 is newer than any distro's.
+# The compiler's libstdc++, the chain ORT and the image's glibc: GCC 16.2's and glibc 2.43 are newer than Debian 13's.
 get_filename_component(_ort_lib_dir "${_ONNXRUNTIME_LIB}" DIRECTORY)
 kataglyphis_install_linux_closure(
+  LOADER
   PRIVATE_DIR
   accelerantgine
   TARGETS
