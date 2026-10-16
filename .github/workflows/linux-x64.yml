@@ -1,6 +1,6 @@
 name: Linux x64 · build + test
 
-# The one build lane every push runs (the family's rule, docs/branch-and-release-strategy.md in ANTfrastructure).
+# The one build lane every push runs (https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md).
 on:
   push:
     branches: ["main", "develop"]
