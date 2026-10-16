@@ -446,7 +446,12 @@ commit messages, so `[ci windows]` runs both Windows lanes, `[ci arm64]` both ar
 `gh workflow run <lane>.yml --ref <branch>`) starts one by hand. A token in a commit message
 starts lanes, so never quote one in prose. Each lane's concurrency group is
 `<lane>-${{ github.ref }}-${{ github.workflow }}`, one per lane and caller. A lane's README
-badge shows only its runs started by hand; a requested run is listed under *On request*. Every job that owns a runner carries `timeout-minutes`, every workflow
+badge shows only its runs started by hand; a requested run is listed under *On request*. **Every push to `main` is a release** (`release.yml`): a version check, all five
+lanes once more, then `v<version>` with every lane's packages
+(`scripts/linux/collect-release-assets.sh`, its suite a job of `linux-x64.yml`), only when every lane is green. The version is
+`CMakeLists.txt`'s `project()` `VERSION`; before a merge, raise it and turn `## [Unreleased]`
+into its CHANGELOG section. `gh workflow run release.yml --ref develop -f dry-run=true` proves it on
+`develop` without publishing. Every job that owns a runner carries `timeout-minutes`, every workflow
 declares `permissions:`, and every upload sets `if-no-files-found: error` — the
 hub's workflow conventions (`verify_workflow_conventions.py`), measured at zero
 findings here since the rename (again on 2026-09-25).

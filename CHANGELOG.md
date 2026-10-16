@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**No release has been tagged yet.** `CMakeLists.txt` declares `VERSION 0.0.1`,
-which is what CPack stamps into every artifact, but no `v0.0.1` tag exists on
-the remote — so the link at the bottom points at the commit log rather than at a
-`compare/` range that would 404. Cut a tag and this file gains a real section.
+**No release has been made yet.** `CMakeLists.txt` declares `VERSION 0.0.1`,
+which is what CPack stamps into every artifact, and since 2026-10-16 every push
+to `main` releases `v<that version>` once every lane is green (`release.yml`),
+with this file's `## [<version>]` section as the notes. So before a merge, raise
+the version and turn `## [Unreleased]` into that section; until the first
+release the link at the bottom points at the commit log rather than at a
+`compare/` range that would 404.
 
 A change here surfaces in OmniAccelerANT only once its
 `third_party/AccelerANTgine` pin is bumped (and thus in the in-tree
@@ -122,6 +125,17 @@ belongs in the **Changed** list below with that consequence spelled out.
   cannot be, because a rule does nothing once a path is already tracked.
 
 ### Changed
+
+- 2026-10-16 — **Every push to `main` releases `v<version>`, and only when all five lanes are green**
+  (`release.yml`, the family's rule in [ANTfrastructure's `branch-and-release-strategy.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md)).
+  The version is `CMakeLists.txt`'s `project()` `VERSION`, read by the hub's `version_util.sh`
+  (5499dc91, this repo's new hub pin). `scripts/linux/collect-release-assets.sh` gathers each
+  lane's packages: the `.deb`, AppImage, flatpak (renamed per arch) and tarball of both Linux
+  arches, the four Python wheels, and the MSI, MSIX and zip of both Windows arches plus x64's
+  installer, never a file from a portable `bundle/`. Checked on the 2026-10-16 uploads: 13 files,
+  141 MB, Linux arm64 aside. Its suite runs with Linux x64 on every push. The Linux packages now
+  upload as `linux-packages-<arch>`, since one release run holds both arches. `gh workflow run
+  release.yml --ref develop -f dry-run=true` runs it all on `develop` and publishes nothing.
 
 - 2026-10-16 — **A push runs Linux x64 and the gates; Linux arm64, Linux riscv64, Windows x64 and
   Windows arm64 run on request**, the family's CI rule ([ANTfrastructure's
