@@ -33,12 +33,12 @@ belongs in the **Changed** list below with that consequence spelled out.
   because the hub's arch gate refused that stub. The gate now reports an NSIS installer instead of
   failing it, and the `windows-11-arm` job installs it silently, checks that every installed binary
   is ARM64, starts `bin/AccelerANTgine.exe` from the install directory and uninstalls it again
-  (`installed-run-command`). The hub moves to 4cfaabcb. Owner rule of the same day: every release ships
+  (`installed-run-command`). The hub moves to 6ea38c48. Owner rule of the same day: every release ships
   Windows arm64 installers next to the x64 ones.
 
 ### Changed
-- ANTfrastructure 4cfaabcb -> 4ca1d4d3 (the Linux chain's sccache S3 level) and NLOHMANN_JSON
-  0e95fe82 (726dc77). The version is 0.0.3 in `CMakeLists.txt` and `pyproject.toml`, so the MSI,
+- ANTfrastructure 6ea38c48 -> a8547b0d (the Linux chain's sccache S3 level) and NLOHMANN_JSON
+  0e95fe82 (6cd5559). The version is 0.0.3 in `CMakeLists.txt` and `pyproject.toml`, so the MSI,
   the MSIX (0.0.3.0) and the wheels say it too.
 
 ## [0.0.2] - 2026-10-17
@@ -173,7 +173,7 @@ belongs in the **Changed** list below with that consequence spelled out.
 - 2026-10-16 — **Every push to `main` releases `v<version>`, and only when all five lanes are green**
   (`release.yml`, the family's rule in [ANTfrastructure's `branch-and-release-strategy.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md)).
   The version is `CMakeLists.txt`'s `project()` `VERSION`, read by the hub's `version_util.sh`
-  (5499dc91, this repo's new hub pin). `scripts/linux/collect-release-assets.sh` gathers each
+  (15bc7d6c, this repo's new hub pin). `scripts/linux/collect-release-assets.sh` gathers each
   lane's packages: the `.deb`, AppImage, flatpak (renamed per arch) and tarball of both Linux
   arches, the four Python wheels, and the MSI, MSIX and zip of both Windows arches plus x64's
   installer, never a file from a portable `bundle/`. Checked on the 2026-10-16 uploads: 13 files,
@@ -292,7 +292,7 @@ belongs in the **Changed** list below with that consequence spelled out.
     v0.6.1 lacks the `CARGO_HOME` and cxxbridge-cmd fixes after it; move to the next tag.
   - `.github/renovate.json` drops its own CMake manager: the preset reads the same pins,
     and two managers would report each pin twice, which `--apply` refuses.
-- **The ONNX Runtime proof is the hub's `WindowsOrtPayload.Common`** (hub `ad08bc30`,
+- **The ONNX Runtime proof is the hub's `WindowsOrtPayload.Common`** (hub `73a8dd74`,
   2026-09-25). `WindowsOrtBundle.Common` and its cases moved there: `Copy-ChainOrtLib`
   is `Copy-ChainOrtBeside -All`, `Assert-BundleChainOrt` is `Assert-ChainOrtTree`
   (`-ExeDirectory`/`-DllDirectory` are `-OrtDirectory`, the Python package's waiver
@@ -396,7 +396,7 @@ belongs in the **Changed** list below with that consequence spelled out.
   renamed to say so: `Start-Build.ps1` → `Invoke-ContainerBuild.ps1`,
   `Start-PythonBindings.ps1` → `Invoke-ContainerPythonBindings.ps1`,
   `Start-Help.ps1` → `Show-BuildHelp.ps1`.
-- 2026-09-15 — `third_party/ANTfrastructure` moved to `49be50f0` and four
+- 2026-09-15 — `third_party/ANTfrastructure` moved to `35960a87` and four
   helpers this repo had written locally, each under a header saying it would
   leave once the hub grew one, came from the hub instead.
   `scripts/linux/ci-release.sh` configures through a single `cmake_build_main`
@@ -413,7 +413,7 @@ belongs in the **Changed** list below with that consequence spelled out.
   `WindowsMediaRuntime.Common`, whose recursive NuGet probe follows the target
   runtime identifier instead of a literal `win-x64`; this lane's presets are all
   `x64-*`, so it resolves to the same `win-x64` it always matched.
-- 2026-09-15 — `third_party/ANTfrastructure` moved to `604294e2`, whose
+- 2026-09-15 — `third_party/ANTfrastructure` moved to `d339cd52`, whose
   `app_packaging_require_flatpak_tools` requires `ostree` alongside `flatpak` and
   `flatpak-builder`, reports every missing tool rather than only the first, and
   names what the packaging step wanted each one for. That is the measurement this
@@ -475,11 +475,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 - 2026-10-12 — **The cmake-format gate fails on drift instead of rewriting it.**
   `run-static-analysis-format.sh` ran the hub's cmake-format in place, so every CI run reformatted
-  its own checkout and passed. `Bindings/python/CMakeLists.txt` had drifted that way since 5ce2d8d
+  its own checkout and passed. `Bindings/python/CMakeLists.txt` had drifted that way since b44a1a8
   (a one-line `nanobind_add_module`). The gate now passes `--check`, and that file is formatted. In
   `:latest` the script exits 0 on this tree and 1 with one planted deviation.
 
-- 2026-10-11 — **The Windows arm64 lane starts again.** Hub 5343096f dropped `bundle-artifact-name`
+- 2026-10-11 — **The Windows arm64 lane starts again.** Hub eb7a05bb dropped `bundle-artifact-name`
   and the bundle-gate job from `container-ci-windows.yml`, because the hub now gates its `:winarm64`
   bundle in its own `windows-arm64.yml`. This lane still passed the input, so GitHub refused the
   workflow before any job ran (`startup_failure`, run 38174233712). The input is gone. The build,
@@ -544,7 +544,7 @@ belongs in the **Changed** list below with that consequence spelled out.
     handlers outlived the streamer.
 
 - 2026-09-30 — **The Linux x64 gcc job links again; both module targets are
-  PIC.** Red since the NLOHMANN_JSON bump of 9ca179d (2026-09-28), which added
+  PIC.** Red since the NLOHMANN_JSON bump of bd3fb23 (2026-09-28), which added
   `basic_json::nesting_depth()` and its function-local `static thread_local`.
   `nlohmann_json_modules` and `tomlplusplus_modules` are static libraries that
   were compiled without `-fPIC`, and GCC 16.2.0 writes the TLS model of a
@@ -571,7 +571,7 @@ belongs in the **Changed** list below with that consequence spelled out.
   AGENTS.md put `knt_push_frame` in this repo's C API, which holds only
   `kataglyphis_add` (the plugin exports `knt_push_frame` itself).
   Also corrected: the Renovate notes (the default is every manager the tree has,
-  and `--apply` rewrites manifests and locks too, since hub d04631ed), `.clang-tidy`
+  and `--apply` rewrites manifests and locks too, since hub a0254781), `.clang-tidy`
   listed as a shared config (`.antfrastructure-shared.manifest` keeps it local),
   `Build-PythonBindings.ps1` said to run tests it does not run, and the Windows
   CI page, which still described the lane before `container-ci-windows.yml`.
@@ -675,7 +675,7 @@ belongs in the **Changed** list below with that consequence spelled out.
 - 2026-09-23 — **the clang lanes' coverage step measures again** (x64 and arm64,
   runs 35921977662 / 35921977310 stopped at `error: Test/compile/default.profraw:
   No such file or directory`). Three causes, each fixed here:
-  `myproject_ENABLE_COVERAGE` has defaulted OFF since 927e8fc and
+  `myproject_ENABLE_COVERAGE` has defaulted OFF since 2ace55e and
   `linux-debug-clang` never set it, so nothing was instrumented — the preset now
   sets it ON (`linux-debug-clang-tsan` does not inherit it and stays
   uninstrumented); `gtest_discover_tests` runs each test case as its own
@@ -700,7 +700,7 @@ belongs in the **Changed** list below with that consequence spelled out.
   where it fails, the lane WARNs with perf's own message and skips the recording
   (and, until the 2026-09-24 entry below, the workload with it); the benchmark
   suite runs either way. Where it passes, everything but the window-closing exit
-  124 is still fatal, as since 072937a. README no longer claims the CI image
+  124 is still fatal, as since f98abe0. README no longer claims the CI image
   carries perf and gperftools.
 - 2026-09-24 — **a working `perf` records the whole window now; the 09-23 fix
   alone was not enough.** With `linux-perf` installed in a `--privileged`
@@ -750,7 +750,7 @@ a measurement belongs in a changelog rather than in `AGENTS.md`.
   as **REFUSED** because they named no branch, and ended in "nothing to apply"
   with `git status` unchanged. That refusal was the feature: an unset branch does
   not disarm `git submodule update --remote`, it makes it walk to the remote's
-  *default* branch. Since 9a5653d all seven declare a branch, so `--apply` now
+  *default* branch. Since ff4e867 all seven declare a branch, so `--apply` now
   moves every one that is behind.
 - **2026-09-09, the report-only managers.** `pep621`, `pip_requirements`,
   `cargo` and `pre-commit` together returned two rows, both from

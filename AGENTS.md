@@ -68,7 +68,7 @@ not here:
 | `scripts/linux/ci-profile-bench.sh` | `linux/scripts/lib/cmake-build.sh` — the perf/benchmark run itself stays local |
 | `scripts/linux/renovate-local.sh` | `linux/scripts/renovate-local.sh` — Renovate as a local CLI, plus the git half that applies what it can only detect (passes this repo's root) |
 | `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh` — its four steps called one by one rather than `docs_build_main`, so the test-result pages `junit_to_markdown.py` renders are in place before Sphinx reads them, with the venv bootstrap handed over as two shell *functions* over `01-core/python_uv.sh`. Why functions and not helper scripts is one owner, the file header: git records a new `.sh` as 100644 under `core.filemode=false`, and a function name is a command with no file mode |
-| `scripts/linux/ci-release.sh` | `linux/scripts/lib/cmake-build.sh` + `lib/app-packaging.sh` — job count, container env repair, flatpak arch mapping and the artifact assertion. The configure line is upstream too now: `cmake_build_main` with two repeatable `--configure-arg` flags, where a hand-written `cmake -B … --preset` used to sit. So is the whole flatpak bundle: `app_packaging_ensure_flatpak_runtime` + `app_packaging_package_cmake_install_flatpak`, which stage container-native and let `ostree` — not flatpak-builder's exit code — decide. `load_project_metadata` and `ensure_flatpak_tools` stay local, the latter for its apt/`AUTO_INSTALL_FLATPAK` knob alone: tool PRESENCE, `ostree` included, is `app_packaging_require_flatpak_tools` since 604294e2 |
+| `scripts/linux/ci-release.sh` | `linux/scripts/lib/cmake-build.sh` + `lib/app-packaging.sh` — job count, container env repair, flatpak arch mapping and the artifact assertion. The configure line is upstream too now: `cmake_build_main` with two repeatable `--configure-arg` flags, where a hand-written `cmake -B … --preset` used to sit. So is the whole flatpak bundle: `app_packaging_ensure_flatpak_runtime` + `app_packaging_package_cmake_install_flatpak`, which stage container-native and let `ostree` — not flatpak-builder's exit code — decide. `load_project_metadata` and `ensure_flatpak_tools` stay local, the latter for its apt/`AUTO_INSTALL_FLATPAK` knob alone: tool PRESENCE, `ostree` included, is `app_packaging_require_flatpak_tools` since d339cd52 |
 | `scripts/linux/ci-finalize.sh` | `linux/scripts/01-core/bind-mount-ownership.sh` — `fix_bind_mount_ownership`, which this file carried locally and asked to have moved. Upstream kept the split that is the point of it: selective chown, never `-R`; tolerated and explained as non-root; fatal as root; a missing target is not an error |
 | `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` — shellcheck, actionlint (with the CI image-ref check), gitleaks, ruff, the shared-config drift check (the rows of `.antfrastructure-shared.manifest`) and the consumer pin-forwarding check, at pinned and SHA256-verified versions; passes this repo's root, which upstream refuses to infer. `--ratchets` adds the eight `--root` measurement gates plus doc-links, frozen in `comment-size.allow` and `shellcheck-warnings.allow` at the repo root; CI passes it, and so does the wrapper itself since 2026-10-16, so a dev box runs CI's seven gates |
 
@@ -177,9 +177,11 @@ written out rather than linked.
   It raises a clear error if that path is missing, which in practice means the
   nested submodule was not initialised recursively.
 - **One binary is tracked on purpose; models never are.**
-  `images/Engine_logo.bmp` (156 KiB) is the NSIS installer header image
+  `images/Engine_logo.bmp` (117 KiB, the family's ant) is the NSIS installer header image
   (`cmake/CPackOptions.cmake`), which CPack reads as a literal path at package
-  time. It **stays** — the history is not rewritten and no LFS is introduced.
+  time. It **stays**, and no LFS is introduced. The family's history rewrite of
+  2026-10-17 took every blob of 500 KB or more that no branch held out of the
+  history (this pack: 12 to 2 MiB).
   The AGPL-3.0 `models/yolo26n.onnx` (9.5 MiB) left the tree on 2026-10-14 (owner):
   `Src/inference_demo.cpp` and `resources/configs/inference_config.toml` now name
   `models/deim_dfine_n_coco.onnx` (Apache-2.0), which `models/README.md` fetches
@@ -202,9 +204,9 @@ written out rather than linked.
 
   Run it from **WSL**: it bootstraps a pinned, checksum-verified Node, and there
   is none on the Windows host. All seven `.gitmodules` entries declare a
-  `branch =` since 9a5653d, so none of them comes back **REFUSED** any more and
+  `branch =` since ff4e867, so none of them comes back **REFUSED** any more and
   `--apply` moves the gitlink of every one that is behind — `FUZZTEST` included,
-  which may raise the abseil pin's floor (§ 3). Since hub d04631ed
+  which may raise the abseil pin's floor (§ 3). Since hub a0254781
   (2026-09-11) the Python, Rust and pre-commit pins are no longer report-only:
   `--apply` rewrites each reported one in place and refreshes its lock. The
   `custom.regex` manager that reads the CMake pins in
@@ -242,7 +244,7 @@ written out rather than linked.
   `x64-MSVC-Windows-{Debug,Release}`. Coverage requires a matching compiler —
   gcovr only reads GCC output, llvm-cov only clang.
 - **llvm-cov coverage is `linux-debug-clang`'s, one profile per process.**
-  `myproject_ENABLE_COVERAGE` defaults OFF (since 927e8fc), so the preset sets it
+  `myproject_ENABLE_COVERAGE` defaults OFF (since 2ace55e), so the preset sets it
   ON; `linux-debug-clang-tsan` inherits `linux-clang`, not that preset, and stays
   uninstrumented. `gtest_discover_tests` runs every test case as its own process,
   so `ci-build-and-test.sh` points `LLVM_PROFILE_FILE` at
@@ -472,7 +474,7 @@ workflow. The job runs `Build-Windows.ps1 -TargetArch arm64
 -BuildTargets clangcl-release,clangcl-debug -SkipFormat` in the family image's arm64 bundle (the format
 steps are the x64 lane's: they read the source, not the target). The hub's arch gate then
 grades `dist/windows-arm64`, and `windows-11-arm` runs `bundle/bin/AccelerANTgine.exe`. The
-image's runtime bundle as a whole is not this lane's to gate: since hub 5343096f the hub proves
+image's runtime bundle as a whole is not this lane's to gate: since hub eb7a05bb the hub proves
 it in its own `windows-arm64.yml`, and `container-ci-windows.yml` no longer takes
 `bundle-artifact-name`.
 On a cross build the script:

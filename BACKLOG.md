@@ -14,7 +14,7 @@ Effort S/M/L, impact ★ … ★★★.
 ## Open
 
 - [ ] **A sporadic segfault in the CLI's WebRTC workload** (M, ★★). On 2026-10-15 the Linux
-  arm64 gcc job (release, LTO) of f321aeb, run 38672470256 attempt 1, died in
+  arm64 gcc job (release, LTO) of a82d9bf, run 38672470256 attempt 1, died in
   `scripts/linux/ci-profile-bench.sh`: `bin/AccelerANTgine` streaming `videotestsrc ! … !
   webrtcsink` to the local signalling server ended in SIGSEGV (exit 139); attempt 2 of the
   same commit passed, and the commit only moved `inference_demo.cpp` out of the library. The

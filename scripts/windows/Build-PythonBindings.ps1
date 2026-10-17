@@ -21,7 +21,7 @@ $ErrorActionPreference = "Stop"
 # Chain ORT staging and its G6 proof come from WindowsOrtPayload.Common, which an older hub pin lacks.
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
 try { Import-BuildModule @('WindowsOrtPayload.Common') } catch {
-    throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit ad08bc30 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
+    throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit 73a8dd74 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
 }
 
 Write-Host "=== Python bindings build ($Preset) ==="

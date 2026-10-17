@@ -72,7 +72,7 @@ if ($isCross -and $notCross.Count -gt 0) {
 }
 # The G6 proof of every staged bin\, install tree and payload; an older hub pin lacks it.
 try { Import-BuildModule @('WindowsOrtPayload.Common') } catch {
-    throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit ad08bc30 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
+    throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit 73a8dd74 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
 }
 
 # The build table: a preset rename is a data edit, and every row carries its own environment override.
