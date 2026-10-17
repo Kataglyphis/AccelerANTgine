@@ -80,6 +80,14 @@ enum class StreamState { Idle, Connecting, Negotiating, Streaming, Paused, Error
 using StateCallback = std::function<void(StreamState old_state, StreamState new_state)>;
 using ErrorCallback = std::function<void(WebRTCError error, const std::string &message)>;
 
+// One element a pipeline here uses, and the plugin file GStreamer loads it from.
+struct ElementLocation
+{
+    std::string element;
+    bool found{ false };
+    std::string plugin_file;
+};
+
 class KATAGLYPHIS_CPP_API WebRTCStreamer
 {
   public:
@@ -96,6 +104,12 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer
       -> std::expected<void, WebRTCError>;
 
     static auto deinitialize() -> void;
+
+    // Every element the pipelines here use; call after initialize().
+    [[nodiscard]] static auto locate_elements() -> std::vector<ElementLocation>;
+
+    // The plugin directory a Linux package carries; empty anywhere else.
+    [[nodiscard]] static auto bundled_plugin_dir() -> std::string;
 
     // Configure and start streaming
     [[nodiscard]] auto configure(const StreamConfig &config) -> std::expected<void, WebRTCError>;

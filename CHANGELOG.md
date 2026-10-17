@@ -19,6 +19,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The Linux packages carry the image's own GStreamer** (2026-10-17, owner: never the distro's).
+  The `.deb` took `libgstreamer*1.0-0 (>= 1.26)` from the distro and its plugins with them; now the
+  libraries and the plugins the pipelines and `webrtcsink` load travel in `lib/accelerantgine`, and
+  the library points GStreamer at them alone when it finds them there. `AccelerANTgine --gst_check`
+  lists every element's plugin file and fails on a missing or foreign one; the clean-host jobs run
+  it instead of `--version`, on runners with no GStreamer at all.
 - **The Linux packages take the host's glibc when it is new enough** (2026-10-17, hub b9e451da ->
   27bf5334). `bin/AccelerANTgine` used the bundled loader and glibc 2.43 on every host, so on a distro
   newer than the build image the distro's own GStreamer, built against its newer glibc, would not

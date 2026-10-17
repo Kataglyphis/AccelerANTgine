@@ -28,6 +28,10 @@ ABSL_FLAG(std::uint32_t, height, 0, "Video height in pixels (0 = use config defa
 ABSL_FLAG(std::uint32_t, fps, 0, "Framerate (0 = use config default)");
 ABSL_FLAG(std::string, encoder, "h264-hw", "Encoder: h264-hw, h264-sw, vp8, vp9");
 ABSL_FLAG(std::uint32_t, bitrate, 0, "Bitrate in kbps (0 = use config default)");
+ABSL_FLAG(bool,
+  gst_check,
+  false,
+  "Check that GStreamer finds every element the pipelines use, in a package only its own");
 
 namespace {
 std::atomic<bool> g_running{ true };
@@ -48,6 +52,28 @@ struct CliOverrideFlags
 };
 
 void signal_handler(int /*signal*/) { g_running.store(false); }
+
+// A missing required element, or one a package loads from outside its own plugins, fails the check.
+auto check_gstreamer(int *argc, char ***argv) -> int
+{
+    if (!kataglyphis::webrtc::WebRTCStreamer::initialize(argc, argv)) {
+        std::cerr << "GStreamer did not initialize\n";
+        return 1;
+    }
+    const std::string bundled = kataglyphis::webrtc::WebRTCStreamer::bundled_plugin_dir();
+    std::cout << "plugins: " << (bundled.empty() ? std::string("not a package, GStreamer's own search path") : bundled)
+              << '\n';
+    int failures = 0;
+    for (const auto &location : kataglyphis::webrtc::WebRTCStreamer::locate_elements()) {
+        const bool optional = location.element == "libcamerasrc" || location.element == "openh264enc";
+        const bool outside = location.found && !bundled.empty() && !location.plugin_file.starts_with(bundled + "/");
+        const char *verdict = location.found ? (outside ? "OUTSIDE" : "ok") : (optional ? "absent" : "MISSING");
+        std::cout << verdict << ' ' << location.element << ' ' << location.plugin_file << '\n';
+        if ((!location.found && !optional) || outside) { ++failures; }
+    }
+    return failures == 0 ? 0 : 1;
+}
+
 
 auto was_flag_provided(std::string_view argument, std::string_view flag_name) -> bool
 {
@@ -158,6 +184,8 @@ auto main(int argc, char **argv) -> int
       "  --webrtc --source test   # For testing without camera");
 
     absl::ParseCommandLine(argc, argv);
+
+    if (absl::GetFlag(FLAGS_gst_check)) { return check_gstreamer(&argc, &argv); }
 
     const bool start_webrtc = absl::GetFlag(FLAGS_webrtc);
     if (!start_webrtc) {

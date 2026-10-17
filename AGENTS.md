@@ -394,6 +394,18 @@ written out rather than linked.
   A new bound class with mutable state needs the same. `Test/python/test_threading.py` crashes
   without them, on the GIL wheel too, because the runs release the GIL.
 
+- **The Linux packages carry the image's own GStreamer, never the distro's** (owner, 2026-10-17).
+  `cmake/CPackOptions.cmake` installs the plugins the pipelines and `webrtcsink` load into
+  `lib/accelerantgine/gstreamer-1.0`, with openh264 and libcamerasrc when the image has them and
+  NSS's softokn and freebl beside `libnss3`; the hub's closure bundles their libraries, and the
+  `.deb` depends on nothing. At load `Src/bundled_gstreamer.cpp` points GStreamer at that directory
+  alone (`GST_PLUGIN_PATH`, an empty system path, no scanner fork, a registry per installed copy)
+  and leaves every variable a user set. `AccelerANTgine --gst_check` prints each element's plugin
+  file and fails on a missing one, or in a package on one loaded from outside it; the clean-host
+  jobs run it on a bare Ubuntu. A new element in a pipeline goes into `locate_elements()`, its
+  plugin into the list. Embedded in OmniAccelerANT's plugin, none of this installs: that bundle
+  carries its own.
+
 ## 5. Build, run, test
 
 The whole Linux CI chain, in order:

@@ -74,8 +74,8 @@ jobs:
         with:
           artifact: linux-packages-x64
           deb: '*.deb'
-          deb-command: AccelerANTgine --version
+          deb-command: AccelerANTgine --gst_check
           tarball: '*.tar.gz'
-          tarball-command: ./usr/bin/AccelerANTgine --version
+          tarball-command: ./usr/bin/AccelerANTgine --gst_check
           appimage: '*.AppImage'
-          appimage-command: '"$APPIMAGE" --version'
+          appimage-command: '"$APPIMAGE" --gst_check'

@@ -1,6 +1,10 @@
 module;
 
 #include "kataglyphis_export.h"
+#if defined(__linux__)
+#include "bundled_gstreamer.hpp"
+#endif
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -369,6 +373,51 @@ WebRTCStreamer::~WebRTCStreamer() = default;
 WebRTCStreamer::WebRTCStreamer(WebRTCStreamer &&) noexcept = default;
 
 auto WebRTCStreamer::operator=(WebRTCStreamer &&) noexcept -> WebRTCStreamer & = default;
+
+auto WebRTCStreamer::locate_elements() -> std::vector<ElementLocation>
+{
+    static constexpr std::array names{ "videotestsrc",
+        "v4l2src",
+        "libcamerasrc",
+        "filesrc",
+        "uridecodebin",
+        "decodebin",
+        "videoconvert",
+        "videoscale",
+        "capsfilter",
+        "appsink",
+        "fakesink",
+        "webrtcsink",
+        "webrtcbin",
+        "vp8enc",
+        "openh264enc" };
+    std::vector<ElementLocation> located;
+    located.reserve(names.size());
+    for (const char *name : names) {
+        ElementLocation location{ .element = name };
+        if (GstElementFactory *factory = gst_element_factory_find(name); factory != nullptr) {
+            location.found = true;
+            if (GstPlugin *plugin = gst_plugin_feature_get_plugin(GST_PLUGIN_FEATURE(factory)); plugin != nullptr) {
+                if (const gchar *file = gst_plugin_get_filename(plugin); file != nullptr) {
+                    location.plugin_file = file;
+                }
+                gst_object_unref(plugin);
+            }
+            gst_object_unref(factory);
+        }
+        located.push_back(std::move(location));
+    }
+    return located;
+}
+
+auto WebRTCStreamer::bundled_plugin_dir() -> std::string
+{
+#if defined(__linux__)
+    return bundled_gstreamer::plugin_dir();
+#else
+    return {};
+#endif
+}
 
 auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, WebRTCError>
 {
