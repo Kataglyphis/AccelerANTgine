@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed
+- **The family's ant replaces the old logos** (2026-10-17, owner: one icon in every repository):
+  `images/logo.png` in the README, and `Engine_logo.png`, `Engine_logo.bmp` and `faviconNew.ico`,
+  which the installers and the Linux desktop entry show. `faviconNew.ico` now holds 16 to 256 px,
+  where it had 16 px only, and `Engine_logo.png` is 256 px, the size of the `hicolor/256x256`
+  folder it is installed into (it was 200 px).
+
 ## [0.0.3] - 2026-10-17
 
 ### Added
