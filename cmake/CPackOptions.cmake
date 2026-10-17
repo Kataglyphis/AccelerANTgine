@@ -40,6 +40,8 @@ if(UNIX
    AND PROJECT_IS_TOP_LEVEL)
   find_package(PkgConfig REQUIRED)
   pkg_get_variable(_gst_plugins_dir gstreamer-1.0 pluginsdir)
+  pkg_get_variable(_gst_lib_dir gstreamer-1.0 libdir)
+  pkg_get_variable(_ffmpeg_lib_dir libavcodec libdir)
   set(_gst_plugin_dest "${CMAKE_INSTALL_LIBDIR}/accelerantgine/gstreamer-1.0")
   set(_gst_plugins
       coreelements
@@ -115,6 +117,11 @@ kataglyphis_install_linux_closure(
   ${PROJECT_NAME}_cli
   SEARCH
   "${_ort_lib_dir}"
+  "${_gst_lib_dir}"
+  "${_ffmpeg_lib_dir}"
+  "/opt/libcamera/lib"
+  "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+  "/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
   PROTECT
   "lib/accelerantgine/libonnxruntime*")
 

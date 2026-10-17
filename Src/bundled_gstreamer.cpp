@@ -24,10 +24,16 @@ auto plugin_dir() -> std::string
     const std::string library = info.dli_fname;
     const std::size_t slash = library.find_last_of('/');
     if (slash == std::string::npos) { return {}; }
-    const std::string dir = library.substr(0, slash) + "/gstreamer-1.0";
-    struct stat status{};
-    if (::stat(dir.c_str(), &status) != 0 || !S_ISDIR(status.st_mode)) { return {}; }
-    return dir;
+    // Beside the library when another package embeds it, under CPackOptions.cmake's PRIVATE_DIR in its own.
+    for (const char *sub : { "/gstreamer-1.0", "/accelerantgine/gstreamer-1.0" }) {
+        const std::string dir = library.substr(0, slash) + sub;
+        struct stat status{};
+        if (::stat(dir.c_str(), &status) != 0 || !S_ISDIR(status.st_mode)) { continue; }
+        std::error_code error;
+        const std::filesystem::path canonical = std::filesystem::canonical(dir, error);
+        return error ? dir : canonical.string();
+    }
+    return {};
 }
 
 }// namespace kataglyphis::bundled_gstreamer

@@ -25,6 +25,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   the library points GStreamer at them alone when it finds them there. `AccelerANTgine --gst_check`
   lists every element's plugin file and fails on a missing or foreign one; the clean-host jobs run
   it instead of `--version`, on runners with no GStreamer at all.
+  Proven on himbeere2 (Debian 13, glibc 2.41): the arm64 `.deb`, tarball and AppImage list all 15
+  elements from their own `lib/accelerantgine/gstreamer-1.0`, and `--webrtc --source test` reaches
+  `PLAYING`.
 - **The Linux packages take the host's glibc when it is new enough** (2026-10-17, hub b9e451da ->
   27bf5334). `bin/AccelerANTgine` used the bundled loader and glibc 2.43 on every host, so on a distro
   newer than the build image the distro's own GStreamer, built against its newer glibc, would not
