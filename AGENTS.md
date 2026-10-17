@@ -400,7 +400,7 @@ written out rather than linked.
   NSS's softokn and freebl beside `libnss3`; the hub's closure bundles their libraries, found
   through `SEARCH` (the image's `/opt/gstreamer/lib`, `/opt/ffmpeg/lib`, `/opt/libcamera/lib` and
   multiarch directories, which reach the build only through `ld.so.conf`), and the `.deb` depends
-  on glibc alone. At load `Src/bundled_gstreamer.cpp` points GStreamer at that directory
+  on glibc and EGL alone, which the arm64 libcamera plugin links. At load `Src/bundled_gstreamer.cpp` points GStreamer at that directory
   alone (`GST_PLUGIN_PATH`, an empty system path, no scanner fork, a registry per installed copy)
   and leaves every variable a user set; it looks beside the library (embedded) and in
   `accelerantgine/` under it (this package, whose `libAccelerANTgine.so` sits in `lib/`). `AccelerANTgine --gst_check` prints each element's plugin

@@ -6,6 +6,9 @@ kataglyphis_cpack_common(
   "${AUTHOR}"
   PACKAGE_ICON
   "${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png"
+  # glibc and GStreamer travel; EGL is the host's, and the arm64 libcamera plugin links it.
+  DEBIAN_DEPENDS
+  "libc6 (>= 2.31), libegl1"
   NSIS_WELCOME_TITLE
   "Inference on caffeine boost."
   NSIS_FINISH_TITLE
