@@ -18,6 +18,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-10-17
+
 ### Fixed
 
 - 2026-10-16 — **The Linux packages start outside the build image.** 0.0.1's `.deb`, tarball and
@@ -732,4 +734,6 @@ a measurement belongs in a changelog rather than in `AGENTS.md`.
   `--platform=local` is `GITHUB_COM_TOKEN`, not `RENOVATE_TOKEN`.
 
 <!-- Links -->
-[Unreleased]: https://github.com/Kataglyphis/AccelerANTgine/commits/main
+[Unreleased]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/Kataglyphis/AccelerANTgine/releases/tag/v0.0.1
