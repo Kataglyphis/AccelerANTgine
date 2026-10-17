@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "kataglyphis-inference"
-version = "0.0.2"
+version = "0.0.3"
 description = "Python bindings for the Kataglyphis C++23 ONNX inference engine"
 readme = "README.md"
 requires-python = ">=3.12"

@@ -134,7 +134,7 @@ Search the tree with [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`):
 **From a release** (Linux packages that start outside the build image since v0.0.2): every
 [release](https://github.com/Kataglyphis/AccelerANTgine/releases/latest) carries a `.deb`, a
 tarball and an AppImage for x86_64 and aarch64, the Windows installers for x64 and arm64 (setup `.exe`,
-MSI, MSIX and zip; arm64's setup `.exe` since the release after v0.0.2), and a `SHA256SUMS`. The
+MSI, MSIX and zip; arm64's setup `.exe` since v0.0.3), and a `SHA256SUMS`. The
 Linux packages bring the C++ runtime, ONNX Runtime and the C library they were built against;
 only GStreamer comes from the distribution, and the `.deb` asks for 1.26 or newer: Debian 13
 (tested on a Raspberry Pi 5) and Ubuntu 26.04 have it, Ubuntu 24.04's 1.24 is too old.

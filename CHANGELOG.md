@@ -18,6 +18,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-10-17
+
 ### Added
 - **Windows arm64 ships a setup `.exe` too** (2026-10-17), as x64 always did. NSIS has no arm64 stub,
   so it is the same x86 stub, which Windows on Arm runs emulated; the arm64 build used to drop it
@@ -26,6 +28,11 @@ belongs in the **Changed** list below with that consequence spelled out.
   is ARM64, starts `bin/AccelerANTgine.exe` from the install directory and uninstalls it again
   (`installed-run-command`). The hub moves to 4cfaabcb. Owner rule of the same day: every release ships
   Windows arm64 installers next to the x64 ones.
+
+### Changed
+- ANTfrastructure 4cfaabcb -> 4ca1d4d3 (the Linux chain's sccache S3 level) and NLOHMANN_JSON
+  0e95fe82 (726dc77). The version is 0.0.3 in `CMakeLists.txt` and `pyproject.toml`, so the MSI,
+  the MSIX (0.0.3.0) and the wheels say it too.
 
 ## [0.0.2] - 2026-10-17
 
@@ -747,6 +754,7 @@ a measurement belongs in a changelog rather than in `AGENTS.md`.
   `--platform=local` is `GITHUB_COM_TOKEN`, not `RENOVATE_TOKEN`.
 
 <!-- Links -->
-[Unreleased]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/Kataglyphis/AccelerANTgine/releases/tag/v0.0.1

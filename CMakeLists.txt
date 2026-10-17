@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.31.6)
 # set the project name
 project(
   AccelerANTgine
-  VERSION 0.0.2
+  VERSION 0.0.3
   DESCRIPTION "C++23 ONNX inference engine with GStreamer and WebRTC support"
   HOMEPAGE_URL "https://jonasheinle.de/"
   LANGUAGES CXX C)
