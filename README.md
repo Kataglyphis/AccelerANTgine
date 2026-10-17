@@ -131,6 +131,21 @@ Search the tree with [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`):
 
 ### Installation
 
+**From a release** (Linux packages that start outside the build image since v0.0.2): every
+[release](https://github.com/Kataglyphis/AccelerANTgine/releases/latest) carries a `.deb`, a
+tarball and an AppImage for x86_64 and aarch64, the Windows installers, and a `SHA256SUMS`. The
+Linux packages bring the C++ runtime, ONNX Runtime and the C library they were built against;
+only GStreamer comes from the distribution, and the `.deb` asks for 1.26 or newer: Debian 13
+(tested on a Raspberry Pi 5) and Ubuntu 26.04 have it, Ubuntu 24.04's 1.24 is too old.
+
+```sh
+sha256sum --check --ignore-missing SHA256SUMS
+sudo apt install ./AccelerANTgine-*-Linux-$(uname -m)-*.deb   # or: unpack the tarball, run usr/bin/AccelerANTgine
+AccelerANTgine --version
+```
+
+**From source:**
+
 1. Clone the repo
    ```bash
    git clone --recurse-submodules https://github.com/Kataglyphis/AccelerANTgine.git
