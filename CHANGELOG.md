@@ -34,6 +34,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 - 2026-10-16 — **A clean-host job proves it**: after each Linux lane, `ubuntu-26.04` and
   `ubuntu-26.04-arm` install the `.deb` with apt, check every installed ELF with `ldd`, and start
   `AccelerANTgine --version` from the `.deb`, the unpacked tarball and the AppImage.
+- 2026-10-17 — **The MSIX carries the release's version.** It was always `0.0.1.0`: the
+  packaging read only a `VERSION.txt`, which this repo has not got, while CPack stamps
+  `CMakeLists.txt`'s `project()` VERSION. ANTfrastructure's `Get-PackageVersion` now reads the
+  latter too, so an installed MSIX upgrades.
 
 ## [0.0.1] - 2026-10-16
 
