@@ -19,6 +19,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The Linux packages take the host's glibc when it is new enough** (2026-10-17, hub b9e451da ->
+  27bf5334). `bin/AccelerANTgine` used the bundled loader and glibc 2.43 on every host, so on a distro
+  newer than the build image the distro's own GStreamer, built against its newer glibc, would not
+  have loaded (the app flatpak of OmniAccelerANT aborted that way). The launcher now reads the host
+  loader's version and runs the program itself on 2.43 or newer, and keeps the bundled loader for
+  Debian 13 and Ubuntu 24.04; glibc moved to `lib/accelerantgine/glibc`.
+  `KATAGLYPHIS_BUNDLED_GLIBC=1` forces the bundled path. The pin move also brings the hub's
+  large-files gate (`large-files.allow` is in) and the README ant.
 - **The family's ant replaces the old logos** (2026-10-17, owner: one icon in every repository):
   `images/logo.png` in the README, and `Engine_logo.png`, `Engine_logo.bmp` and `faviconNew.ico`,
   which the installers and the Linux desktop entry show. `faviconNew.ico` now holds 16 to 256 px,
