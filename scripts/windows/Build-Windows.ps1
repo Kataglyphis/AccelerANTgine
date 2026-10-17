@@ -491,7 +491,7 @@ try {
             Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--build", $fastBuildReleaseDirFull, "--target", "package")
         }
 
-        # The uploaded install tree plus installers; NSIS's stub is x86, which the arm64 arch gate refuses.
+        # The uploaded install tree plus installers; arm64's setup .exe is NSIS's x86 stub too, which the device job installs.
         Invoke-BuildStep -Context $Context -StepName "Portable Bundle ($TargetArch)" -Critical -Script {
             $distArch = Join-Path $Workspace "dist\windows-$packageArch"
             $bundle = Join-Path $distArch 'bundle'
@@ -511,11 +511,9 @@ try {
             if (Test-Path $packages) { Remove-Item -LiteralPath $packages -Recurse -Force }
             New-Item -ItemType Directory -Force -Path $packages | Out-Null
             $installers = @(Get-ChildItem -LiteralPath $fastBuildReleaseDirFull -File | Where-Object { $_.Extension -in '.msi', '.zip' })
-            if (-not $isCross) {
-                # NSIS names its installer like the MSI; the build root's other .exe files are tests.
-                $installers += @($installers | ForEach-Object { Join-Path $fastBuildReleaseDirFull "$($_.BaseName).exe" } |
-                        Select-Object -Unique | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Get-Item)
-            }
+            # NSIS names its installer like the MSI; the build root's other .exe files are tests.
+            $installers += @($installers | ForEach-Object { Join-Path $fastBuildReleaseDirFull "$($_.BaseName).exe" } |
+                    Select-Object -Unique | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Get-Item)
             $installers | Copy-Item -Destination $packages
             Write-BuildLog -Context $Context -Message "Portable bundle $bundle; the install tree carries its whole DLL closure ($($installed.Count) file(s) in bin)"
         }
