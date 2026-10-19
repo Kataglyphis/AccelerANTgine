@@ -56,7 +56,7 @@ reorganisation.
 
 | Script | Upstream driver |
 | --- | --- |
-| `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism) |
+| `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism); without the hub it stops, with no fallback of its own |
 | `scripts/linux/ci-coverage.sh` | `linux/scripts/lib/coverage.sh`: gcovr for GCC, llvm-cov for clang |
 | `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh`; every analysis runs through `01-core/gates.sh` (`run_gate` … `assert_gates`) with its tools `require_tools`'d, never skipped: no tool, no green lane (the file header names the rule and its owner) |
 | `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |

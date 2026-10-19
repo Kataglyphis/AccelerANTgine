@@ -19,6 +19,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **`ci-common.sh` has no fallback core any more** (2026-10-19). Without the hub it defined its own
+  `info`/`warn`/`err`/`die`, `arch_oci`, `require_sudo`, `apt_update_once`, `apt_install` and
+  `compute_jobs` and went on, and the `ci-*.sh` chain then failed at its first hub call (only
+  `ci-init.sh` ran on them). Now it sources the hub's `01-core/common.sh` and `modules.sh` through
+  `antfrastructure_path`, which stops with the `git submodule update` fix. In `:latest`: with the hub
+  all of those functions are defined and `ci-init.sh` runs; with `ANTFRASTRUCTURE_DIR=/nonexistent`
+  sourcing it exits 1, where the old file printed `using minimal fallbacks` and went on.
 - **The clang-format gate takes the hub's pinned clang-format** (2026-10-19, hub 1a174d9c).
   `run-static-analysis-format.sh` grepped `clang-format --version` for `LLVM_RELEASE` itself; now
   the hub's `code_quality_require_pinned_clang_format` picks the clang-format of that release
