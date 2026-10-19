@@ -32,6 +32,23 @@ The container build currently targets:
 - ``clangcl-profile``
 - ``clangcl-release``
 
+Run The Build Script Directly
+-----------------------------
+
+Inside the image, the same script CI runs:
+
+.. code-block:: powershell
+
+   pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1
+   pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1 -BuildTargets clangcl-debug -LogDir logs\debug
+
+Build directories and presets are rows in
+``scripts/windows/Build-Windows.config.psd1``, not parameters; each row also names
+an environment variable that overrides it. ``-LogDir`` is relative to the
+workspace. The script expects the family Windows image (its toolchain, its
+GStreamer and its chain ONNX Runtime); from a host,
+``.\scripts\windows\Invoke-ContainerBuild.ps1`` runs it inside that image.
+
 Artifact Locations
 ------------------
 

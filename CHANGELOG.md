@@ -41,6 +41,18 @@ belongs in the **Changed** list below with that consequence spelled out.
   which the installers and the Linux desktop entry show. `faviconNew.ico` now holds 16 to 256 px,
   where it had 16 px only, and `Engine_logo.png` is 256 px, the size of the `hicolor/256x256`
   folder it is installed into (it was 200 px).
+- **The README is a short overview** (2026-10-19, owner: every README in the family, the hub's
+  `repository-family.md` § *The README rule*). It keeps the header, the badges, the docs site, six
+  highlights, a quick start and a table of the guides, all with absolute URLs, since it is the
+  wheels' long description. What it carried moved to the Sphinx pages: installing a release, the
+  Rust features and the Python bindings to `getting_started.rst`; the suites and lanes, profiling,
+  static analysis, the tool lists and the literature to `development_workflow.rst`; the features,
+  the dependencies and CI's compilers to `overview.rst`; the direct `Build-Windows.ps1` run to
+  `windows_workflow.rst`. Contributing, contact and licence are the hub page's; the Renovate
+  commands stay in `AGENTS.md` § 4. Two claims did not move: the arm64 GCC job waits on no image
+  fix (green since run 36568033223), and `cargo install cxxbridge-cmd` is not needed, because
+  `corrosion_add_cxxbridge` builds the version `Cargo.lock` names when `PATH` has no exact match.
+  The release section says that the packages carry their own GStreamer after v0.0.3.
 
 ## [0.0.3] - 2026-10-17
 

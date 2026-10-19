@@ -1,14 +1,12 @@
 <div align="center">
   <a href="https://jonasheinle.de">
-    <img src="images/logo.png" alt="logo" width="200" />
+    <img src="https://raw.githubusercontent.com/Kataglyphis/AccelerANTgine/develop/images/logo.png" alt="logo" width="200" />
   </a>
 
   <h1>AccelerANTgine</h1>
 
   <h4>This C++ inference project gives me a good starting point for hardware accelerated AI inference 🚀 </h4>
 </div>
-  
-For the official docs follow this [link](https://hardwareacceleratedai.jonasheinle.de/).
 
 [![Linux arm64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml/badge.svg?branch=develop)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml)
 [![Linux x64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-x64.yml/badge.svg?branch=develop)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-x64.yml)
@@ -20,407 +18,54 @@ For the official docs follow this [link](https://hardwareacceleratedai.jonashein
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/paypalme/JonasHeinle)
 [![Twitter](https://img.shields.io/twitter/follow/Cataglyphis_?style=social)](https://twitter.com/Cataglyphis_)
 
-## Table of Contents
-- [About The Project](#about-the-project)
-  - [Key Features](#key-features)
-  - [Dependencies](#dependencies)
-  - [Useful tools](#useful-tools)
-- [Getting Started](#getting-started)
-  - [Specific version requirements](#specific-version-requirements)
-  - [Installation](#installation)
-  - [Upgrades](#upgrades)
-- [Tests](#tests)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
-- [Acknowledgements](#acknowledgements)
-- [Literature](#literature)
+[**Docs site**](https://hardwareacceleratedai.jonasheinle.de/)
 
-## About The Project
+This repo is dedicated to deliver AI inference on steroids. AccelerANTgine is a C++23 library
+that runs ONNX Runtime models on GStreamer media and streams over WebRTC, exposed three ways: a C
+API for native embedders, Python bindings and a CLI. It is the inference core that
+[OmniAccelerANT](https://github.com/Kataglyphis/OmniAccelerANT)'s native plugin links, and CI
+builds and tests it on five lanes in the family's container images.
 
-This repo is dedicated to deliver AI inference on steroids.
+## Highlights
 
-Frequently tested under (what CI builds, in the family's container images):
-* windows server 2025 x64 *__clang-cl (LLVM 23)__* with the VS 2026 toolset (MSVC 14.51);
-  `cl.exe` builds (`msvc-debug`, the `x64-MSVC-*` presets) exist, but no lane runs them
-* [clang-cl](https://learn.microsoft.com/de-de/cpp/build/clang-support-msbuild?view=msvc-170) to compile the rust crate on windows
-* windows arm64: a *__clang-cl__* cross build of the release configuration, run on `windows-11-arm`
-* ubuntu 26.04 x64 *__Clang 23__* and *__GCC 16.2__*
-* ubuntu 26.04 ARM *__Clang 23__* and *__GCC 16.2__* (the GCC job waits on an image fix, `AGENTS.md` § 4)
+- **One library, three surfaces:** a C API for native embedders, Python bindings and a CLI.
+- **ONNX Runtime on GStreamer media:** YOLO detection on pipeline frames, WebRTC out through `webrtcsink`.
+- **C++23 named modules**, with Rust called from C++ through corrosion and cxx.
+- **Five CI lanes:** Linux x64, arm64 and riscv64, Windows x64 and arm64.
+- **Tested without a model file:** four C++ suites and the Python tests, the Debug ones under ASan, UBSan and TSan.
+- **Releases that start outside the image:** `.deb`, tarball, AppImage, setup `.exe`, MSI, MSIX, zip and Python wheels.
 
-### Key Features
-
-<div align="center">
-
-| Category            | Feature                      | Implement Status |
-|---------------------|------------------------------|:----------------:|
-| Build System        | CMake >= 3.31.6              |        ✔️        |
-| Performance         | Performance Benchmark        |        ✔️        |
-| Platform Support    | Linux/Windows support        |        ✔️        |
-| Compiler Support    | Clang/GNU/MSVC support       |        ✔️        |
-| Rust integration    | Call Rust code from C++      |        ✔️        |
-
-</div>
-
-**Legend:**
-- ✔️ - completed  
-- 🔶 - in progress  
-- ❌ - not started
-
-
-
-### Dependencies
-This enumeration also includes submodules.
-* [ANTfrastructure](https://github.com/Kataglyphis/ANTfrastructure) — the build
-  hub: every reusable script, CMake module, PowerShell module and CI action this
-  repo runs comes from `third_party/ANTfrastructure`, and its gitlink decides
-  what the lanes actually execute
-* [ONNX Runtime](https://onnxruntime.ai/) — inference
-* [GStreamer](https://gstreamer.freedesktop.org/) — media pipelines
-* [WebRTC](https://webrtc.org/) — realtime transport, through GStreamer's `webrtcsink`
-* [abseil](https://github.com/abseil/abseil-cpp) — pinned at or above the version FUZZTEST pins (`AGENTS.md` § 3)
-* [GSL](https://github.com/microsoft/GSL)
-* [nlohmann_json](https://github.com/nlohmann/json)
-* [tomlplusplus](https://github.com/marzer/tomlplusplus)
-* [SPDLOG](https://github.com/gabime/spdlog)
-* [nanobind](https://github.com/wjakob/nanobind) — the Python bindings
-* [gtest](https://github.com/google/googletest)
-* [gbenchmark](https://github.com/google/benchmark)
-* [google fuzztest](https://github.com/google/fuzztest)
-
-##### Optional
-* [Rust](https://www.rust-lang.org/)
-* [corrosion-rs](https://github.com/corrosion-rs/corrosion)
-* [cxx](https://cxx.rs/)
-
-### Useful tools
-* [NSIS](https://nsis.sourceforge.io/Main_Page)
-* [doxygen](https://www.doxygen.nl/index.html)
-* [cppcheck](https://cppcheck.sourceforge.io/)
-* [cmake](https://cmake.org/)
-* [valgrind](https://valgrind.org/)
-* [clangtidy](https://github.com/llvm/llvm-project)
-* [visualstudio](https://visualstudio.microsoft.com/de/)
-* [ClangPowerTools](https://www.clangpowertools.com/)
-* [Codecov](https://app.codecov.io/gh)
-* [Ccache](https://ccache.dev/)
-* [Sccache](https://github.com/mozilla/sccache)
-
-#### Benchmarking
-* [gperftools](https://github.com/gperftools/gperftools)
-
-### VSCode Extensions
-* [CMake format](https://github.com/cheshirekow/cmake_format)
-* [CMake tools](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools)
-* [CppTools](https://github.com/microsoft/vscode-cpptools)
-
-<!-- GETTING STARTED -->
-## Getting Started
-
-### Specific version requirements
-
-**C++23** or higher required.<br />
-**C17** or higher required.<br />
-**CMake 3.31.6** or higher required.<br />
-
-### Searching the tree
-
-Search the tree with [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`):
-`winget install --id BurntSushi.ripgrep.MSVC -e --scope user` on Windows,
-`apt install ripgrep` on Linux.
-
-### Installation
-
-**From a release** (Linux packages that start outside the build image since v0.0.2): every
-[release](https://github.com/Kataglyphis/AccelerANTgine/releases/latest) carries a `.deb`, a
-tarball and an AppImage for x86_64 and aarch64, the Windows installers for x64 and arm64 (setup `.exe`,
-MSI, MSIX and zip; arm64's setup `.exe` since v0.0.3), and a `SHA256SUMS`. The
-Linux packages bring the C++ runtime, ONNX Runtime and the C library they were built against;
-only GStreamer comes from the distribution, and the `.deb` asks for 1.26 or newer: Debian 13
-(tested on a Raspberry Pi 5) and Ubuntu 26.04 have it, Ubuntu 24.04's 1.24 is too old.
-
-```sh
-sha256sum --check --ignore-missing SHA256SUMS
-sudo apt install ./AccelerANTgine-*-Linux-$(uname -m)-*.deb   # or: unpack the tarball, run usr/bin/AccelerANTgine
-AccelerANTgine --version
-```
-
-**From source:**
-
-1. Clone the repo
-   ```bash
-   git clone --recurse-submodules https://github.com/Kataglyphis/AccelerANTgine.git
-   ```
-   > **_NOTE:_** In case you forgot the flag --recurse run the following command  
-   ```bash
-   git submodule update --init --recursive
-
-   ```
-   afterwards.
-3. Optional: Using the newest clang compiler. Install via apt. See [here](https://apt.llvm.org/):
-4. Optional: Run `third_party/ANTfrastructure/linux/scripts/02-toolchain/setup-dependencies.sh`
-   for preparing important dev tools. The dependency installer is ANTfrastructure's;
-   this repo does not carry a local copy.
-5. Then build your solution with [CMAKE] (https://cmake.org/) <br />
-  Here the recommended way over command line after cloning the repo:<br />
-  > **_NOTE:_** Here we use CmakePresets to simplify things. Consider using it too
-  or just build on a common way.
-  
-  For now the features in Rust are experimental, and they are ON by default:
-  `RUST_FEATURES` defaults to ON and every preset but `x64-Clang-Windows-*` sets
-  it, so a build needs Rust (cargo) installed, or `-DRUST_FEATURES=OFF`. In order
-  to compile a rust crate on windows it has to be MSVC ABI compatible, so the
-  crate's C++ is compiled with the compiler CMake was configured with:
-  `Src/CMakeLists.txt` hands `CC`/`CXX` to cargo (`corrosion_set_env_vars`),
-  which is clang-cl under the ClangCL presets.
-  (`Src/rusty_code/.cargo/config.toml` is empty.)
-
-  ONNX Runtime must be the family image's chain build: configure searches only
-  `-DONNXRUNTIME_ROOT`, else the image's own prefix, and stops without it
-  (`AGENTS.md` § 4).
-
-  (for clarity: Assumption you are in the dir you have cloned the repo into; each
-  preset names its own build directory, e.g. `build/` for `linux-debug-clang`)
-  ```sh
-  # enlisting all available presets
-  $ cmake --list-presets=all
-  $ cmake --preset <configurePreset-name>
-  $ cmake --build --preset <buildPreset-name>
-  ```
-
-On Windows, through the same script CI runs:
-
-```powershell
-pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1
-pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1 -BuildTargets clangcl-debug -LogDir logs\debug
-```
-
-Build directories and presets are rows in
-`scripts/windows/Build-Windows.config.psd1`, not parameters; each row also names
-an environment variable that overrides it. `-LogDir` is relative to the
-workspace. The script expects the family Windows image (its toolchain, its
-GStreamer and its chain ONNX Runtime); from a host,
-`.\scripts\windows\Invoke-ContainerBuild.ps1` runs it inside that image.
-
-### Python bindings
-
-The library is also exposed to Python through nanobind: the module lives in
-`Bindings/python` (`kataglyphis_inference`), its tests in `Test/python`, and
-`scripts/windows/Build-PythonBindings.ps1` (or `Invoke-ContainerPythonBindings.ps1`, which
-runs it inside the ANTfrastructure Windows image) builds it on Windows and stages the
-package, with its GStreamer and chain ONNX Runtime DLLs, into `build-python/python`.
-It does not run `Test/python`: that is the `python_bindings` ctest, registered only by a
-`KATAGLYPHIS_BUILD_PYTHON_BINDINGS=ON` configure with `BUILD_TESTING` on and pytest
-importable.
-
-On Linux the clang leg of both Linux lanes builds two wheels with
-`scripts/linux/ci-python-bindings.sh`: `cp314-cp314` for the GIL interpreter and
-`cp314-cp314t` for the image's free-threaded 3.14t. Each is installed into its own venv
-and runs `Test/python`. The free-threaded one first goes through ANTfrastructure's
-`free-threaded-wheel.py prove`, which fails when loading the module re-enables the GIL.
-The wheels upload as `python-wheels-<arch>`. They are `linux_<arch>` wheels: GStreamer
-and ONNX Runtime come from the image, not from the wheel.
-
-Without the GIL the module stays safe because `OnnxInferenceEngine` and `YoloDetector`
-lock themselves: runs share a `std::shared_mutex`, and `initialize` takes it alone. Every
-bound field also takes its Python object's lock (`nb::lock_self()`).
-
-### Upgrades
-
-#### What is behind: Renovate as a local CLI
+## Quick start
 
 ```bash
-bash scripts/linux/renovate-local.sh                     # report (default: every manager this tree has)
-bash scripts/linux/renovate-local.sh --managers pep621   # the pyproject pins
-bash scripts/linux/renovate-local.sh --apply --dry-run   # the plan
-bash scripts/linux/renovate-local.sh --apply             # gitlinks, manifests and their locks
+git clone --recurse-submodules --branch develop https://github.com/Kataglyphis/AccelerANTgine.git
+cd AccelerANTgine
+cmake --preset linux-debug-clang && cmake --build --preset linux-debug-clang
 ```
 
-Run it from WSL; it bootstraps a pinned, checksum-verified Node on first use.
-`AGENTS.md` § 4 (Pitfalls) is the in-repo owner of this procedure — what `--apply` will and
-will not move, the `FUZZTEST`/abseil coupling it can trip, the `GITHUB_COM_TOKEN`
-rate-limit note — and
-[`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md)
-is the full rationale.
+Run it in the family's Linux image (`ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest`):
+configure requires its chain ONNX Runtime. On Windows,
+`pwsh -NoProfile -File .\scripts\windows\Invoke-ContainerBuild.ps1` builds in the Windows image.
+A release needs no build:
+[Install From A Release](https://hardwareacceleratedai.jonasheinle.de/getting_started.html#install-from-a-release).
 
-#### Rusty things:
-1. Do not forget to upgrade the cxxbridge from time to time:
-```bash
-cargo install cxxbridge-cmd
-```
+## Documentation
 
-# Tests
+| Topic | Read |
+| --- | --- |
+| Prerequisites, installing a release, presets, Rust features, Python bindings | [Getting Started](https://hardwareacceleratedai.jonasheinle.de/getting_started.html) |
+| Key features, project layout, dependencies, what CI builds with | [Overview](https://hardwareacceleratedai.jonasheinle.de/overview.html) |
+| The test suites and lanes, profiling, static analysis, useful tools, literature | [Development Workflow](https://hardwareacceleratedai.jonasheinle.de/development_workflow.html) |
+| The Windows container build and the host run | [Windows Workflow](https://hardwareacceleratedai.jonasheinle.de/windows_workflow.html) |
+| The C++ and C API | [API Reference](https://hardwareacceleratedai.jonasheinle.de/api_reference.html) |
+| Include graphs | [Architecture](https://hardwareacceleratedai.jonasheinle.de/graphviz_files.html) |
+| CI test results and coverage | [Test Results](https://hardwareacceleratedai.jonasheinle.de/test_results.html) |
+| The demo's model, fetched by checksum | [models/README.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/models/README.md) |
+| Rules for agents and contributors, dependency upgrades (Renovate) | [AGENTS.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/AGENTS.md) |
+| Known work | [BACKLOG.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/BACKLOG.md) |
+| Changes | [CHANGELOG.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/CHANGELOG.md) |
 
-Four C++ suites link `AccelerANTgine` and import its modules, so they test the
-library itself; a fifth, `Test/python`, tests the Python bindings.
+## Contributing and contact
 
-| Suite | Binary | What it covers |
-| --- | --- | --- |
-| `Test/commit` | `commitTestSuite` | The C API; the TOML and JSON config parsers, every rejection path included; the ONNX engine on models the tests generate (Relu, Add, two outputs, and a Reshape that turns the input into raw YOLO output); YOLO decoding (thresholds, classes, NMS, scaling, NaN and infinity, rows shorter than the class count); GStreamer frames from `videotestsrc` and `appsrc` through `appsink`, callbacks and state; the WebRTC stream config, its validation and a start against a refusing signalling server |
-| `Test/compile` | `compileTestSuite` | The embedder contract: the C header compiles as C17 and links, `import kataglyphis.c_api` reaches the same symbol, every module imports into one translation unit, the resource owners are move-only, the error codes keep their numbers, the defaults agree |
-| `Test/fuzz` | `fuzzTestSuite` | FuzzTest properties over the untrusted inputs: the settings JSON and the inference TOML on arbitrary bytes, unsigned fields that round-trip or are rejected, the stream-name mapping, the COCO table, and the YOLO decoder on arbitrary floats |
-| `Test/perf` | `perfTestSuite` | Google Benchmark over the hot paths: both parsers, `run_inference` at three sizes, YOLO detection with 0, 64 and 512 candidate boxes (NMS is quadratic), and `pull_sample` |
-
-No model or media file is checked in for them:
-`Test/common/kataglyphis_test_support.h` writes the ONNX protobuf itself, and
-the GStreamer tests use `videotestsrc` and `appsrc`. A test that needs a
-GStreamer element the install lacks skips and names it; the WebRTC ones need
-`webrtcsink` (gst-plugins-rs), which the Linux image has and the Windows image
-has not.
-
-Commit, compile and fuzz build in Debug; perf in RelWithDebInfo; all four in
-Release with `-DKATAGLYPHIS_RELEASE_TESTS=ON`, which both Windows lanes set
-(`Build-Windows.ps1 -StageTests`). FuzzTest needs Clang or clang-cl. Every lane runs them:
-
-| Lane | Commit + compile | Fuzz (unit mode) | Perf |
-| --- | --- | --- | --- |
-| Linux x64, arm64 (clang) | ctest, ASan + UBSan with llvm-cov, then again under TSan | yes | `ci-profile-bench.sh` |
-| Linux x64, arm64 (GCC) | ctest, ASan + UBSan with gcovr | — (FuzzTest is Clang-only) | `ci-profile-bench.sh` |
-| Linux riscv64 | ctest under QEMU, no sanitizers | yes | — (QEMU timing) |
-| Windows x64 | Debug: ctest in the container (ASan), then on the runner host; Release: staged, on the host | yes, Debug and Release | Profile build, container and host; Release, by exit code |
-| Windows arm64 | Release, on `windows-11-arm` | yes | yes, by exit code |
-
-Locally, in the family image:
-
-```sh
-cmake --preset linux-debug-clang && cmake --build build -j
-ctest --test-dir build --no-tests=error --output-on-failure
-./build/fuzzTestSuite                       # about a second per property
-FUZZTEST_FUZZ_FOR=60s ./build/fuzzTestSuite  # longer, still unit mode
-```
-
-Coverage: `scripts/linux/ci-coverage.sh` reports llvm-cov on the clang lane
-(over `lib/libAccelerANTgine.so`) and gcovr on the GCC lane, where
-`linux-debug-GNU` now builds with `myproject_ENABLE_COVERAGE`. The HTML lands
-in `docs/coverage/`.
-
-The Python bindings test suite (`Test/python`) runs against both installed
-wheels, GIL and free-threaded (see [Python bindings](#python-bindings)).
-`test_threading.py` calls one engine, detector and config from eight threads at once.
-
-## Performance tests
-
-`ci-profile-bench.sh` is the profiling and benchmark lane, and it is what CI
-runs:
-
-```bash
-bash scripts/linux/ci-profile-bench.sh
-```
-
-It links gperftools' `libprofiler` (`google-perftools`, `libgoogle-perftools-dev`)
-when configure finds it, which writes `logs/profile.prof`; reading that profile
-takes Go's `pprof` (plus `graphviz` for its graphs), which the lane itself never
-calls. `valgrind --tool=callgrind` is reached through
-`bash scripts/linux/ci-release.sh --callgrind`, and `perf record` needs a
-`perf` binary (Ubuntu 26.04: the `linux-perf` package — `linux-tools-common` no
-longer ships one) plus permission to open perf events. Installing them is not
-this project's subject — the upstream install instructions for
-[gperftools](https://github.com/gperftools/gperftools),
-[pprof](https://github.com/google/pprof),
-[valgrind](https://valgrind.org/docs/manual/cl-manual.html) and
-[perf](https://perfwiki.github.io/main/) are the ones that stay correct. The CI
-image does NOT carry the whole set: it has no `perf` (so the lane warns, runs
-the workload for a short window without a recorder, then runs the benchmarks).
-It does carry gperftools' `libprofiler` (2.18.1, checked 2026-10-16), so that
-window writes `logs/profile.prof` on both arches; a host without it falls back
-to `-pg`. **On arm64 the script picks gperftools' `generic_fp` stack walker**:
-the default, `libgcc`, unwinds from inside the profiler's signal handler and
-crashed the workload with a segfault in 6 of 140 starts at 4 kHz on a Pi 5 (one
-CI run on 2026-10-16), while `generic_fp` crashed in none of 210 and gave
-slightly deeper stacks, since clang keeps arm64's frame records at `-O3`. x86_64
-keeps the default, where clang drops frame pointers. Setting
-`TCMALLOC_STACKTRACE_METHOD` yourself overrides the choice.
-
-A `perf` binary alone does not make a profile. The profiled workload is the
-CLI's WebRTC producer on its synthetic source (`--webrtc --source test`), which
-only streams while a signalling server answers; with none it gives up about
-200 ms in. `ci-profile-bench.sh` therefore starts `gst-webrtc-signalling-server`
-(gst-plugins-rs; the image has it) on `127.0.0.1:18443` for the window and
-points the CLI there, unless `--profile-args` names a `--server` of its own.
-`--signalling-port` moves it.
-
-## Static analysis and formatting
-
-One entry point per platform, and CI runs exactly these:
-
-```bash
-bash scripts/linux/run-static-analysis-format.sh
-```
-
-```powershell
-pwsh -NoProfile -File .\scripts\windows\Build-Windows.ps1
-```
-
-They cover cmake-format and clang-format everywhere, plus clang-tidy and
-`scan-build` on the Linux clang lane and clang-tidy in the Windows `clangcl-debug`
-build, over the files the project actually compiles (`.ixx`, `.cppm` and `.mxx`
-included). `clang++ --analyze` runs only when asked for (`--direct-analyze`).
-cmake-format rewrites in place, and so does clang-format on Windows. On Linux,
-clang-format checks and does not rewrite. It covers every C/C++ file under `Src/`,
-`Test/`, `Bindings/` and `cmake/`, and fails the lane when one of them deviates
-from `.clang-format`. It also refuses any clang-format but the hub's `LLVM_RELEASE`
-(23.1.3), because each release formats differently. To fix a file, run that
-release's `clang-format -i` on it; the image's `clang-format` is that release.
-Every tool here is a gate: a tool that is not installed fails the lane rather
-than being skipped.
-
-`.clang-format` and `.cmake-format.yaml` here are **shared** configs, and
-`scripts/linux/run-lint-gates.sh` checks them against ANTfrastructure's copies
-(the rows of `.antfrastructure-shared.manifest`) — edit them upstream, not here.
-`.clang-tidy`, `gcovr.cfg` and `.pre-commit-config.yaml` are this project's own
-on purpose; the manifest's header says why. What each tool does and
-how to run one of them alone is in
-[`third_party/ANTfrastructure/docs/code-quality-tooling.md`](third_party/ANTfrastructure/docs/code-quality-tooling.md),
-and the configs themselves are described in
-[`third_party/ANTfrastructure/shared/config/README.md`](third_party/ANTfrastructure/shared/config/README.md).
-
-The pre-commit hook installs from the same `requirements.txt`:
-
-```bash
-uv venv
-source .venv/bin/activate # .venv/Scripts/activate on pwsh
-uv pip install -r requirements.txt
-pre-commit install
-pre-commit run --all-files   # once, optional
-```
-
-<!-- CONTRIBUTING -->
-## Contributing
-
-Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-
-<!-- LICENSE -->
-## License
-
-Distributed under the MIT License. See [`LICENSE`](LICENSE).
-
-<!-- CONTACT -->
-## Contact
-
-Jonas Heinle - [@Cataglyphis_](https://twitter.com/Cataglyphis_) - jonasheinle@googlemail.com
-
-[jonasheinle.de](https://jonasheinle.de/#/landingPage)
-<!-- ACKNOWLEDGEMENTS -->
-## Acknowledgements
-
-## Literature 
-
-Some very helpful literature, tutorials, etc. 
-
-Rust
-* [rust-lang](https://www.rust-lang.org/)
-
-CMake/C++
-* [ClangCL](https://clang.llvm.org/docs/MSVCCompatibility.html)
-* [Cpp best practices](https://github.com/cpp-best-practices/cppbestpractices)
-* [Integrate Rust into CMake projects](https://github.com/trondhe/rusty_cmake)
-* [corrosion-rs](https://github.com/corrosion-rs/corrosion)
-* [cxx](https://cxx.rs/)
-* [C++ Software Design by Klaus Iglberger](https://meetingcpp.com/2024/Speaker/items/Klaus_Iglberger.html)
+AccelerANTgine is one of the [Kataglyphis repositories](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/repository-family.md),
+which share one way to contribute and one contact. Licence: MIT, see [LICENSE](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/LICENSE).

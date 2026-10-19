@@ -19,7 +19,7 @@ is the single fact that most shapes its tooling.
 | --- | --- |
 | `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, plus `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
-| `Test/` | The four C++ suites, `commit`, `compile`, `fuzz` and `perf` (README § Tests), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
+| `Test/` | The four C++ suites, `commit`, `compile`, `fuzz` and `perf` (`docs/source/development_workflow.rst` § *The Suites*), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, driven end-to-end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
 | `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, and the Pester suites in `tests/`. There is no project-local `modules/` any more: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
@@ -254,7 +254,7 @@ written out rather than linked.
   object is `lib/libAccelerANTgine.so`, where `Src/` lives — a test executable's
   own mapping holds only `Test/`, which the ignore regex drops. Until
   2026-10-01 every `Src/` file read 0.00% because the suites were placeholders;
-  they call the library now (README § Tests). `linux-debug-GNU` sets the option
+  they call the library now (`docs/source/development_workflow.rst` § *The Suites*). `linux-debug-GNU` sets the option
   as well since then, so gcovr measures the GCC lane, where it reported `0 out
   of 0` lines before. `inference_demo.cpp` read 0% while it was a `main` compiled
   into the library that nothing called; since 2026-10-15 it is the `AccelerANTgine_demo`
@@ -422,6 +422,10 @@ which runs `ci-init.sh` → `ci-build-and-test.sh` → `ci-coverage.sh` →
 (clang only) → `ci-docs.sh` → `ci-release.sh` → `ci-finalize.sh`. Each is runnable on its own with the same
 arguments `ci-run-all.sh` passes it.
 
+**The pre-commit hook** installs from `requirements.txt`: `uv venv`, `uv pip install -r
+requirements.txt`, then `pre-commit install` in that venv
+(`docs/source/development_workflow.rst` § *Static Analysis And Formatting*).
+
 Windows:
 
 ```powershell
@@ -563,6 +567,12 @@ FuzzTest's build-time tools need no emulator wrapper.
 
 ## 6. Docs owned by this repo
 
+- `README.md` is the short overview of the family's
+  [README rule](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/repository-family.md#the-readme-rule)
+  (owner, 2026-10-19), and `pyproject.toml` makes it the wheels' long description, so its
+  links are absolute URLs. Installing a release, the Rust features and the Python bindings
+  are in `getting_started.rst`; the suites, profiling, static analysis, tools and literature in
+  `development_workflow.rst`; features, dependencies and CI's compilers in `overview.rst`.
 - Hand-written Sphinx sources live in `docs/source/`, with one exception:
   `graphviz_files.rst` is `graphviz_generator.py`'s output, tracked as a
   snapshot and rewritten by every `ci-docs.sh` run. What else `ci-docs.sh`

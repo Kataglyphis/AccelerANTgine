@@ -7,6 +7,33 @@ Python bindings (nanobind), and CLI tooling.
 The API reference is generated from Doxygen XML via Breathe/Exhale and published
 under the API section.
 
+Key Features
+------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - Category
+     - Feature
+     - Implement Status
+   * - Build System
+     - CMake >= 3.31.6
+     - ✔️
+   * - Performance
+     - Performance Benchmark
+     - ✔️
+   * - Platform Support
+     - Linux/Windows support
+     - ✔️
+   * - Compiler Support
+     - Clang/GNU/MSVC support
+     - ✔️
+   * - Rust integration
+     - Call Rust code from C++
+     - ✔️
+
+**Legend:** ✔️ completed, 🔶 in progress, ❌ not started.
+
 Project Layout
 --------------
 
@@ -29,6 +56,36 @@ Project Layout
 - ``scripts/windows``: the Windows build script, its container wrappers and the
   host-side run script
 
+Dependencies
+------------
+
+This enumeration also includes submodules.
+
+- `ANTfrastructure <https://github.com/Kataglyphis/ANTfrastructure>`_ — the
+  build hub: every reusable script, CMake module, PowerShell module and CI action
+  this repo runs comes from ``third_party/ANTfrastructure``, and its gitlink
+  decides what the lanes actually execute
+- `ONNX Runtime <https://onnxruntime.ai/>`_ — inference
+- `GStreamer <https://gstreamer.freedesktop.org/>`_ — media pipelines
+- `WebRTC <https://webrtc.org/>`_ — realtime transport, through GStreamer's
+  ``webrtcsink``
+- `abseil <https://github.com/abseil/abseil-cpp>`_ — pinned at or above the
+  version FUZZTEST pins (``AGENTS.md`` § 3)
+- `GSL <https://github.com/microsoft/GSL>`_
+- `nlohmann_json <https://github.com/nlohmann/json>`_
+- `tomlplusplus <https://github.com/marzer/tomlplusplus>`_
+- `SPDLOG <https://github.com/gabime/spdlog>`_
+- `nanobind <https://github.com/wjakob/nanobind>`_ — the Python bindings
+- `gtest <https://github.com/google/googletest>`_
+- `gbenchmark <https://github.com/google/benchmark>`_
+- `google fuzztest <https://github.com/google/fuzztest>`_
+
+Optional:
+
+- `Rust <https://www.rust-lang.org/>`_
+- `corrosion-rs <https://github.com/corrosion-rs/corrosion>`_
+- `cxx <https://cxx.rs/>`_
+
 Build Matrix Summary
 --------------------
 
@@ -47,6 +104,20 @@ GitHub workflows.
   on a host through PowerShell (``Start-Windows.ps1`` for x64; the arm64 product
   runs on GitHub's ``windows-11-arm`` runner)
 
+Frequently tested under (what CI builds, in the family's container images):
+
+- Windows Server 2025 x64: **clang-cl (LLVM 23)** with the VS 2026 toolset
+  (MSVC 14.51); ``cl.exe`` builds (``msvc-debug``, the ``x64-MSVC-*`` presets)
+  exist, but no lane runs them
+- `clang-cl <https://learn.microsoft.com/de-de/cpp/build/clang-support-msbuild?view=msvc-170>`_
+  to compile the Rust crate on Windows
+- Windows arm64: a **clang-cl** cross build of the Release and Debug
+  configurations, run on ``windows-11-arm``
+- Ubuntu 26.04 x64: **Clang 23** and **GCC 16.2**
+- Ubuntu 26.04 arm64: **Clang 23** and **GCC 16.2**
+- Linux riscv64: cross-built on amd64 with the image's distro clang 22 and tested
+  under QEMU (``AGENTS.md`` § 5, *The riscv64 lane*)
+
 Test Suite Selection
 --------------------
 
@@ -55,7 +126,8 @@ Top-level CMake selects test suites by build type:
 - ``Debug``: ``commit``, ``compile``, and ``fuzz`` with Clang or clang-cl
 - ``RelWithDebInfo``: ``perf``
 - ``Release``: none, unless ``KATAGLYPHIS_RELEASE_TESTS`` is on, which builds all
-  four (the Windows arm64 lane runs them on ``windows-11-arm``)
+  four (both Windows lanes set it through ``Build-Windows.ps1 -StageTests``; the
+  arm64 lane runs them on ``windows-11-arm``)
 
 This means the most useful local loops are:
 
