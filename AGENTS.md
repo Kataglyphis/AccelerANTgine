@@ -19,7 +19,7 @@ and **C++23 named modules** (`.ixx`) shape most of its tooling.
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | The four C++ suites `commit`, `compile`, `fuzz` and `perf` (`docs/source/development_workflow.rst` § *The Suites*), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, run end to end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
-| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap and the Pester suites in `tests/`. No project-local `modules/`: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
+| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the Pester suite in `tests/` and `generated-artifacts.txt`, the pathspecs the hub's generated-artifacts suite reads. No project-local `modules/`: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
 
 **This repo is consumed as a direct submodule** of OmniAccelerANT, at
@@ -420,7 +420,7 @@ platform + arch, display names `<Platform> <Arch> · <what>`. They are `linux-x6
 `linux-arm64.yml` (each calls the containerized `reusable-linux.yml` once per compiler),
 `windows-x64.yml` (the container build through the hub's `container-ci-windows.yml`, a
 `lint-powershell` job over `scripts/` with the hub's `Invoke-Lint.ps1`, and a `pester-tests` job
-over `scripts/windows/tests/`), `windows-arm64-cross.yml`, `linux-riscv64.yml`, `lint-gates.yml`
+over `scripts/windows/tests/` plus the hub's `shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1`), `windows-arm64-cross.yml`, `linux-riscv64.yml`, `lint-gates.yml`
 and `submodule-pins.yml`.
 
 - **A push or PR runs Linux x64 and the gates; the other four platform lanes run on request**: the

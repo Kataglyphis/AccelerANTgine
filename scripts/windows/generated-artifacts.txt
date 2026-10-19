@@ -1,0 +1,13 @@
+# Generated-output pathspecs for the hub's shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1; a wildcard directory ends in /*.
+logs/                     # Build-Windows.ps1 / ci-* run output
+target/                   # cargo, Src/rusty_code
+build*/*                  # every CMake preset's tree
+*.prof                    # gperftools, ci-profile-bench.sh
+*.profraw                 # llvm coverage
+**/__pycache__/*          # pytest / Test/python
+docs/build/               # Sphinx output
+docs/coverage/            # gcovr / llvm-cov
+docs/test_results*.xml    # ctest JUnit
+docs/test-results*/*      # ci-docs.sh junit2html + pandoc output
+docs/_build*              # Sphinx validation tree
+scan-build-reports/       # run-static-analysis-format.sh

@@ -65,7 +65,7 @@ jobs:
           -Path scripts
 
   pester-tests:
-    name: Pester suites (scripts/windows/tests)
+    name: Pester suites (scripts/windows/tests, generated artifacts)
     runs-on: windows-2025
     timeout-minutes: 15
     permissions:
@@ -82,4 +82,11 @@ jobs:
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@develop
         with:
           path: scripts/windows/tests
+          version: '3.4.0'
+
+      # The hub's suite, never a copy; this repo's pathspecs are scripts/windows/generated-artifacts.txt.
+      - name: No generated artifact is tracked (the hub's suite)
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@develop
+        with:
+          path: third_party/ANTfrastructure/shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1
           version: '3.4.0'

@@ -19,6 +19,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The generated-artifacts check is the hub's suite** (2026-10-19, hub c3fc7585 -> 1a174d9c).
+  `scripts/windows/tests/Repo.GeneratedArtifacts.Tests.ps1` is gone; `windows-x64.yml`'s
+  `pester-tests` job runs the hub's `shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1`, which
+  reads this repo's pathspecs from `scripts/windows/generated-artifacts.txt`. Two of the old ones,
+  `build*/` and `docs/test-results*/`, matched no file (git matches a wildcard ending in `/`
+  against nothing), so a tracked file under them passed; they are `build*/*` and
+  `docs/test-results*/*`, and the hub now refuses the old form. Under Pester 3.4.0 both cases pass
+  here; in a clone with a planted `docs/test-results-unit/index.html`, which `.gitignore` does not
+  cover, the generated-output case fails on it.
 - **The demo's model comes through `models/models.lock` and the hub's fetcher** (2026-10-19, hub
   CON98). The lock pins `deim_dfine_n_coco.onnx`, its `.LICENSE` and its `.NOTICE` by URL and
   SHA-256, and `models/README.md`'s `curl` + `sha256sum -c` recipe is one call of the hub's
