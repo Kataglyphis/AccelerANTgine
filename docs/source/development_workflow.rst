@@ -197,9 +197,12 @@ this project's subject — the upstream install instructions for
 `pprof <https://github.com/google/pprof>`__,
 `valgrind <https://valgrind.org/docs/manual/cl-manual.html>`__ and
 `perf <https://perfwiki.github.io/main/>`__ are the ones that stay correct. The CI
-image does NOT carry the whole set: it has no ``perf`` (so the lane warns, runs
-the workload for a short window without a recorder, then runs the benchmarks).
-It does carry gperftools' ``libprofiler`` (2.18.1, checked 2026-10-16), so that
+image has ``perf`` (``linux-perf`` 7.0.0-38.38, checked 2026-10-19), but CI cannot
+open perf events: the lane runs as the image's uid 1001, which has no
+capabilities even under ``--privileged``, and the GitHub runners set
+``perf_event_paranoid`` to 4. So the probe fails there, and the lane warns, runs
+the workload for a short window without a recorder, then runs the benchmarks.
+The image also carries gperftools' ``libprofiler`` (2.18.1, checked 2026-10-16), so that
 window writes ``logs/profile.prof`` on both arches; a host without it falls back
 to ``-pg``. **On arm64 the script picks gperftools' generic_fp stack walker**:
 the default, ``libgcc``, unwinds from inside the profiler's signal handler and

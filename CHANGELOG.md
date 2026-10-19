@@ -54,6 +54,12 @@ belongs in the **Changed** list below with that consequence spelled out.
   `corrosion_add_cxxbridge` builds the version `Cargo.lock` names when `PATH` has no exact match.
   The release section says that the packages carry their own GStreamer after v0.0.3.
 
+### Fixed
+- **The docs no longer say the CI image has no `perf`.** `:latest` carries `linux-perf`
+  7.0.0-38.38 (checked 2026-10-19); CI records nothing because the lane's uid 1001 has no
+  capabilities under `--privileged` and the runners set `perf_event_paranoid` to 4 (the probe
+  exits 255 on every Linux leg). `AGENTS.md` § 4 and `development_workflow.rst` say so.
+
 ## [0.0.3] - 2026-10-17
 
 ### Added

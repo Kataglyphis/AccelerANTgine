@@ -360,10 +360,16 @@ written out rather than linked.
   -shared`, while aarch64 links `R_AARCH64_TLSLE_*` into the `.so` without a
   word. Treat PIC like `-pthread` and `-fno-exceptions` there: a BMI flag the
   importer must agree with. clang is not affected.
-- **perf is optional in `ci-profile-bench.sh`, the CI image has none, and perf
-  alone is not a profile.** Ubuntu 26.04's `linux-tools-common`, which the image
-  installs, no longer ships `/usr/bin/perf` — perf is the `linux-perf` package
-  now — so a bare `timeout … perf record` died with exit 127. The script probes
+- **perf is optional in `ci-profile-bench.sh`, CI cannot open perf events, and
+  perf alone is not a profile.** The image has perf (`linux-perf` 7.0.0-38.38,
+  `perf version 7.0.14`, checked in `:latest` 2026-10-19); before it did, a bare
+  `timeout … perf record` died with exit 127, since Ubuntu 26.04's
+  `linux-tools-common` no longer ships `/usr/bin/perf`. CI still records nothing:
+  the lane runs as the image's uid 1001, which has no capabilities even under
+  `--privileged` (`CapEff` 0), and the GitHub runners set `perf_event_paranoid`
+  to 4, so the probe exits 255 on every Linux leg (x64 run 39135484490,
+  2026-10-18; arm64 run 38756495381, 2026-10-15). A host at paranoid 2, such as
+  WSL2's 6.18 kernel, records unprivileged. The script probes
   `perf record` (same options) around `true`; where that fails it WARNs with
   perf's own message, records nothing, and still runs the workload for a
   `--smoke-seconds` window (10 s) without a recorder, so a workload that stops
@@ -377,9 +383,10 @@ written out rather than linked.
   (`--signalling-port`; not the CLI's default 8443, which a dev box's own
   producer holds) for the window and points the CLI at it. Where the probe
   passes, everything but the window-closing exit 124 stays fatal. A CI perf
-  profile still needs `linux-perf` in the image, an ANTfrastructure change, and
-  with no consumer attached the producer mostly idles: 150 to 230 samples in a
-  20 s window were measured, not a hot loop.
+  profile now needs permission, not a package (root or `CAP_PERFMON` in the
+  container, or a lower `perf_event_paranoid` on the runner), and with no
+  consumer attached the producer mostly idles: 150 to 230 samples in a 20 s
+  window were measured, not a hot loop.
 
 - **The Python module runs without the GIL on 3.14t, so its locks are load-bearing.**
   `nanobind_add_module(... FREE_THREADED ...)` marks it `Py_MOD_GIL_NOT_USED`; against a GIL

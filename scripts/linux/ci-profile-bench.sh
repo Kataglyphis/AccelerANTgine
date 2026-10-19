@@ -73,7 +73,7 @@ if [[ -z "${STACK_WALKER}" && "$(uname -m)" == "aarch64" ]]; then
   STACK_WALKER="generic_fp"
 fi
 
-# Sets PERF_SKIP_REASON when this host cannot run perf, as in the CI image (AGENTS.md section 4).
+# Sets PERF_SKIP_REASON when this host cannot run perf, as on a CI runner (AGENTS.md section 4).
 perf_probe() {
   PERF_SKIP_REASON=""
   if ! command -v perf >/dev/null 2>&1; then
