@@ -25,8 +25,11 @@ __pycache__/
 *.py[cod]
 
 # Large binaries; the one tracked on purpose is re-included (AGENTS.md, "One binary is tracked").
-# Models are never tracked: models/README.md fetches them by checksum.
+# Models are never tracked: models/models.lock names them and the hub's fetcher puts them beside it.
 *.onnx
+/models/*
+!/models/README.md
+!/models/models.lock
 *.bmp
 !images/Engine_logo.bmp
 

@@ -19,6 +19,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The demo's model comes through `models/models.lock` and the hub's fetcher** (2026-10-19, hub
+  CON98). The lock pins `deim_dfine_n_coco.onnx`, its `.LICENSE` and its `.NOTICE` by URL and
+  SHA-256, and `models/README.md`'s `curl` + `sha256sum -c` recipe is one call of the hub's
+  `fetch-data-lock.py --lock models/models.lock`, which also fetches the two licence files and
+  caches by hash. `.gitignore` keeps everything in `models/` but the README and the lock. In
+  `:latest`: the three files land `0644` with the lock's hashes, the model byte for byte the old
+  recipe's; a second run writes nothing; a tampered model is replaced from the cache; a lock whose
+  hash differs from the download exits 1 and writes nothing.
 - **`release.yml` calls the hub's `release-publish.yml`** (2026-10-19, hub 89b098c9 -> c3fc7585).
   Its `version` and `release` jobs are the two calls, `stage: check` and `stage: publish`; the lane
   jobs, the `dry-run` input and the concurrency group stay. The collector is the hub's

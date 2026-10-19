@@ -169,10 +169,13 @@ written out rather than linked.
   ([`data-repositories.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/data-repositories.md#what-moved-and-why))
   took this pack from 12 to 2 MiB. The AGPL-3.0 `models/yolo26n.onnx` (9.5 MiB) left the tree on
   2026-10-14 (owner): `Src/inference_demo.cpp` and `resources/configs/inference_config.toml` now
-  name `models/deim_dfine_n_coco.onnx` (Apache-2.0), which `models/README.md` fetches by checksum
-  from [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release. No `Test/` suite loads it.
-  `.gitignore` carries `*.onnx` with no exception and `*.bmp` with the logo re-included, so a
-  model or bitmap dropped here is not committed unnoticed, and the hub's large-files gate
+  name `models/deim_dfine_n_coco.onnx` (Apache-2.0), from
+  [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release. `models/models.lock` pins it and
+  its license and notice by SHA-256, and the hub's `fetch-data-lock.py` fetches them
+  (`models/README.md`); no other fetcher exists here. No `Test/` suite loads it.
+  `.gitignore` carries `*.onnx` with no exception, everything in `models/` but the README and the
+  lock, and `*.bmp` with the logo re-included, so a model or bitmap dropped here is not committed
+  unnoticed, and the hub's large-files gate
   (`--ratchets`) fails any tracked data file over 500 KiB; no `large-files.allow` exists, so none
   is frozen.
 - **Dependency upgrades are Renovate as a local CLI, and nothing else**
