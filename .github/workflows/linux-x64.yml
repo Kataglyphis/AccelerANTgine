@@ -32,20 +32,6 @@ jobs:
     secrets:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
-  # Seconds on the bare runner: the collector release.yml runs on main, against uploads shaped like the lanes'.
-  release-collector:
-    name: Release collector suite
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: collect-release-assets.sh against synthetic uploads
-        run: bash scripts/linux/tests/test-collect-release-assets.sh
-
   build-ubuntu26_04_clang-x64:
     uses: ./.github/workflows/reusable-linux.yml
     with:

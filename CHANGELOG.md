@@ -19,6 +19,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **`release.yml` calls the hub's `release-publish.yml`** (2026-10-19, hub 89b098c9 -> c3fc7585).
+  Its `version` and `release` jobs are the two calls, `stage: check` and `stage: publish`; the lane
+  jobs, the `dry-run` input and the concurrency group stay. The collector is the hub's
+  `collect-release-assets.sh`, with this repo's choice as the `collect:` options, so
+  `scripts/linux/collect-release-assets.sh`, its suite and `linux-x64.yml`'s `release-collector`
+  job are gone; the hub's suite covers these options. Over the v0.0.3 release run's 7 uploads (97
+  files) plus both docs-site uploads, in `:latest`, the hub collector gives the same 20 files as
+  the old one and as the v0.0.3 release, and fails on a duplicate name and on no uploads.
 - **The docs site goes through the hub's `build-docs.yml`** (2026-10-19, hub a447ef3c ->
   89b098c9). The clang x64 build uploads `docs/build/html/` as `accelerantgine-docs-site` instead
   of deploying it, and `linux-x64.yml`'s new `docs` job hands that artifact to the hub workflow: it

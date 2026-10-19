@@ -70,7 +70,8 @@ reorganisation.
 CI uses ANTfrastructure's composite actions (`prepare-linux-ci-host`, `run-in-linux-container`,
 `compiler-cache-restore`/`-save`, `clean-host-package-check`, `requested-lanes`,
 `run-pester-suite`) and reusable workflows (`container-ci-windows.yml`, `container-ci-riscv64.yml`,
-`build-docs.yml`, `lint-gates.yml`, `submodule-pins.yml`), not hand-written `docker run` blocks.
+`build-docs.yml`, `release-publish.yml`, `lint-gates.yml`, `submodule-pins.yml`), not hand-written
+`docker run` blocks.
 
 **CMake modules: this repo's `cmake/` first, then the hub's.** `CMakeLists.txt` puts this repo's
 `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on `CMAKE_MODULE_PATH` and includes every
@@ -426,8 +427,12 @@ and `submodule-pins.yml`.
   and `windows-arm64-cross`, `[ci riscv64]` `linux-riscv64`, and `[ci all]` all four. A lane's
   README badge shows only its runs started by hand; a requested run is listed under *On request*.
 - **Every push to `main` is a release** (`release.yml`): all five lanes once more, then
-  `v<version>` with every lane's packages (`scripts/linux/collect-release-assets.sh`, its suite a
-  job of `linux-x64.yml`). The version is `CMakeLists.txt`'s `project()` `VERSION`.
+  `v<version>` with every lane's packages. The version check and the release job are two calls
+  of the hub's `release-publish.yml`
+  ([§ *The reusable release workflow*](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md#the-reusable-release-workflow));
+  the release job's `collect:` options pick CPack's packages and the wheels, never a file from a
+  `bundle/`, and the hub's collector suite runs them over uploads shaped like this repo's. The
+  version is `CMakeLists.txt`'s `project()` `VERSION`.
   `gh workflow run release.yml --ref develop -f dry-run=true` proves it on `develop`.
 - **The docs site** goes through the hub's `build-docs.yml` (2026-10-19). The clang x64 build's
   `ci-docs.sh` writes it with the coverage pages, `reusable-linux.yml` uploads `docs/build/html/`
