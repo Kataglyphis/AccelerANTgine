@@ -19,6 +19,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The docs site goes through the hub's `build-docs.yml`** (2026-10-19, hub a447ef3c ->
+  89b098c9). The clang x64 build uploads `docs/build/html/` as `accelerantgine-docs-site` instead
+  of deploying it, and `linux-x64.yml`'s new `docs` job hands that artifact to the hub workflow: it
+  adds the hub's `.htaccess` (HTTPS redirect, HSTS, the FTP state file not served) and 404 page,
+  fails on a dead internal link or anchor, and publishes only on a push to `develop` or `main`.
+  Every event but a dispatch used to deploy, pull requests included. `reusable-linux.yml` and its
+  callers drop `SERVER`/`USERNAME`/`PW`, which the `docs` job maps onto the hub's `FTP_*`;
+  `collect-release-assets.sh` skips both uploads of the site. Built with `ci-docs.sh` in
+  `:latest` and staged as the `docs` job stages it, coverage pages included: 407 documents, 0 link
+  findings, `.htaccess` and `404.html` in the site.
 - **The Linux packages carry the image's own GStreamer** (2026-10-17, owner: never the distro's).
   The `.deb` took `libgstreamer*1.0-0 (>= 1.26)` from the distro and its plugins with them; now the
   libraries and the plugins the pipelines and `webrtcsink` load travel in `lib/accelerantgine`, and

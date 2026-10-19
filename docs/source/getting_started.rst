@@ -174,3 +174,11 @@ Python 3.14):
    source .venv/bin/activate
    uv pip install -r requirements.txt
    cd docs && make html
+
+CI builds the site in the clang x64 lane and publishes it through ANTfrastructure's
+``build-docs.yml``, whose link gate fails on a dead internal link or anchor. The same gate over a
+local build:
+
+.. code-block:: bash
+
+   python3 third_party/ANTfrastructure/linux/scripts/verify_site_links.py docs/build/html

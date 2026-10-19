@@ -30,9 +30,6 @@ jobs:
       arch: x64
       platform: linux/amd64
     secrets:
-      SERVER: ${{ secrets.SERVER }}
-      USERNAME: ${{ secrets.USERNAME }}
-      PW: ${{ secrets.PW }}
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
   # Seconds on the bare runner: the collector release.yml runs on main, against uploads shaped like the lanes'.
@@ -57,10 +54,20 @@ jobs:
       arch: x64
       platform: linux/amd64
     secrets:
-      SERVER: ${{ secrets.SERVER }}
-      USERNAME: ${{ secrets.USERNAME }}
-      PW: ${{ secrets.PW }}
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
+
+  # The clang build's site, coverage included: the hub adds its .htaccess, checks every link and publishes on a push to develop or main.
+  docs:
+    needs: build-ubuntu26_04_clang-x64
+    permissions:
+      contents: read
+    uses: Kataglyphis/ANTfrastructure/.github/workflows/build-docs.yml@develop
+    with:
+      artifact: accelerantgine-docs-site
+    secrets:
+      FTP_SERVER: ${{ secrets.SERVER }}
+      FTP_USERNAME: ${{ secrets.USERNAME }}
+      FTP_PASSWORD: ${{ secrets.PW }}
 
   # Inside the image every library is present; the bare image base shows a missing one (hub linux-build-basics.md).
   clean-host-x64:

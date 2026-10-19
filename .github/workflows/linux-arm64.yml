@@ -26,9 +26,6 @@ jobs:
       arch: arm64
       platform: linux/arm64
     secrets:
-      SERVER: ${{ secrets.SERVER }}
-      USERNAME: ${{ secrets.USERNAME }}
-      PW: ${{ secrets.PW }}
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
   build-ubuntu26_04_clang-arm:
@@ -39,9 +36,6 @@ jobs:
       arch: arm64
       platform: linux/arm64
     secrets:
-      SERVER: ${{ secrets.SERVER }}
-      USERNAME: ${{ secrets.USERNAME }}
-      PW: ${{ secrets.PW }}
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
   # Inside the image every library is present; the bare image base shows a missing one (hub linux-build-basics.md).

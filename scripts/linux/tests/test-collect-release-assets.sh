@@ -33,6 +33,10 @@ done
 printf 'nsis' > "${a}/AccelerANTgine-windows-x64/packages/AccelerANTgine-0.0.1-Release-x86_64.exe"
 mkdir -p "${a}/AccelerANTgine-windows-arm64-tests/packages"
 printf 'msi' > "${a}/AccelerANTgine-windows-arm64-tests/packages/tests.msi"
+for site in accelerantgine-docs-site docs-site-docs; do
+  mkdir -p "${a}/${site}/_downloads"
+  printf 'zip' > "${a}/${site}/_downloads/examples.zip"
+done
 
 out="${work}/release"
 check "it collects" bash "${collect}" "${a}" "${out}"
@@ -42,6 +46,7 @@ check "all four wheels, gil and free-threaded" test "$(find "${out}" -maxdepth 1
 check "the MSI, zip and MSIX of both Windows arches" test "$(find "${out}" -maxdepth 1 \( -name '*.msi' -o -name '*.msix' -o -name '*.zip' \) | wc -l)" = 6
 check "the x64 installer, but no exe from a bundle" bash -c "test -e '${out}/AccelerANTgine-0.0.1-Release-x86_64.exe' && ! test -e '${out}/AccelerANTgine.exe'"
 check "nothing from a test artifact" test ! -e "${out}/tests.msi"
+check "nothing from either docs site" test ! -e "${out}/examples.zip"
 check "relative paths, as release.yml passes them" bash -c "cd '${work}' && bash '${collect}' artifacts release-relative >/dev/null && test -e release-relative/AccelerANTgine_0.0.1.0_arm64.msix"
 
 mkdir -p "${a}/AccelerANTgine-windows-x64-copy/packages"

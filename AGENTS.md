@@ -68,8 +68,9 @@ reorganisation.
 | `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` over this repo's root, always with `--ratchets` as CI passes it; the freeze files (`comment-size.allow`, `shellcheck-warnings.allow`, `doc-dupes-hub.allow`) sit at the repo root. What each gate does: [`code-quality-tooling.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/code-quality-tooling.md) |
 
 CI uses ANTfrastructure's composite actions (`prepare-linux-ci-host`, `run-in-linux-container`,
-`deploy-over-ftp`, `run-pester-suite`) and reusable workflows (`container-ci-windows.yml`,
-`lint-gates.yml`, `submodule-pins.yml`), not hand-written `docker run` blocks.
+`compiler-cache-restore`/`-save`, `clean-host-package-check`, `requested-lanes`,
+`run-pester-suite`) and reusable workflows (`container-ci-windows.yml`, `container-ci-riscv64.yml`,
+`build-docs.yml`, `lint-gates.yml`, `submodule-pins.yml`), not hand-written `docker run` blocks.
 
 **CMake modules: this repo's `cmake/` first, then the hub's.** `CMakeLists.txt` puts this repo's
 `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on `CMAKE_MODULE_PATH` and includes every
@@ -428,6 +429,14 @@ and `submodule-pins.yml`.
   `v<version>` with every lane's packages (`scripts/linux/collect-release-assets.sh`, its suite a
   job of `linux-x64.yml`). The version is `CMakeLists.txt`'s `project()` `VERSION`.
   `gh workflow run release.yml --ref develop -f dry-run=true` proves it on `develop`.
+- **The docs site** goes through the hub's `build-docs.yml` (2026-10-19). The clang x64 build's
+  `ci-docs.sh` writes it with the coverage pages, `reusable-linux.yml` uploads `docs/build/html/`
+  as `accelerantgine-docs-site`, and `linux-x64.yml`'s `docs` job hands that to the hub, which adds
+  its `.htaccess` and 404 page, fails on a dead internal link or anchor, and publishes only on a
+  push to `develop` or `main` (`SERVER`/`USERNAME`/`PW` mapped onto its `FTP_*`). A pull request
+  builds and checks the site but publishes nothing.
+  [`docs-sites.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/docs-sites.md#the-reusable-workflow)
+  has the rest.
 - Every job that owns a runner carries `timeout-minutes`, every workflow declares `permissions:`,
   and every upload sets `if-no-files-found: error`: the hub's workflow conventions
   (`verify_workflow_conventions.py`), measured at zero findings here since the rename (again on
