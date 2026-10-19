@@ -3,6 +3,7 @@
 # The shared theme baseline is loaded at build time, so template changes land without edits here.
 import importlib.util
 import pathlib
+import re
 import sys
 
 _DOCS_SOURCE_DIR = pathlib.Path(__file__).resolve().parent
@@ -34,10 +35,22 @@ _spec.loader.exec_module(_conf_base)
 
 # -- Project information -----------------------------------------------------
 
+
+def _cmake_project_version() -> str:
+    """VERSION of CMakeLists.txt's first project(), the one CPack stamps."""
+    cmake_lists = _REPO_ROOT / "CMakeLists.txt"
+    text = cmake_lists.read_text(encoding="utf-8")
+    call = re.search(r"^\s*project\s*\(([^)]*)\)", text, re.IGNORECASE | re.MULTILINE)
+    version = re.search(r"\bVERSION\s+(\d+(?:\.\d+)*)", call.group(1)) if call else None
+    if version is None:
+        raise RuntimeError(f"No VERSION in the first project() of {cmake_lists}")
+    return version.group(1)
+
+
 project = "AccelerANTgine"
 copyright = "2025, Jonas Heinle"
 author = "Jonas Heinle"
-release = "0.0.1"
+release = _cmake_project_version()
 
 # -- General configuration ---------------------------------------------------
 

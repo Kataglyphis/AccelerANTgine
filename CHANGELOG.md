@@ -59,6 +59,11 @@ belongs in the **Changed** list below with that consequence spelled out.
   7.0.0-38.38 (checked 2026-10-19); CI records nothing because the lane's uid 1001 has no
   capabilities under `--privileged` and the runners set `perf_event_paranoid` to 4 (the probe
   exits 255 on every Linux leg). `AGENTS.md` § 4 and `development_workflow.rst` say so.
+- **The docs site names the library's version** (live-site audit, 2026-10-19): it said 0.0.1
+  while `CMakeLists.txt` declares 0.0.3, since `docs/source/conf.py` hard-coded the release. It
+  now reads the `VERSION` of the first `project()` and fails the build when there is none.
+- **The docs index no longer links `py-modindex.html`**, a 404 on the live site: no page
+  documents a Python module, so Sphinx writes no module index.
 
 ## [0.0.3] - 2026-10-17
 
