@@ -73,17 +73,12 @@ fi
 # --check: in place it rewrote the CI checkout and stayed green over a drifted file (2026-10-12).
 run_gate cmake-format code_quality_run_cmake_format --check "${CMAKE_FILES[@]}"
 
-# Releases format differently, so only the hub's LLVM_RELEASE (loaded from versions.env by ci-common.sh) may grade.
+# Releases format differently, so the hub picks the clang-format of its LLVM_RELEASE, or the gate fails.
 check_clang_format() {
-  [[ -n "${LLVM_RELEASE:-}" ]] || err "LLVM_RELEASE is unset: ANTfrastructure's versions.env no longer publishes it."
-  local version
-  version="$(clang-format --version)"
-  if ! grep -Eq "clang-format version ${LLVM_RELEASE//./\\.}([^0-9.]|\$)" <<<"${version}"; then
-    err "clang-format reports '${version}', not the hub's LLVM_RELEASE ${LLVM_RELEASE}."
-  fi
+  code_quality_require_pinned_clang_format
   code_quality_check_clang_format "${FORMAT_FILES[@]}"
   if [[ "${CODE_QUALITY_CLANG_FORMAT_DEVIATIONS}" -gt 0 ]]; then
-    err "${CODE_QUALITY_CLANG_FORMAT_DEVIATIONS} file(s) deviate from .clang-format; rewrite them with clang-format ${LLVM_RELEASE} -i."
+    err "${CODE_QUALITY_CLANG_FORMAT_DEVIATIONS} file(s) deviate from .clang-format; rewrite them with ${CODE_QUALITY_CLANG_FORMAT} -i."
   fi
 }
 run_gate clang-format check_clang_format

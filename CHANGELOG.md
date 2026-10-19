@@ -19,6 +19,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The clang-format gate takes the hub's pinned clang-format** (2026-10-19, hub 1a174d9c).
+  `run-static-analysis-format.sh` grepped `clang-format --version` for `LLVM_RELEASE` itself; now
+  the hub's `code_quality_require_pinned_clang_format` picks the clang-format of that release
+  (`/usr/local/llvm-target/bin` first, then `PATH`) or fails the gate, and the check runs the binary
+  it picked. In `:latest` over the committed sources: 0 of 41 files deviate; with only a 22.1.0
+  clang-format to find, the gate fails with `No clang-format 23.1.3 (the hub's LLVM_RELEASE)`.
 - **The generated-artifacts check is the hub's suite** (2026-10-19, hub c3fc7585 -> 1a174d9c).
   `scripts/windows/tests/Repo.GeneratedArtifacts.Tests.ps1` is gone; `windows-x64.yml`'s
   `pester-tests` job runs the hub's `shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1`, which

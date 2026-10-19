@@ -249,9 +249,11 @@ One entry point per platform, and CI runs exactly these:
   Linux clang-format checks and does not rewrite: it covers every C/C++ file under ``Src/``,
   ``Test/``, ``Bindings/`` and ``cmake/``, and fails the lane when one of them deviates from
   ``.clang-format``.
-- **One clang-format release:** the Linux gate refuses any clang-format but the hub's
-  ``LLVM_RELEASE`` (23.1.3), because each release formats differently. To fix a file, run that
-  release's ``clang-format -i`` on it; the image's ``clang-format`` is that release.
+- **One clang-format release:** the Linux gate grades with the clang-format of the hub's
+  ``LLVM_RELEASE`` (23.1.3), because each release formats differently. The hub's
+  ``code_quality_require_pinned_clang_format`` looks in ``/usr/local/llvm-target/bin``, then on
+  ``PATH``, and fails the gate when neither has that release. To fix a file, run the
+  ``clang-format -i`` the gate's error names; the image's ``clang-format`` is that release.
 - **Every tool is a gate:** a tool that is not installed fails the lane rather than being
   skipped.
 - **Configs:** ``.clang-format`` and ``.cmake-format.yaml`` here are **shared** configs, and
