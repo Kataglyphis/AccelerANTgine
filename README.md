@@ -20,7 +20,7 @@
 
 [**Docs site**](https://hardwareacceleratedai.jonasheinle.de/)
 
-This repo is dedicated to deliver AI inference on steroids. AccelerANTgine is a C++23 library
+AccelerANTgine is a C++23 library
 that runs ONNX Runtime models on GStreamer media and streams over WebRTC, exposed three ways: a C
 API for native embedders, Python bindings and a CLI. It is the inference core that
 [OmniAccelerANT](https://github.com/Kataglyphis/OmniAccelerANT)'s native plugin links, and CI
