@@ -567,6 +567,9 @@ FuzzTest's build-time tools need no emulator wrapper.
 
 ## 6. Docs owned by this repo
 
+**Write docs like a developer: short and precise** (owner, 2026-10-19). Say what a thing does,
+how to run it and what breaks; no filler, no marketing, no repetition.
+
 - `README.md` is the short overview of the family's
   [README rule](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/repository-family.md#the-readme-rule)
   (owner, 2026-10-19), and `pyproject.toml` makes it the wheels' long description, so its
