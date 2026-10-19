@@ -82,8 +82,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   documents a Python module, so Sphinx writes no module index.
 - **The API page's tree views reach their anchors** (live-site audit, 2026-10-19: 77 dead). Exhale
   links a label with its case and dots kept, while docutils lowercases the id and turns the dots
-  into hyphens; an `include-read` hook in `conf.py` rewrites the two tree views. An offline crawl
-  of the site `ci-docs.sh` builds in `:latest` finds 0 dead anchors, against 77 before.
+  into hyphens; an `include-read` hook rewrites the two tree views, the family theme's since
+  DocumANTation a58ae23, so `conf.py` no longer carries a copy. An offline crawl of the site
+  `ci-docs.sh` builds in `:latest` finds 0 dead anchors, against 77 before.
 
 ## [0.0.3] - 2026-10-17
 

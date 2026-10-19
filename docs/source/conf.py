@@ -3,8 +3,6 @@
 import pathlib
 import re
 
-from docutils.nodes import make_id
-
 # An editable install from the hub's nested DocumANTation (requirements.txt).
 from sphinx_kataglyphis import brand, setup_theme
 
@@ -94,16 +92,3 @@ html_extra_path = [
 ]
 
 graphviz_output_format = "svg"
-
-# Exhale's tree view links a label with its case and dots kept; the docutils id has neither.
-_EXHALE_TREE_LINK = re.compile(r'(href="[^"#]+\.html#)([^"]+)"')
-
-
-def _exhale_tree_anchors(app, relative_path, parent_docname, content):
-    """Point the tree views library_root includes at the ids docutils gives exhale's labels."""
-    if relative_path.name.endswith("_view_hierarchy.rst.include"):
-        content[0] = _EXHALE_TREE_LINK.sub(lambda m: f'{m.group(1)}{make_id(m.group(2))}"', content[0])
-
-
-def setup(app):
-    app.connect("include-read", _exhale_tree_anchors)
