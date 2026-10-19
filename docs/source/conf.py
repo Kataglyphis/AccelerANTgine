@@ -56,6 +56,8 @@ else:
 # Staged by ci-coverage.sh in an earlier step, so a docs-only build cannot check it.
 linkcheck_ignore = [
     r"^coverage/index\.html$",
+    # sourceforge.io answers 403 to GitHub's runners and 200 to a browser (2026-10-19).
+    r"^https://[a-z]+\.sourceforge\.io/",
 ]
 
 if _DOXYGEN_XML_DIR.exists():
