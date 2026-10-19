@@ -1,1 +1,1 @@
-Welcome to an unique rendering experience.
+AccelerANTgine: a C++23 library that runs ONNX Runtime models on GStreamer media, with a C API, Python bindings and a CLI.
