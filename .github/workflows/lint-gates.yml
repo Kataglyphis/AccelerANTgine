@@ -18,6 +18,4 @@ jobs:
     name: shellcheck + actionlint + gitleaks + ruff + ratchets
     uses: Kataglyphis/ANTfrastructure/.github/workflows/lint-gates.yml@develop
     with:
-      # recursive: docs/source/_static/css/custom.css links into a nested submodule, and a dangling path fails the gates.
-      submodules: 'recursive'
       ratchets: true

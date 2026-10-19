@@ -61,6 +61,14 @@ belongs in the **Changed** list below with that consequence spelled out.
   claims were wrong: the CMake module path takes this repo's `cmake/` first (PowerShell resolves
   the hub first), the lint wrapper runs eight gates, not seven, and the hub's large-files gate
   limits tracked data files to 500 KiB beside the `.gitignore` guard.
+- **The docs site uses the family theme through `setup_theme()`** (2026-10-19). `conf.py` loaded
+  DocumANTation's frozen `conf_base.py` by file path and symlinked its `custom.css`; it now calls
+  `sphinx_kataglyphis`, which `requirements.txt` installs from the hub's nested DocumANTation
+  (4866eae): the family logo and favicon, a title without the doubled "documentation", the brand's
+  code colours, and Markdown links that resolve. graphviz, inheritance diagrams, breathe, exhale,
+  the version from `CMakeLists.txt` and `linkcheck_ignore` stay. The docs venv needs Python 3.14.
+  `lint-gates.yml` drops its `submodules: 'recursive'`, which only the symlink needed and which is
+  the hub's default anyway.
 
 ### Fixed
 - **The docs no longer say the CI image has no `perf`.** `:latest` carries `linux-perf`
@@ -72,6 +80,10 @@ belongs in the **Changed** list below with that consequence spelled out.
   now reads the `VERSION` of the first `project()` and fails the build when there is none.
 - **The docs index no longer links `py-modindex.html`**, a 404 on the live site: no page
   documents a Python module, so Sphinx writes no module index.
+- **The API page's tree views reach their anchors** (live-site audit, 2026-10-19: 77 dead). Exhale
+  links a label with its case and dots kept, while docutils lowercases the id and turns the dots
+  into hyphens; an `include-read` hook in `conf.py` rewrites the two tree views. An offline crawl
+  of the site `ci-docs.sh` builds in `:latest` finds 0 dead anchors, against 77 before.
 
 ## [0.0.3] - 2026-10-17
 

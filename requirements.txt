@@ -8,3 +8,5 @@ breathe==5.1.0
 exhale==0.3.7
 pre-commit==4.7.0
 sphinx-autobuild==2025.8.25
+# The family theme docs/source/conf.py calls; uv resolves this path from the cwd, so install from the repo root.
+-e ./third_party/ANTfrastructure/third_party/DocumANTation/sphinx-kataglyphis-theme

@@ -115,15 +115,12 @@ is what you want, update the gitlink **and** fix the fallout in the same change.
   pins 20260526.0) passes the clang Debug suites (ASan + UBSan), `fuzzTestSuite`, the TSan build
   and the GCC suites in `:latest`.
 - `third_party/ANTfrastructure`'s **own** nested submodule is a build input here.
-  `docs/source/conf.py` loads `conf_base.py` from
-  `third_party/ANTfrastructure/third_party/DocumANTation/docs-tooling/source_templates/sphinx-book`
-  and fails without it (a `FileNotFoundError` naming that file), so the docs lane is pinned to the
-  DocumANTation commit the ANTfrastructure gitlink carries. `git submodule update --init` without
-  `--recursive` satisfies every other consumer here and breaks this one (the symptom: § 4).
-  `docs/source/_static/css/custom.css` is a tracked SYMLINK into that tree and fails quietly:
-  Sphinx renders without the brand stylesheet and says nothing. Until 2026-09-15 its target named
-  the pre-rename `third_party/ContainerHub`; a tracked path that is not on disk fails the
-  doc-links and code-size ratchets before they read a line of code.
+  `requirements.txt` installs the family's Sphinx theme, which `docs/source/conf.py` calls
+  (`setup_theme()`), from
+  `third_party/ANTfrastructure/third_party/DocumANTation/sphinx-kataglyphis-theme`, so the site is
+  pinned to the DocumANTation commit the ANTfrastructure gitlink carries. `git submodule update
+  --init` without `--recursive` satisfies every other consumer here and breaks this one (the
+  symptom: § 4).
 - No other pin here has a recorded coupling (checked 2026-09-15).
 
 Drift is guarded by ANTfrastructure's shared suite, which `.github/workflows/submodule-pins.yml`
@@ -155,9 +152,14 @@ written out rather than linked.
   `import kataglyphis.c_api;`. The webcam path's `knt_push_frame` is not part of it; the plugin
   defines and exports that itself. A signature change here breaks a consumer one superproject up,
   which no build in this repo catches.
-- **Sphinx config pulls its baseline from DocumANTation, via ANTfrastructure** (§ 3). A docs build
-  that fails on a missing `conf_base.py` means the nested submodule was not initialised
-  recursively.
+- **The docs theme comes from DocumANTation, via ANTfrastructure** (§ 3). A docs venv whose
+  install stops at `error: Distribution not found at: file:///…/sphinx-kataglyphis-theme` means
+  the nested submodule was not initialised recursively, or `uv pip install -r requirements.txt`
+  ran outside the repo root: uv resolves the `-e` path from the working directory. The theme needs
+  Python 3.14. `conf.py` adds only this project's settings to `setup_theme()`: graphviz,
+  inheritance diagrams, breathe and exhale when Doxygen's XML exists, the version from
+  `CMakeLists.txt`, and an `include-read` hook that points exhale's two tree views at the ids
+  docutils gives its labels (lowercase, no dots), where their links used to miss 77 anchors.
 - **One binary is tracked on purpose; models never are.** `images/Engine_logo.bmp` (117 KiB, the
   family's ant) is the NSIS installer header image (`cmake/CPackOptions.cmake`), which CPack reads
   as a literal path at package time. It **stays**, and no LFS is introduced. The family's history
@@ -487,14 +489,12 @@ stays unsigned.
 `Build-Windows.ps1` exits 1 on an error outside every build step; it used to log it and exit 0.
 
 `lint-gates.yml` and `submodule-pins.yml` are one `uses:` line each onto ANTfrastructure's
-reusable workflows; only this repo's `on:` filters and their inputs (`submodules: 'recursive'`
-and `ratchets: true` for the lint gates, `pester-version: '3.4.0'` for the pins) stay local.
+reusable workflows; only this repo's `on:` filters and their inputs (`ratchets: true` for the
+lint gates, `pester-version: '3.4.0'` for the pins) stay local.
 `lint-gates.yml` runs the same aggregator a dev box runs with
 `bash scripts/linux/run-lint-gates.sh` (which adds `--ratchets` itself), against the same
 explicit root, but reaches it from the hub checkout rather than through the wrapper, because the
-wrappers sit at different paths across the family. The doc-link gate needs the hub's
-`third_party/DocumANTation` checked out, since `docs/source/_static/css/custom.css` links into
-it.
+wrappers sit at different paths across the family.
 
 ### The riscv64 lane
 

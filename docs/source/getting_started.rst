@@ -164,11 +164,13 @@ packages and builds the docs:
      --runner ubuntu-26.04 \
      --docs-out build/build/html
 
-A direct docs build, written to ``docs/build/html/index.html``:
+A direct docs build, written to ``docs/build/html/index.html``, from the repository root (the
+family theme in ``requirements.txt`` is a path into the recursive submodule checkout, and it needs
+Python 3.14):
 
 .. code-block:: bash
 
-   uv venv
+   uv venv --python 3.14
    source .venv/bin/activate
    uv pip install -r requirements.txt
    cd docs && make html

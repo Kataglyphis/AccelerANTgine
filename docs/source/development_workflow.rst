@@ -268,7 +268,7 @@ The pre-commit hook installs from the same ``requirements.txt``:
 
 .. code-block:: bash
 
-   uv venv
+   uv venv --python 3.14   # the docs theme in requirements.txt needs it
    source .venv/bin/activate # .venv/Scripts/activate on pwsh
    uv pip install -r requirements.txt
    pre-commit install
