@@ -53,15 +53,8 @@ if (-not (Test-Path $configPathResolved)) {
 }
 $buildConfig = Import-PowerShellDataFile -Path $configPathResolved
 
-$row = Get-ConfigValue -Config $buildConfig -Path "Build.Configurations.$rowName"
-if ($null -eq $row) {
-    throw "Unknown build configuration '$rowName' in $configPathResolved."
-}
-
-# The build side's environment override, so a retargeted build directory is found here too.
-$buildDirEnvItem = Get-Item -Path "Env:$($row['BuildDirEnv'])" -ErrorAction SilentlyContinue
-$buildDirName = Get-OrDefault $(if ($null -ne $buildDirEnvItem) { $buildDirEnvItem.Value } else { $null }) $row['BuildDir']
-$buildDir = Join-Path $ProjectRoot $buildDirName
+# The row's BuildDirEnv applies here as on the build side, so a retargeted build directory is found too.
+$buildDir = Join-Path $ProjectRoot (Get-BuildConfigurationRow -Config $buildConfig -Name $rowName -ConfigPath $configPathResolved).BuildDir
 
 $logDirPath = Join-Path $ProjectRoot (Get-OrDefault $LogDir (Get-ConfigValue -Config $buildConfig -Path 'Build.LogDir'))
 if (-not (Test-Path $logDirPath)) {
@@ -179,12 +172,8 @@ try {
         $manifest = Join-Path $staged 'tests.json'
         if (Test-Path -LiteralPath $manifest) {
             Write-BuildLog -Context $ctx -Message "--- Release suites staged in $staged ---"
-            $verdicts = @(& (Join-Path $staged 'Invoke-StagedTests.ps1') -Manifest $manifest |
-                    Select-String -Pattern '^TESTS: passed=(\d+) failed=(\d+) skipped=(\d+)\s*$')
-            if ($verdicts.Count -ne 1) { throw "The staged Release suites printed $($verdicts.Count) TESTS lines, not one" }
-            $passed, $failed, $skipped = $verdicts[0].Matches[0].Groups[1..3].Value | ForEach-Object { [int]$_ }
-            Write-BuildLog -Context $ctx -Message "Release suites: passed $passed, failed $failed, skipped $skipped"
-            if ($failed -gt 0 -or $passed -lt 1) { throw "The staged Release suites failed: passed $passed, failed $failed" }
+            $verdict = Assert-StagedTestVerdict -Lines @(& (Join-Path $staged 'Invoke-StagedTests.ps1') -Manifest $manifest) -Label 'The staged Release suites'
+            Write-BuildLog -Context $ctx -Message "Release suites: passed $($verdict.Passed), failed $($verdict.Failed), skipped $($verdict.Skipped)"
         } else {
             Write-BuildLog -Context $ctx -Message "No staged Release suites in $staged; build with -StageTests to run them"
         }

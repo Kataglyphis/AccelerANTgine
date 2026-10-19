@@ -19,6 +19,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The Windows scripts take their config rows, the portable bundle and the staged verdict from the
+  hub** (2026-10-19, hub 1a174d9c). `Build-Windows.ps1` and `Start-Windows.ps1` read a
+  `Build-Windows.config.psd1` row through `Get-BuildConfigurationRow` (`BuildDirEnv`/`PresetEnv`
+  applied), not their own lookups. The Portable Bundle step is `New-PortableBundle
+  -RequireCompleteInstall`, then `Assert-ChainOrtTree` on its bundle: the same install, closure
+  check and installer copy as the inline code it replaces, and the build now needs a hub with
+  `New-PortableBundle`. `Start-Windows.ps1 -Config Release` grades the staged suites with
+  `Assert-StagedTestVerdict`. `OrtProofWiring.Tests.ps1` fails when the bundle is proved before it is
+  made or `-RequireCompleteInstall` goes. A clangcl-release `-StageTests` build in `:winamd64`: 7 of
+  7 steps, the bundle complete as installed and G6-proved; with `intl-8.dll` withheld from
+  `package-dlls` the step throws naming it. On the host, `Start-Windows.ps1 -Config Release` over that
+  output: 107 passed, 0 failed, 6 skipped.
 - **`ci-common.sh` has no fallback core any more** (2026-10-19). Without the hub it defined its own
   `info`/`warn`/`err`/`die`, `arch_oci`, `require_sudo`, `apt_update_once`, `apt_install` and
   `compute_jobs` and went on, and the `ci-*.sh` chain then failed at its first hub call (only

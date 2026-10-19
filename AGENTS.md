@@ -402,7 +402,8 @@ pwsh -NoProfile -File .\scripts\windows\Build-PythonBindings.ps1
 `Start-Windows.ps1 -Config Debug|Profile|Release` runs on the host what a build produced: the CLI
 check, then that configuration's suites. One script replaced three that differed only in a build
 directory and a suite list; it reads the build directory from `Build-Windows.config.psd1`, the
-table `Build-Windows.ps1` builds into, so producer and consumer cannot disagree.
+table `Build-Windows.ps1` builds into, through the same hub call (`Get-BuildConfigurationRow`), so
+producer and consumer cannot disagree.
 
 `Invoke-ContainerBuild.ps1`, `Invoke-ContainerPythonBindings.ps1` and `Show-BuildHelp.ps1` are
 the other entry points, named for what they do: none of them starts the application. The first
@@ -496,7 +497,9 @@ clangcl-release configures `KATAGLYPHIS_PACKAGE_DLL_DIR`, the hub's
 `AccelerANTgine.exe` and `AccelerANTgine.dll`. The search runs in the order of
 `Get-ProductDllSearchPath`: the chain ONNX Runtime, the image's `C:\runtime\bin`, then the
 target's VC++ runtime. The CPack installers and the portable bundle in
-`dist/windows-<x64|arm64>/bundle` carry that closure, and G6 proves the ORT in each. The MSIX
+`dist/windows-<x64|arm64>/bundle` carry that closure, and G6 proves the ORT in each. The bundle is
+the hub's `New-PortableBundle -RequireCompleteInstall`: a DLL its closure has to add to the install
+tree fails the build, because every installer packs that tree and would lack it. The MSIX
 ships the bundle's `bin\` whole. On x64 the NSIS installer joins the MSI and ZIP in
 `dist/windows-x64/packages`; arm64 leaves it out, because its installer stub is x86. The MSIX is
 signed through the hub's `Invoke-MsixPackage -Sign -SigningRoot` with the first `*.pfx` at the

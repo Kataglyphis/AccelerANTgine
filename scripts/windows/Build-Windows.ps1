@@ -54,12 +54,12 @@ Import-BuildModule @(
     'WindowsMediaRuntime.Common'
     'WindowsTargetArch.Common'  # the target: accepted spellings, cross or not, the MSVC lib dir
 )
-# Cross arguments, package arch and the DLL closure; an older hub pin lacks Get-ProductDllSearchPath.
+# Cross arguments, package arch, the DLL closure and the portable bundle; an older hub pin lacks New-PortableBundle.
 try {
     Import-BuildModule @('WindowsCrossBundle.Common')
-    $null = Get-Command -Name 'Get-ProductDllSearchPath' -ErrorAction Stop
+    $null = Get-Command -Name 'New-PortableBundle' -ErrorAction Stop
 } catch {
-    throw "This build needs ANTfrastructure's WindowsCrossBundle.Common with Get-ProductDllSearchPath (hub commit of 2026-09-25, third_party/ANTfrastructure/docs/windows-cross-builds.md); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
+    throw "This build needs ANTfrastructure's WindowsCrossBundle.Common with New-PortableBundle (hub 3d26fac7 of 2026-10-19, third_party/ANTfrastructure/docs/windows-cross-builds.md); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
 }
 $TargetArch = Get-WindowsTargetArch -Arch $TargetArch
 $isCross = Test-WindowsCrossTarget -Arch $TargetArch
@@ -81,31 +81,6 @@ if (-not (Test-Path $configPathResolved)) {
     throw "Build config not found: $configPathResolved"
 }
 $BuildConfig = Import-PowerShellDataFile -Path $configPathResolved
-
-function Get-EnvironmentVariableValue {
-    param([string]$Name)
-
-    if ([string]::IsNullOrWhiteSpace($Name)) { return $null }
-    $item = Get-Item -Path "Env:$Name" -ErrorAction SilentlyContinue
-    if ($null -ne $item) { return $item.Value }
-    return $null
-}
-
-function Get-BuildConfiguration {
-    param([Parameter(Mandatory)][string]$Name)
-
-    $row = Get-ConfigValue -Config $BuildConfig -Path "Build.Configurations.$Name"
-    if ($null -eq $row) {
-        throw "Unknown build configuration '$Name' in $configPathResolved."
-    }
-
-    return [pscustomobject]@{
-        Name          = $Name
-        BuildDir      = (Get-OrDefault (Get-EnvironmentVariableValue -Name $row['BuildDirEnv']) $row['BuildDir'])
-        Preset        = (Get-OrDefault (Get-EnvironmentVariableValue -Name $row['PresetEnv']) $row['Preset'])
-        Configuration = $row['Configuration']
-    }
-}
 
 # For host runs only: a VS 2022 runner's redistributable is older than the toolset the binaries import from.
 function Copy-AppLocalVcRuntime {
@@ -210,10 +185,10 @@ try {
     $fastLocalCache = Initialize-BuildCacheEnvironment -Context $Context -FastBuildDir $FastBuildDir
     
     # The --config value also decides whether Invoke-CmakeConfigureAndBuild stages the sanitizer runtime.
-    $cfgMsvc = Get-BuildConfiguration -Name 'msvc-debug'
-    $cfgClang = Get-BuildConfiguration -Name 'clangcl-debug'
-    $cfgProfile = Get-BuildConfiguration -Name 'clangcl-profile'
-    $cfgRelease = Get-BuildConfiguration -Name 'clangcl-release'
+    $cfgMsvc = Get-BuildConfigurationRow -Config $BuildConfig -Name 'msvc-debug' -ConfigPath $configPathResolved
+    $cfgClang = Get-BuildConfigurationRow -Config $BuildConfig -Name 'clangcl-debug' -ConfigPath $configPathResolved
+    $cfgProfile = Get-BuildConfigurationRow -Config $BuildConfig -Name 'clangcl-profile' -ConfigPath $configPathResolved
+    $cfgRelease = Get-BuildConfigurationRow -Config $BuildConfig -Name 'clangcl-release' -ConfigPath $configPathResolved
 
     foreach ($cfg in @($cfgMsvc, $cfgClang, $cfgProfile, $cfgRelease)) {
         Write-BuildLog -Context $Context -Message ("Configuration {0,-16} -> {1} / {2} / {3}" -f $cfg.Name, $cfg.BuildDir, $cfg.Preset, $cfg.Configuration)
@@ -493,29 +468,12 @@ try {
 
         # The uploaded install tree plus installers; arm64's setup .exe is NSIS's x86 stub too, which the device job installs.
         Invoke-BuildStep -Context $Context -StepName "Portable Bundle ($TargetArch)" -Critical -Script {
-            $distArch = Join-Path $Workspace "dist\windows-$packageArch"
-            $bundle = Join-Path $distArch 'bundle'
-            if (Test-Path $bundle) { Remove-Item -LiteralPath $bundle -Recurse -Force }
-            Invoke-BuildExternal -Context $Context -File "cmake" -Parameters @("--install", $fastBuildReleaseDirFull, "--prefix", $bundle, "--config", $cfgRelease.Configuration)
-            $bundleBin = Join-Path $bundle 'bin'
-            $installed = @(Get-ChildItem -LiteralPath $bundleBin -File | ForEach-Object Name)
-            $seeds = @(Get-ChildItem -LiteralPath $bundleBin -File | Where-Object { $_.Extension -in '.exe', '.dll' } | ForEach-Object FullName)
-            # The installers pack this tree, so a DLL this has to add is one they would all lack.
-            $added = @(Copy-PeImportClosure -Path $seeds -SearchDirectory @(Get-ProductDllSearchPath -Arch $TargetArch) -Destination $bundleBin -Arch $TargetArch |
-                ForEach-Object { Split-Path $_ -Leaf } | Where-Object { $_ -notin $installed })
-            if ($added.Count) {
-                throw "The install tree lacks $($added -join ', '), which its binaries import, so every installer would ship without it: seed the package DLL closure with the binary that imports it."
-            }
-            $null = Assert-ChainOrtTree -Root $bundle -OrtDirectory $bundleBin
-            $packages = Join-Path $distArch 'packages'
-            if (Test-Path $packages) { Remove-Item -LiteralPath $packages -Recurse -Force }
-            New-Item -ItemType Directory -Force -Path $packages | Out-Null
-            $installers = @(Get-ChildItem -LiteralPath $fastBuildReleaseDirFull -File | Where-Object { $_.Extension -in '.msi', '.zip' })
-            # NSIS names its installer like the MSI; the build root's other .exe files are tests.
-            $installers += @($installers | ForEach-Object { Join-Path $fastBuildReleaseDirFull "$($_.BaseName).exe" } |
-                    Select-Object -Unique | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Get-Item)
-            $installers | Copy-Item -Destination $packages
-            Write-BuildLog -Context $Context -Message "Portable bundle $bundle; the install tree carries its whole DLL closure ($($installed.Count) file(s) in bin)"
+            # -RequireCompleteInstall: the installers pack the install tree, so a DLL the closure has to add is one they would all lack.
+            $portable = New-PortableBundle -BuildDir $fastBuildReleaseDirFull -DistDir (Join-Path $Workspace "dist\windows-$packageArch") `
+                -Configuration $cfgRelease.Configuration -Arch $TargetArch -RequireCompleteInstall `
+                -Runner { param($File, [string[]]$Arguments) $null = Invoke-BuildExternal -Context $Context -File $File -Parameters $Arguments }
+            $null = Assert-ChainOrtTree -Root $portable.Bundle -OrtDirectory (Join-Path $portable.Bundle 'bin')
+            Write-BuildLog -Context $Context -Message "Portable bundle $($portable.Bundle), complete as installed; packages: $($portable.Installers -join ', ')"
         }
 
         # Beside the product, not in it: the run job downloads both, and the hub grades this tree with the same arch gate.
