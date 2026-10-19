@@ -5,7 +5,7 @@
 
   <h1>AccelerANTgine</h1>
 
-  <h4>This C++ inference project gives me a good starting point for hardware accelerated AI inference 🚀 </h4>
+  <h4>The Kataglyphis family's C++23 inference core: ONNX Runtime on GStreamer media.</h4>
 </div>
 
 [![Linux arm64 · build + test](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml/badge.svg?branch=develop)](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-arm64.yml)

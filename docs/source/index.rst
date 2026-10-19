@@ -3,11 +3,8 @@ AccelerANTgine documentation
 
 .. rst-class:: hero-section
 
-Native C++ inference library with C API bindings, Python bindings and CLI tooling.
-
-- Hardware-accelerated AI inference
-- Cross-platform (Linux x64/arm64, Windows x64/arm64)
-- Doxygen-generated API reference
+Native C++ inference library with C API bindings, Python bindings and CLI tooling, built and
+tested on Linux x64, arm64 and riscv64 and on Windows x64 and arm64.
 
 .. grid:: 2
    :gutter: 2
@@ -16,19 +13,19 @@ Native C++ inference library with C API bindings, Python bindings and CLI toolin
       :link: getting_started
       :link-type: doc
 
-      Configure, build, and run the project on your platform.
+      Prerequisites, a release install, presets, Rust features, Python bindings, the docs build.
 
    .. grid-item-card:: API Reference
       :link: api_reference
       :link-type: doc
 
-      Auto-generated C++ and C API documentation when Doxygen XML is available.
+      The C++ and C API, generated when Doxygen XML is available.
 
    .. grid-item-card:: Architecture
       :link: graphviz_files
       :link-type: doc
 
-      Include-graph diagrams and dependency visualisations.
+      Include graphs and dependency diagrams.
 
    .. grid-item-card:: Test Results
       :link: test_results
@@ -40,7 +37,7 @@ Native C++ inference library with C API bindings, Python bindings and CLI toolin
       :link: development_workflow
       :link-type: doc
 
-      How features, docs, tests, and refactors are delivered together.
+      The test suites and lanes, profiling, static analysis.
 
    .. grid-item-card:: Windows Workflow
       :link: windows_workflow
@@ -59,16 +56,6 @@ Native C++ inference library with C API bindings, Python bindings and CLI toolin
    api_reference
    graphviz_files
    test_results
-
-Coverage
---------
-
-* `Coverage report <coverage/index.html>`_
-
-Test results
-------------
-
-* :doc:`Test results <test-results/index>`
 
 Indices and tables
 ==================

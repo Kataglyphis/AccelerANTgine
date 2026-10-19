@@ -1,25 +1,22 @@
 Getting Started
 ===============
 
-AccelerANTgine supports Linux and Windows builds with CMake presets,
-containerized CI, and local host-side run scripts.
-
 Prerequisites
 -------------
 
 - **C++23** or higher and **C17** or higher; optional: the newest clang, installed
   via apt (see `apt.llvm.org <https://apt.llvm.org/>`_)
 - CMake 3.31.6 or newer
-- Optional: ``third_party/ANTfrastructure/linux/scripts/02-toolchain/setup-dependencies.sh``
-  prepares important dev tools. The dependency installer is ANTfrastructure's;
-  this repo does not carry a local copy
+- Optional: ANTfrastructure's
+  ``third_party/ANTfrastructure/linux/scripts/02-toolchain/setup-dependencies.sh`` prepares
+  important dev tools; this repo carries no local copy
 - Git submodules checked out
 - ONNX Runtime from the family image's chain build: configure searches only
   ``-DONNXRUNTIME_ROOT``, else the image's own prefix, and stops without it
 - GStreamer 1.24 or newer, found through pkg-config
 - Rust (cargo), unless configured with ``-DRUST_FEATURES=OFF``
-- Python tooling for docs when building Sphinx locally
-- Docker for the Windows containerized build flow
+- Python tooling, for a local Sphinx build
+- Docker, for the Windows container build
 
 Install From A Release
 ----------------------
@@ -49,7 +46,7 @@ Clone The Repository
 
    git clone --recurse-submodules https://github.com/Kataglyphis/AccelerANTgine.git
 
-If you cloned without submodules:
+Cloned without submodules:
 
 .. code-block:: bash
 
@@ -58,7 +55,7 @@ If you cloned without submodules:
 Available Build Presets
 -----------------------
 
-The repository already defines platform-specific presets in ``CMakePresets.json``.
+``CMakePresets.json`` defines them per platform:
 
 - Linux debug: ``linux-debug-clang``, ``linux-debug-GNU``
 - Linux thread sanitizer: ``linux-debug-clang-tsan``
@@ -81,24 +78,24 @@ Each preset names its own build directory, e.g. ``build/`` for
 Rust Features
 ^^^^^^^^^^^^^
 
-For now the features in Rust are experimental, and they are ON by default:
-``RUST_FEATURES`` defaults to ON and every preset but ``x64-Clang-Windows-*``
-sets it, so a build needs Rust (cargo) installed, or ``-DRUST_FEATURES=OFF``. In
-order to compile a Rust crate on Windows it has to be MSVC ABI compatible, so the
-crate's C++ is compiled with the compiler CMake was configured with:
-``Src/CMakeLists.txt`` hands ``CC``/``CXX`` to cargo (``corrosion_set_env_vars``),
-which is clang-cl under the ClangCL presets.
-(``Src/rusty_code/.cargo/config.toml`` is empty.)
+The Rust features are experimental and ON by default: ``RUST_FEATURES`` defaults to ON and
+every preset but ``x64-Clang-Windows-*`` sets it, so a build needs Rust (cargo) installed, or
+``-DRUST_FEATURES=OFF``. On Windows the crate must be MSVC ABI compatible, so its C++ is
+compiled with the compiler CMake was configured with: ``Src/CMakeLists.txt`` hands
+``CC``/``CXX`` to cargo (``corrosion_set_env_vars``), which is clang-cl under the ClangCL
+presets. (``Src/rusty_code/.cargo/config.toml`` is empty.)
 
 ``cxxbridge`` needs no install by hand: ``corrosion_add_cxxbridge`` uses one on
 ``PATH`` only when its version equals the ``cxx`` version in
 ``Src/rusty_code/Cargo.lock``, and otherwise builds that exact
 ``cxxbridge-cmd`` into the build tree.
 
+.. _linux-build-and-test:
+
 Linux Build And Test
 --------------------
 
-For a direct debug build with presets:
+A direct debug build with presets:
 
 .. code-block:: bash
 
@@ -106,18 +103,10 @@ For a direct debug build with presets:
    cmake --build --preset linux-debug-clang
    cd build && ctest -C Debug --output-on-failure
 
-The Linux CI path is automated through ``scripts/linux/ci-run-all.sh``. That
-script orchestrates:
-
-- initialization and dependency checks
-- debug build and test execution
-- coverage generation
-- static analysis and formatting checks
-- profile benchmark builds
-- Sphinx documentation generation
-- release packaging
-
-Example:
+``scripts/linux/ci-run-all.sh`` runs the whole CI path: initialization and dependency checks,
+the debug build and tests, coverage, static analysis and formatting checks, profile benchmark
+builds, the Sphinx docs and release packaging (the chain in order: ``AGENTS.md`` § 5). For
+example:
 
 .. code-block:: bash
 
@@ -129,59 +118,10 @@ Example:
      --build-dir build \
      --build-release-dir build-release
 
-Windows Build In Container
---------------------------
+Windows
+-------
 
-The recommended Windows build wrapper is:
-
-.. code-block:: powershell
-
-   .\scripts\windows\Invoke-ContainerBuild.ps1
-
-This hands the build to ANTfrastructure's ``Invoke-ContainerBuild`` (module
-``WindowsContainerBuild.Reuse``), which runs
-``scripts/windows/Build-Windows.ps1`` inside a REUSABLE container with these
-defaults:
-
-- tar-pipe transport into the family workspace path ``C:\ws`` (bind mount only
-  via ``-UseBindMount``; a fresh container via ``-FreshContainer``)
-- ``--isolation process`` — resource caps apply only under ``-Isolation
-  hyperv`` (``-CpuCount``/``-MemoryGb`` knobs)
-- artifact delivery back to the host: ``build-<target>`` (verified per lane),
-  ``logs`` and ``dist``
-
-The wrapper builds these targets:
-
-- ``clangcl-debug``
-- ``clangcl-profile``
-- ``clangcl-release``
-
-Artifacts are synchronized back into the repository under:
-
-- ``build-clangcl-debug``
-- ``build-clangcl-profile``
-- ``build-clangcl-release``
-- ``dist/windows-x64``: the release configuration's portable bundle, its
-  installers and its MSIX
-- ``logs``
-
-Run The App On The Windows Host
--------------------------------
-
-Build in the container, then run outside the container on the Windows host.
-Use the host-side scripts from ``scripts/windows``:
-
-.. code-block:: powershell
-
-   .\scripts\windows\Start-Windows.ps1 -Config Debug
-   .\scripts\windows\Start-Windows.ps1 -Config Profile
-   .\scripts\windows\Start-Windows.ps1 -Config Release
-
-The script runs the built executables from the synchronized build folders.
-``-Config Debug`` performs a stable CLI check and runs the commit and compile
-test suites; a missing or unstartable one fails the run. If you have a
-signalling server available, you can opt into the WebRTC smoke test with
-``-RunWebRtcSmoke``.
+Build in the Windows container, then run on the Windows host: :doc:`windows_workflow`.
 
 .. _python-bindings:
 
@@ -189,35 +129,32 @@ Python Bindings
 ---------------
 
 The library is also exposed to Python through nanobind: the module lives in
-``Bindings/python`` (``kataglyphis_inference``), its tests in ``Test/python``, and
-``scripts/windows/Build-PythonBindings.ps1`` (or
-``Invoke-ContainerPythonBindings.ps1``, which runs it inside the ANTfrastructure
-Windows image) builds it on Windows and stages the package, with its GStreamer
-and chain ONNX Runtime DLLs, into ``build-python/python``. It does not run
-``Test/python``: that is the ``python_bindings`` ctest, registered only by a
-``KATAGLYPHIS_BUILD_PYTHON_BINDINGS=ON`` configure with ``BUILD_TESTING`` on and
-pytest importable.
+``Bindings/python`` (``kataglyphis_inference``), its tests in ``Test/python``.
 
-On Linux the clang leg of both Linux lanes builds two wheels with
-``scripts/linux/ci-python-bindings.sh``: ``cp314-cp314`` for the GIL interpreter
-and ``cp314-cp314t`` for the image's free-threaded 3.14t. Each is installed into
-its own venv and runs ``Test/python``. The free-threaded one first goes through
-ANTfrastructure's ``free-threaded-wheel.py prove``, which fails when loading the
-module re-enables the GIL. The wheels upload as ``python-wheels-<arch>``. They
-are ``linux_<arch>`` wheels: GStreamer and ONNX Runtime come from the image, not
-from the wheel.
+- **Windows:** ``scripts/windows/Build-PythonBindings.ps1`` (or
+  ``Invoke-ContainerPythonBindings.ps1``, which runs it inside the ANTfrastructure Windows
+  image) builds the module and stages the package, with its GStreamer and chain ONNX Runtime
+  DLLs, into ``build-python/python``. It does not run ``Test/python``: that is the
+  ``python_bindings`` ctest, registered only by a ``KATAGLYPHIS_BUILD_PYTHON_BINDINGS=ON``
+  configure with ``BUILD_TESTING`` on and pytest importable.
+- **Linux:** the clang leg of both Linux lanes builds two wheels with
+  ``scripts/linux/ci-python-bindings.sh``: ``cp314-cp314`` for the GIL interpreter and
+  ``cp314-cp314t`` for the image's free-threaded 3.14t. Each is installed into its own venv and
+  runs ``Test/python``. The free-threaded one first goes through ANTfrastructure's
+  ``free-threaded-wheel.py prove``, which fails when loading the module re-enables the GIL. The
+  wheels upload as ``python-wheels-<arch>``. They are ``linux_<arch>`` wheels: GStreamer and
+  ONNX Runtime come from the image, not from the wheel.
 
-Without the GIL the module stays safe because ``OnnxInferenceEngine`` and
-``YoloDetector`` lock themselves: runs share a ``std::shared_mutex``, and
-``initialize`` takes it alone. Every bound field also takes its Python object's
-lock (``nb::lock_self()``).
+Without the GIL the module stays safe through its own locks; which ones, and what a new bound
+class needs: ``AGENTS.md`` § 4.
+
+.. _build-docs:
 
 Build Documentation
 -------------------
 
-The Sphinx project lives under ``docs/``.
-
-On Linux, the CI docs script installs the required packages and builds the docs:
+The Sphinx project lives under ``docs/``. On Linux the CI docs script installs the required
+packages and builds the docs:
 
 .. code-block:: bash
 
@@ -227,7 +164,7 @@ On Linux, the CI docs script installs the required packages and builds the docs:
      --runner ubuntu-26.04 \
      --docs-out build/build/html
 
-For a direct docs build:
+A direct docs build, written to ``docs/build/html/index.html``:
 
 .. code-block:: bash
 
@@ -235,12 +172,3 @@ For a direct docs build:
    source .venv/bin/activate
    uv pip install -r requirements.txt
    cd docs && make html
-
-Generated HTML is written to ``docs/build/html/index.html``.
-
-Next Steps
-----------
-
-- See :doc:`overview` for the current architecture summary.
-- See :doc:`development_workflow` for the feature, docs, test, and refactor loop.
-- See :doc:`windows_workflow` for the Windows-specific build and run workflow.

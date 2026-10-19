@@ -1,36 +1,28 @@
 Windows Workflow
 ================
 
-The intended Windows developer flow is:
-
-1. build inside the Windows container
-2. synchronize artifacts back to the repository
-3. run the built application and tests on the Windows host with PowerShell
+Build inside the Windows container, which synchronizes the artifacts back to the repository,
+then run the built application and tests on the Windows host with PowerShell.
 
 Build In The Container
 ----------------------
-
-Use the wrapper script:
 
 .. code-block:: powershell
 
    .\scripts\windows\Invoke-ContainerBuild.ps1
 
-This script delegates to ANTfrastructure's ``Invoke-ContainerBuild``
-(``WindowsContainerBuild.Reuse``): the sources travel by tar-pipe into a
-reusable container at the family workspace path ``C:\ws`` and
-``scripts/windows/Build-Windows.ps1`` runs inside it. Bind mounting is the
-measured-slower opt-in (``-UseBindMount``); ``-FreshContainer`` discards the
-reused build tree.
+The wrapper delegates to ANTfrastructure's ``Invoke-ContainerBuild``
+(``WindowsContainerBuild.Reuse``), which runs ``scripts/windows/Build-Windows.ps1`` inside a
+reusable container:
 
-Resource settings: ``--isolation process`` gives the container every host CPU;
-``-CpuCount``/``-MemoryGb`` apply only under ``-Isolation hyperv``.
-
-The container build currently targets:
-
-- ``clangcl-debug``
-- ``clangcl-profile``
-- ``clangcl-release``
+- **Transport:** the sources travel by tar-pipe to the family workspace path ``C:\ws``. Bind
+  mounting is the measured-slower opt-in (``-UseBindMount``); ``-FreshContainer`` discards the
+  reused build tree.
+- **Resources:** ``--isolation process`` gives the container every host CPU;
+  ``-CpuCount``/``-MemoryGb`` apply only under ``-Isolation hyperv``.
+- **Targets:** ``clangcl-debug``, ``clangcl-profile`` and ``clangcl-release``.
+- **Delivery:** ``build-<target>`` (verified per lane), ``logs`` and ``dist`` come back to the
+  host (`Artifact Locations`_).
 
 Run The Build Script Directly
 -----------------------------
@@ -52,8 +44,8 @@ GStreamer and its chain ONNX Runtime); from a host,
 Artifact Locations
 ------------------
 
-The container build syncs output back into the workspace so host-side scripts can
-run them directly.
+The container build syncs its output back into the workspace, where the host-side scripts run
+it directly:
 
 - ``build-clangcl-debug``
 - ``build-clangcl-profile``
@@ -66,7 +58,9 @@ run them directly.
 Host-Side Execution
 -------------------
 
-After the build finishes, run the executables outside the container.
+``Start-Windows.ps1`` runs a configuration's executables outside the container. A missing or
+unstartable binary fails the run; for one that exists but will not start, the script first walks
+its imports and names every DLL the loader cannot find.
 
 Debug Run
 ^^^^^^^^^
@@ -75,19 +69,12 @@ Debug Run
 
    .\scripts\windows\Start-Windows.ps1 -Config Debug
 
-This script:
+Starts the CLI from ``build-clangcl-debug\bin\AccelerANTgine.exe`` for a stable local version
+check, then runs ``commitTestSuite.exe``, ``compileTestSuite.exe`` and ``fuzzTestSuite.exe`` (in
+FuzzTest's unit mode, about a second per property).
 
-- starts the CLI from ``build-clangcl-debug\bin\AccelerANTgine.exe``
-- performs a stable local CLI version check by default
-- runs ``commitTestSuite.exe`` and ``compileTestSuite.exe``
-- runs ``fuzzTestSuite.exe`` in FuzzTest's unit mode (about a second per property)
-
-A missing or unstartable binary fails the run. For one that exists but will not
-start, the script first walks its imports and names every DLL the loader cannot
-find.
-
-For a host machine that already has a signalling server running, you can opt into
-the older network-dependent smoke test explicitly:
+With a signalling server already running on the host, opt into the network-dependent WebRTC
+smoke test:
 
 .. code-block:: powershell
 
@@ -100,8 +87,7 @@ Profile Run
 
    .\scripts\windows\Start-Windows.ps1 -Config Profile
 
-This script runs the profile build executable and then executes
-``perfTestSuite.exe``; a missing suite fails the run.
+Runs the profile build executable, then ``perfTestSuite.exe``; a missing suite fails the run.
 
 Release Run
 ^^^^^^^^^^^
@@ -110,8 +96,10 @@ Release Run
 
    .\scripts\windows\Start-Windows.ps1 -Config Release
 
-This is the lightest validation path: the CLI check alone, run from
-``build-clangcl-release\bin`` (the build tree, not the ``dist`` bundle).
+The CLI check, run from ``build-clangcl-release\bin`` (the build tree, not the ``dist``
+bundle), then the Release suites ``Build-Windows.ps1 -StageTests`` staged in
+``dist\windows-x64-tests``, through their ``Invoke-StagedTests.ps1``; a failed or an empty
+verdict fails the run. Without staged suites it is the CLI check alone.
 
 Build Script Responsibilities
 -----------------------------
@@ -137,19 +125,9 @@ Build Script Responsibilities
 CI Note
 -------
 
-CI runs the same script, but not through ``Invoke-ContainerBuild.ps1``.
-``.github/workflows/windows-x64.yml`` is a thin caller of ANTfrastructure's
-reusable ``container-ci-windows.yml``, which bind-mounts the checkout (``D:\ws``
-on the runner, ``C:\ws`` in the container) and runs ``Build-Windows.ps1`` there
-for ``clangcl-debug``, ``clangcl-profile`` and ``clangcl-release``. Its host
-command then runs ``Start-Windows.ps1 -Config Debug|Profile|Release`` on the
-runner host, which has the desktop the container lacks, and
-``dist/windows-x64`` uploads as the ``AccelerANTgine-windows-x64`` artifact. Two
-jobs beside it lint ``scripts/`` (the hub's ``Invoke-Lint.ps1``) and run the
-Pester suites in ``scripts/windows/tests``.
-
-``.github/workflows/windows-arm64-cross.yml`` calls the same reusable workflow
-for ``clangcl-release`` only, with ``-TargetArch arm64``: a cross build in the
-image's arm64 bundle, graded by the hub's arch gate, whose
-``bundle/bin/AccelerANTgine.exe`` then runs on GitHub's ``windows-11-arm``
-runner.
+CI runs the same script, but not through ``Invoke-ContainerBuild.ps1``: both Windows lanes call
+ANTfrastructure's reusable ``container-ci-windows.yml``, which bind-mounts the checkout
+(``D:\ws`` on the runner, ``C:\ws`` in the container) and runs ``Build-Windows.ps1`` there. The
+x64 lane then runs ``Start-Windows.ps1 -Config Debug|Profile|Release`` on the runner host, which
+has the desktop the container lacks; the arm64 cross build runs on GitHub's ``windows-11-arm``
+runner. Both lanes, their targets, artifacts and side jobs: ``AGENTS.md`` § 5.
