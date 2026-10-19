@@ -62,18 +62,18 @@ reorganisation.
 | `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |
 | `scripts/linux/ci-profile-bench.sh` | `linux/scripts/lib/cmake-build.sh`; the perf/benchmark run itself stays local |
 | `scripts/linux/renovate-local.sh` | `linux/scripts/renovate-local.sh`: Renovate as a local CLI, plus the git half that applies what it can only detect (passes this repo's root) |
-| `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh`, its four steps called one by one instead of `docs_build_main`, so the test-result pages `junit_to_markdown.py` renders exist before Sphinx reads them. The venv bootstrap is two shell *functions* over `01-core/python_uv.sh`, not helper scripts: git records a new `.sh` as 100644 under `core.filemode=false`, and a function name is a command with no file mode (the file header owns this) |
-| `scripts/linux/ci-release.sh` | `linux/scripts/lib/cmake-build.sh` + `lib/app-packaging.sh`: job count, container env repair, flatpak arch mapping and the artifact assertion. Configure is `cmake_build_main` with two repeatable `--configure-arg` flags, where a hand-written `cmake -B … --preset` used to sit. The flatpak bundle is `app_packaging_ensure_flatpak_runtime` + `app_packaging_package_cmake_install_flatpak`, which stage container-native and let `ostree`, not flatpak-builder's exit code, decide. Local: `load_project_metadata`, and `ensure_flatpak_tools` for its apt/`AUTO_INSTALL_FLATPAK` knob alone; tool PRESENCE, `ostree` included, is `app_packaging_require_flatpak_tools` since d339cd52 |
-| `scripts/linux/ci-finalize.sh` | `linux/scripts/01-core/bind-mount-ownership.sh`'s `fix_bind_mount_ownership`, moved upstream from this file: selective chown, never `-R`; tolerated and explained as non-root, fatal as root; a missing target is not an error |
-| `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh`: shellcheck, actionlint (with the CI image-ref check), gitleaks, ruff, the shared-config drift check (the rows of `.antfrastructure-shared.manifest`) and the consumer pin-forwarding check, at pinned and SHA256-verified versions. It passes this repo's root, which upstream refuses to infer. `--ratchets` adds the eight `--root` measurement gates plus doc-links, frozen in `comment-size.allow` and `shellcheck-warnings.allow` at the repo root; CI passes it, and so does the wrapper since 2026-10-16, so a dev box runs CI's seven gates |
+| `scripts/linux/ci-docs.sh` | `linux/scripts/lib/docs-build.sh`, its steps called one by one so the test-result pages `junit_to_markdown.py` renders exist before Sphinx reads them |
+| `scripts/linux/ci-release.sh` | `linux/scripts/lib/cmake-build.sh` (configure through `cmake_build_main`) + `lib/app-packaging.sh` (the flatpak); `load_project_metadata` and `ensure_flatpak_tools` stay local |
+| `scripts/linux/ci-finalize.sh` | `linux/scripts/01-core/bind-mount-ownership.sh`'s `fix_bind_mount_ownership` |
+| `scripts/linux/run-lint-gates.sh` | `linux/scripts/run-lint-gates.sh` over this repo's root, always with `--ratchets` as CI passes it; the freeze files (`comment-size.allow`, `shellcheck-warnings.allow`, `doc-dupes-hub.allow`) sit at the repo root. What each gate does: [`code-quality-tooling.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/code-quality-tooling.md) |
 
 CI uses ANTfrastructure's composite actions (`prepare-linux-ci-host`, `run-in-linux-container`,
 `deploy-over-ftp`, `run-pester-suite`) and reusable workflows (`container-ci-windows.yml`,
 `lint-gates.yml`, `submodule-pins.yml`), not hand-written `docker run` blocks.
 
-**CMake modules: ANTfrastructure-first, local override wins.** `CMakeLists.txt` puts this repo's
+**CMake modules: this repo's `cmake/` first, then the hub's.** `CMakeLists.txt` puts this repo's
 `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on `CMAKE_MODULE_PATH` and includes every
-module by name. Local `cmake/` holds only this project's own policy (`ProjectOptions.cmake`,
+module by name, so a local module of the same name wins. Local `cmake/` holds only this project's own policy (`ProjectOptions.cmake`,
 `CPackOptions.cmake`, `SystemLibDependencies.cmake`, `MsvcRuntime.cmake`, `fuzztest_compat/`);
 everything else, `Test/cmake/CommonTestBuild.cmake`'s GoogleTest registration (`GTestDiscovery`)
 included, resolves by name from
@@ -88,13 +88,16 @@ Two upstream facts repeated here only because they bite before you reach a doc:
   depends on must be pushed **before** the consumer change.
 
 **This repo's glue:** `scripts/windows/Resolve-BuildModule.ps1` and its bash twin
-`scripts/linux/lib/antfrastructure.sh`, the two files that cannot live upstream because they
-*find* the submodule. Both are verbatim copies of the hub's templates, held to them by the
-shared-config drift check. How `Build-Windows.ps1` uses the PowerShell one (the module import
-list, the step shapes, and why every module is named explicitly: a nested import inside a `.psm1`
-is module-private) is the consumer calling convention in
-[`third_party/ANTfrastructure/docs/adopting-in-a-new-project.md`](third_party/ANTfrastructure/docs/adopting-in-a-new-project.md)
-§ 8; the script's own comments are the second copy.
+`scripts/linux/lib/antfrastructure.sh`, which find the submodule
+([`adopting-in-a-new-project.md` § 1](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/adopting-in-a-new-project.md#1-the-one-file-that-cannot-live-here)).
+Both are body-mode copies of the hub's templates
+([`shared/config/README.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/shared/config/README.md#the-template-trees-are-owners-too)):
+change the template upstream, then copy it. Unlike CMake, PowerShell resolves a module from the
+hub first, then from `scripts/windows/modules/`, which this repo does not have. How
+`Build-Windows.ps1` imports its modules is the hub's calling convention,
+[`adopting-in-a-new-project.md` § 8](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/adopting-in-a-new-project.md#8-calling-conventions-what-every-consumer-looks-like)
+and its
+[*Reach for these before writing a helper*](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/adopting-in-a-new-project.md#reach-for-these-before-writing-a-helper).
 
 ## 3. Critical invariant: submodule pins
 
@@ -158,40 +161,33 @@ written out rather than linked.
 - **One binary is tracked on purpose; models never are.** `images/Engine_logo.bmp` (117 KiB, the
   family's ant) is the NSIS installer header image (`cmake/CPackOptions.cmake`), which CPack reads
   as a literal path at package time. It **stays**, and no LFS is introduced. The family's history
-  rewrite of 2026-10-17 took every blob of 500 KB or more that no branch held out of the history
-  (this pack: 12 to 2 MiB). The AGPL-3.0 `models/yolo26n.onnx` (9.5 MiB) left the tree on
+  rewrite of 2026-10-17
+  ([`data-repositories.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/data-repositories.md#what-moved-and-why))
+  took this pack from 12 to 2 MiB. The AGPL-3.0 `models/yolo26n.onnx` (9.5 MiB) left the tree on
   2026-10-14 (owner): `Src/inference_demo.cpp` and `resources/configs/inference_config.toml` now
   name `models/deim_dfine_n_coco.onnx` (Apache-2.0), which `models/README.md` fetches by checksum
   from [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release. No `Test/` suite loads it.
   `.gitignore` carries `*.onnx` with no exception and `*.bmp` with the logo re-included, so a
-  model or bitmap dropped here is not committed unnoticed; that is the guard, not a size limit.
-- **Dependency upgrades are Renovate as a local CLI, and nothing else.** The Renovate GitHub App
-  is installed on no repo in this family and will not be, and there is no
-  `.github/dependabot.yml` here, so this wrapper is this repo's only dependency watch. It gates
-  nothing: no workflow runs it, it blocks no commit, and it stages and commits nothing.
+  model or bitmap dropped here is not committed unnoticed, and the hub's large-files gate
+  (`--ratchets`) fails any tracked data file over 500 KiB; no `large-files.allow` exists, so none
+  is frozen.
+- **Dependency upgrades are Renovate as a local CLI, and nothing else**
+  ([`dependency-updates.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md):
+  why local, run it from WSL, what `--apply` writes, `GITHUB_COM_TOKEN`). This repo has no
+  `.github/dependabot.yml`, so the wrapper is its only dependency watch, and nothing runs it for you.
 
   ```bash
   bash scripts/linux/renovate-local.sh                     # report (default: every manager this tree has)
   bash scripts/linux/renovate-local.sh --managers pep621   # the pyproject pins
+  bash scripts/linux/renovate-local.sh --managers custom.regex  # the CMake pins in third_party/CMakeLists.txt
   bash scripts/linux/renovate-local.sh --apply --dry-run   # the plan
   bash scripts/linux/renovate-local.sh --apply             # gitlinks, manifests and their locks
   ```
 
-  - Run it from **WSL**: it bootstraps a pinned, checksum-verified Node, and the Windows host has
-    none.
-  - All seven `.gitmodules` entries declare a `branch =` since ff4e867, so none comes back
-    **REFUSED** and `--apply` moves the gitlink of every one that is behind, `FUZZTEST` included,
-    which may raise the abseil pin's floor (§ 3). The measurement that dated the old "exactly one
-    declares a branch" claim is in `CHANGELOG.md`.
-  - Since hub a0254781 (2026-09-11) the Python, Rust and pre-commit pins are no longer
-    report-only: `--apply` rewrites each reported one in place and refreshes its lock.
-  - Tree detection does not pick the `custom.regex` manager that reads the CMake pins in
-    `third_party/CMakeLists.txt` (`.github/renovate.json`); name it with `--managers`.
-  - Under `--platform=local` the variable that clears `Rate limit exceeded for api.github.com` is
-    `GITHUB_COM_TOKEN`, not `RENOVATE_TOKEN`.
-
-  Full rationale:
-  [`third_party/ANTfrastructure/docs/dependency-updates.md`](third_party/ANTfrastructure/docs/dependency-updates.md).
+  - All seven `.gitmodules` entries declare a `branch =` since ff4e867, so `--apply` moves every
+    gitlink that is behind, `FUZZTEST` included, which may raise the abseil pin's floor (§ 3).
+  - The CMake pins come from the hub preset's `custom.regex` managers, which tree detection never
+    picks: name them, as above.
 - **ONNX Runtime is REQUIRED and must be the family's chain build** (owner rule 2026-09-23).
   `cmake/SystemLibDependencies.cmake` searches exactly one prefix (`-DONNXRUNTIME_ROOT`, else the
   image's `ONNX_ROOT` on Windows or `/usr/local/lib/onnxruntime-cpu` on Linux) and refuses a
@@ -301,10 +297,10 @@ written out rather than linked.
   - `clang-format` is the pinned release too since hub CON71. The Linux format gate in
     `run-static-analysis-format.sh` fails on any other version, because releases format
     differently: 21.1.8 flags 7 of the 39 files that 23.1.3 passes.
-  - The same image lets a bare `clang`/`clang++` select `/opt/gcc-16.2.0` through the
-    `<native-triple>-clang{,++}.cfg` beside the compiler (hub CON16), so neither CMake nor
-    `ci-run-all.sh` injects `--gcc-toolchain` any more; the cxx crate's `cc` build passes
-    `--target=<native triple>`, which loads the same file.
+  - The same image's bare `clang`/`clang++` select its GCC 16.2 by themselves
+    ([`linux-cross-builds.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/linux-cross-builds.md#clang-cross-wrappers)),
+    so nothing here injects `--gcc-toolchain`; the cxx crate's `cc` build passes
+    `--target=<native triple>`, which loads the same config file.
   - Windows has the same trap with a different pair. The image compiles with its patched LLVM
     (`C:/llvm-patched/bin/clang-cl.exe`), so the `clang-tidy` on PATH is scoop's, and it refuses
     the BMIs with `module file … built from a different branch () than the compiler`.
@@ -359,19 +355,17 @@ written out rather than linked.
   A new bound class with mutable state needs the same. `Test/python/test_threading.py` crashes
   without them, on the GIL wheel too, because the runs release the GIL.
 
-- **The Linux packages carry the image's own GStreamer, never the distro's** (owner, 2026-10-17).
+- **The Linux packages carry the image's own GStreamer, never the distro's** (owner, 2026-10-17;
+  the mechanism is the hub's
+  [`linux-build-basics.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/linux-build-basics.md#gstreamer-loads-from-the-package-alone)).
   `cmake/CPackOptions.cmake` installs the plugins the pipelines and `webrtcsink` load into
   `lib/accelerantgine/gstreamer-1.0`, with openh264 and libcamerasrc when the image has them and
-  NSS's softokn and freebl beside `libnss3`. The hub's closure bundles their libraries, found
-  through `SEARCH` (the image's `/opt/gstreamer/lib`, `/opt/ffmpeg/lib`, `/opt/libcamera/lib` and
-  multiarch directories, which reach the build only through `ld.so.conf`), and the `.deb` depends
-  on glibc and EGL alone, which the arm64 libcamera plugin links. At load
-  `Src/bundled_gstreamer.cpp` points GStreamer at that directory alone (`GST_PLUGIN_PATH`, an
-  empty system path, no scanner fork, a registry per installed copy) and leaves every variable a
-  user set; it looks beside the library (embedded) and in `accelerantgine/` under it (this
-  package, whose `libAccelerANTgine.so` sits in `lib/`). `AccelerANTgine --gst_check` prints each
-  element's plugin file and fails on a missing one, or in a package on one loaded from outside it;
-  the clean-host jobs run it on a bare Ubuntu. A new element in a pipeline goes into
+  NSS's softokn and freebl beside `libnss3`; the `.deb` depends on glibc and EGL alone, which the
+  arm64 libcamera plugin links. `Src/bundled_gstreamer.cpp` sets the environment at load, looking
+  beside the library (embedded) and in `accelerantgine/` under it (this package, whose
+  `libAccelerANTgine.so` sits in `lib/`). `AccelerANTgine --gst_check` prints each element's
+  plugin file and fails on a missing one, or in a package on one loaded from outside it; the
+  clean-host jobs run it on a bare Ubuntu. A new element in a pipeline goes into
   `locate_elements()`, its plugin into the list. Embedded in OmniAccelerANT's plugin, none of this
   installs: that bundle carries its own.
 
@@ -422,22 +416,16 @@ platform + arch, display names `<Platform> <Arch> · <what>`. They are `linux-x6
 over `scripts/windows/tests/`), `windows-arm64-cross.yml`, `linux-riscv64.yml`, `lint-gates.yml`
 and `submodule-pins.yml`.
 
-- **A push or PR runs Linux x64 and the gates; the other four platform lanes run on request**
-  (owner rule 2026-10-15 for the whole family, ANTfrastructure's
-  [`branch-and-release-strategy.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md)).
-  `on-request.yml` reads `[ci <lane>]` in the pushed commit messages: `[ci windows]` runs both
-  Windows lanes, `[ci arm64]` both arm64 ones, `[ci riscv64]` the riscv64 lane and `[ci all]` all
-  four. Each lane's Run workflow button (or `gh workflow run <lane>.yml --ref <branch>`) starts
-  one by hand. A token in a commit message starts lanes, so never quote one in prose.
-- Each lane's concurrency group is `<lane>-${{ github.ref }}-${{ github.workflow }}`, one per
-  lane and caller. A lane's README badge shows only its runs started by hand; a requested run is
-  listed under *On request*.
-- **Every push to `main` is a release** (`release.yml`): a version check, all five lanes once
-  more, then `v<version>` with every lane's packages (`scripts/linux/collect-release-assets.sh`,
-  its suite a job of `linux-x64.yml`), only when every lane is green. The version is
-  `CMakeLists.txt`'s `project()` `VERSION`; before a merge, raise it and turn `## [Unreleased]`
-  into its CHANGELOG section. `gh workflow run release.yml --ref develop -f dry-run=true` proves it
-  on `develop` without publishing.
+- **A push or PR runs Linux x64 and the gates; the other four platform lanes run on request**: the
+  family's rule (owner, 2026-10-15), with the tokens, the hand start and the merge into `main`, is
+  [`branch-and-release-strategy.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md).
+  Here `[ci windows]` runs `windows-x64` and `windows-arm64-cross`, `[ci arm64]` `linux-arm64`
+  and `windows-arm64-cross`, `[ci riscv64]` `linux-riscv64`, and `[ci all]` all four. A lane's
+  README badge shows only its runs started by hand; a requested run is listed under *On request*.
+- **Every push to `main` is a release** (`release.yml`): all five lanes once more, then
+  `v<version>` with every lane's packages (`scripts/linux/collect-release-assets.sh`, its suite a
+  job of `linux-x64.yml`). The version is `CMakeLists.txt`'s `project()` `VERSION`.
+  `gh workflow run release.yml --ref develop -f dry-run=true` proves it on `develop`.
 - Every job that owns a runner carries `timeout-minutes`, every workflow declares `permissions:`,
   and every upload sets `if-no-files-found: error`: the hub's workflow conventions
   (`verify_workflow_conventions.py`), measured at zero findings here since the rename (again on
@@ -510,14 +498,12 @@ it.
 
 ### The riscv64 lane
 
-**Cross-built on amd64, tested under QEMU** (owner decision 2026-10-01, hub CON48): an emulated
-riscv64 build is 20-30x slower than native and would not fit a 6 h job. `linux-riscv64.yml`
-("Linux riscv64 · cross build + test") is one `uses:` onto the hub's `container-ci-riscv64.yml`,
-whose container half is `bash scripts/linux/ci-riscv64-test.sh`: the hub's `riscv64_cross_env`,
-then the `linux-riscv64-cross` preset (Debug, the hub's `$env{RISCV64_CMAKE_TOOLCHAIN_FILE}`,
-`Rust_CARGO_TARGET=riscv64gc-unknown-linux-gnu`), ctest, and `fuzzTestSuite`. binfmt runs the
-riscv64 test binaries, so ctest, gtest discovery and FuzzTest's build-time tools need no emulator
-wrapper.
+**Cross-built on amd64, tested under QEMU**: the family's riscv64 lane
+([`riscv64-cross-test-lanes.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/riscv64-cross-test-lanes.md)).
+`linux-riscv64.yml` ("Linux riscv64 · cross build + test") is one `uses:` onto the hub's
+`container-ci-riscv64.yml`, whose container half is `bash scripts/linux/ci-riscv64-test.sh`: the
+hub's `riscv64_cross_env`, then the `linux-riscv64-cross` preset (Debug,
+`Rust_CARGO_TARGET=riscv64gc-unknown-linux-gnu`), ctest, and `fuzzTestSuite`.
 
 - **What runs:** the native Debug suites: every ctest entry of the commit, compile and fuzz
   suites, then `fuzzTestSuite` once more as a whole, against the image's riscv64 GStreamer and

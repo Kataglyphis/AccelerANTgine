@@ -53,6 +53,14 @@ belongs in the **Changed** list below with that consequence spelled out.
   fix (green since run 36568033223), and `cargo install cxxbridge-cmd` is not needed, because
   `corrosion_add_cxxbridge` builds the version `Cargo.lock` names when `PATH` has no exact match.
   The release section says that the packages carry their own GStreamer after v0.0.3.
+- **`AGENTS.md` and `BACKLOG.md` link the hub instead of restating it** (2026-10-19). ANTfrastructure
+  5a1518de -> a447ef3c brings `doc-dupes --against-hub`, on here through `doc-dupes-hub.allow`
+  with one row, the owner's docs rule. The CI rule, Renovate, the bootstrap copies, the history
+  rewrite, the image's clang and GCC, the packaged GStreamer, the riscv64 lane and the backlog
+  markers link the hub page that owns them; this repo's lanes, commands and numbers stay. Three
+  claims were wrong: the CMake module path takes this repo's `cmake/` first (PowerShell resolves
+  the hub first), the lint wrapper runs eight gates, not seven, and the hub's large-files gate
+  limits tracked data files to 500 KiB beside the `.gitignore` guard.
 
 ### Fixed
 - **The docs no longer say the CI image has no `perf`.** `:latest` carries `linux-perf`
