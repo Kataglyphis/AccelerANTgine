@@ -19,6 +19,20 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **nanobind a1c8924 → d2c66af (2026-10-20, Renovate `--apply`, owner-approved): its `master`
+  was force-pushed.** a1c8924 ("Explain nanobind's threat model") is on no nanobind branch or tag
+  any more, so `submodule-pins.yml` failed its reachability check (runs 39440347403,
+  39454520052; hub issue Kataglyphis/ANTfrastructure#6). Upstream amended it as 7e66497, which
+  also drops an unused `nb_func_check_redefined` and a `func_data` copy from `src/nb_func.cpp`;
+  d2c66af adds a test fix on top. `ext/robin_map` stays at 4ec1bf1. The run was
+  `renovate-local.sh --managers git-submodules --apply` in `:latest`, with a
+  `RENOVATE_CONFIG` packageRule disabling every other gitlink, so nanobind alone moved. In
+  `:latest` (x64), `ci-python-bindings.sh`: the cp314 wheel passes `Test/python` (14 passed,
+  1 skipped, the free-threaded-only test); the cp314t wheel passes the hub's prover (the GIL
+  stayed disabled) and `Test/python` (15 passed). In `:winamd64`,
+  `Invoke-ContainerPythonBindings.ps1`: 386 of 386 steps with clang-cl, nanobind's stubgen
+  importing the cp315 `_core`; the staged package passes `Test/python` on the host (14 passed,
+  1 skipped).
 - **Rust is in every build, with no switch** (2026-10-20, owner: every Rust feature is mandatory
   and permanent). The `RUST_FEATURES` cache option left `CMakeLists.txt`; `third_party/CMakeLists.txt`
   fetches Corrosion and finds cxxbridge, and `Src/CMakeLists.txt` imports, bridges and links
