@@ -12,7 +12,7 @@ Key Features
 - Performance benchmarks (``Test/perf``)
 - Linux and Windows
 - Clang, GNU and MSVC
-- Rust code called from C++
+- Rust in every build: ``Src/rusty_code``, through Corrosion and cxx
 
 Project Layout
 --------------

@@ -142,8 +142,8 @@ written out rather than linked.
   scan-build) only when `COMPILER=clang`. Re-enabling it produces a wall of parse errors, not
   findings.
 - **Two analyses stay local rather than going upstream:** `scan-build` (the pinned LLVM's), which
-  the clang lane runs, and `clang++ --analyze` with the `-DUSE_RUST=1` define it needs, which runs
-  only under `--direct-analyze` (no lane passes it). No other ANTfrastructure consumer runs them,
+  the clang lane runs, and `clang++ --analyze`, which runs only under `--direct-analyze` (no lane
+  passes it). No other ANTfrastructure consumer runs them,
   and one consumer does not justify moving code upstream (the two-consumer rule).
 - **`.ixx` files are first-class sources.** Tooling that globs C++ sources must include them; the
   shared `.pre-commit-config.yaml` regex upstream was extended for exactly this. A file-discovery
@@ -216,9 +216,13 @@ written out rather than linked.
   naming the hub commit, while the pinned hub predates that module.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
   `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`, `linux-debug-clang-tsan`, and on
-  Windows `x64-{ClangCL,Clang}-Windows-{Debug,RelWithDebInfo,Profile,Release}` plus
+  Windows `x64-ClangCL-Windows-{Debug,RelWithDebInfo,Profile,Release}` plus
   `x64-MSVC-Windows-{Debug,Release}`. Coverage requires a matching compiler: gcovr only reads GCC
   output, llvm-cov only clang.
+- **Rust is in every build, with no switch** (owner, 2026-10-20). `Src/rusty_code` is imported,
+  bridged and linked unconditionally, and `Test/commit/rust_bridge_test.cpp` calls both exports.
+  Never add back a `RUST_FEATURES` option, a `USE_RUST` define or a Rust-less preset; the 2026-10-20
+  removal took `x64-Clang-Windows-*` with it, the one preset family built without Rust.
 - **llvm-cov coverage is `linux-debug-clang`'s, one profile per process.**
   `myproject_ENABLE_COVERAGE` defaults OFF (since 2ace55e), so that preset sets it ON;
   `linux-debug-clang-tsan` inherits `linux-clang`, not that preset, and stays uninstrumented.
@@ -543,7 +547,7 @@ how to run it and what breaks; no filler, no marketing, no repetition.
 - `README.md` is the short overview of the family's
   [README rule](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/repository-family.md#the-readme-rule)
   (owner, 2026-10-19), and `pyproject.toml` makes it the wheels' long description, so its links
-  are absolute URLs. Installing a release, the Rust features and the Python bindings are in
+  are absolute URLs. Installing a release, the Rust crate and the Python bindings are in
   `getting_started.rst`; the suites, profiling, static analysis, tools and literature in
   `development_workflow.rst`; the Windows container build and the host run in
   `windows_workflow.rst`; features, dependencies and CI's compilers in `overview.rst`.

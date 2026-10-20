@@ -24,5 +24,4 @@ if(COMMAND link_fuzztest)
 
   link_fuzztest(${FUZZ_TEST_SUITE})
   kataglyphis_configure_gtest_discovery(${FUZZ_TEST_SUITE})
-  kataglyphis_link_rust_target_if_enabled(${FUZZ_TEST_SUITE})
 endif()

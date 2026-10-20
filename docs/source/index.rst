@@ -13,7 +13,7 @@ tested on Linux x64, arm64 and riscv64 and on Windows x64 and arm64.
       :link: getting_started
       :link-type: doc
 
-      Prerequisites, a release install, presets, Rust features, Python bindings, the docs build.
+      Prerequisites, a release install, presets, the Rust crate, Python bindings, the docs build.
 
    .. grid-item-card:: API Reference
       :link: api_reference

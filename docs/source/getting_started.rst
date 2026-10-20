@@ -14,7 +14,7 @@ Prerequisites
 - ONNX Runtime from the family image's chain build: configure searches only
   ``-DONNXRUNTIME_ROOT``, else the image's own prefix, and stops without it
 - GStreamer 1.24 or newer, found through pkg-config
-- Rust (cargo), unless configured with ``-DRUST_FEATURES=OFF``
+- Rust (cargo): the crate is part of every build
 - Python tooling, for a local Sphinx build
 - Docker, for the Windows container build
 
@@ -75,15 +75,15 @@ Each preset names its own build directory, e.g. ``build/`` for
    cmake --preset <configurePreset-name>
    cmake --build --preset <buildPreset-name>
 
-Rust Features
-^^^^^^^^^^^^^
+The Rust Crate
+^^^^^^^^^^^^^^
 
-The Rust features are experimental and ON by default: ``RUST_FEATURES`` defaults to ON and
-every preset but ``x64-Clang-Windows-*`` sets it, so a build needs Rust (cargo) installed, or
-``-DRUST_FEATURES=OFF``. On Windows the crate must be MSVC ABI compatible, so its C++ is
-compiled with the compiler CMake was configured with: ``Src/CMakeLists.txt`` hands
-``CC``/``CXX`` to cargo (``corrosion_set_env_vars``), which is clang-cl under the ClangCL
-presets. (``Src/rusty_code/.cargo/config.toml`` is empty.)
+``Src/rusty_code`` is built and linked into every build, on every platform and preset; the
+commit suite calls both of its exports. There is no switch: ``RUST_FEATURES`` is gone
+(owner, 2026-10-20). On Windows the crate must be MSVC ABI compatible, so its C++ is compiled
+with the compiler CMake was configured with: ``Src/CMakeLists.txt`` hands ``CC``/``CXX`` to
+cargo (``corrosion_set_env_vars``), which is clang-cl under the ClangCL presets.
+(``Src/rusty_code/.cargo/config.toml`` is empty.)
 
 ``cxxbridge`` needs no install by hand: ``corrosion_add_cxxbridge`` uses one on
 ``PATH`` only when its version equals the ``cxx`` version in

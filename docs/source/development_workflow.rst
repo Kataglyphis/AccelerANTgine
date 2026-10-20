@@ -51,7 +51,8 @@ library itself; a fifth, ``Test/python``, tests the Python bindings.
        decoding (thresholds, classes, NMS, scaling, NaN and infinity, rows
        shorter than the class count); GStreamer frames from ``videotestsrc`` and
        ``appsrc`` through ``appsink``, callbacks and state; the WebRTC stream
-       config, its validation and a start against a refusing signalling server
+       config, its validation and a start against a refusing signalling server;
+       both exports of the Rust crate, through cxx and ``extern "C"``
    * - ``Test/compile``
      - ``compileTestSuite``
      - The embedder contract: the C header compiles as C17 and links,

@@ -58,12 +58,6 @@ function(
   target_name
   resource_path
   include_path)
-  if(RUST_FEATURES)
-    target_compile_definitions(${target_name} PRIVATE USE_RUST=1)
-  else()
-    target_compile_definitions(${target_name} PRIVATE USE_RUST=0)
-  endif()
-
   target_compile_definitions(${target_name} PRIVATE RELATIVE_RESOURCE_PATH="${resource_path}"
                                                     RELATIVE_INCLUDE_PATH="${include_path}")
 
@@ -106,10 +100,4 @@ function(kataglyphis_configure_library_test_target target_name)
     ${target_name} PRIVATE KATAGLYPHIS_TEST_PROJECT_VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
   kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/resources/configs/inference_config.toml"
                               kShippedInferenceConfig)
-endfunction()
-
-function(kataglyphis_link_rust_target_if_enabled target_name)
-  if(RUST_FEATURES)
-    target_link_libraries(${target_name} PUBLIC rusty_code)
-  endif()
 endfunction()

@@ -107,7 +107,7 @@ run_clang_tidy() {
 
 if [[ "${COMPILER}" == "clang" ]]; then
   if [[ "${DIRECT_ANALYZE}" == "1" ]]; then
-    run_gate clang-analyze clang++ --analyze -DUSE_RUST=1 -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}"
+    run_gate clang-analyze clang++ --analyze -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}"
   fi
   run_gate scan-build run_scan_build
   run_gate clang-tidy run_clang_tidy

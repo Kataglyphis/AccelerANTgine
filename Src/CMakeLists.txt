@@ -34,55 +34,52 @@ set(KataglyphisCppProjectConfig_MODULE_OUT "${CMAKE_CURRENT_BINARY_DIR}/Kataglyp
 configure_file(${KataglyphisCppProjectConfig_MODULE_IN} ${KataglyphisCppProjectConfig_MODULE_OUT} @ONLY)
 list(APPEND KataglyphisCppProject_MODULES ${KataglyphisCppProjectConfig_MODULE_OUT})
 
-if(RUST_FEATURES)
-  corrosion_import_crate(MANIFEST_PATH rusty_code/Cargo.toml)
+corrosion_import_crate(MANIFEST_PATH rusty_code/Cargo.toml)
 
-  # Keep Rust bridge compilers aligned with the configured CMake toolchain.
-  set(RUST_CC "${CMAKE_C_COMPILER}")
-  set(RUST_CXX "${CMAKE_CXX_COMPILER}")
-  if(NOT RUST_CC)
-    set(RUST_CC "cc")
-  endif()
-  if(NOT RUST_CXX)
-    set(RUST_CXX "c++")
-  endif()
+# Keep Rust bridge compilers aligned with the configured CMake toolchain.
+set(RUST_CC "${CMAKE_C_COMPILER}")
+set(RUST_CXX "${CMAKE_CXX_COMPILER}")
+if(NOT RUST_CC)
+  set(RUST_CC "cc")
+endif()
+if(NOT RUST_CXX)
+  set(RUST_CXX "c++")
+endif()
 
-  if(WIN32)
-    corrosion_set_env_vars(
-      rusty_code
-      CC=${RUST_CC}
-      CXX=${RUST_CXX}
-      CXXFLAGS=/EHsc)
-  else()
-    # Native only: a bare clang++ finds the image's GCC through its <native-triple>-clang++.cfg.
-    set(RUST_CXXFLAGS "-fexceptions")
-    if(DEFINED ENV{CXXFLAGS}
-       AND NOT
-           "$ENV{CXXFLAGS}"
-           STREQUAL
-           "")
-      set(RUST_CXXFLAGS "$ENV{CXXFLAGS} ${RUST_CXXFLAGS}")
-    endif()
-
-    # Set deterministic env for corrosion on non-Windows hosts.
-    corrosion_set_env_vars(
-      rusty_code
-      CC=${RUST_CC}
-      CXX=${RUST_CXX}
-      "CXXFLAGS=${RUST_CXXFLAGS}")
-
-    message(STATUS "Configured native corrosion: CC=${RUST_CC} CXX=${RUST_CXX} CXXFLAGS=${RUST_CXXFLAGS}")
-
-  endif() # end non-WIN32 branch
-
-  corrosion_add_cxxbridge(
-    rusty_bridge
-    CRATE
+if(WIN32)
+  corrosion_set_env_vars(
     rusty_code
-    FILES
-    lib.rs)
+    CC=${RUST_CC}
+    CXX=${RUST_CXX}
+    CXXFLAGS=/EHsc)
+else()
+  # Native only: a bare clang++ finds the image's GCC through its <native-triple>-clang++.cfg.
+  set(RUST_CXXFLAGS "-fexceptions")
+  if(DEFINED ENV{CXXFLAGS}
+     AND NOT
+         "$ENV{CXXFLAGS}"
+         STREQUAL
+         "")
+    set(RUST_CXXFLAGS "$ENV{CXXFLAGS} ${RUST_CXXFLAGS}")
+  endif()
 
-endif() # end RUST_FEATURES
+  # Set deterministic env for corrosion on non-Windows hosts.
+  corrosion_set_env_vars(
+    rusty_code
+    CC=${RUST_CC}
+    CXX=${RUST_CXX}
+    "CXXFLAGS=${RUST_CXXFLAGS}")
+
+  message(STATUS "Configured native corrosion: CC=${RUST_CC} CXX=${RUST_CXX} CXXFLAGS=${RUST_CXXFLAGS}")
+
+endif() # end non-WIN32 branch
+
+corrosion_add_cxxbridge(
+  rusty_bridge
+  CRATE
+  rusty_code
+  FILES
+  lib.rs)
 
 # add the executable
 add_library(${PROJECT_NAME} SHARED)
@@ -124,14 +121,6 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE KATAGLYPHIS_EXPORTS)
 
 # Set symbol visibility
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
-
-if(RUST_FEATURES)
-  message("RUST features defined")
-  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=1)
-else()
-  message("RUST features not defined")
-  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_RUST=0)
-endif()
 
 # MSVC deploys one directory deeper than clang-cl, hence the extra ../.
 if(WIN32 AND NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC))
@@ -182,9 +171,7 @@ else()
   target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_ONNXRUNTIME=0)
 endif()
 
-if(RUST_FEATURES)
-  target_link_libraries(${PROJECT_NAME} PUBLIC rusty_code)
-endif()
+target_link_libraries(${PROJECT_NAME} PUBLIC rusty_code)
 
 if(TARGET ${PROJECT_NAME}_cli)
   target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME} absl::flags_parse)

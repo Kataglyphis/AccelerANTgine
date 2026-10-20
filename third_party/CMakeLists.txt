@@ -262,40 +262,28 @@ if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
   add_subdirectory(nanobind)
 endif()
 
-if(RUST_FEATURES)
+# A lower bound, not a pin: `cargo install --version` reads 1.0.205 as ^1.0.205; Src/rusty_code's and OxidANT's Cargo.lock hold the cxx it must match.
+set(CXXBRIDGE_CMD_VERSION
+    # renovate: datasource=crate depName=cxxbridge-cmd versioning=semver
+    "1.0.205"
+    CACHE STRING "Lower bound for cxxbridge-cmd; cargo install resolves it as a caret range")
 
-  # This is a LOWER BOUND, not a pin, and the docstring used to claim otherwise.
-  # `cargo install --version <v>` takes a VersionReq, so a bare 1.0.205 means
-  # ^1.0.205 and the newest 1.x is what lands.
-  # The cxx crate it has to match lives in two locks: Src/rusty_code's and
-  # OxidANT's Cargo.lock both resolve cxx 1.0.205 (2026-10-13), but they drifted
-  # apart before. A true pin would need BOTH
-  # `--version =${CXXBRIDGE_CMD_VERSION}` below AND one agreed version across
-  # the two locks. Left as it is deliberately; the annotation makes the drift
-  # visible instead of silent.
-  set(CXXBRIDGE_CMD_VERSION
-      # renovate: datasource=crate depName=cxxbridge-cmd versioning=semver
-      "1.0.205"
-      CACHE STRING "Lower bound for cxxbridge-cmd; cargo install resolves it as a caret range")
+# A commit, not v0.6.1: that tag lacks the CARGO_HOME and cxxbridge-cmd fixes; move to the first tag after it.
+FetchContent_Declare(
+  Corrosion
+  GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+  GIT_TAG c4786e7ae2d5ade784aca29448df362c874ed04e)
+FetchContent_MakeAvailable(Corrosion)
 
-  # A commit, not v0.6.1: that tag lacks the CARGO_HOME and cxxbridge-cmd fixes; move to the first tag after it.
-  FetchContent_Declare(
-    Corrosion
-    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG c4786e7ae2d5ade784aca29448df362c874ed04e)
-  FetchContent_MakeAvailable(Corrosion)
-
-  find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")
-  if(CXXBRIDGE STREQUAL "CXXBRIDGE-NOTFOUND")
-    message("Could not find cxxbridge, trying to install with `cargo install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION}`")
-    find_program(CARGO cargo PATHS "$ENV{HOME}/.cargo/bin/")
-    if(CARGO STREQUAL "CARGO-NOTFOUND")
-      message(FATAL_ERROR "Requires cargo available in path, install via rustup https://rustup.rs/")
-    endif()
-    execute_process(COMMAND ${CARGO} install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION} --locked)
-    find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")
+find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")
+if(CXXBRIDGE STREQUAL "CXXBRIDGE-NOTFOUND")
+  message("Could not find cxxbridge, trying to install with `cargo install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION}`")
+  find_program(CARGO cargo PATHS "$ENV{HOME}/.cargo/bin/")
+  if(CARGO STREQUAL "CARGO-NOTFOUND")
+    message(FATAL_ERROR "Requires cargo available in path, install via rustup https://rustup.rs/")
   endif()
-
+  execute_process(COMMAND ${CARGO} install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION} --locked)
+  find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")
 endif()
 
 # One MSVC runtime for every dependency above (abseil pins its own otherwise);

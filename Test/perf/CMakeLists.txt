@@ -37,5 +37,3 @@ target_link_libraries(
           GSL
           spdlog
           ${PROJECT_NAME})
-
-kataglyphis_link_rust_target_if_enabled(${PERF_TEST_SUITE})

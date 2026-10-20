@@ -53,5 +53,3 @@ target_link_libraries(
           ${PROJECT_NAME})
 
 kataglyphis_configure_gtest_discovery(${COMPILE_TEST_SUITE})
-
-kataglyphis_link_rust_target_if_enabled(${COMPILE_TEST_SUITE})

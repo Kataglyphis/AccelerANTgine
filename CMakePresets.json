@@ -12,7 +12,6 @@
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "ON",
-        "RUST_FEATURES": "ON",
         "BUILD_TESTING": "TRUE"
       },
       "condition": {
@@ -49,7 +48,6 @@
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",
-        "RUST_FEATURES": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "COMPILER_CACHE": "sccache"
       },
@@ -67,7 +65,6 @@
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
-        "RUST_FEATURES": "ON",
         "COMPILER_CACHE": "sccache"
       },
       "condition": {
@@ -78,23 +75,6 @@
       "architecture": {
         "value": "x64",
         "strategy": "set"
-      }
-    },
-    {
-      "name": "windows-clang",
-      "hidden": true,
-      "generator": "Ninja",
-      "cacheVariables": {
-        "CMAKE_VERBOSE_MAKEFILE": "ON",
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++",
-        "RUST_FEATURES": "OFF",
-        "COMPILER_CACHE": "sccache"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
       }
     },
     {
@@ -294,52 +274,6 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_TESTING": "FALSE"
       }
-    },
-    {
-      "name": "x64-Clang-Windows-Debug",
-      "displayName": "Windows Clang Debug",
-      "description": "Windows Debug build with Clang",
-      "inherits": "windows-clang",
-      "binaryDir": "${sourceDir}/build/",
-      "installDir": "${sourceDir}/build/",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "x64-Clang-Windows-RelWithDebInfo",
-      "displayName": "Windows Clang RelWithDebInfo",
-      "description": "Windows RelWithDebInfo build with Clang",
-      "inherits": "windows-clang",
-      "binaryDir": "${sourceDir}/build/",
-      "installDir": "${sourceDir}/build/",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "BUILD_TESTING": "FALSE"
-      }
-    },
-    {
-      "name": "x64-Clang-Windows-Release",
-      "displayName": "Windows Clang Release",
-      "description": "Windows Release build with Clang",
-      "inherits": "windows-clang",
-      "binaryDir": "${sourceDir}/build-release/",
-      "installDir": "${sourceDir}/build-release/",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_TESTING": "FALSE"
-      }
-    },
-    {
-      "name": "x64-Clang-Windows-Profile",
-      "displayName": "Windows Clang Profile",
-      "description": "Windows Profile build with Clang",
-      "inherits": "windows-clang",
-      "binaryDir": "${sourceDir}/build/",
-      "installDir": "${sourceDir}/build/",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
     }
   ],
   "buildPresets": [
@@ -395,18 +329,6 @@
       "name": "x64-MSVC-Windows-Release",
       "jobs": 0,
       "configurePreset": "x64-MSVC-Windows-Release",
-      "configuration": "Release"
-    },
-    {
-      "name": "x64-Clang-Windows-Debug",
-      "jobs": 0,
-      "configurePreset": "x64-Clang-Windows-Debug",
-      "configuration": "Debug"
-    },
-    {
-      "name": "x64-Clang-Windows-Release",
-      "jobs": 0,
-      "configurePreset": "x64-Clang-Windows-Release",
       "configuration": "Release"
     },
     {
@@ -486,22 +408,6 @@
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
-      }
-    },
-    {
-      "name": "windows-clang-release-wix",
-      "displayName": "Windows Release Clang NSIS+WIX",
-      "description": "Windows installer packages via CPack",
-      "configurePreset": "x64-Clang-Windows-Release",
-      "generators": [
-        "NSIS",
-        "WIX",
-        "ZIP"
-      ],
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
       }
     }
   ],

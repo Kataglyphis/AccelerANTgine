@@ -16,19 +16,6 @@ set(PROJECT_APP_ID "org.kataglyphis.accelerantgine")
 set(WINDOWS_CI
     OFF
     CACHE BOOL "Enable Windows CI build options")
-set(RUST_FEATURES
-    ON
-    CACHE BOOL "Enable Rust features in our project.")
-if(RUST_FEATURES)
-  message(STATUS "Rust features are enabled.")
-  if(MSVC)
-    message(STATUS "On a windows machine you must use MSVC or clang-cl when integrating rust features.")
-  endif()
-else()
-  message(STATUS "Rust features are disabled.")
-  message(
-    STATUS "Your are going to use a non MSVC/clang-cl compiler on windows. Therefore no rust integration possible.")
-endif()
 
 option(KATAGLYPHIS_BUILD_PYTHON_BINDINGS "Build Python bindings with nanobind" OFF)
 if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)

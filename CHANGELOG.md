@@ -19,6 +19,24 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **Rust is in every build, with no switch** (2026-10-20, owner: every Rust feature is mandatory
+  and permanent). The `RUST_FEATURES` cache option left `CMakeLists.txt`; `third_party/CMakeLists.txt`
+  fetches Corrosion and finds cxxbridge, and `Src/CMakeLists.txt` imports, bridges and links
+  `Src/rusty_code`, all unconditionally. `USE_RUST`, which no source read, is no longer defined for
+  the library or the suites, nor passed to `clang++ --analyze`. `kataglyphis_link_rust_target_if_enabled`
+  went with its four calls: the suites get `rusty_code` through the library's PUBLIC link.
+  `CMakePresets.json` drops `RUST_FEATURES` from its three hidden bases, and drops the one Rust-less
+  family, `windows-clang` with `x64-Clang-Windows-{Debug,RelWithDebInfo,Release,Profile}`, its two
+  build presets and the `windows-clang-release-wix` package preset; no workflow or script used them.
+  `Test/commit/rust_bridge_test.cpp` calls the crate's cxx export (42) and its `extern "C"` one
+  (322), which nothing had called since 194fb4a (2025-10-06), so a build without Rust fails to link.
+  OmniAccelerANT's plugin sets `RUST_FEATURES` before `add_subdirectory`; after its pin moves,
+  nothing reads that line. In `:latest`, `ci-run-all.sh` clang: ctest 114/114 (ASan, UBSan) and
+  106/106 (TSan), `static-analysis OK (4 gate(s))`, both wheels' `Test/python`, the four packages;
+  gcc: 106/106; `ci-riscv64-test.sh`: the crate built for `riscv64gc-unknown-linux-gnu`, 114/114
+  under QEMU. In `:winamd64`, the x64 build: 18 of 18 steps, and on the host the Release suites
+  109 passed, 0 failed, 6 skipped (107 before: the two new tests). In `:winarm64`, the arm64 cross
+  build (`Rust_CARGO_TARGET=aarch64-pc-windows-msvc`): 11 of 11 steps, both commit suites ARM64.
 - **The Windows scripts take their config rows, the portable bundle and the staged verdict from the
   hub** (2026-10-19, hub 1a174d9c). `Build-Windows.ps1` and `Start-Windows.ps1` read a
   `Build-Windows.config.psd1` row through `Get-BuildConfigurationRow` (`BuildDirEnv`/`PresetEnv`
