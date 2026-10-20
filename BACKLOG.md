@@ -14,3 +14,16 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   WebRTC streamer's success path has no test (`Test/commit/webrtc_streamer.cpp` covers its
   errors), so nothing else would catch a race there. Next: keep a core dump as an artifact
   when the workload crashes, or run the same workload under ASan in the Debug lane.
+
+- [ ] **The Python bindings build and test on Linux x64 and arm64 only** (M, ★★). Owner goal
+  2026-10-01: every test on every arch, on the pinned CPython once with the GIL and once
+  free-threaded. `ci-python-bindings.sh` builds both wheels, installs each and runs
+  `Test/python`, but only `ci-run-all.sh:92-97` calls it, on the clang rows of `linux-x64.yml`
+  and `linux-arm64.yml`. Missing:
+  1. Windows x64 and arm64: no workflow calls `Build-PythonBindings.ps1` (or
+     `Invoke-ContainerPythonBindings.ps1`); it builds the GIL package only and runs no test.
+  2. riscv64: `ci-riscv64-test.sh` cross-builds and runs the C++ suites alone; no wheel is
+     built or imported under QEMU.
+
+  Done when every lane builds both wheels from the image's interpreters and passes
+  `Test/python` on each, Windows arm64 on the `windows-11-arm` device.
