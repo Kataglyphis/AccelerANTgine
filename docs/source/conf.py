@@ -37,6 +37,10 @@ setup_theme(
     + (["breathe", "exhale"] if _HAS_API else []),
 )
 
+# The repository's own logo, in place of setup_theme()'s shared default.
+html_logo = "../../images/logo.svg"
+html_favicon = html_logo
+
 # -- General configuration ---------------------------------------------------
 
 exclude_patterns = [] if _HAS_API else ["api/**"]

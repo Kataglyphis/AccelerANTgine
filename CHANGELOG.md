@@ -24,6 +24,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   `scripts/make_repo_logos.py` draws. `images/logo.png`, and `Engine_logo.png`, `Engine_logo.bmp`
   and `faviconNew.ico`, which the installers and the Linux desktop entry show, are rendered from it
   at their sizes (256, 256, 200 and 16 to 256 px).
+- **The docs site shows AccelerANTgine's own logo** (2026-10-21, owner): `docs/source/conf.py` sets
+  `html_logo` and `html_favicon` to `images/logo.svg` after `setup_theme()`, in place of the theme's
+  shared wireframe.
 - **nanobind a1c8924 → d2c66af (2026-10-20, Renovate `--apply`, owner-approved): its `master`
   was force-pushed.** a1c8924 ("Explain nanobind's threat model") is on no nanobind branch or tag
   any more, so `submodule-pins.yml` failed its reachability check (runs 39440347403,
