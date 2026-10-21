@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://jonasheinle.de">
-    <img src="https://raw.githubusercontent.com/Kataglyphis/AccelerANTgine/develop/images/logo.png" alt="logo" width="200" />
+    <img src="https://raw.githubusercontent.com/Kataglyphis/AccelerANTgine/develop/images/logo.svg" alt="AccelerANTgine logo: latte art in the shape of an ant" width="200" />
   </a>
 
   <h1>AccelerANTgine</h1>

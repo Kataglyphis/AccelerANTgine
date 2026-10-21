@@ -19,6 +19,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 ## [Unreleased]
 
 ### Changed
+- **The README header shows AccelerANTgine's own logo, `images/logo.svg`** (2026-10-21, owner):
+  latte art in the shape of an ant, from the family set DocumANTation's
+  `scripts/make_repo_logos.py` draws. `images/logo.png` stays the Windows package's icon.
 - **nanobind a1c8924 → d2c66af (2026-10-20, Renovate `--apply`, owner-approved): its `master`
   was force-pushed.** a1c8924 ("Explain nanobind's threat model") is on no nanobind branch or tag
   any more, so `submodule-pins.yml` failed its reachability check (runs 39440347403,
