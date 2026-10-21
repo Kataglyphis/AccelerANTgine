@@ -134,12 +134,36 @@ stop_signalling_server() {
   trap - EXIT
 }
 
+# capture_crash <what> <status> - the evidence of a signal death, which the workflow uploads on failure: the status, any core,
+# and gdb's backtrace from a rerun. A sporadic crash may not repeat, and the note then says so.
+capture_crash() {
+  local what="$1" status="$2" dir core
+  dir="${BUILD_DIR}/crash-evidence"
+  mkdir -p "${dir}"
+  printf '%s: exit %s, signal %s\n' "${what}" "${status}" "$((status - 128))" >"${dir}/status.txt"
+  shopt -s nullglob
+  for core in "${BUILD_DIR}"/core*; do
+    [[ -f "${core}" ]] && mv "${core}" "${dir}/"
+  done
+  shopt -u nullglob
+  if command -v gdb >/dev/null 2>&1; then
+    (cd "${BUILD_DIR}" && timeout 240 gdb -batch -ex run -ex 'thread apply all bt 40' \
+      --args "./${PROFILE_BINARY}" "${WORKLOAD_ARGS[@]}") >"${dir}/backtrace.txt" 2>&1 || true
+    grep -q '^Thread ' "${dir}/backtrace.txt" \
+      || echo "the rerun did not crash within 240 s: no backtrace (a core, if any, is in this directory)" >>"${dir}/backtrace.txt"
+  else
+    echo "gdb is not on PATH: no backtrace" >"${dir}/backtrace.txt"
+  fi
+  info "crash evidence in ${dir}"
+}
+
 # run_workload <what> <window-seconds> [recorder argv...] - timeout's 124 is the expected end; an early 0 profiled nothing.
 run_workload() {
   local what="$1" window="$2" status=0
   shift 2
   start_signalling_server
   (
+    ulimit -c unlimited 2>/dev/null || true
     cd "${BUILD_DIR}" && timeout "${window}" \
       "$@" env CPUPROFILE="${PROFILE_OUTPUT}" ${STACK_WALKER:+"TCMALLOC_STACKTRACE_METHOD=${STACK_WALKER}"} \
       "./${PROFILE_BINARY}" "${WORKLOAD_ARGS[@]}"
@@ -150,6 +174,9 @@ run_workload() {
     info "${what} window closed by the configured ${window}s timeout (the intended bound)"
   elif [[ "${status}" -eq 0 ]]; then
     die "profiled workload exited cleanly before the ${window}s window closed - under '${PROFILE_ARGS}' the CLI streams until stopped, so an early exit 0 means nothing was profiled"
+  elif [[ "${status}" -gt 128 ]]; then
+    capture_crash "${what}" "${status}"
+    die "${what} died on signal $((status - 128)) (exit ${status}); its evidence is in ${BUILD_DIR}/crash-evidence"
   else
     die "${what} failed with exit code ${status}"
   fi

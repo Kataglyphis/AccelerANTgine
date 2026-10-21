@@ -15,6 +15,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   errors), so nothing else would catch a race there. Next: keep a core dump as an artifact
   when the workload crashes, or run the same workload under ASan in the Debug lane.
 
+  Status 2026-10-21: the core-dump step is in (`scripts/linux/ci-profile-bench.sh` `capture_crash`:
+  status, core, gdb backtrace of a rerun; `reusable-linux.yml` uploads `crash-evidence-<arch>-<compiler>`
+  on failure). The helper was checked against a self-crashing binary, with and without a core. Still
+  open until a real crash in CI leaves a backtrace; the ASan lane is not started.
+
 - [ ] **The Python bindings build and test on Linux x64 and arm64 only** (M, ★★). Owner goal
   2026-10-01: every test on every arch, on the pinned CPython once with the GIL and once
   free-threaded. `ci-python-bindings.sh` builds both wheels, installs each and runs
