@@ -134,8 +134,7 @@ stop_signalling_server() {
   trap - EXIT
 }
 
-# capture_crash <what> <status> - the evidence of a signal death, which the workflow uploads on failure: the status, any core,
-# and gdb's backtrace from a rerun. A sporadic crash may not repeat, and the note then says so.
+# capture_crash <what> <status>: a signal death's status, core and gdb backtrace, for the workflow's upload.
 capture_crash() {
   local what="$1" status="$2" dir core
   dir="${BUILD_DIR}/crash-evidence"

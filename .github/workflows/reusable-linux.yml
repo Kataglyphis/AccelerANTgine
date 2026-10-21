@@ -91,7 +91,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: crash-evidence-${{ inputs.arch }}-${{ inputs.compiler }}
-          if-no-files-found: ignore
+          if-no-files-found: warn
           path: build/crash-evidence
 
       - name: Save compiler cache
