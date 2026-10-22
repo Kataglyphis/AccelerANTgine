@@ -47,6 +47,28 @@ TEST(OnnxEngine, DefaultSessionConfigIsSequentialCpuWithFourThreads)
     EXPECT_EQ(config.execution_mode, inference::ExecutionMode::Sequential);
 }
 
+TEST(OnnxEngine, RejectsIntegerAndBooleanOutputsBeforeReadingTheirStorage)
+{
+    for (const std::int32_t type : { 2, 7, 9 }) {
+        const TempFile model("kataglyphis-cast", ".onnx", kataglyphis::test::cast_output_model(type));
+        auto engine = initialized_engine(model);
+        const std::vector<float> input{ 0, 1, 2, 3 };
+        const auto result = engine.run_inference(input, shape({ 1, 4 }), "X");
+        ASSERT_FALSE(result.has_value()) << type;
+        EXPECT_EQ(result.error(), inference::OnnxError::InvalidOutputType) << type;
+    }
+}
+
+TEST(OnnxEngine, RejectsASequenceOutputWithoutAborting)
+{
+    const TempFile model("kataglyphis-sequence", ".onnx", kataglyphis::test::sequence_output_model());
+    auto engine = initialized_engine(model);
+    const std::vector<float> input{ 0, 1, 2, 3 };
+    const auto result = engine.run_inference(input, shape({ 1, 4 }), "X");
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), inference::OnnxError::InvalidOutputType);
+}
+
 TEST(OnnxEngine, EverythingFailsCleanlyBeforeInitialize)
 {
     inference::OnnxInferenceEngine engine;

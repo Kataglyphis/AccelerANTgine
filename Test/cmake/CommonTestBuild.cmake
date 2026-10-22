@@ -100,4 +100,6 @@ function(kataglyphis_configure_library_test_target target_name)
     ${target_name} PRIVATE KATAGLYPHIS_TEST_PROJECT_VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
   kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/resources/configs/inference_config.toml"
                               kShippedInferenceConfig)
+  kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/third_party/ModelANT/contracts/inference-v1.json"
+                              kInferenceContract)
 endfunction()

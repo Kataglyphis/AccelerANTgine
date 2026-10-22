@@ -71,30 +71,61 @@ namespace {
         return shape;
     }
 
-    auto to_tensor_data(const Ort::Value &tensor) -> TensorData
+    auto to_tensor_data(const Ort::Value &tensor) -> std::expected<TensorData, OnnxError>
     {
+        const OrtApi &api = Ort::GetApi();
+        ONNXType value_type{};
+        if (!ort_succeeded(api.GetValueType(tensor, &value_type)) || value_type != ONNX_TYPE_TENSOR) {
+            return std::unexpected(OnnxError::InvalidOutputType);
+        }
+        OrtTensorTypeAndShapeInfo *raw_info = nullptr;
+        if (!ort_succeeded(api.GetTensorTypeAndShape(tensor, &raw_info))) {
+            return std::unexpected(OnnxError::InvalidOutputType);
+        }
+        const Ort::TensorTypeAndShapeInfo type_info{ raw_info };
+        ONNXTensorElementDataType element_type{};
+        if (!ort_succeeded(api.GetTensorElementType(type_info, &element_type))
+            || element_type != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+            return std::unexpected(OnnxError::InvalidOutputType);
+        }
+        std::size_t rank = 0;
+        if (!ort_succeeded(api.GetDimensionsCount(type_info, &rank))) {
+            return std::unexpected(OnnxError::InvalidOutputShape);
+        }
+        std::vector<int64_t> shape(rank);
+        std::size_t total_elements = 0;
+        if (!ort_succeeded(api.GetDimensions(type_info, shape.data(), rank))
+            || std::ranges::any_of(shape, [](int64_t dim) { return dim < 0; })
+            || !ort_succeeded(api.GetTensorShapeElementCount(type_info, &total_elements))) {
+            return std::unexpected(OnnxError::InvalidOutputShape);
+        }
         TensorData tensor_data;
-        const auto type_info = tensor.GetTensorTypeAndShapeInfo();
-        const auto shape = type_info.GetShape();
-
         tensor_data.shape = to_tensor_shape(shape);
-
-        const auto total_elements = type_info.GetElementCount();
-        const auto *tensor_data_ptr = tensor.GetTensorData<float>();
-
-        tensor_data.data.assign(tensor_data_ptr, tensor_data_ptr + total_elements);
+        void *raw_data = nullptr;
+        if (!ort_succeeded(api.GetTensorMutableData(tensor, &raw_data))) {
+            return std::unexpected(OnnxError::OutputAllocationFailed);
+        }
+        if (total_elements != 0) {
+            if (raw_data == nullptr) { return std::unexpected(OnnxError::OutputAllocationFailed); }
+            const auto *data = static_cast<const float *>(raw_data);
+            tensor_data.data.assign(data, data + total_elements);
+        }
         return tensor_data;
     }
 
     auto make_inference_result(const std::vector<Ort::Value> &output_tensors,
       const InferenceClock::time_point start_time,
-      const InferenceClock::time_point end_time) -> InferenceResult
+      const InferenceClock::time_point end_time) -> std::expected<InferenceResult, OnnxError>
     {
         InferenceResult result;
         result.inference_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
         result.outputs.reserve(output_tensors.size());
 
-        for (const auto &tensor : output_tensors) { result.outputs.push_back(to_tensor_data(tensor)); }
+        for (const auto &tensor : output_tensors) {
+            auto output = to_tensor_data(tensor);
+            if (!output) { return std::unexpected(output.error()); }
+            result.outputs.push_back(std::move(*output));
+        }
 
         return result;
     }
@@ -211,7 +242,8 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     if (!ort_succeeded(api.SetIntraOpNumThreads(options, config.intra_op_num_threads))
         || !ort_succeeded(api.SetInterOpNumThreads(options, config.inter_op_num_threads))
         || !ort_succeeded(api.SetSessionExecutionMode(options, execution_mode))
-        || (config.enable_memory_pattern && !ort_succeeded(api.EnableMemPattern(options)))) {
+        || !ort_succeeded(
+          config.enable_memory_pattern ? api.EnableMemPattern(options) : api.DisableMemPattern(options))) {
         impl_->reset();
         return std::unexpected(OnnxError::SessionCreationFailed);
     }

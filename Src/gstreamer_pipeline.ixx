@@ -44,6 +44,8 @@ struct FrameMetadata
     std::string format;
     std::uint64_t timestamp_ns{ 0 };
     std::uint64_t duration_ns{ 0 };
+    std::int64_t row_stride_bytes{ 0 };
+    std::size_t plane_offset_bytes{ 0 };
 };
 
 struct BufferInfo

@@ -18,7 +18,26 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed
+
+- Convert GStreamer RGB/RGBA bytes to normalized RGB NCHW floats before inference, honoring
+  padded rows and plane offsets. Reject invalid buffers, support explicit stretch/letterbox
+  mapping, and use the same preprocessing in synchronous and asynchronous detection.
+- Reject non-tensor and non-FLOAT ONNX outputs before reading their storage; invalid output
+  types and shapes now return explicit errors instead of being copied as floats.
+- Keep asynchronous detection failures observable through an error callback and `last_error()`.
+
 ### Changed
+
+- C++ preprocessing tests consume ModelANT's pinned `contracts/inference-v1.json`, shared with
+  the Python and Rust implementations. Model weights remain checksum-pinned release assets.
+- Append `InvalidOutputType` and `InvalidOutputShape` to the ONNX error enum and expose them in
+  Python. The C API remains unchanged; OmniAccelerANT receives the C++ behavior after its
+  AccelerANTgine pin moves.
+- Add stride/offset fields to `FrameMetadata` and preprocessing policy to `YoloConfig`.
+  Rebuild C++ consumers alongside the library because those public struct layouts changed.
+- Rust toolchain setup uses ANTfrastructure's shared Corrosion CMake module; this repository
+  keeps its own crate and feature choices.
 - **The README header shows AccelerANTgine's own logo, `images/logo.svg`** (2026-10-21, owner):
   latte art in the shape of an ant, from the family set DocumANTation's
   `scripts/make_repo_logos.py` draws. `images/logo.png`, and `Engine_logo.png`, `Engine_logo.bmp`

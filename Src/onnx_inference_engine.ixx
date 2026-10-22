@@ -23,7 +23,9 @@ enum class OnnxError {
     InvalidInputType,
     MemoryAllocationError,
     SessionNotInitialized,
-    OutputNotFound
+    OutputNotFound,
+    InvalidOutputType,
+    InvalidOutputShape
 };
 
 // Exported: a member defined in a module interface is not inline, so importers link against this one.

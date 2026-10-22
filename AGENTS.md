@@ -21,6 +21,7 @@ and **C++23 named modules** (`.ixx`) shape most of its tooling.
 | `scripts/linux/` | The `ci-*.sh` chain, run end to end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
 | `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the Pester suite in `tests/` and `generated-artifacts.txt`, the pathspecs the hub's generated-artifacts suite reads. No project-local `modules/`: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
+| `third_party/ModelANT` | The pinned, data-only inference contract used by the C++ regression suite; model weights remain release downloads |
 
 **This repo is consumed as a direct submodule** of OmniAccelerANT, at
 `third_party/AccelerANTgine`. The Flutter plugin `packages/kataglyphis_native_inference` lives
@@ -123,7 +124,9 @@ is what you want, update the gitlink **and** fix the fallout in the same change.
   pinned to the DocumANTation commit the ANTfrastructure gitlink carries. `git submodule update
   --init` without `--recursive` satisfies every other consumer here and breaks this one (the
   symptom: § 4).
-- No other pin here has a recorded coupling (checked 2026-09-15).
+- `third_party/ModelANT/contracts/inference-v1.json` is embedded into the C++ tests through
+  `kataglyphis_embed_text_file`. A contract pin bump must preserve the production preprocessing
+  checks; do not regenerate expected tensors from the C++ implementation being tested.
 
 Drift is guarded by ANTfrastructure's shared suite, which `.github/workflows/submodule-pins.yml`
 runs on every push and PR that touches `.gitmodules` or `third_party/**`. It asserts that every
@@ -136,6 +139,20 @@ tree. Run it after any pin bump. It does **not** check the couplings above; that
 
 Everything here is false or meaningless in another repo — that is why it is
 written out rather than linked.
+
+- **GStreamer bytes must pass through `preprocess_frame`.** `RGB` and `RGBA` frames carry byte
+  stride and plane offset; the helper validates their bounds, resizes and writes RGB float32
+  NCHW values. Both synchronous and asynchronous detection use `detect_frame`; never reinterpret
+  frame bytes as floats. The selected stretch/letterbox policy belongs to `YoloConfig`, not a
+  guessed tensor length. Details and shared cases: [`inference_preprocessing.rst`](docs/source/inference_preprocessing.rst).
+- **The engine returns dense FLOAT outputs only.** Check the ONNX value kind, element type,
+  shape and pointer before copying; `InvalidOutputType` and `InvalidOutputShape` must reach both
+  single-input and multi-input callers. New error enum values append to the stable existing
+  values and must be exported by the Python bindings.
+- **Asynchronous inference errors stay observable.** `VideoDetectorPipeline` records
+  `last_error()` and calls `set_error_callback`'s callback for failed frames. `start()` resets
+  the stored error; a successful frame does not erase it. Without a callback the pipeline logs
+  a changed error to stderr. Preserve these semantics when changing the streaming path.
 
 - **clang-tidy is skipped for GCC on purpose.** A GCC-generated `compile_commands.json` carries
   C++ module flags clang-tidy cannot parse, so `run-static-analysis-format.sh` runs it (and
@@ -191,7 +208,7 @@ written out rather than linked.
   bash scripts/linux/renovate-local.sh --apply             # gitlinks, manifests and their locks
   ```
 
-  - All seven `.gitmodules` entries declare a `branch =` since ff4e867, so `--apply` moves every
+  - Every `.gitmodules` entry declares a `branch =`, so `--apply` moves every
     gitlink that is behind, `FUZZTEST` included, which may raise the abseil pin's floor (§ 3).
   - The CMake pins come from the hub preset's `custom.regex` managers, which tree detection never
     picks: name them, as above.
@@ -550,7 +567,8 @@ how to run it and what breaks; no filler, no marketing, no repetition.
   are absolute URLs. Installing a release, the Rust crate and the Python bindings are in
   `getting_started.rst`; the suites, profiling, static analysis, tools and literature in
   `development_workflow.rst`; the Windows container build and the host run in
-  `windows_workflow.rst`; features, dependencies and CI's compilers in `overview.rst`.
+  `windows_workflow.rst`; features, dependencies and CI's compilers in `overview.rst`;
+  frame/model contracts and errors in `inference_preprocessing.rst`.
 - Hand-written Sphinx sources live in `docs/source/`, with one exception: `graphviz_files.rst` is
   `graphviz_generator.py`'s output, tracked as a snapshot and rewritten by every `ci-docs.sh`
   run. What else `ci-docs.sh` writes (`docs/source/api/`, the `docs/source/test-results/*.md`

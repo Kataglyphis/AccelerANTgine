@@ -131,11 +131,21 @@ namespace {
 
                 const gchar *format = gst_structure_get_string(structure, "format");
                 if (format != nullptr) { buffer_info.metadata.format = format; }
+                GstVideoInfo video_info;
+                if (gst_video_info_from_caps(&video_info, caps) != 0 && GST_VIDEO_INFO_N_PLANES(&video_info) == 1) {
+                    buffer_info.metadata.row_stride_bytes = GST_VIDEO_INFO_PLANE_STRIDE(&video_info, 0);
+                    buffer_info.metadata.plane_offset_bytes = GST_VIDEO_INFO_PLANE_OFFSET(&video_info, 0);
+                }
             }
         }
 
         buffer_info.metadata.timestamp_ns = GST_BUFFER_PTS(buffer);
         buffer_info.metadata.duration_ns = GST_BUFFER_DURATION(buffer);
+        if (const auto *video_meta = gst_buffer_get_video_meta(buffer);
+          video_meta != nullptr && video_meta->n_planes == 1) {
+            buffer_info.metadata.row_stride_bytes = video_meta->stride[0];
+            buffer_info.metadata.plane_offset_bytes = video_meta->offset[0];
+        }
     }
 
     auto extract_buffer_info(GstSample *sample) -> std::expected<BufferInfo, GStreamerError>

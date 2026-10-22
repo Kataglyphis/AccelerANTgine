@@ -60,6 +60,8 @@ struct ValueSpec
 {
     std::string name;
     std::vector<std::int64_t> dims;
+    std::int32_t element_type{ kOnnxFloat };
+    bool sequence{ false };
 };
 
 struct NodeSpec
@@ -67,6 +69,7 @@ struct NodeSpec
     std::string op_type;
     std::vector<std::string> inputs;
     std::vector<std::string> outputs;
+    std::vector<std::pair<std::string, std::int64_t>> int_attributes;
 };
 
 struct Int64Constant
@@ -84,10 +87,18 @@ inline auto encode_value_info(const ValueSpec &value) -> ProtoWriter
         shape.message_field(1, dimension);
     }
     ProtoWriter tensor_type;
-    tensor_type.int_field(1, kOnnxFloat);
+    tensor_type.int_field(1, value.element_type);
     tensor_type.message_field(2, shape);
     ProtoWriter type;
-    type.message_field(1, tensor_type);
+    if (value.sequence) {
+        ProtoWriter element;
+        element.message_field(1, tensor_type);
+        ProtoWriter sequence;
+        sequence.message_field(1, element);
+        type.message_field(4, sequence);
+    } else {
+        type.message_field(1, tensor_type);
+    }
     ProtoWriter info;
     info.bytes_field(1, value.name);
     info.message_field(2, type);
@@ -108,6 +119,13 @@ inline auto build_onnx_model(const std::vector<ValueSpec> &inputs,
         for (const auto &output : node_spec.outputs) { node.bytes_field(2, output); }
         node.bytes_field(3, node_spec.op_type + "_" + std::to_string(index++));
         node.bytes_field(4, node_spec.op_type);
+        for (const auto &[name, value] : node_spec.int_attributes) {
+            ProtoWriter attribute;
+            attribute.bytes_field(1, name);
+            attribute.int_field(3, value);
+            attribute.int_field(20, 2);
+            node.message_field(5, attribute);
+        }
         graph.message_field(1, node);
     }
     graph.bytes_field(2, "kataglyphis_test_graph");
@@ -151,6 +169,18 @@ inline auto relu_neg_model() -> std::string
     return build_onnx_model({ { "X", { 1, 4 } } },
       { { "R", { 1, 4 } }, { "N", { 1, 4 } } },
       { { "Relu", { "X" }, { "R" } }, { "Neg", { "X" }, { "N" } } });
+}
+
+inline auto cast_output_model(std::int32_t type) -> std::string
+{
+    return build_onnx_model(
+      { { "X", { 1, 4 } } }, { { "Y", { 1, 4 }, type } }, { { "Cast", { "X" }, { "Y" }, { { "to", type } } } });
+}
+
+inline auto sequence_output_model() -> std::string
+{
+    return build_onnx_model(
+      { { "X", { 1, 4 } } }, { { "Y", { 1, 4 }, kOnnxFloat, true } }, { { "SequenceConstruct", { "X" }, { "Y" } } });
 }
 
 // images[1,3,H,W] reshaped to output[1,rows,values]: the input IS the raw detector output, so tests choose every row.

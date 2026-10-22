@@ -57,6 +57,13 @@ def test_onnx_engine_uninitialized():
 
 
 @needs_onnx
+def test_onnx_output_errors_are_exposed():
+    """Python callers can distinguish unsupported output types from invalid output shapes."""
+    assert ki.OnnxError.InvalidOutputType.name == "InvalidOutputType"
+    assert ki.OnnxError.InvalidOutputShape.name == "InvalidOutputShape"
+
+
+@needs_onnx
 def test_onnx_uninitialized_inference_raises():
     np = pytest.importorskip("numpy")
     engine = ki.OnnxInferenceEngine()

@@ -5,6 +5,7 @@ module;
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -45,6 +46,27 @@ enum class YoloOutputLayout {
     CornersScoreClass,// end-to-end exports (DEIM, YOLOv10): x1, y1, x2, y2, score, class index
 };
 
+enum class FramePreprocessMode { Stretch, Letterbox };
+
+struct FrameMapping
+{
+    float scale_x{ 1.0F };
+    float scale_y{ 1.0F };
+    float pad_x{ 0.0F };
+    float pad_y{ 0.0F };
+};
+
+struct PreprocessedFrame
+{
+    std::vector<float> data;
+    FrameMapping mapping;
+};
+
+[[nodiscard]] KATAGLYPHIS_CPP_API auto preprocess_frame(const gstreamer::BufferInfo &buffer,
+  std::uint32_t width,
+  std::uint32_t height,
+  FramePreprocessMode mode = FramePreprocessMode::Stretch) -> std::expected<PreprocessedFrame, OnnxError>;
+
 struct YoloConfig
 {
     std::filesystem::path model_path;
@@ -54,6 +76,7 @@ struct YoloConfig
     std::uint32_t input_height{ 640 };
     int num_classes{ 80 };
     YoloOutputLayout output_layout{ YoloOutputLayout::CenterObjectnessScores };
+    FramePreprocessMode preprocess_mode{ FramePreprocessMode::Stretch };
 };
 
 class KATAGLYPHIS_CPP_API YoloDetector
@@ -77,6 +100,8 @@ class KATAGLYPHIS_CPP_API YoloDetector
     [[nodiscard]] auto detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline, std::uint32_t timeout_ms = 5000)
       -> std::expected<DetectionResult, OnnxError>;
 
+    [[nodiscard]] auto detect_frame(const gstreamer::BufferInfo &frame) -> std::expected<DetectionResult, OnnxError>;
+
     static auto get_coco_class_name(int class_id) -> std::string_view;
 
   private:
@@ -85,7 +110,8 @@ class KATAGLYPHIS_CPP_API YoloDetector
 
     auto post_process(const inference::InferenceResult &raw_output,
       std::uint32_t original_width,
-      std::uint32_t original_height) -> DetectionResult;
+      std::uint32_t original_height,
+      const FrameMapping &mapping) -> DetectionResult;
 
     auto apply_nms(std::vector<BoundingBox> &boxes, float nms_threshold) -> void;
 
@@ -122,6 +148,9 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
       -> void;
 
     auto set_frame_callback(std::function<void(const gstreamer::BufferInfo &)> callback) -> void;
+
+    auto set_error_callback(std::function<void(OnnxError)> callback) -> void;
+    [[nodiscard]] auto last_error() const -> std::optional<OnnxError>;
 
     [[nodiscard]] auto is_running() const -> bool;
 
