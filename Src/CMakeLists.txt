@@ -36,43 +36,8 @@ list(APPEND KataglyphisCppProject_MODULES ${KataglyphisCppProjectConfig_MODULE_O
 
 corrosion_import_crate(MANIFEST_PATH rusty_code/Cargo.toml)
 
-# Keep Rust bridge compilers aligned with the configured CMake toolchain.
-set(RUST_CC "${CMAKE_C_COMPILER}")
-set(RUST_CXX "${CMAKE_CXX_COMPILER}")
-if(NOT RUST_CC)
-  set(RUST_CC "cc")
-endif()
-if(NOT RUST_CXX)
-  set(RUST_CXX "c++")
-endif()
-
-if(WIN32)
-  corrosion_set_env_vars(
-    rusty_code
-    CC=${RUST_CC}
-    CXX=${RUST_CXX}
-    CXXFLAGS=/EHsc)
-else()
-  # Native only: a bare clang++ finds the image's GCC through its <native-triple>-clang++.cfg.
-  set(RUST_CXXFLAGS "-fexceptions")
-  if(DEFINED ENV{CXXFLAGS}
-     AND NOT
-         "$ENV{CXXFLAGS}"
-         STREQUAL
-         "")
-    set(RUST_CXXFLAGS "$ENV{CXXFLAGS} ${RUST_CXXFLAGS}")
-  endif()
-
-  # Set deterministic env for corrosion on non-Windows hosts.
-  corrosion_set_env_vars(
-    rusty_code
-    CC=${RUST_CC}
-    CXX=${RUST_CXX}
-    "CXXFLAGS=${RUST_CXXFLAGS}")
-
-  message(STATUS "Configured native corrosion: CC=${RUST_CC} CXX=${RUST_CXX} CXXFLAGS=${RUST_CXXFLAGS}")
-
-endif() # end non-WIN32 branch
+include(CorrosionToolchain)
+kataglyphis_configure_corrosion_target(rusty_code ADDRESS_SANITIZER ${myproject_ENABLE_SANITIZER_ADDRESS})
 
 corrosion_add_cxxbridge(
   rusty_bridge

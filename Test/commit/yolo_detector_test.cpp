@@ -17,8 +17,10 @@
 #include <utility>
 #include <vector>
 
+#include "kInferenceContract.inc"
 #include "kShippedInferenceConfig.inc"
 
+import nlohmann.json;
 import kataglyphis.gstreamer_pipeline;
 import kataglyphis.toml_config;
 import kataglyphis.yolo_detector;
@@ -308,20 +310,20 @@ TEST(YoloDetectorGStreamer, DecodesAFramePushedThroughAppsrc)
     detection::YoloDetector detector;
     ASSERT_TRUE(detector.initialize(two_class_config(model)).has_value());
 
-    // The caps only carry the frame size the boxes are scaled to; the payload is the raw detector output.
     gstreamer::GStreamerPipeline pipeline;
     ASSERT_TRUE(pipeline
         .create_pipeline_from_string("appsrc name=src format=time "
-                                     "caps=video/x-raw,format=RGBA,width=14,height=6,framerate=0/1 "
+                                     "caps=video/x-raw,format=RGB,width=14,height=6,framerate=0/1 "
                                      "! appsink name=sink sync=false")
         .has_value());
     ASSERT_TRUE(pipeline.start().has_value());
 
-    auto rows = flatten({ { 10, 10, 4, 4, 0.9F, 0.9F, 0.1F }, {}, {}, {}, {}, {} });
+    // RGB rows align to four bytes; white normalises to one in every NCHW channel.
+    std::vector<std::uint8_t> pixels(44 * 6, 255);
     gstreamer::FrameMetadata metadata;
     metadata.timestamp_ns = 0;
     metadata.duration_ns = 1000;
-    ASSERT_TRUE(pipeline.push_buffer(rows.data(), rows.size() * sizeof(float), metadata).has_value());
+    ASSERT_TRUE(pipeline.push_buffer(pixels.data(), pixels.size(), metadata).has_value());
 
     const auto result = detector.detect_from_gstreamer(pipeline, 10000);
     ASSERT_TRUE(result.has_value());
@@ -329,12 +331,12 @@ TEST(YoloDetectorGStreamer, DecodesAFramePushedThroughAppsrc)
     EXPECT_EQ(result->original_height, 6U);
     ASSERT_EQ(result->boxes.size(), 1U);
     EXPECT_EQ(result->boxes[0].class_name, "person");
-    EXPECT_FLOAT_EQ(result->boxes[0].width, 8.0F);
-    EXPECT_FLOAT_EQ(result->boxes[0].height, 12.0F);
+    EXPECT_FLOAT_EQ(result->boxes[0].width, 2.0F);
+    EXPECT_FLOAT_EQ(result->boxes[0].height, 3.0F);
     EXPECT_TRUE(pipeline.stop().has_value());
 }
 
-TEST(YoloDetectorGStreamer, RejectsFramesThatAreNoFloatTensorOfTheModelsSize)
+TEST(YoloDetectorGStreamer, RejectsFramesWithoutVideoGeometry)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("appsrc", "appsink");
     const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
@@ -379,11 +381,10 @@ TEST(VideoDetectorPipeline, RunsTheDetectorOnEveryFrame)
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
     const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
 
-    // A 6x7 RGBA frame is 168 bytes, exactly the 42 floats the model takes; black pixels decode to no box.
     detection::VideoDetectionConfig config;
     config.yolo_config = two_class_config(model);
     config.gstreamer_config.pipeline_description =
-      "videotestsrc num-buffers=3 pattern=black ! video/x-raw,format=RGBA,width=6,height=7,framerate=30/1 "
+      "videotestsrc num-buffers=3 pattern=black ! video/x-raw,format=RGB,width=640,height=480,framerate=30/1 "
       "! appsink name=sink sync=false";
 
     detection::VideoDetectorPipeline pipeline;
@@ -413,7 +414,108 @@ TEST(VideoDetectorPipeline, RunsTheDetectorOnEveryFrame)
     EXPECT_EQ(frames.count(), 3);
     EXPECT_EQ(detections.count(), 3);
     std::scoped_lock lock(sizes_mutex);
-    EXPECT_EQ(widths, (std::vector<std::uint32_t>{ 6, 6, 6 }));
+    EXPECT_EQ(widths, (std::vector<std::uint32_t>{ 640, 640, 640 }));
+}
+
+TEST(VideoDetectorPipeline, ReportsUnsupportedFramesThroughTheErrorCallback)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
+    const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    detection::VideoDetectionConfig config;
+    config.yolo_config = two_class_config(model);
+    config.gstreamer_config.pipeline_description =
+      "videotestsrc num-buffers=2 pattern=black ! video/x-raw,format=GRAY8,width=8,height=4 ! appsink sync=false";
+    detection::VideoDetectorPipeline pipeline;
+    ASSERT_TRUE(pipeline.initialize(config).has_value());
+    kataglyphis::test::EventCounter errors;
+    pipeline.set_error_callback([&](detection::OnnxError error) {
+        EXPECT_EQ(error, detection::OnnxError::InvalidInputType);
+        errors.add();
+    });
+    ASSERT_TRUE(pipeline.start().has_value());
+    EXPECT_TRUE(errors.wait_for(2, kataglyphis::test::kStreamTimeout));
+    EXPECT_TRUE(pipeline.stop().has_value());
+    EXPECT_EQ(pipeline.last_error(), detection::OnnxError::InvalidInputType);
+}
+
+TEST(FramePreprocessing, ReadsPaddedRgbRowsAndNormalisesIntoSeparateChannels)
+{
+    gstreamer::BufferInfo frame;
+    frame.metadata.width = 2;
+    frame.metadata.height = 2;
+    frame.metadata.format = "RGB";
+    frame.metadata.row_stride_bytes = 8;
+    frame.metadata.plane_offset_bytes = 3;
+    const std::vector<unsigned char> bytes{ 9, 9, 9, 255, 0, 0, 0, 255, 0, 9, 9, 0, 0, 255, 255, 255, 255 };
+    for (const auto value : bytes) { frame.data.push_back(static_cast<std::byte>(value)); }
+    frame.size = frame.data.size();
+    const auto result = detection::preprocess_frame(frame, 2, 2);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->data, (std::vector<float>{ 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1 }));
+    frame.metadata.row_stride_bytes = 5;
+    EXPECT_EQ(
+      kataglyphis::test::error_of(detection::preprocess_frame(frame, 2, 2)), detection::OnnxError::InvalidInputShape);
+    frame.metadata.row_stride_bytes = 8;
+    frame.size--;
+    EXPECT_EQ(
+      kataglyphis::test::error_of(detection::preprocess_frame(frame, 2, 2)), detection::OnnxError::InvalidInputShape);
+}
+
+TEST(FramePreprocessing, MatchesTheSharedModelAntContract)
+{
+    const auto contract = nlohmann::json::parse(kInferenceContract, nullptr, false);
+    ASSERT_FALSE(contract.is_discarded());
+    ASSERT_EQ(contract["schema_version"], 1);
+    for (const auto &item : contract["cases"]) {
+        SCOPED_TRACE(item["name"].get<std::string>());
+        gstreamer::BufferInfo frame;
+        frame.metadata.width = item["width"].get<std::uint32_t>();
+        frame.metadata.height = item["height"].get<std::uint32_t>();
+        frame.metadata.format = item["pixel_format"].get<std::string>();
+        frame.metadata.row_stride_bytes = item["row_stride_bytes"].get<std::int64_t>();
+        frame.metadata.plane_offset_bytes = item["plane_offset_bytes"].get<std::size_t>();
+        for (const auto value : item["data"].get<std::vector<unsigned char>>()) {
+            frame.data.push_back(static_cast<std::byte>(value));
+        }
+        frame.size = frame.data.size();
+        const auto mode = item["mode"] == "letterbox" ? detection::FramePreprocessMode::Letterbox
+                                                      : detection::FramePreprocessMode::Stretch;
+        const auto result = detection::preprocess_frame(
+          frame, item["input_width"].get<std::uint32_t>(), item["input_height"].get<std::uint32_t>(), mode);
+        ASSERT_TRUE(result.has_value());
+        const auto expected = item["expected_nchw"].get<std::vector<float>>();
+        ASSERT_EQ(result->data.size(), expected.size());
+        for (std::size_t i = 0; i < expected.size(); ++i) { EXPECT_NEAR(result->data[i], expected[i], 1e-6F) << i; }
+        EXPECT_NEAR(result->mapping.scale_x, item["mapping"]["scale_x"].get<float>(), 1e-6F);
+        EXPECT_NEAR(result->mapping.scale_y, item["mapping"]["scale_y"].get<float>(), 1e-6F);
+        EXPECT_FLOAT_EQ(result->mapping.pad_x, item["mapping"]["pad_x"].get<float>());
+        EXPECT_FLOAT_EQ(result->mapping.pad_y, item["mapping"]["pad_y"].get<float>());
+    }
+}
+
+TEST(FramePreprocessing, LetterboxesRgbaAndReturnsTheActualPixelMapping)
+{
+    gstreamer::BufferInfo frame;
+    frame.metadata.width = 2;
+    frame.metadata.height = 1;
+    frame.metadata.format = "RGBA";
+    const std::vector<unsigned char> bytes{ 255, 0, 0, 0, 0, 255, 0, 17 };
+    for (const auto value : bytes) { frame.data.push_back(static_cast<std::byte>(value)); }
+    frame.size = frame.data.size();
+    const auto result = detection::preprocess_frame(frame, 4, 4, detection::FramePreprocessMode::Letterbox);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FLOAT_EQ(result->mapping.scale_x, 2.0F);
+    EXPECT_FLOAT_EQ(result->mapping.scale_y, 2.0F);
+    EXPECT_FLOAT_EQ(result->mapping.pad_y, 1.0F);
+    EXPECT_FLOAT_EQ(result->data[0], 114.0F / 255.0F);
+    EXPECT_FLOAT_EQ(result->data[4], 1.0F);
+    EXPECT_FLOAT_EQ(result->data[5], 1.0F);
+    EXPECT_FLOAT_EQ(result->data[6], 0.0F);
+    EXPECT_FLOAT_EQ(result->data[16 + 6], 1.0F);
+    EXPECT_FLOAT_EQ(result->data[32 + 4], 0.0F);
+    frame.metadata.format = "GRAY8";
+    EXPECT_EQ(
+      kataglyphis::test::error_of(detection::preprocess_frame(frame, 4, 4)), detection::OnnxError::InvalidInputType);
 }
 
 TEST(VideoDetectorPipeline, AMovedPipelineStillRunsTheDetector)

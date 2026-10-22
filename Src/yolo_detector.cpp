@@ -5,10 +5,12 @@ module;
 #include <array>
 #include <atomic>
 #include <cmath>
-#include <cstring>
+#include <cstddef>
+#include <cstdio>
 #include <expected>
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <mutex>
 #include <numeric>
 #include <shared_mutex>
@@ -105,18 +107,6 @@ namespace {
         "hair drier",
         "toothbrush" };
 
-    auto copy_buffer_to_float_data(const gstreamer::BufferInfo &buffer) -> std::expected<std::vector<float>, OnnxError>
-    {
-        if (buffer.data.empty()) { return std::unexpected(OnnxError::InputAllocationFailed); }
-        if (buffer.size % sizeof(float) != 0) { return std::unexpected(OnnxError::InvalidInputShape); }
-        if (buffer.data.size() < buffer.size) { return std::unexpected(OnnxError::InputAllocationFailed); }
-
-        const std::size_t num_floats = buffer.size / sizeof(float);
-        std::vector<float> float_data(num_floats);
-        std::memcpy(float_data.data(), buffer.data.data(), buffer.size);
-        return float_data;
-    }
-
     auto build_camera_detection_pipeline_description(const std::string &device,
       std::uint32_t width,
       std::uint32_t height,
@@ -156,6 +146,8 @@ namespace {
     {
         float x;
         float y;
+        float offset_x;
+        float offset_y;
     };
 
     auto labelled_box(float x, float y, float width, float height, float confidence, int class_id) -> BoundingBox
@@ -209,8 +201,8 @@ namespace {
             }
             if (!(final_conf >= config.confidence_threshold) || !std::isfinite(final_conf)) { continue; }
 
-            boxes.push_back(labelled_box((cx - (w / 2.0F)) * scale.x,
-              (cy - (h / 2.0F)) * scale.y,
+            boxes.push_back(labelled_box((cx - (w / 2.0F)) * scale.x - scale.offset_x,
+              (cy - (h / 2.0F)) * scale.y - scale.offset_y,
               w * scale.x,
               h * scale.y,
               final_conf,
@@ -239,8 +231,8 @@ namespace {
         for (std::size_t i = 0; i < rows && (i + 1) * values <= data.size(); ++i) {
             const auto row = data.subspan(i * values, values);
             if (!corner_row_is_usable(row, config)) { continue; }
-            boxes.push_back(labelled_box(row[0] * scale.x,
-              row[1] * scale.y,
+            boxes.push_back(labelled_box(row[0] * scale.x - scale.offset_x,
+              row[1] * scale.y - scale.offset_y,
               (row[2] - row[0]) * scale.x,
               (row[3] - row[1]) * scale.y,
               row[4],
@@ -249,6 +241,60 @@ namespace {
         return boxes;
     }
 }// namespace
+
+auto preprocess_frame(const gstreamer::BufferInfo &buffer,
+  std::uint32_t width,
+  std::uint32_t height,
+  FramePreprocessMode mode) -> std::expected<PreprocessedFrame, OnnxError>
+{
+    const auto &meta = buffer.metadata;
+    if (width == 0 || height == 0 || meta.width == 0 || meta.height == 0 || meta.row_stride_bytes < 0) {
+        return std::unexpected(OnnxError::InvalidInputShape);
+    }
+    const std::size_t channels = meta.format == "RGB" ? 3 : (meta.format == "RGBA" ? 4 : 0);
+    if (channels == 0) { return std::unexpected(OnnxError::InvalidInputType); }
+    const auto max_size = std::numeric_limits<std::size_t>::max();
+    if (meta.width > max_size / channels || width > max_size / height / 3) {
+        return std::unexpected(OnnxError::InvalidInputShape);
+    }
+    const auto row_bytes = static_cast<std::size_t>(meta.width) * channels;
+    const auto stride = meta.row_stride_bytes == 0 ? row_bytes : static_cast<std::size_t>(meta.row_stride_bytes);
+    if (stride < row_bytes || meta.plane_offset_bytes > buffer.size || row_bytes > buffer.size - meta.plane_offset_bytes
+        || buffer.data.size() < buffer.size
+        || static_cast<std::size_t>(meta.height - 1) > (buffer.size - meta.plane_offset_bytes - row_bytes) / stride) {
+        return std::unexpected(OnnxError::InvalidInputShape);
+    }
+    std::uint32_t content_width = width;
+    std::uint32_t content_height = height;
+    if (mode == FramePreprocessMode::Letterbox) {
+        const auto ratio = std::min(static_cast<double>(width) / meta.width, static_cast<double>(height) / meta.height);
+        content_width = std::clamp(static_cast<std::uint32_t>(std::round(meta.width * ratio)), 1U, width);
+        content_height = std::clamp(static_cast<std::uint32_t>(std::round(meta.height * ratio)), 1U, height);
+    }
+    const auto pad_x = (width - content_width) / 2;
+    const auto pad_y = (height - content_height) / 2;
+    const auto plane = static_cast<std::size_t>(width) * height;
+    PreprocessedFrame result;
+    result.mapping = { static_cast<float>(content_width) / meta.width,
+        static_cast<float>(content_height) / meta.height,
+        static_cast<float>(pad_x),
+        static_cast<float>(pad_y) };
+    result.data.assign(3 * plane, mode == FramePreprocessMode::Letterbox ? 114.0F / 255.0F : 0.0F);
+    for (std::uint32_t y = 0; y < content_height; ++y) {
+        const auto source_y = static_cast<std::uint64_t>(y) * meta.height / content_height;
+        for (std::uint32_t x = 0; x < content_width; ++x) {
+            const auto source_x = static_cast<std::uint64_t>(x) * meta.width / content_width;
+            const auto source = meta.plane_offset_bytes + static_cast<std::size_t>(source_y) * stride
+                                + static_cast<std::size_t>(source_x) * channels;
+            const auto destination = static_cast<std::size_t>(y + pad_y) * width + x + pad_x;
+            for (std::size_t channel = 0; channel < 3; ++channel) {
+                result.data[channel * plane + destination] =
+                  std::to_integer<unsigned char>(buffer.data[source + channel]) / 255.0F;
+            }
+        }
+    }
+    return result;
+}
 
 struct YoloDetector::Impl
 {
@@ -271,6 +317,7 @@ auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, O
 {
     const std::unique_lock lock(impl_->mutex);
     impl_->initialized = false;
+    if (config.input_width == 0 || config.input_height == 0) { return std::unexpected(OnnxError::InvalidInputShape); }
     impl_->config = config;
 
     auto session_config = inference::create_default_session_config(config.model_path);
@@ -293,6 +340,7 @@ auto YoloDetector::detect(std::span<const float> image_data, std::uint32_t width
 {
     const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+    if (width == 0 || height == 0) { return std::unexpected(OnnxError::InvalidInputShape); }
 
     inference::TensorShape input_shape;
     input_shape.dimensions = { 1, 3, impl_->config.input_height, impl_->config.input_width };
@@ -301,7 +349,11 @@ auto YoloDetector::detect(std::span<const float> image_data, std::uint32_t width
 
     if (!result) { return std::unexpected(result.error()); }
 
-    return post_process(result.value(), width, height);
+    const FrameMapping mapping{ static_cast<float>(impl_->config.input_width) / width,
+        static_cast<float>(impl_->config.input_height) / height,
+        0.0F,
+        0.0F };
+    return post_process(result.value(), width, height, mapping);
 }
 
 auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline, std::uint32_t timeout_ms)
@@ -312,18 +364,26 @@ auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline,
     auto buffer_result = pipeline.pull_sample(timeout_ms);
     if (!buffer_result) { return std::unexpected(OnnxError::InputAllocationFailed); }
 
-    const auto &buffer_info = buffer_result.value();
-    auto float_data = copy_buffer_to_float_data(buffer_info);
-    if (!float_data) { return std::unexpected(float_data.error()); }
+    return detect_frame(*buffer_result);
+}
 
-    return detect(std::span<const float>(float_data->data(), float_data->size()),
-      buffer_info.metadata.width,
-      buffer_info.metadata.height);
+auto YoloDetector::detect_frame(const gstreamer::BufferInfo &frame) -> std::expected<DetectionResult, OnnxError>
+{
+    const std::shared_lock lock(impl_->mutex);
+    if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+    auto input =
+      preprocess_frame(frame, impl_->config.input_width, impl_->config.input_height, impl_->config.preprocess_mode);
+    if (!input) { return std::unexpected(input.error()); }
+    inference::TensorShape shape{ { 1, 3, impl_->config.input_height, impl_->config.input_width } };
+    auto result = impl_->engine.run_inference(input->data, shape, "images");
+    if (!result) { return std::unexpected(result.error()); }
+    return post_process(*result, frame.metadata.width, frame.metadata.height, input->mapping);
 }
 
 auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
   std::uint32_t original_width,
-  std::uint32_t original_height) -> DetectionResult
+  std::uint32_t original_height,
+  const FrameMapping &mapping) -> DetectionResult
 {
 
     DetectionResult result;
@@ -346,8 +406,9 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
     }
 
     const std::span<const float> data(output.data.data(), output.data.size());
-    const Scale scale{ static_cast<float>(original_width) / static_cast<float>(impl_->config.input_width),
-        static_cast<float>(original_height) / static_cast<float>(impl_->config.input_height) };
+    const Scale scale{
+        1.0F / mapping.scale_x, 1.0F / mapping.scale_y, mapping.pad_x / mapping.scale_x, mapping.pad_y / mapping.scale_y
+    };
     auto all_boxes = impl_->config.output_layout == YoloOutputLayout::CornersScoreClass
                        ? decode_corner_rows(data, num_detections, values_per_detection, impl_->config, scale)
                        : decode_center_rows(data, num_detections, values_per_detection, impl_->config, scale);
@@ -413,8 +474,11 @@ auto YoloDetector::get_coco_class_name(int class_id) -> std::string_view
 struct VideoDetectorPipeline::Impl
 {
     YoloDetector detector;
+    mutable std::mutex callback_mutex;
     std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> detection_callback;
     std::function<void(const gstreamer::BufferInfo &)> frame_callback;
+    std::function<void(OnnxError)> error_callback;
+    std::optional<OnnxError> last_error;
     std::atomic<bool> running{ false };
     VideoDetectionConfig config;
     // Last, so it is destroyed first: its streaming thread calls into every member above.
@@ -422,17 +486,31 @@ struct VideoDetectorPipeline::Impl
 
     void on_frame_received(const gstreamer::BufferInfo &buffer)
     {
-        if (frame_callback) { frame_callback(buffer); }
-
-        if (detector.is_initialized()) {
-            auto float_data = copy_buffer_to_float_data(buffer);
-            if (!float_data) { return; }
-
-            auto detection = detector.detect(std::span<const float>(float_data->data(), float_data->size()),
-              buffer.metadata.width,
-              buffer.metadata.height);
-
-            if (detection && detection_callback) { detection_callback(detection.value(), buffer); }
+        std::function<void(const gstreamer::BufferInfo &)> on_frame;
+        std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> on_detection;
+        {
+            const std::scoped_lock lock(callback_mutex);
+            on_frame = frame_callback;
+            on_detection = detection_callback;
+        }
+        if (on_frame) { on_frame(buffer); }
+        auto detection = detector.detect_frame(buffer);
+        if (detection) {
+            if (on_detection) { on_detection(*detection, buffer); }
+            return;
+        }
+        std::function<void(OnnxError)> on_error;
+        bool changed = false;
+        {
+            const std::scoped_lock lock(callback_mutex);
+            changed = last_error != detection.error();
+            last_error = detection.error();
+            on_error = error_callback;
+        }
+        if (on_error) {
+            on_error(detection.error());
+        } else if (changed) {
+            std::fprintf(stderr, "Video detection failed: %d\n", static_cast<int>(detection.error()));
         }
     }
 };
@@ -468,6 +546,10 @@ auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config) -> st
 
 auto VideoDetectorPipeline::start() -> std::expected<void, gstreamer::GStreamerError>
 {
+    {
+        const std::scoped_lock lock(impl_->callback_mutex);
+        impl_->last_error.reset();
+    }
     auto result = impl_->pipeline.start();
     if (result) { impl_->running.store(true); }
     return result;
@@ -484,10 +566,28 @@ auto VideoDetectorPipeline::pause() -> std::expected<void, gstreamer::GStreamerE
 
 auto VideoDetectorPipeline::set_detection_callback(
   std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> callback) -> void
-{ impl_->detection_callback = std::move(callback); }
+{
+    const std::scoped_lock lock(impl_->callback_mutex);
+    impl_->detection_callback = std::move(callback);
+}
 
 auto VideoDetectorPipeline::set_frame_callback(std::function<void(const gstreamer::BufferInfo &)> callback) -> void
-{ impl_->frame_callback = std::move(callback); }
+{
+    const std::scoped_lock lock(impl_->callback_mutex);
+    impl_->frame_callback = std::move(callback);
+}
+
+auto VideoDetectorPipeline::set_error_callback(std::function<void(OnnxError)> callback) -> void
+{
+    const std::scoped_lock lock(impl_->callback_mutex);
+    impl_->error_callback = std::move(callback);
+}
+
+auto VideoDetectorPipeline::last_error() const -> std::optional<OnnxError>
+{
+    const std::scoped_lock lock(impl_->callback_mutex);
+    return impl_->last_error;
+}
 
 auto VideoDetectorPipeline::is_running() const -> bool { return impl_->running.load(); }
 
@@ -502,8 +602,6 @@ auto create_camera_detection_pipeline(const std::string &device,
     VideoDetectionConfig config;
 
     config.yolo_config.model_path = model_path;
-    config.yolo_config.input_width = width;
-    config.yolo_config.input_height = height;
 
     config.gstreamer_config.pipeline_description =
       build_camera_detection_pipeline_description(device, width, height, fps);
@@ -526,8 +624,6 @@ auto create_video_detection_pipeline(const std::string &video_source,
     VideoDetectionConfig config;
 
     config.yolo_config.model_path = model_path;
-    config.yolo_config.input_width = width;
-    config.yolo_config.input_height = height;
 
     config.gstreamer_config.pipeline_description =
       build_video_detection_pipeline_description(video_source, width, height);

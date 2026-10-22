@@ -55,6 +55,7 @@ A release needs no build:
 | --- | --- |
 | Prerequisites, installing a release, presets, the Rust crate, Python bindings | [Getting Started](https://hardwareacceleratedai.jonasheinle.de/getting_started.html) |
 | Key features, project layout, dependencies, what CI builds with | [Overview](https://hardwareacceleratedai.jonasheinle.de/overview.html) |
+| Frame formats, model contracts and inference errors | [Inference and preprocessing](https://hardwareacceleratedai.jonasheinle.de/inference_preprocessing.html) |
 | The test suites and lanes, profiling, static analysis, useful tools, literature | [Development Workflow](https://hardwareacceleratedai.jonasheinle.de/development_workflow.html) |
 | The Windows container build and the host run | [Windows Workflow](https://hardwareacceleratedai.jonasheinle.de/windows_workflow.html) |
 | The C++ and C API | [API Reference](https://hardwareacceleratedai.jonasheinle.de/api_reference.html) |

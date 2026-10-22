@@ -81,6 +81,10 @@ auto onnx_error_name(kataglyphis::inference::OnnxError error) -> const char *
         return "SessionNotInitialized";
     case OnnxError::OutputNotFound:
         return "OutputNotFound";
+    case OnnxError::InvalidOutputType:
+        return "InvalidOutputType";
+    case OnnxError::InvalidOutputShape:
+        return "InvalidOutputShape";
     }
     return "UnknownError";
 }
@@ -139,7 +143,9 @@ void bind_onnx(nb::module_ &m)
       .value("InvalidInputType", OnnxError::InvalidInputType)
       .value("MemoryAllocationError", OnnxError::MemoryAllocationError)
       .value("SessionNotInitialized", OnnxError::SessionNotInitialized)
-      .value("OutputNotFound", OnnxError::OutputNotFound);
+      .value("OutputNotFound", OnnxError::OutputNotFound)
+      .value("InvalidOutputType", OnnxError::InvalidOutputType)
+      .value("InvalidOutputShape", OnnxError::InvalidOutputShape);
 
     nb::enum_<ExecutionMode>(m, "ExecutionMode")
       .value("Sequential", ExecutionMode::Sequential)
