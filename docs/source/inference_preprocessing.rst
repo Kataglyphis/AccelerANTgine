@@ -51,7 +51,7 @@ by another copy of the backend under test.
 ModelANT owns this contract and its fixture licensing. The ModelANT submodule supplies small
 test data; weights, LICENSE and NOTICE are still fetched through ``models/models.lock``.
 See `ModelANT's contract documentation
-<https://github.com/Kataglyphis/ModelANT/blob/develop/contracts/README.md>`_ and
+<https://github.com/Kataglyphis/ModelANT/blob/7bb8c9f5b4c8a74632c850b0066dc8ec2adf421f/contracts/README.md>`_ and
 `the model download guide <https://github.com/Kataglyphis/AccelerANTgine/blob/develop/models/README.md>`_.
 
 Output and error handling
