@@ -11,14 +11,13 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `scripts/linux/ci-profile-bench.sh`: `bin/AccelerANTgine` streaming `videotestsrc ! … !
   webrtcsink` to the local signalling server ended in SIGSEGV (exit 139); attempt 2 of the
   same commit passed, and the commit only moved `inference_demo.cpp` out of the library. The
-  WebRTC streamer's success path has no test (`Test/commit/webrtc_streamer.cpp` covers its
-  errors), so nothing else would catch a race there. Next: keep a core dump as an artifact
-  when the workload crashes, or run the same workload under ASan in the Debug lane.
+  WebRTC streamer's success path has no test (`Test/commit/webrtc_streamer_test.cpp` covers its
+  errors), so nothing else would catch a race there.
 
-  Status 2026-10-21: the core-dump step is in (`scripts/linux/ci-profile-bench.sh` `capture_crash`:
-  status, core, gdb backtrace of a rerun; `reusable-linux.yml` uploads `crash-evidence-<arch>-<compiler>`
-  on failure). The helper was checked against a self-crashing binary, with and without a core. Still
-  open until a real crash in CI leaves a backtrace; the ASan lane is not started.
+  Crash capture is already wired: `scripts/linux/ci-profile-bench.sh`'s `capture_crash`
+  records the status, core and rerun backtrace; `reusable-linux.yml` uploads the evidence on failure.
+  Remaining: analyze a stack from a real workload crash and exercise the successful
+  start/stream/stop path under Debug ASan; the existing unit tests cover failure paths.
 
 - [ ] **The Python bindings build and test on Linux x64 and arm64 only** (M, ★★). Owner goal
   2026-10-01: every test on every arch, on the pinned CPython once with the GIL and once
