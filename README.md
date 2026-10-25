@@ -27,7 +27,9 @@ API for native embedders, Python bindings and a CLI. It is the inference core th
 builds and tests it on five lanes in the family's container images.
 
 Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan,
-and `--apply` to update. CI checks the wrapper and config; see
+and `--apply` to update. It checks every direct submodule against its remote default branch and
+initializes missing checkouts when applying, including the tooling hub when needed. CI checks the
+wrapper and config; see
 [the shared Renovate guide](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md).
 
 ## Highlights

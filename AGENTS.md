@@ -208,8 +208,12 @@ written out rather than linked.
   bash scripts/linux/renovate-local.sh --apply             # gitlinks, manifests and their locks
   ```
 
-  - Every `.gitmodules` entry declares a `branch =`, so `--apply` moves every
-    gitlink that is behind, `FUZZTEST` included, which may raise the abseil pin's floor (§ 3).
+  - The default run checks every direct `.gitmodules` entry against its remote default branch.
+    `--apply` initializes missing direct checkouts and moves their gitlinks to those exact tips,
+    even when `branch =` names another line. FUZZTEST's release branch remains for the separate
+    branch-sync command; moving its gitlink may raise the abseil pin's floor (§ 3).
+  - The wrapper initializes an absent ANTfrastructure tooling submodule only for a real
+    `--apply`; report and dry-run need it checked out already.
   - The CMake pins come from the hub preset's `custom.regex` managers and are detected by
     the default one-command run; `--managers custom.regex` narrows a run to those pins.
 - **ONNX Runtime is REQUIRED and must be the family's chain build** (owner rule 2026-09-23).

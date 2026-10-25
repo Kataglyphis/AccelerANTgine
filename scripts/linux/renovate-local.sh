@@ -7,9 +7,12 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/antfrastructure.sh
 source "${_SCRIPT_DIR}/lib/antfrastructure.sh"
 
-# Own guard: the likely failure is a gitlink pinned before the driver existed, not a moved file.
+# Keep the stale-pin hint while letting a real apply initialize an absent canonical hub.
 HUB_RENOVATE_RELATIVE="linux/scripts/renovate-local.sh"
-if [ ! -f "${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE}" ]; then
+if [ ! -f "${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE}" ] &&
+   { [ -e "${ANTFRASTRUCTURE_DIR}/.git" ] ||
+     [ "${ANTFRASTRUCTURE_DIR}" != "${KATAGLYPHIS_REPO_ROOT}/third_party/ANTfrastructure" ] ||
+     ! antfrastructure_renovate_will_apply "$@"; }; then
   echo "Error: ${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE} is missing." >&2
   echo "       Either ANTfrastructure is not checked out (git submodule update" >&2
   echo "       --init --recursive third_party/ANTfrastructure), or the pinned" >&2
@@ -18,4 +21,4 @@ if [ ! -f "${ANTFRASTRUCTURE_DIR}/${HUB_RENOVATE_RELATIVE}" ]; then
   exit 1
 fi
 
-antfrastructure_exec "${HUB_RENOVATE_RELATIVE}" "${KATAGLYPHIS_REPO_ROOT}" "$@"
+antfrastructure_renovate_exec "${HUB_RENOVATE_RELATIVE}" "${KATAGLYPHIS_REPO_ROOT}" "$@"

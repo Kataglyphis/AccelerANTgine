@@ -29,6 +29,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- The shared Renovate driver now checks every direct submodule against its remote default branch
+  and initializes missing checkouts when applying. The FUZZTEST release setting remains for
+  the separate branch-sync command. The wrapper can bootstrap an absent tooling hub for a real
+  apply.
 - Verify the Renovate wrapper and shared config in CI; the default local run now includes
   custom CMake pins through the hub driver.
 - Add shared CI quality reports, Ruff/ty analysis, PowerShell lint and complexity reporting,
