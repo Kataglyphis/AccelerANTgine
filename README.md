@@ -61,6 +61,7 @@ A release needs no build:
 | The C++ and C API | [API Reference](https://hardwareacceleratedai.jonasheinle.de/api_reference.html) |
 | Include graphs | [Architecture](https://hardwareacceleratedai.jonasheinle.de/graphviz_files.html) |
 | CI test results and coverage | [Test Results](https://hardwareacceleratedai.jonasheinle.de/test_results.html) |
+| CI quality reports, Ruff/ty, PowerShell checks and refactor previews | [Shared quality tooling](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/code-quality-tooling.md) |
 | The demo's model, fetched by checksum | [models/README.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/models/README.md) |
 | Rules for agents and contributors, dependency upgrades (Renovate) | [AGENTS.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/AGENTS.md) |
 | Known work | [BACKLOG.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/BACKLOG.md) |

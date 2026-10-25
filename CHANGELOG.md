@@ -29,6 +29,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- Add shared CI quality reports, Ruff/ty analysis, PowerShell lint and complexity reporting,
+  and a manual Python refactor preview. Generated reports stay under ignored `logs/`.
 - C++ preprocessing tests consume ModelANT's pinned `contracts/inference-v1.json`, shared with
   the Python and Rust implementations. Model weights remain checksum-pinned release assets.
 - Append `InvalidOutputType` and `InvalidOutputShape` to the ONNX error enum and expose them in
