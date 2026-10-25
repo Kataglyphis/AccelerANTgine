@@ -198,7 +198,7 @@ written out rather than linked.
 - **Dependency upgrades are Renovate as a local CLI, and nothing else**
   ([`dependency-updates.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md):
   why local, run it from WSL, what `--apply` writes, `GITHUB_COM_TOKEN`). This repo has no
-  `.github/dependabot.yml`, so the wrapper is its only dependency watch, and nothing runs it for you.
+  `.github/dependabot.yml`; CI verifies the wrapper and config, while upgrades stay explicit.
 
   ```bash
   bash scripts/linux/renovate-local.sh                     # report (default: every manager this tree has)
@@ -210,8 +210,8 @@ written out rather than linked.
 
   - Every `.gitmodules` entry declares a `branch =`, so `--apply` moves every
     gitlink that is behind, `FUZZTEST` included, which may raise the abseil pin's floor (§ 3).
-  - The CMake pins come from the hub preset's `custom.regex` managers, which tree detection never
-    picks: name them, as above.
+  - The CMake pins come from the hub preset's `custom.regex` managers and are detected by
+    the default one-command run; `--managers custom.regex` narrows a run to those pins.
 - **ONNX Runtime is REQUIRED and must be the family's chain build** (owner rule 2026-09-23).
   `cmake/SystemLibDependencies.cmake` searches exactly one prefix (`-DONNXRUNTIME_ROOT`, else the
   image's `ONNX_ROOT` on Windows or `/usr/local/lib/onnxruntime-cpu` on Linux) and refuses a

@@ -26,6 +26,10 @@ API for native embedders, Python bindings and a CLI. It is the inference core th
 [OmniAccelerANT](https://github.com/Kataglyphis/OmniAccelerANT)'s native plugin links, and CI
 builds and tests it on five lanes in the family's container images.
 
+Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan,
+and `--apply` to update. CI checks the wrapper and config; see
+[the shared Renovate guide](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md).
+
 ## Highlights
 
 - **One library, three surfaces:** a C API for native embedders, Python bindings and a CLI.
