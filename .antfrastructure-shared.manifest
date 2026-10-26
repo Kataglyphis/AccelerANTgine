@@ -32,4 +32,5 @@
 clang-format
 cmake-format
 antfrastructure-sh
+renovate-git-mode-sh
 resolve-build-module

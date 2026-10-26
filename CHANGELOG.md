@@ -20,6 +20,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Use the shared Windows Git helper when Renovate runs in WSL on a Windows checkout; its CRLF
+  `.gitmodules` no longer appears locally edited during hub bootstrap.
 - Convert GStreamer RGB/RGBA bytes to normalized RGB NCHW floats before inference, honoring
   padded rows and plane offsets. Reject invalid buffers, support explicit stretch/letterbox
   mapping, and use the same preprocessing in synchronous and asynchronous detection.
