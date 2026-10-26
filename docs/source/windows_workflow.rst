@@ -136,6 +136,8 @@ CI Note
 CI runs the same script, but not through ``Invoke-ContainerBuild.ps1``: both Windows lanes call
 ANTfrastructure's reusable ``container-ci-windows.yml``, which bind-mounts the checkout
 (``D:\ws`` on the runner, ``C:\ws`` in the container) and runs ``Build-Windows.ps1`` there. The
+callers request direct submodules; the build needs no nested documentation tree, whose recursive
+checkout can cycle through ANTfrastructure and DocumANTation. The
 x64 lane then runs ``Start-Windows.ps1 -Config Debug|Profile|Release`` on the runner host, which
 has the desktop the container lacks; the arm64 cross build runs on GitHub's ``windows-11-arm``
 runner. Both lanes, their targets, artifacts and side jobs: ``AGENTS.md`` § 5.

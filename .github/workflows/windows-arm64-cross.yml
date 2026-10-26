@@ -20,6 +20,7 @@ jobs:
     uses: Kataglyphis/ANTfrastructure/.github/workflows/container-ci-windows.yml@develop
     with:
       target-arch: arm64
+      submodules: 'true'
       build-script: scripts/windows/Build-Windows.ps1
       # Format is the x64 lane's: it reads the source, not the target.
       build-args: |

@@ -452,6 +452,8 @@ platform + arch, display names `<Platform> <Arch> · <what>`. They are `linux-x6
 `lint-powershell` job over `scripts/` with the hub's `Invoke-Lint.ps1`, and a `pester-tests` job
 over `scripts/windows/tests/` plus the hub's `shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1`), `windows-arm64-cross.yml`, `linux-riscv64.yml`, `lint-gates.yml`
 and `submodule-pins.yml`.
+Both Windows container callers request `submodules: 'true'`: their build inputs are direct
+submodules, while a recursive checkout follows ANTfrastructure's documentation cycle.
 
 - **A push or PR runs Linux x64 and the gates; the other four platform lanes run on request**: the
   family's rule (owner, 2026-10-15), with the tokens, the hand start and the merge into `main`, is

@@ -20,6 +20,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Keep Windows x64 and arm64 container checkouts at direct submodules so the shared hub's
+  nested documentation cycle cannot fail the build before it starts.
 - Stage Windows GStreamer DLLs once through ANTfrastructure's media closure, including the
   image's `C:\runtime\bin`; the shared module keeps ONNX Runtime and DirectML bytes tied to the
   chain build, while missing GStreamer still emits a warning.
