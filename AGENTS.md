@@ -235,6 +235,10 @@ written out rather than linked.
   `onnxruntime.dll` beside the exe (or in the package's `_libs`), and no ORT-family DLL that the
   chain ORT or GenAI install has not got. `Build-Windows.ps1` and `Build-PythonBindings.ps1` stop,
   naming the hub commit, while the pinned hub predates that module.
+- **Windows media DLL staging has one owner.** Each clang build calls the hub's
+  `Copy-MediaRuntimeBundle -GStreamerRoot 'C:\runtime\bin'`; do not add a second local DLL
+  copier after it. Warn when the selected GStreamer bin is missing. The local helper stages only
+  GStreamer test plugins. DirectML must come from the chain ONNX Runtime install.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
   `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`, `linux-debug-clang-tsan`, and on
   Windows `x64-ClangCL-Windows-{Debug,RelWithDebInfo,Profile,Release}` plus

@@ -102,21 +102,13 @@ function Copy-AppLocalVcRuntime {
     Write-BuildLog -Context $Context -Message "App-local VC++ runtime: $($crt.Count) DLL(s) from $($crt[0].DirectoryName) -> $($Destination -join ', ')"
 }
 
-# Copy-MediaRuntimeBundle misses the image's C:\runtime\bin; ORT-family DLLs stay the chain staging's alone.
-function Copy-ImageGStreamerRuntime {
-    param(
-        [Parameter(Mandatory)][pscustomobject]$Context,
-        [Parameter(Mandatory)][string]$Destination
-    )
+# The shared bundler permits ORT-only builds, so this consumer keeps its missing-GStreamer hint.
+function Write-MissingGStreamerBinWarning {
+    param([Parameter(Mandatory)][pscustomobject]$Context)
     $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
     if (-not (Test-Path -LiteralPath $gstBin -PathType Container)) {
         Write-BuildLogWarning -Context $Context -Message "GStreamer bin not found ($gstBin); host runs of this tree lack GStreamer."
-        return
     }
-    $dlls = @(Get-ChildItem -LiteralPath $gstBin -Filter '*.dll' -File |
-        Where-Object { $_.Name -notlike 'onnxruntime*' -and $_.Name -ne 'DirectML.dll' })
-    foreach ($dll in $dlls) { Copy-Item -LiteralPath $dll.FullName -Destination $Destination -Force }
-    Write-BuildLog -Context $Context -Message "Image GStreamer runtime: $($dlls.Count) DLL(s) from $gstBin (ORT family excluded) -> $Destination"
 }
 
 # GStreamer looks for plugins in <dir of gstreamer-1.0-0.dll, minus a trailing bin>\lib\gstreamer-1.0; build\bin holds that DLL.
@@ -284,8 +276,8 @@ try {
             } finally { Pop-Location }
 
             # $null =: the returned DLL count would otherwise land in the step's output stream.
-            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin")
-            Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildClangFull "bin")
+            Write-MissingGStreamerBinWarning -Context $Context
+            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin") -GStreamerRoot 'C:\runtime\bin'
             Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildClangFull
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildClangFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
@@ -386,8 +378,8 @@ try {
             } finally { Pop-Location }
 
             # $null =: the returned DLL count would otherwise land in the step's output stream.
-            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin")
-            Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildProfileFull "bin")
+            Write-MissingGStreamerBinWarning -Context $Context
+            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin") -GStreamerRoot 'C:\runtime\bin'
             Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildProfileFull
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildProfileFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildProfileFull "bin"), $fastBuildProfileFull)
@@ -448,8 +440,8 @@ try {
             } finally { Pop-Location }
 
             # $null =: the returned DLL count would otherwise land in the step's output stream.
-            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin")
-            Copy-ImageGStreamerRuntime -Context $Context -Destination (Join-Path $fastBuildReleaseDirFull "bin")
+            Write-MissingGStreamerBinWarning -Context $Context
+            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin") -GStreamerRoot 'C:\runtime\bin'
             $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildReleaseDirFull "bin")
             Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildReleaseDirFull "bin"), $fastBuildReleaseDirFull)
             # Everything the engine imports transitively that a clean machine lacks.

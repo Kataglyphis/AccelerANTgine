@@ -20,6 +20,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Stage Windows GStreamer DLLs once through ANTfrastructure's media closure, including the
+  image's `C:\runtime\bin`; the shared module keeps ONNX Runtime and DirectML bytes tied to the
+  chain build, while missing GStreamer still emits a warning.
 - Use the shared Windows Git helper when Renovate runs in WSL on a Windows checkout; its CRLF
   `.gitmodules` no longer appears locally edited during hub bootstrap.
 - Convert GStreamer RGB/RGBA bytes to normalized RGB NCHW floats before inference, honoring

@@ -122,6 +122,14 @@ Build Script Responsibilities
   ``*.pfx`` at the repository root and ``MSIX_PFX_PASSWORD`` when there is one,
   and unsigned with a warning otherwise
 
+All three clang configurations call ANTfrastructure's ``Copy-MediaRuntimeBundle``
+with ``C:\runtime\bin`` as an extra GStreamer root. The hub also considers
+``GSTREAMER_BIN`` and refuses ONNX Runtime DLLs outside the chain install.
+It also refuses ``DirectML.dll`` from a non-chain runtime root. A missing
+GStreamer bin emits a warning; a host build can continue with chain ONNX Runtime.
+The local ``Copy-ImageGStreamerTestPlugins`` stages only test plugins under
+``lib\gstreamer-1.0``.
+
 CI Note
 -------
 
