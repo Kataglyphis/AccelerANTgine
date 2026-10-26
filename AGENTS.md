@@ -2,6 +2,14 @@
 
 Guidance for coding agents (and new contributors) working in AccelerANTgine.
 
+**Reuse before adding Bash or PowerShell code.** Search this repository and every direct
+submodule, including `third_party/ANTfrastructure`, for an existing implementation. Call or
+extend its canonical owner, passing project-specific values as arguments. For new behavior
+needed by multiple consumers, create or extend one shared owner module and call it here.
+Keep unique product logic in this repository.
+Both Windows container wrappers pass root-only exclusions to the shared runner; never
+enumerate inbound files privately or use recursive tar exclusions for those root names.
+
 Laid out per ANTfrastructure's
 [`shared/templates/AGENTS.md.template`](third_party/ANTfrastructure/shared/templates/AGENTS.md.template).
 The rule that shapes it: *would this still be true in a different project?* If
@@ -57,7 +65,7 @@ reorganisation.
 
 | Script | Upstream driver |
 | --- | --- |
-| `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism); without the hub it stops, with no fallback of its own |
+| `scripts/linux/ci-common.sh` | sources `linux/scripts/01-core/` (logging, retry, downloads, parallelism) and `linux/scripts/lib/cli-value-options.sh`; without the hub it stops, with no fallback of its own |
 | `scripts/linux/ci-coverage.sh` | `linux/scripts/lib/coverage.sh`: gcovr for GCC, llvm-cov for clang |
 | `scripts/linux/run-static-analysis-format.sh` | `linux/scripts/lib/code-quality.sh`; every analysis runs through `01-core/gates.sh` (`run_gate` … `assert_gates`) with its tools `require_tools`'d, never skipped: no tool, no green lane (the file header names the rule and its owner) |
 | `scripts/linux/ci-build-and-test.sh` | `linux/scripts/lib/cmake-build.sh` + `linux/scripts/lib/ctest-run.sh` |
@@ -235,10 +243,11 @@ written out rather than linked.
   `onnxruntime.dll` beside the exe (or in the package's `_libs`), and no ORT-family DLL that the
   chain ORT or GenAI install has not got. `Build-Windows.ps1` and `Build-PythonBindings.ps1` stop,
   naming the hub commit, while the pinned hub predates that module.
-- **Windows media DLL staging has one owner.** Each clang build calls the hub's
-  `Copy-MediaRuntimeBundle -GStreamerRoot 'C:\runtime\bin'`; do not add a second local DLL
-  copier after it. Warn when the selected GStreamer bin is missing. The local helper stages only
-  GStreamer test plugins. DirectML must come from the chain ONNX Runtime install.
+- **Windows media DLL staging has one owner.** Each clang build calls local
+  `Copy-BuildMediaRuntime`, which calls the hub's `Copy-MediaRuntimeBundle` with
+  `-GStreamerRoot 'C:\runtime\bin'`; do not add a second DLL copier after it. Debug and Profile
+  stage test plugins and ORT beside their root suites; Release does neither. Warn when the
+  selected GStreamer bin is missing. DirectML must come from the chain ONNX Runtime install.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
   `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`, `linux-debug-clang-tsan`, and on
   Windows `x64-ClangCL-Windows-{Debug,RelWithDebInfo,Profile,Release}` plus
@@ -417,6 +426,10 @@ runs `ci-init.sh` → `ci-build-and-test.sh` → `ci-coverage.sh` →
 `run-static-analysis-format.sh` → `ci-profile-bench.sh` → `ci-python-bindings.sh`
 (clang only) → `ci-docs.sh` → `ci-release.sh` → `ci-finalize.sh`. Each runs on its own with the
 arguments `ci-run-all.sh` passes it.
+Eight entry scripts share `ci_parse_value_options` in `ci-common.sh`, backed by ANTfrastructure's
+`parse_cli_value_options`. Keep each lane's accepted flags, defaults and last-value-wins order;
+unknown flags and a missing value must fail before a product build starts. The Linux lint lane
+runs `scripts/linux/tests/test-ci-value-options.sh` over all eight modes and broken-map mutants.
 
 **The pre-commit hook** installs from `requirements.txt` into a `uv` venv; the commands are in
 `docs/source/development_workflow.rst` § *Static Analysis And Formatting*.

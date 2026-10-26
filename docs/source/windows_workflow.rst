@@ -18,6 +18,9 @@ reusable container:
 - **Transport:** the sources travel by tar-pipe to the family workspace path ``C:\ws``. Bind
   mounting is the measured-slower opt-in (``-UseBindMount``); ``-FreshContainer`` discards the
   reused build tree.
+- **Source selection:** both container wrappers pass exact and wildcard root exclusions to
+  ANTfrastructure's runner. It selects top-level names without dropping a nested ``build``
+  directory, and fails before Docker if no source entry remains.
 - **Resources:** ``--isolation process`` gives the container every host CPU;
   ``-CpuCount``/``-MemoryGb`` apply only under ``-Isolation hyperv``.
 - **Targets:** ``clangcl-debug``, ``clangcl-profile`` and ``clangcl-release``.
@@ -122,8 +125,11 @@ Build Script Responsibilities
   ``*.pfx`` at the repository root and ``MSIX_PFX_PASSWORD`` when there is one,
   and unsigned with a warning otherwise
 
-All three clang configurations call ANTfrastructure's ``Copy-MediaRuntimeBundle``
-with ``C:\runtime\bin`` as an extra GStreamer root. The hub also considers
+All three clang configurations call local ``Copy-BuildMediaRuntime``, which calls
+ANTfrastructure's ``Copy-MediaRuntimeBundle`` with ``C:\runtime\bin`` as an extra
+GStreamer root. Debug and Profile also stage test plugins and put chain ONNX Runtime
+beside their root-level test suites; Release keeps its package-oriented layout.
+The hub also considers
 ``GSTREAMER_BIN`` and refuses ONNX Runtime DLLs outside the chain install.
 It also refuses ``DirectML.dll`` from a non-chain runtime root. A missing
 GStreamer bin emits a warning; a host build can continue with chain ONNX Runtime.

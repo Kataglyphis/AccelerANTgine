@@ -24,29 +24,7 @@ RELEASE_FLATPAK="1"
 RELEASE_APPIMAGE_OUT_DIR=""
 RELEASE_FLATPAK_OUT_DIR=""
 
-while [[ $# -gt 0 ]]; do
-	case "$1" in
-		--compiler) COMPILER="${2:-}"; shift 2 ;;
-		--runner) RUNNER="${2:-}"; shift 2 ;;
-		--arch) MATRIX_ARCH="${2:-}"; shift 2 ;;
-		--build-type) BUILD_TYPE="${2:-}"; shift 2 ;;
-		--build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
-		--build-release-dir) BUILD_RELEASE_DIR="${2:-}"; shift 2 ;;
-		--gcc-debug-preset) GCC_DEBUG_PRESET="${2:-}"; shift 2 ;;
-		--clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
-		--gcc-profile-preset) GCC_PROFILE_PRESET="${2:-}"; shift 2 ;;
-		--clang-profile-preset) CLANG_PROFILE_PRESET="${2:-}"; shift 2 ;;
-		--clang-release-preset) CLANG_RELEASE_PRESET="${2:-}"; shift 2 ;;
-		--coverage-json) COVERAGE_JSON="${2:-}"; shift 2 ;;
-		--docs-out) DOCS_OUT="${2:-}"; shift 2 ;;
-		--release-callgrind) RELEASE_CALLGRIND="${2:-}"; shift 2 ;;
-		--release-appimage) RELEASE_APPIMAGE="${2:-}"; shift 2 ;;
-		--release-flatpak) RELEASE_FLATPAK="${2:-}"; shift 2 ;;
-		--release-appimage-out-dir) RELEASE_APPIMAGE_OUT_DIR="${2:-}"; shift 2 ;;
-		--release-flatpak-out-dir) RELEASE_FLATPAK_OUT_DIR="${2:-}"; shift 2 ;;
-		*) die "Unknown argument: $1" ;;
-	esac
-done
+ci_parse_value_options run-all "$@"
 
 info "=== CI Run All ==="
 info "Compiler: ${COMPILER}  Runner: ${RUNNER}  Arch: ${MATRIX_ARCH}"

@@ -10,15 +10,7 @@ COMPILER="clang"
 RUNNER="ubuntu-26.04"
 MATRIX_ARCH="x64"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
-    --compiler) COMPILER="${2:-}"; shift 2 ;;
-    --runner) RUNNER="${2:-}"; shift 2 ;;
-    --arch) MATRIX_ARCH="${2:-}"; shift 2 ;;
-    *) die "Unknown argument: $1" ;;
-  esac
-done
+ci_parse_value_options init "$@"
 
 # No safe.directory here: the build and ctest libraries register it for the real workspace.
 

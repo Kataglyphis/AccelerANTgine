@@ -20,6 +20,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Use ANTfrastructure's shared value-option parser in eight Linux CI entry scripts; one local
+  option map preserves each lane's flags and defaults, and a lint job tests it before builds.
+- Share one Windows media-runtime staging sequence across Debug, Profile and Release while
+  retaining the test-only plugin and ORT placement in Debug and Profile.
+- Route both Windows container wrappers' root source exclusions through ANTfrastructure's
+  shared selector, preserving their exact and wildcard build-output skips.
 - Keep Windows x64 and arm64 container checkouts at direct submodules so the shared hub's
   nested documentation cycle cannot fail the build before it starts.
 - Stage Windows GStreamer DLLs once through ANTfrastructure's media closure, including the

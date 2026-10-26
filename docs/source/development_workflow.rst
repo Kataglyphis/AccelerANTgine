@@ -127,6 +127,21 @@ In the family image:
 Coverage
 ^^^^^^^^
 
+Eight Linux CI entry scripts for build/test, coverage, docs, initialization, profiling, Python
+bindings, finalization and the full chain share the value-option parser in ``ci-common.sh``.
+It calls ANTfrastructure's ``parse_cli_value_options`` and keeps each script's own accepted
+options and defaults. Repeated options still use the last value, unknown options still fail,
+and a missing value now names its
+flag instead of producing Bash's ``shift`` error. The standalone regression runs before builds
+in the Linux lint workflow and writes its CI log under ignored ``logs/test-results/``:
+
+.. code-block:: bash
+
+   bash scripts/linux/tests/test-ci-value-options.sh
+
+The test covers each option map, argument boundaries, default retention, caller wiring and
+broken-map mutants. It does not execute CMake, test binaries or package creation.
+
 ``scripts/linux/ci-coverage.sh`` reports llvm-cov on the clang lane (over
 ``lib/libAccelerANTgine.so``) and gcovr on the GCC lane, where
 ``linux-debug-GNU`` now builds with ``myproject_ENABLE_COVERAGE``. The HTML lands

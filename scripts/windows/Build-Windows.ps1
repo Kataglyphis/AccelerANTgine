@@ -137,6 +137,23 @@ function Copy-ImageGStreamerTestPlugins {
     Write-BuildLog -Context $Context -Message "GStreamer test plugins: $($copied -join ', ') -> $destination"
 }
 
+function Copy-BuildMediaRuntime {
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Context,
+        [Parameter(Mandatory)][string]$BuildRoot,
+        [switch]$StageTestPlugins,
+        [switch]$CopyOrtBeside
+    )
+    $bin = Join-Path $BuildRoot 'bin'
+    Write-MissingGStreamerBinWarning -Context $Context
+    $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir $bin -GStreamerRoot 'C:\runtime\bin'
+    if ($StageTestPlugins) { Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $BuildRoot }
+    $null = Assert-ChainOrtTree -Root $bin
+    Copy-AppLocalVcRuntime -Context $Context -Destination @($bin, $BuildRoot)
+    # Suites at the build root must load the chain ORT before Windows ML's System32 copy.
+    if ($CopyOrtBeside) { $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $BuildRoot }
+}
+
 $FastBuildDir = Get-OrDefault $FastBuildDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.FastBuildDir')
 $LogDir = Get-OrDefault $LogDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.LogDir')
 
@@ -275,14 +292,7 @@ try {
                         @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
 
-            # $null =: the returned DLL count would otherwise land in the step's output stream.
-            Write-MissingGStreamerBinWarning -Context $Context
-            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildClangFull "bin") -GStreamerRoot 'C:\runtime\bin'
-            Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildClangFull
-            $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildClangFull "bin")
-            Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildClangFull "bin"), $fastBuildClangFull)
-            # The suites sit at the build root, where a desktop host's loader finds Windows ML's onnxruntime.dll (System32) before bin\.
-            $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $fastBuildClangFull
+            Copy-BuildMediaRuntime -Context $Context -BuildRoot $fastBuildClangFull -StageTestPlugins -CopyOrtBeside
         }
 
         # A cross build stages the instrumented suite for the arm64 runner instead: the container cannot execute it.
@@ -377,14 +387,7 @@ try {
                     -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
             } finally { Pop-Location }
 
-            # $null =: the returned DLL count would otherwise land in the step's output stream.
-            Write-MissingGStreamerBinWarning -Context $Context
-            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildProfileFull "bin") -GStreamerRoot 'C:\runtime\bin'
-            Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $fastBuildProfileFull
-            $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildProfileFull "bin")
-            Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildProfileFull "bin"), $fastBuildProfileFull)
-            # The suites sit at the build root, where a desktop host's loader finds Windows ML's onnxruntime.dll (System32) before bin\.
-            $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $fastBuildProfileFull
+            Copy-BuildMediaRuntime -Context $Context -BuildRoot $fastBuildProfileFull -StageTestPlugins -CopyOrtBeside
         }
 
         Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
@@ -439,11 +442,7 @@ try {
                         @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
 
-            # $null =: the returned DLL count would otherwise land in the step's output stream.
-            Write-MissingGStreamerBinWarning -Context $Context
-            $null = Copy-MediaRuntimeBundle -Context $Context -TargetDir (Join-Path $fastBuildReleaseDirFull "bin") -GStreamerRoot 'C:\runtime\bin'
-            $null = Assert-ChainOrtTree -Root (Join-Path $fastBuildReleaseDirFull "bin")
-            Copy-AppLocalVcRuntime -Context $Context -Destination @((Join-Path $fastBuildReleaseDirFull "bin"), $fastBuildReleaseDirFull)
+            Copy-BuildMediaRuntime -Context $Context -BuildRoot $fastBuildReleaseDirFull
             # Everything the engine imports transitively that a clean machine lacks.
             New-Item -ItemType Directory -Force -Path $packageDlls | Out-Null
             $engine = @('AccelerANTgine.exe', 'AccelerANTgine.dll') | ForEach-Object { Join-Path $fastBuildReleaseDirFull "bin\$_" }
@@ -472,8 +471,7 @@ try {
         if ($StageTests) {
             Invoke-BuildStep -Context $Context -StepName "Stage Tests ($TargetArch)" -Critical -Script {
                 $tests = Join-Path $Workspace "dist\windows-$packageArch-tests"
-                if (Test-Path $tests) { Remove-Item -LiteralPath $tests -Recurse -Force }
-                New-Item -ItemType Directory -Force -Path $tests | Out-Null
+                Initialize-BuildDirectory -Path $tests -Empty
                 # The fuzz suite runs in FuzzTest's unit mode (a gtest binary); the benchmarks count by exit code, kept short.
                 $manifest = @(
                     @{ exe = 'commitTestSuite.exe'; kind = 'gtest' }

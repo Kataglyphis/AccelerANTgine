@@ -42,15 +42,10 @@ $buildCommand = {
     )
 }.GetNewClosure()
 
-# Root build dirs leave the list, not a pattern (bsdtar matches everywhere); raw enumeration dodges WhatIf records.
-$inboundItems = @([System.IO.Directory]::GetFileSystemEntries($ProjectRoot) |
-    ForEach-Object { [System.IO.Path]::GetFileName($_) } |
-    Where-Object { $_ -notin @("logs", "dist") -and $_ -notlike "build" -and $_ -notlike "build-*" -and $_ -notlike "build_*" })
-
 # Not Invoke-ContainerBuild.ps1's container (the two lanes must never race); no VerifyDirs, nothing to deliver-check.
 & $runner -RepoRoot $ProjectRoot -ContainerName "accelerantgine-python-persistent" `
     -BuildCommand $buildCommand -Image $Image -DockerExe $DockerExe -Isolation $Isolation -CpuCount $CpuCount -MemoryGb $MemoryGb `
-    -InboundItems $inboundItems -InboundExclude @(".git") `
+    -ExcludeRootEntries @("logs", "dist") -ExcludeRootPatterns @("build", "build-*", "build_*") -InboundExclude @(".git") `
     -OutputDirs @("build-python") `
     -UseBindMount:$UseBindMount -FreshContainer:$FreshContainer -WhatIf:$WhatIfPreference
 

@@ -15,15 +15,7 @@ COMPILER="clang"
 RUNNER="ubuntu-26.04"
 DOCS_OUT="build/build/html"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
-    --compiler) COMPILER="${2:-}"; shift 2 ;;
-    --runner) RUNNER="${2:-}"; shift 2 ;;
-    --docs-out) DOCS_OUT="${2:-}"; shift 2 ;;
-    *) die "Unknown argument: $1" ;;
-  esac
-done
+ci_parse_value_options docs "$@"
 
 if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   info "Building documentation"

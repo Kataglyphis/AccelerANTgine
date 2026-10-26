@@ -10,12 +10,7 @@ antfrastructure_source linux/scripts/01-core/bind-mount-ownership.sh
 
 WORKSPACE_DIR="$(pwd)"
 
-while [[ $# -gt 0 ]]; do
-	case "$1" in
-		--workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
-		*) die "Unknown argument: $1" ;;
-	esac
-done
+ci_parse_value_options finalize "$@"
 
 # The container's uid differs from the host user's, so without this the host cannot clean docs/.
 fix_bind_mount_ownership "${WORKSPACE_DIR}/docs" "${WORKSPACE_DIR}"

@@ -21,20 +21,7 @@ TSAN_BUILD_DIR="build_tsan"
 # Empty means <build-dir>/profraw; ci-coverage.sh must read the same directory.
 PROFRAW_DIR=""
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
-    --compiler) COMPILER="${2:-}"; shift 2 ;;
-    --build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
-    --build-type) BUILD_TYPE="${2:-}"; shift 2 ;;
-    --gcc-debug-preset) GCC_DEBUG_PRESET="${2:-}"; shift 2 ;;
-    --clang-debug-preset) CLANG_DEBUG_PRESET="${2:-}"; shift 2 ;;
-    --clang-tsan-preset) CLANG_TSAN_PRESET="${2:-}"; shift 2 ;;
-    --tsan-build-dir) TSAN_BUILD_DIR="${2:-}"; shift 2 ;;
-    --profraw-dir) PROFRAW_DIR="${2:-}"; shift 2 ;;
-    *) die "Unknown argument: $1" ;;
-  esac
-done
+ci_parse_value_options build-and-test "$@"
 PROFRAW_DIR="${PROFRAW_DIR:-${BUILD_DIR}/profraw}"
 
 case "${COMPILER}" in

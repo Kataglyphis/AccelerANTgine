@@ -4,26 +4,46 @@
 Describe 'Windows media runtime reuse' {
     . (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1')
     Import-BuildModule 'WindowsMediaRuntime.Common'
+    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function Get-TestScriptAst -ErrorAction Stop
 
-    It 'passes the image runtime root to the shared bundler in every clang build' {
-        $tokens = $null
-        $errors = $null
-        $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot '..\Build-Windows.ps1'), [ref]$tokens, [ref]$errors)
-        @($errors | Where-Object { $_ }).Count | Should Be 0
+    It 'stages the shared runtime through one helper for all three build roots' {
+        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
         $calls = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Copy-MediaRuntimeBundle' }, $true))
-        $calls.Count | Should Be 3
-        foreach ($call in $calls) {
-            ($call.Extent.Text -match "-GStreamerRoot 'C:\\runtime\\bin'") | Should Be $true
-        }
+        $calls.Count | Should Be 1
+        ($calls[0].Extent.Text -match "-GStreamerRoot 'C:\\runtime\\bin'") | Should Be $true
+        $buildCalls = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Copy-BuildMediaRuntime' }, $true))
+        $buildCalls.Count | Should Be 3
+        @($buildCalls | Where-Object { $_.Extent.Text -match '-StageTestPlugins\s+-CopyOrtBeside' }).Count | Should Be 2
+        @($buildCalls | Where-Object { $_.Extent.Text -match '\$fastBuildReleaseDirFull' -and $_.Extent.Text -notmatch '-StageTestPlugins|-CopyOrtBeside' }).Count | Should Be 1
         @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Copy-ImageGStreamerRuntime' }, $true)).Count | Should Be 0
-        @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Write-MissingGStreamerBinWarning' }, $true)).Count | Should Be 3
+        @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Write-MissingGStreamerBinWarning' }, $true)).Count | Should Be 1
+    }
+
+    It 'keeps debug-only plugin and ORT staging out of Release while preserving call order' {
+        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
+        $definitions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Copy-BuildMediaRuntime' }, $true))
+        $definitions.Count | Should Be 1
+        . ([scriptblock]::Create($definitions[0].Extent.Text))
+        $calls = [Collections.Generic.List[string]]::new()
+        function Write-MissingGStreamerBinWarning { param($Context) $calls.Add('warning') }
+        function Copy-MediaRuntimeBundle { param($Context, $TargetDir, $GStreamerRoot) $calls.Add('bundle'); return 7 }
+        function Copy-ImageGStreamerTestPlugins { param($Context, $BuildRoot) $calls.Add('plugins') }
+        function Assert-ChainOrtTree { param($Root) $calls.Add('ort-proof'); return 9 }
+        function Copy-AppLocalVcRuntime { param($Context, $Destination) $calls.Add('crt') }
+        function Copy-ChainOrtBeside { param($OnnxRoot, $Destination) $calls.Add('ort-beside'); return 11 }
+        $context = [pscustomobject]@{}
+        $root = Join-Path $TestDrive 'runtime'
+        $output = @(Copy-BuildMediaRuntime -Context $context -BuildRoot $root -StageTestPlugins -CopyOrtBeside)
+        $output.Count | Should Be 0
+        ($calls -join ',') | Should Be 'warning,bundle,plugins,ort-proof,crt,ort-beside'
+        $calls.Clear()
+        $output = @(Copy-BuildMediaRuntime -Context $context -BuildRoot $root)
+        $output.Count | Should Be 0
+        ($calls -join ',') | Should Be 'warning,bundle,ort-proof,crt'
     }
 
     It 'warns when the selected GStreamer bin is missing' {
-        $tokens = $null
-        $errors = $null
-        $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot '..\Build-Windows.ps1'), [ref]$tokens, [ref]$errors)
-        @($errors | Where-Object { $_ }).Count | Should Be 0
+        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
         $functions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Write-MissingGStreamerBinWarning' }, $true))
         $functions.Count | Should Be 1
         . ([scriptblock]::Create($functions[0].Extent.Text))

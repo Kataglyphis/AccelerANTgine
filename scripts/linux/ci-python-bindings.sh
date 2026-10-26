@@ -13,16 +13,7 @@ BUILD_ROOT="/tmp/kataglyphis-pywheels"
 PYTHON_VERSION="${PYTHON_MAJOR_MINOR:-$(sed -n 's/^PYTHON_VERSION=\([0-9]*\.[0-9]*\)\..*/\1/p' "$(antfrastructure_path linux/scripts/01-core/versions.env)")}"
 COMPILER="clang"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
-    --out-dir) OUT_DIR="${2:-}"; shift 2 ;;
-    --build-root) BUILD_ROOT="${2:-}"; shift 2 ;;
-    --python-version) PYTHON_VERSION="${2:-}"; shift 2 ;;
-    --compiler) COMPILER="${2:-}"; shift 2 ;;
-    *) die "Unknown argument: $1" ;;
-  esac
-done
+ci_parse_value_options python-bindings "$@"
 
 case "${COMPILER}" in
   clang) CC_BIN="clang"; CXX_BIN="clang++" ;;

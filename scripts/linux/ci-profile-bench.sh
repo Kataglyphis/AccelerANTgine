@@ -26,20 +26,7 @@ PROFILE_BINARY="bin/AccelerANTgine"
 # Without --webrtc the CLI only prints its version; the headless test source streams until stopped.
 PROFILE_ARGS="--webrtc --source test"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --perf-timeout-seconds) PERF_TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
-    --smoke-seconds) SMOKE_SECONDS="${2:-}"; shift 2 ;;
-    --signalling-port) SIGNALLING_PORT="${2:-}"; shift 2 ;;
-    --build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
-    --compiler) COMPILER="${2:-}"; shift 2 ;;
-    --gcc-profile-preset) GCC_PROFILE_PRESET="${2:-}"; shift 2 ;;
-    --clang-profile-preset) CLANG_PROFILE_PRESET="${2:-}"; shift 2 ;;
-    --profile-binary) PROFILE_BINARY="${2:-}"; shift 2 ;;
-    --profile-args) PROFILE_ARGS="${2:-}"; shift 2 ;;
-    *) die "Unknown argument: $1" ;;
-  esac
-done
+ci_parse_value_options profile-bench "$@"
 
 # Deliberate word-splitting: --profile-args is a whole argv tail, not a single token.
 read -r -a PROFILE_ARGS_ARR <<<"${PROFILE_ARGS}"

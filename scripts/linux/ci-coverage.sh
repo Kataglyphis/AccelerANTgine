@@ -16,16 +16,7 @@ COVERAGE_JSON="coverage.json"
 # Must match ci-build-and-test.sh; empty means <build-dir>/profraw there too.
 PROFRAW_DIR=""
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --workspace-dir) WORKSPACE_DIR="${2:-}"; shift 2 ;;
-    --compiler) COMPILER="${2:-}"; shift 2 ;;
-    --build-dir) BUILD_DIR="${2:-}"; shift 2 ;;
-    --coverage-json) COVERAGE_JSON="${2:-}"; shift 2 ;;
-    --profraw-dir) PROFRAW_DIR="${2:-}"; shift 2 ;;
-    *) die "Unknown argument: $1" ;;
-  esac
-done
+ci_parse_value_options coverage "$@"
 PROFRAW_DIR="${PROFRAW_DIR:-${BUILD_DIR}/profraw}"
 
 # Dependencies, _deps trees and the tests themselves are not under measurement.
