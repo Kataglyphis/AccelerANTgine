@@ -249,6 +249,10 @@ Static Analysis And Formatting
 
 One entry point per platform, and CI runs exactly these:
 
+The on-request Windows x64 PowerShell lint job calls ANTfrastructure's reusable
+``powershell-quality.yml`` with analyzer warnings advisory. Its shared bootstrap reads the hub's
+version pin and retries transient PowerShell Gallery failures; parser failures stay fatal.
+
 .. code-block:: bash
 
    bash scripts/linux/run-static-analysis-format.sh

@@ -54,6 +54,8 @@ configure requires its chain ONNX Runtime. On Windows,
 `pwsh -NoProfile -File .\scripts\windows\Invoke-ContainerBuild.ps1` builds in the Windows image.
 Its [Windows workflow](https://hardwareacceleratedai.jonasheinle.de/windows_workflow.html)
 describes the shared container source selection used by both Windows wrappers.
+The Windows x64 lint job calls ANTfrastructure's shared PowerShell quality workflow, which installs
+the pinned analyzer with retries when PowerShell Gallery is temporarily unavailable.
 A release needs no build:
 [Install From A Release](https://hardwareacceleratedai.jonasheinle.de/getting_started.html#install-from-a-release).
 

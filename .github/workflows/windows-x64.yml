@@ -43,27 +43,10 @@ jobs:
   # No -FailOnAnalyzer yet: parse and AST-trap errors fail, PSScriptAnalyzer stays advisory until triaged.
   lint-powershell:
     name: PowerShell lint (scripts)
-    runs-on: windows-2025
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: pwsh
-    steps:
-      # Top-level submodules only: the gate is the hub's Invoke-Lint.ps1.
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: true
-
-      - name: Install PSScriptAnalyzer
-        run: Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
-
-      - name: Lint PowerShell (parse gate + PSScriptAnalyzer)
-        run: >-
-          pwsh -NoProfile -File third_party/ANTfrastructure/windows/scripts/Invoke-Lint.ps1
-          -Path scripts
+    uses: Kataglyphis/ANTfrastructure/.github/workflows/powershell-quality.yml@develop
+    with:
+      lint-path: scripts
+      analyzer-strict: false
 
   pester-tests:
     name: Pester suites (scripts/windows/tests, generated artifacts)

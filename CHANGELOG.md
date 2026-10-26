@@ -20,6 +20,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Route the Windows x64 PowerShell lint job through ANTfrastructure's reusable quality workflow,
+  so the pinned analyzer uses the shared retrying Gallery installer.
 - Use ANTfrastructure's shared value-option parser in eight Linux CI entry scripts; one local
   option map preserves each lane's flags and defaults, and a lint job tests it before builds.
 - Share one Windows media-runtime staging sequence across Debug, Profile and Release while
