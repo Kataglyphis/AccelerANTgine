@@ -69,7 +69,9 @@ auto build_default_level() noexcept -> Level
 
 auto parse_level(std::string_view text) noexcept -> std::optional<Level>
 {
-    static constexpr std::array<Level, 5> kLevels{ Level::Debug, Level::Info, Level::Warning, Level::Error, Level::Off };
+    static constexpr std::array<Level, 5> kLevels{
+        Level::Debug, Level::Info, Level::Warning, Level::Error, Level::Off
+    };
     for (const Level candidate : kLevels) {
         const std::string_view name = level_name(candidate);
         if (std::ranges::equal(text, name, [](char lhs, char rhs) -> bool {
@@ -104,9 +106,7 @@ auto level() noexcept -> Level
 void set_level(Level threshold) noexcept { g_level.store(static_cast<int>(threshold), std::memory_order_release); }
 
 auto enabled(Level message_level) noexcept -> bool
-{
-    return message_level != Level::Off && static_cast<int>(message_level) >= static_cast<int>(level());
-}
+{ return message_level != Level::Off && static_cast<int>(message_level) >= static_cast<int>(level()); }
 
 void set_sink(Sink sink)
 {

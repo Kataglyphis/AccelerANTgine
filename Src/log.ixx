@@ -24,8 +24,7 @@ using Sink = std::function<void(Level, std::string_view)>;
 [[nodiscard]] KATAGLYPHIS_CPP_API auto parse_level(std::string_view text) noexcept -> std::optional<Level>;
 
 /// The level an unset or unparsable ACCELERANTGINE_LOG_LEVEL value resolves to.
-[[nodiscard]] KATAGLYPHIS_CPP_API auto level_from_environment(std::optional<std::string_view> value) noexcept
-  -> Level;
+[[nodiscard]] KATAGLYPHIS_CPP_API auto level_from_environment(std::optional<std::string_view> value) noexcept -> Level;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto level() noexcept -> Level;
 KATAGLYPHIS_CPP_API void set_level(Level threshold) noexcept;
