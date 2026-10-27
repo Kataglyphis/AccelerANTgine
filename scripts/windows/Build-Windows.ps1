@@ -243,10 +243,10 @@ try {
     # --- Step 3: cmake-format, in place like the Linux gate (no -Check) ---
     if (-not $SkipFormat) {
         # The Linux lane's pinned cmake-format; .venv is excluded because the step's own venv holds CMake files.
-        $cmakeFormatRequirements = Join-Path $Workspace 'third_party\ANTfrastructure\linux\scripts\cmake-format.requirements.txt'
+        $cmakeFormatProject = Join-Path $Workspace 'third_party\ANTfrastructure\quality\cmake-format'
         Invoke-BuildStep -Context $Context -StepName "Python tooling + cmake-format" -Critical -Script {
             Invoke-CmakeFormatStep -Context $Context -WorkspacePath $Workspace `
-                -RequirementsPath $cmakeFormatRequirements `
+                -UvProjectPath $cmakeFormatProject `
                 -ExcludePattern @('\\\.venv\\')
         }
 

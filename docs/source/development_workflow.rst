@@ -267,6 +267,7 @@ malformed build script before checking its build steps.
   the Linux clang lane and clang-tidy in the Windows ``clangcl-debug`` build, over the files the
   project actually compiles (``.ixx``, ``.cppm`` and ``.mxx`` included). ``clang++ --analyze``
   runs only when asked for (``--direct-analyze``).
+- **Pinned formatter:** both platforms use ANTfrastructure's ``quality/cmake-format/uv.lock``.
 - **Rewrite or check:** cmake-format rewrites in place, and so does clang-format on Windows. On
   Linux clang-format checks and does not rewrite: it covers every C/C++ file under ``Src/``,
   ``Test/``, ``Bindings/`` and ``cmake/``, and fails the lane when one of them deviates from

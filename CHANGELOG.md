@@ -20,6 +20,7 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- Install the Windows CMake formatter from ANTfrastructure's locked uv tool project.
 - Lock Python documentation and wheel-test dependencies with uv, retaining the editable theme from
   ANTfrastructure's nested DocumANTation submodule and the local Renovate update path.
 
