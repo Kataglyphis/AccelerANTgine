@@ -133,7 +133,7 @@ is what you want, update the gitlink **and** fix the fallout in the same change.
   pins 20260526.0) passes the clang Debug suites (ASan + UBSan), `fuzzTestSuite`, the TSan build
   and the GCC suites in `:latest`.
 - `third_party/ANTfrastructure`'s **own** nested submodule is a build input here.
-  `requirements.txt` installs the family's Sphinx theme, which `docs/source/conf.py` calls
+  The locked `docs` group in `pyproject.toml` installs the family's Sphinx theme, which `docs/source/conf.py` calls
   (`setup_theme()`), from
   `third_party/ANTfrastructure/third_party/DocumANTation/sphinx-kataglyphis-theme`, so the site is
   pinned to the DocumANTation commit the ANTfrastructure gitlink carries. `git submodule update
@@ -188,8 +188,8 @@ written out rather than linked.
   which no build in this repo catches.
 - **The docs theme comes from DocumANTation, via ANTfrastructure** (§ 3). A docs venv whose
   install stops at `error: Distribution not found at: file:///…/sphinx-kataglyphis-theme` means
-  the nested submodule was not initialised recursively, or `uv pip install -r requirements.txt`
-  ran outside the repo root: uv resolves the `-e` path from the working directory. The theme needs
+  the nested submodule was not initialised recursively. `uv sync --locked --only-group docs`
+  resolves the source path relative to the project root. The theme needs
   Python 3.14. `conf.py` adds only this project's settings to `setup_theme()`: graphviz,
   inheritance diagrams, breathe and exhale when Doxygen's XML exists, the version from
   `CMakeLists.txt`, and an `include-read` hook that points exhale's two tree views at the ids
@@ -437,8 +437,10 @@ Eight entry scripts share `ci_parse_value_options` in `ci-common.sh`, backed by 
 `parse_cli_value_options`. Keep each lane's accepted flags, defaults and last-value-wins order;
 unknown flags and a missing value must fail before a product build starts. The Linux lint lane
 runs `scripts/linux/tests/test-ci-value-options.sh` over all eight modes and broken-map mutants.
+The same lane tests locked docs installation and both wheel ABI sequences with
+`test-ci-docs-uv.sh` and `test-ci-python-lock.sh`; neither compiles the native wheels.
 
-**The pre-commit hook** installs from `requirements.txt` into a `uv` venv; the commands are in
+**The pre-commit hook** installs from the locked `docs` group into a `uv` venv; the commands are in
 `docs/source/development_workflow.rst` § *Static Analysis And Formatting*.
 
 Windows:

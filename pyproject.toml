@@ -16,6 +16,27 @@ classifiers = ["Programming Language :: Python :: Free Threading :: 2 - Beta"]
 [project.optional-dependencies]
 test = ["pytest"]
 
+[dependency-groups]
+docs = [
+    "sphinx==9.2.0",
+    "sphinx-book-theme==1.4.0",
+    "sphinx-design==0.7.0",
+    "myst-parser==5.1.0",
+    "pyyaml==6.0.3",
+    "cmake-format==0.6.13",
+    "breathe==5.1.0",
+    "exhale==0.3.7",
+    "pre-commit==4.7.0",
+    "sphinx-autobuild==2025.8.25",
+    "sphinx-kataglyphis-theme",
+]
+
+[tool.uv.dependency-groups]
+docs = { requires-python = ">=3.14" }
+
+[tool.uv.sources]
+sphinx-kataglyphis-theme = { path = "third_party/ANTfrastructure/third_party/DocumANTation/sphinx-kataglyphis-theme", editable = true }
+
 [project.urls]
 Homepage = "https://jonasheinle.de/"
 

@@ -3,7 +3,7 @@
 import pathlib
 import re
 
-# An editable install from the hub's nested DocumANTation (requirements.txt).
+# The theme is pinned by the hub's nested DocumANTation submodule.
 from sphinx_kataglyphis import brand, setup_theme
 
 _DOCS_SOURCE_DIR = pathlib.Path(__file__).resolve().parent

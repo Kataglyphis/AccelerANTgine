@@ -165,14 +165,13 @@ packages and builds the docs:
      --docs-out build/build/html
 
 A direct docs build, written to ``docs/build/html/index.html``, from the repository root (the
-family theme in ``requirements.txt`` is a path into the recursive submodule checkout, and it needs
+family theme in ``pyproject.toml`` is a path into the recursive submodule checkout, and it needs
 Python 3.14):
 
 .. code-block:: bash
 
-   uv venv --python 3.14
+   uv sync --locked --only-group docs --python 3.14
    source .venv/bin/activate
-   uv pip install -r requirements.txt
    cd docs && make html
 
 CI builds the site in the clang x64 lane and publishes it through ANTfrastructure's

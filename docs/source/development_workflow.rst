@@ -288,13 +288,12 @@ malformed build script before checking its build steps.
   and the configs themselves are described in its
   `shared/config/README.md <https://github.com/Kataglyphis/ANTfrastructure/blob/develop/shared/config/README.md>`_.
 
-The pre-commit hook installs from the same ``requirements.txt``:
+The pre-commit hook installs from the locked docs dependency group:
 
 .. code-block:: bash
 
-   uv venv --python 3.14   # the docs theme in requirements.txt needs it
+   uv sync --locked --only-group docs --python 3.14
    source .venv/bin/activate # .venv/Scripts/activate on pwsh
-   uv pip install -r requirements.txt
    pre-commit install
    pre-commit run --all-files   # once, optional
 

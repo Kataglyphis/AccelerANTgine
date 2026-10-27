@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed
+
+- Lock Python documentation and wheel-test dependencies with uv, retaining the editable theme from
+  ANTfrastructure's nested DocumANTation submodule and the local Renovate update path.
+
 ### Fixed
 
 - Reuse ANTfrastructure's Windows AST reader in the ONNX Runtime build-wiring suite, so malformed

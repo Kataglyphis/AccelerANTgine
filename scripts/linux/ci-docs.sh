@@ -20,13 +20,13 @@ ci_parse_value_options docs "$@"
 if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   info "Building documentation"
 
-  # Not a plain `uv pip install`: uv honours UV_PYTHON over an active venv and would hit the root-owned /opt/venv.
+  # Explicit targeting keeps the image's root-owned /opt/venv out of the docs build.
   VENV_DIR="${WORKSPACE_DIR}/.venv"
   DOCS_BUILD_VENV_DIR="${VENV_DIR}"
 
   docs_venv_create() { uv_venv_create "${VENV_DIR}" ""; }
   docs_venv_install_requirements() {
-    uv_pip_install_requirements "${VENV_DIR}" "${WORKSPACE_DIR}/requirements.txt"
+    (cd "${WORKSPACE_DIR}" && _CURRENT_VENV_PATH="${VENV_DIR}" && uv_sync_project --locked --only-group docs)
   }
 
   DOCS_BUILD_UV_VENV_CREATE_SCRIPT=docs_venv_create

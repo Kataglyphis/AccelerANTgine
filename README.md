@@ -32,6 +32,9 @@ initializes missing checkouts when applying, including the tooling hub when need
 wrapper and config; see
 [the shared Renovate guide](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md).
 
+Python dependencies are declared in `pyproject.toml` and locked in `uv.lock`; the documentation
+environment uses `uv sync --locked --only-group docs --python 3.14` after recursive submodule checkout.
+
 ## Highlights
 
 - **One library, three surfaces:** a C API for native embedders, Python bindings and a CLI.

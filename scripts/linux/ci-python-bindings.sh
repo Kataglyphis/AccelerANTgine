@@ -63,7 +63,9 @@ build_and_test() {
   if [[ "${abi}" == "${TAG}t" ]]; then
     "${venv}/bin/python" -I "${PROVER}" prove "${DIST_NAME}" || die "${label}: the free-threaded proof failed"
   fi
-  uv pip install --python "${venv}/bin/python" "${wheel}" pytest
+  uv export --locked --extra test --no-default-groups --no-emit-project \
+    --output-file "${venv}/requirements-locked.txt" --project "${WORKSPACE_DIR}"
+  uv pip install --python "${venv}/bin/python" --no-deps -r "${venv}/requirements-locked.txt"
 
   # From outside the tree, so the installed wheel is what imports, not a staged build.
   (cd "${BUILD_ROOT}" &&
