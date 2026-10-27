@@ -58,14 +58,16 @@ namespace {
     }
 }// namespace
 
-auto build_default_level() noexcept -> Level
+auto release_build() noexcept -> bool
 {
 #if defined(NDEBUG)
-    return Level::Warning;
+    return true;
 #else
-    return Level::Debug;
+    return false;
 #endif
 }
+
+auto build_default_level() noexcept -> Level { return release_build() ? Level::Warning : Level::Debug; }
 
 auto parse_level(std::string_view text) noexcept -> std::optional<Level>
 {

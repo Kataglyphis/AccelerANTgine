@@ -38,14 +38,9 @@ class LogLevelTest : public ::testing::Test
 
 }// namespace
 
+// The staged arm64 Debug suite loads the Release library, so the library's own NDEBUG decides.
 TEST(Log, ReleaseBuildsDefaultToWarningsAndDebugBuildsToEverything)
-{
-#if defined(NDEBUG)
-    EXPECT_EQ(klog::build_default_level(), klog::Level::Warning);
-#else
-    EXPECT_EQ(klog::build_default_level(), klog::Level::Debug);
-#endif
-}
+{ EXPECT_EQ(klog::build_default_level(), klog::release_build() ? klog::Level::Warning : klog::Level::Debug); }
 
 TEST(Log, ParsesEveryLevelNameCaseInsensitively)
 {

@@ -17,6 +17,9 @@ enum class Level : std::uint8_t { Debug = 0, Info = 1, Warning = 2, Error = 3, O
 
 using Sink = std::function<void(Level, std::string_view)>;
 
+/// Whether the library itself was compiled with NDEBUG.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto release_build() noexcept -> bool;
+
 /// Warning in release (NDEBUG) builds, Debug otherwise.
 [[nodiscard]] KATAGLYPHIS_CPP_API auto build_default_level() noexcept -> Level;
 

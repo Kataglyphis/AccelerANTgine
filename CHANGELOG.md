@@ -43,6 +43,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 - Restore the Linux lanes: `cmake/SystemLibDependencies.cmake` is cmake-formatted again, and
   ANTfrastructure's `CPackCommon` is included at top level, because its include guard kept the
   package closure's script paths in `Src/`'s scope and `cpack` ran `bash` on an empty path.
+- Pass the Windows Pester job's formatter-wiring check an absolute script path; the hub's check
+  resolves a relative one against the hub checkout and failed the job.
 - Stop shipping the placeholder `LICENSE.rtf` in the Python wheel; only `LICENSE` is a wheel license file.
 - Route the library's and the CLI's progress messages through the logger instead of printing them
   unconditionally.
