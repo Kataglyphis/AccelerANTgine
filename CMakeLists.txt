@@ -66,6 +66,8 @@ message(STATUS "About to call the local options function.")
 myproject_local_options()
 
 include(SystemLibDependencies)
+# Here, not in Src/: its include_guard(GLOBAL) would keep the closure script paths in Src's scope only.
+include(CPackCommon)
 if(myproject_ENABLE_SANITIZER_ADDRESS)
   if(MSVC)
     add_compile_definitions(

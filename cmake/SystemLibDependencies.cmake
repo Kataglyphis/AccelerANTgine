@@ -114,10 +114,9 @@ if(WIN32)
   endforeach()
   install(FILES ${_ort_install_files} DESTINATION ${CMAKE_INSTALL_BINDIR})
   if(PROJECT_IS_TOP_LEVEL AND KATAGLYPHIS_PACKAGE_DLL_DIR)
-    install(
-      FILES "${KATAGLYPHIS_PACKAGE_DLL_DIR}/licenses/onnxruntime/LICENSE"
-            "${KATAGLYPHIS_PACKAGE_DLL_DIR}/licenses/onnxruntime/ThirdPartyNotices.txt"
-      DESTINATION "licenses/onnxruntime")
+    install(FILES "${KATAGLYPHIS_PACKAGE_DLL_DIR}/licenses/onnxruntime/LICENSE"
+                  "${KATAGLYPHIS_PACKAGE_DLL_DIR}/licenses/onnxruntime/ThirdPartyNotices.txt"
+            DESTINATION "licenses/onnxruntime")
   endif()
 endif()
 
