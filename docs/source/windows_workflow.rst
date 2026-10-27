@@ -4,6 +4,12 @@ Windows Workflow
 Build inside the Windows container, which synchronizes the artifacts back to the repository,
 then run the built application and tests on the Windows host with PowerShell.
 
+The package build selects ONNX Runtime's original license and notices from the image wheel
+whose DLL matches the chain runtime byte for byte. The install tree, CPack ZIP and MSIX are
+checked for both texts. MSI and NSIS are generated from the same install rules, but their
+finished artifacts are not independently checked for these texts. Other native components
+have separate license requirements.
+
 Build In The Container
 ----------------------
 
@@ -124,6 +130,11 @@ Build Script Responsibilities
 - optionally creates MSIX output (``-SkipMSIX`` skips it), signed with the first
   ``*.pfx`` at the repository root and ``MSIX_PFX_PASSWORD`` when there is one,
   and unsigned with a warning otherwise
+
+The MSIX stage copies the project ``LICENSE`` beside the executable and checks the
+finished archive with ANTfrastructure's shared package-license verifier. When MSIX
+is selected, missing ``makeappx.exe``, the manifest or the project logo fails the
+build; pass ``-SkipMSIX`` explicitly to omit this stage.
 
 All three clang configurations call local ``Copy-BuildMediaRuntime``, which calls
 ANTfrastructure's ``Copy-MediaRuntimeBundle`` with ``C:\runtime\bin`` as an extra

@@ -71,7 +71,7 @@ if ($isCross -and $notCross.Count -gt 0) {
     throw "-TargetArch $TargetArch builds clangcl-release and clangcl-debug, not $($notCross -join ', ') (third_party/ANTfrastructure/docs/windows-cross-builds.md)."
 }
 # The G6 proof of every staged bin\, install tree and payload; an older hub pin lacks it.
-try { Import-BuildModule @('WindowsOrtPayload.Common') } catch {
+try { Import-BuildModule @('WindowsOrtProvenance.Common', 'WindowsOrtPayload.Common', 'WindowsMsiLicense.Common', 'WindowsOrtLicense.Common') } catch {
     throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit 73a8dd74 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
 }
 
@@ -447,6 +447,7 @@ try {
             New-Item -ItemType Directory -Force -Path $packageDlls | Out-Null
             $engine = @('AccelerANTgine.exe', 'AccelerANTgine.dll') | ForEach-Object { Join-Path $fastBuildReleaseDirFull "bin\$_" }
             $closure = @(Copy-PeImportClosure -Path $engine -SearchDirectory @(Get-ProductDllSearchPath -Arch $TargetArch) -Destination $packageDlls -Arch $TargetArch)
+            $null = Copy-OrtWheelLicenses -OrtDll (Join-Path $env:ONNX_ROOT 'bin\onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $packageDlls
             Write-BuildLog -Context $Context -Message "Package DLL closure ($TargetArch): $(@($closure | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
             # The NSIS/WiX/ZIP installers pack the install tree, not bin\: G6 proves that tree first.
             $installProof = Join-Path ([System.IO.Path]::GetTempPath()) "accelerantgine-install-$([guid]::NewGuid().ToString('N'))"
@@ -464,6 +465,14 @@ try {
                 -Configuration $cfgRelease.Configuration -Arch $TargetArch -RequireCompleteInstall `
                 -Runner { param($File, [string[]]$Arguments) $null = Invoke-BuildExternal -Context $Context -File $File -Parameters $Arguments }
             $null = Assert-ChainOrtTree -Root $portable.Bundle -OrtDirectory (Join-Path $portable.Bundle 'bin')
+            $ortLicenses = Join-Path $fastBuildReleaseDirFull 'package-dlls\licenses\onnxruntime'
+            Assert-OrtWheelLicensesInPackage -Path $portable.Bundle -LicenseDirectory $ortLicenses -Format archive
+            $zipFiles = @($portable.Installers | Where-Object { $_ -like '*.zip' })
+            if ($zipFiles.Count -eq 0) { throw 'CPack produced no ZIP for ONNX license verification' }
+            foreach ($zip in $zipFiles) {
+                Assert-OrtWheelLicensesInPackage -Path (Join-Path $portable.Packages $zip) -LicenseDirectory $ortLicenses `
+                    -Format archive -ArchivePrefix ([IO.Path]::GetFileNameWithoutExtension($zip))
+            }
             Write-BuildLog -Context $Context -Message "Portable bundle $($portable.Bundle), complete as installed; packages: $($portable.Installers -join ', ')"
         }
 
@@ -512,9 +521,9 @@ try {
             Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $releaseBuildDir) -ExcludeCommonRustAndCppCache
         }
 
-        # MSIX: staging is this repo's, the rest the hub's; a box without the SDK only warns (dev box, not a broken lane).
+        # A selected MSIX must fail when its inputs are unavailable.
         if (-not $SkipMSIX) {
-            Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Script {
+            Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Critical -Script {
                 $msixWorkspace = Join-Path $Workspace "packaging\msix"
                 $msixTemplate = Join-Path $msixWorkspace "AppxManifest.template.xml"
                 $msixOutput = Join-Path $Workspace "dist\windows-$packageArch\msix"
@@ -526,18 +535,15 @@ try {
 
                 $makeappx = Resolve-WindowsSdkToolPath -ToolName "makeappx.exe"
                 if (-not $makeappx) {
-                    Write-BuildLogWarning -Context $Context -Message "makeappx.exe not found. Skipping MSIX packaging."
-                    return
+                    throw 'makeappx.exe is required for MSIX packaging'
                 }
 
-                if (-not (Test-Path $msixTemplate)) {
-                    Write-BuildLogWarning -Context $Context -Message "MSIX manifest template not found: $msixTemplate. Skipping."
-                    return
+                if (-not (Test-Path -LiteralPath $msixTemplate -PathType Leaf)) {
+                    throw "MSIX manifest template not found: $msixTemplate"
                 }
 
-                if (-not (Test-Path $logoSource)) {
-                    Write-BuildLogWarning -Context $Context -Message "Logo not found: $logoSource. Skipping MSIX."
-                    return
+                if (-not (Test-Path -LiteralPath $logoSource -PathType Leaf)) {
+                    throw "MSIX project logo not found: $logoSource"
                 }
 
                 # Invoke-MsixPackage never clears the staging tree, so the extra assets placed here survive.
@@ -560,6 +566,10 @@ try {
                 Copy-Item -LiteralPath @(Get-ChildItem -LiteralPath $bundleBin -File | Where-Object { $_.Extension -in '.exe', '.dll' } | ForEach-Object FullName) -Destination $payloadDir
                 $null = Assert-ChainOrtTree -Root $payloadDir
                 $payloadExtra = @(Get-ChildItem -LiteralPath $payloadDir -Filter '*.dll' -File | ForEach-Object FullName)
+                $licenseSource = Join-Path $Workspace 'LICENSE'
+                $payloadExtra += Copy-PackageLicense -Path $licenseSource -Destination $payloadDir
+                $ortLicenses = Copy-OrtWheelLicenses -OrtDll (Join-Path $payloadDir 'onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $payloadDir
+                $payloadExtra += Join-Path $payloadDir 'licenses'
 
                 Write-BuildLog -Context $Context -Message "Creating MSIX package (version $packageVersion)..."
                 Invoke-MsixPackage -Context $Context `
@@ -581,6 +591,10 @@ try {
                     -LogoPath $logoSource `
                     -MakeAppxPath $makeappx `
                     -Sign -SigningRoot $Workspace | Out-Null
+
+                $licenseVerifier = Join-Path $Workspace 'third_party\ANTfrastructure\linux\scripts\verify_package_license.py'
+                Invoke-BuildExternal -Context $Context -File 'python' -Parameters @($licenseVerifier, $msixFile, '--require', "LICENSE=$licenseSource") | Out-Null
+                Assert-OrtWheelLicensesInPackage -Path $msixFile -LicenseDirectory $ortLicenses -Format archive
 
                 Write-BuildLog -Context $Context -Message "MSIX package created: $msixFile"
             }

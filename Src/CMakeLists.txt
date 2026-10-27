@@ -59,12 +59,15 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_SCAN_FOR_MODULES ON)
 if(PROJECT_IS_TOP_LEVEL)
   if(MYPROJECT_USE_CPP_MODULES)
     add_executable(${PROJECT_NAME}_cli cli_main.cpp)
+    include(CPackCommon)
+    kataglyphis_add_windows_icon(${PROJECT_NAME}_cli "${PROJECT_SOURCE_DIR}/images/faviconNew.ico")
     set_target_properties(${PROJECT_NAME}_cli PROPERTIES OUTPUT_NAME "${PROJECT_NAME}" RUNTIME_OUTPUT_DIRECTORY
                                                                                        "${CMAKE_BINARY_DIR}/bin")
     set_target_properties(${PROJECT_NAME}_cli PROPERTIES CXX_SCAN_FOR_MODULES ON)
     # The demo models/README.md runs; it needs the ONNX modules the library drops without ONNX Runtime.
     if(ONNXRUNTIME_FOUND)
       add_executable(${PROJECT_NAME}_demo inference_demo.cpp)
+      kataglyphis_add_windows_icon(${PROJECT_NAME}_demo "${PROJECT_SOURCE_DIR}/images/faviconNew.ico")
       set_target_properties(${PROJECT_NAME}_demo PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
                                                             CXX_SCAN_FOR_MODULES ON)
     endif()

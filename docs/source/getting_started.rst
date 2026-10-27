@@ -121,6 +121,9 @@ example:
 Windows
 -------
 
+The Windows CLI and demo executables embed the project icon using the shared
+ANTfrastructure CMake resource helper.
+
 Build in the Windows container, then run on the Windows host: :doc:`windows_workflow`.
 
 .. _python-bindings:

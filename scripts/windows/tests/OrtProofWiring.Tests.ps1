@@ -3,17 +3,14 @@
 # This checks G6 build wiring and parse failures, not a running Windows build.
 
 Describe 'ONNX Runtime proof wiring' {
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function Get-TestScriptAst -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function Get-TestScriptAst, Get-TestAstCommands -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
 
     # The one Invoke-BuildStep whose -StepName starts with $StepName, as an AST; a step that is gone or doubled throws.
     function Get-BuildStep([string]$StepName, [string]$BuildScriptPath = '') {
         $source = if ($BuildScriptPath) { $BuildScriptPath } else { Join-Path $PSScriptRoot '..\Build-Windows.ps1' }
         $ast = Get-TestScriptAst -ScriptPath $source
-        $step = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and
-                    $n.GetCommandName() -eq 'Invoke-BuildStep' -and $n.Extent.Text.Contains("-StepName `"$StepName") }, $true))
-        # A throw, not Should: Pester 3.4's Should writes to the pipeline, which would join the returned AST.
-        if ($step.Count -ne 1) { throw "Build-Windows.ps1 has $($step.Count) Invoke-BuildStep -StepName `"$StepName...`", not one" }
-        return $step[0]
+        return Get-UniqueBuildAstNode -Ast $ast -StepName $StepName
     }
 
     It 'rejects a malformed build script before accepting its step (mutation)' {
@@ -37,7 +34,7 @@ Describe 'ONNX Runtime proof wiring' {
         $bundle = $text.IndexOf('New-PortableBundle ')
         $proof = $text.IndexOf('Assert-ChainOrtTree -Root $portable.Bundle')
         ($bundle -ge 0 -and $bundle -lt $proof) | Should Be $true
-        $call = @($step.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'New-PortableBundle' }, $true))
+        $call = @(Get-TestAstCommands -Ast $step -Name 'New-PortableBundle')
         $switches = @($call | ForEach-Object { $_.CommandElements } | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] } |
                 ForEach-Object ParameterName)
         ($switches -contains 'RequireCompleteInstall') | Should Be $true

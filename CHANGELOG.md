@@ -20,12 +20,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- Install ONNX Runtime's original license and notices from the DLL-matched image wheel;
+  verify the Windows install tree, ZIP and MSIX.
+
 - Install the Windows CMake formatter from ANTfrastructure's locked uv tool project.
 - Lock Python documentation and wheel-test dependencies with uv, retaining the editable theme from
   ANTfrastructure's nested DocumANTation submodule and the local Renovate update path.
 
 ### Fixed
 
+- Fail selected MSIX packaging when its SDK tool, manifest or project logo is missing; keep explicit `-SkipMSIX`.
+- Embed the project icon into the Windows CLI and demo using ANTfrastructure's shared CMake resource helper.
+- Include and verify the project license in the Windows MSIX payload.
 - Reuse ANTfrastructure's Windows AST reader in the ONNX Runtime build-wiring suite, so malformed
   build scripts fail before their steps are inspected.
 - Route the Windows x64 PowerShell lint job through ANTfrastructure's reusable quality workflow,

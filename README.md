@@ -26,6 +26,9 @@ API for native embedders, Python bindings and a CLI. It is the inference core th
 [OmniAccelerANT](https://github.com/Kataglyphis/OmniAccelerANT)'s native plugin links, and CI
 builds and tests it on five lanes in the family's container images.
 
+Windows packages carry the ONNX Runtime license and notices from the image wheel matching
+the packaged DLL; see the [Windows workflow](docs/source/windows_workflow.rst).
+
 Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan,
 and `--apply` to update. It checks every direct submodule against its remote default branch and
 initializes missing checkouts when applying, including the tooling hub when needed. CI checks the
@@ -61,6 +64,8 @@ describes the shared container source selection used by both Windows wrappers.
 The Windows x64 lint job calls ANTfrastructure's shared PowerShell quality workflow, which installs
 the pinned analyzer with retries when PowerShell Gallery is temporarily unavailable.
 Windows build-wiring tests use the shared AST reader to reject syntax errors before checking steps.
+The Windows CLI and demo executables embed the project icon through ANTfrastructure's shared CMake helper.
+The MSIX also includes and verifies the project license; selected packaging fails when its SDK, manifest or logo is missing.
 A release needs no build:
 [Install From A Release](https://hardwareacceleratedai.jonasheinle.de/getting_started.html#install-from-a-release).
 

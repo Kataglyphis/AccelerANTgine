@@ -4,26 +4,26 @@
 Describe 'Windows media runtime reuse' {
     . (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1')
     Import-BuildModule 'WindowsMediaRuntime.Common'
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function Get-TestScriptAst -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function Get-TestScriptAst, Get-TestAstCommands -ErrorAction Stop
+    Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
 
     It 'stages the shared runtime through one helper for all three build roots' {
         $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
-        $calls = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Copy-MediaRuntimeBundle' }, $true))
+        $calls = @(Get-TestAstCommands -Ast $ast -Name 'Copy-MediaRuntimeBundle')
         $calls.Count | Should Be 1
         ($calls[0].Extent.Text -match "-GStreamerRoot 'C:\\runtime\\bin'") | Should Be $true
-        $buildCalls = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Copy-BuildMediaRuntime' }, $true))
+        $buildCalls = @(Get-TestAstCommands -Ast $ast -Name 'Copy-BuildMediaRuntime')
         $buildCalls.Count | Should Be 3
         @($buildCalls | Where-Object { $_.Extent.Text -match '-StageTestPlugins\s+-CopyOrtBeside' }).Count | Should Be 2
         @($buildCalls | Where-Object { $_.Extent.Text -match '\$fastBuildReleaseDirFull' -and $_.Extent.Text -notmatch '-StageTestPlugins|-CopyOrtBeside' }).Count | Should Be 1
         @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Copy-ImageGStreamerRuntime' }, $true)).Count | Should Be 0
-        @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Write-MissingGStreamerBinWarning' }, $true)).Count | Should Be 1
+        @(Get-TestAstCommands -Ast $ast -Name 'Write-MissingGStreamerBinWarning').Count | Should Be 1
     }
 
     It 'keeps debug-only plugin and ORT staging out of Release while preserving call order' {
         $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
-        $definitions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Copy-BuildMediaRuntime' }, $true))
-        $definitions.Count | Should Be 1
-        . ([scriptblock]::Create($definitions[0].Extent.Text))
+        $definition = Get-BuildFunctionSource -Ast $ast -Name 'Copy-BuildMediaRuntime'
+        . ([scriptblock]::Create($definition))
         $calls = [Collections.Generic.List[string]]::new()
         function Write-MissingGStreamerBinWarning { param($Context) $calls.Add('warning') }
         function Copy-MediaRuntimeBundle { param($Context, $TargetDir, $GStreamerRoot) $calls.Add('bundle'); return 7 }
@@ -44,9 +44,8 @@ Describe 'Windows media runtime reuse' {
 
     It 'warns when the selected GStreamer bin is missing' {
         $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
-        $functions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Write-MissingGStreamerBinWarning' }, $true))
-        $functions.Count | Should Be 1
-        . ([scriptblock]::Create($functions[0].Extent.Text))
+        $definition = Get-BuildFunctionSource -Ast $ast -Name 'Write-MissingGStreamerBinWarning'
+        . ([scriptblock]::Create($definition))
         $warnings = [Collections.Generic.List[string]]::new()
         function Write-BuildLogWarning { param($Context, $Message) $warnings.Add($Message) }
         $missing = Join-Path $TestDrive 'missing-gstreamer'

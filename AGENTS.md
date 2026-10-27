@@ -1,5 +1,8 @@
 # AGENTS.md
 
+Windows packaging must select ONNX Runtime license texts from an image wheel whose DLL is
+byte-identical to the chain runtime, install both texts, and check the install tree, ZIP and MSIX.
+
 Guidance for coding agents (and new contributors) working in AccelerANTgine.
 
 **Reuse before adding Bash or PowerShell code.** Search this repository and every direct
@@ -9,6 +12,9 @@ needed by multiple consumers, create or extend one shared owner module and call 
 Keep unique product logic in this repository.
 Both Windows container wrappers pass root-only exclusions to the shared runner; never
 enumerate inbound files privately or use recursive tar exclusions for those root names.
+Windows CLI and demo executables carry `images/faviconNew.ico` through the shared CMake resource helper.
+The MSIX stages the project LICENSE independently of the bundle's `bin` and verifies its finished payload.
+When MSIX is selected, missing makeappx, the project manifest or the project logo fails the build; `-SkipMSIX` is the explicit opt-out.
 
 Laid out per ANTfrastructure's
 [`shared/templates/AGENTS.md.template`](third_party/ANTfrastructure/shared/templates/AGENTS.md.template).
@@ -88,6 +94,7 @@ warnings advisory and parser failures fatal. Keep module installation in its sha
 bootstrap so a transient PowerShell Gallery lookup does not break the lane.
 Windows source-structure tests use the hub's `Get-TestScriptAst` so a malformed build script
 fails before its AST is inspected.
+MSIX, media and ONNX wiring tests share `BuildAstFixture.psm1`; missing or ambiguous selections fail.
 
 **CMake modules: this repo's `cmake/` first, then the hub's.** `CMakeLists.txt` puts this repo's
 `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on `CMAKE_MODULE_PATH` and includes every
