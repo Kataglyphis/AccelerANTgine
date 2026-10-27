@@ -43,10 +43,10 @@ case "$1" in
   venv)
     venv="${@: -1}"
     mkdir -p "$venv/bin"
-    cat > "$venv/bin/python" <<'PYTHON'
+    cat > "$venv/bin/python" <<'SHELL_STUB'
 #!/usr/bin/env bash
 printf 'python %s\n' "$*" >> "${UV_TEST_LOG}"
-PYTHON
+SHELL_STUB
     chmod +x "$venv/bin/python"
     ;;
   export)
