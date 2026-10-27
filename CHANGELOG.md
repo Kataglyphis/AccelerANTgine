@@ -20,6 +20,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- Every package lists its third-party components with version, SPDX license, source and license
+  texts in `THIRD-PARTY-NOTICES.txt`: the Linux `.deb`, tarball, AppImage and Flatpak, the Windows
+  MSI, NSIS, ZIP and MSIX, and the Python wheel (#2). The install step fails on a shipped binary
+  with no license source; `ci-release.sh` and `Build-Windows.ps1` check every package for the list.
+- Linux packages install `images/logo.svg` as the scalable hicolor icon beside the 256 px PNG, and
+  `ci-release.sh` checks both logo files byte for byte in every `.deb`, tarball, Flatpak and AppImage.
 - `kataglyphis::log` with levels: release (`NDEBUG`) builds print warnings and errors only, Debug
   builds everything; `ACCELERANTGINE_LOG_LEVEL` and the CLI's `--log_level` override it (#1).
 
@@ -37,6 +43,7 @@ belongs in the **Changed** list below with that consequence spelled out.
 - Restore the Linux lanes: `cmake/SystemLibDependencies.cmake` is cmake-formatted again, and
   ANTfrastructure's `CPackCommon` is included at top level, because its include guard kept the
   package closure's script paths in `Src/`'s scope and `cpack` ran `bash` on an empty path.
+- Stop shipping the placeholder `LICENSE.rtf` in the Python wheel; only `LICENSE` is a wheel license file.
 - Route the library's and the CLI's progress messages through the logger instead of printing them
   unconditionally.
 - Fail selected MSIX packaging when its SDK tool, manifest or project logo is missing; keep explicit `-SkipMSIX`.

@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "project_binaries": [
+    "AccelerANTgine",
+    "AccelerANTgine.exe",
+    "AccelerANTgine.dll",
+    "AccelerANTgine_demo",
+    "AccelerANTgine_demo.exe",
+    "libAccelerANTgine.so",
+    "libAccelerANTgine.so.*",
+    "_core.*.so",
+    "_core.*.pyd"
+  ],
+  "components": [
+    {
+      "id": "onnxruntime",
+      "name": "ONNX Runtime",
+      "version_var": "ONNXRUNTIME_VERSION",
+      "spdx": "MIT",
+      "url": "https://github.com/microsoft/onnxruntime",
+      "source": "https://github.com/microsoft/onnxruntime (ANTfrastructure's chain build; its ThirdPartyNotices.txt covers what it links statically)",
+      "binaries": ["libonnxruntime.so*", "libonnxruntime_providers_*.so*", "onnxruntime.dll", "onnxruntime_providers_*.dll"],
+      "texts": {
+        "linux": [
+          {"root": "install", "path": "share/licenses/onnxruntime/LICENSE"},
+          {"root": "install", "path": "share/licenses/onnxruntime/ThirdPartyNotices.txt"}
+        ],
+        "windows": [
+          {"root": "install", "path": "licenses/onnxruntime/LICENSE"},
+          {"root": "install", "path": "licenses/onnxruntime/ThirdPartyNotices.txt"}
+        ]
+      }
+    },
+    {
+      "id": "directml",
+      "name": "Microsoft DirectML",
+      "version": "the redistributable the chain ONNX Runtime ships",
+      "spdx": "LicenseRef-Microsoft-DirectML",
+      "url": "https://github.com/microsoft/DirectML",
+      "binaries": ["DirectML.dll"],
+      "notice": "Microsoft's redistributable DirectML runtime, distributed under the Microsoft DirectML license terms published with the Microsoft.AI.DirectML package: https://www.nuget.org/packages/Microsoft.AI.DirectML. The build image does not carry that text."
+    },
+    {
+      "id": "msvc-runtime",
+      "name": "Microsoft Visual C++ runtime",
+      "version": "the Visual Studio toolset that built this package",
+      "spdx": "LicenseRef-Microsoft-VC-Redistributable",
+      "url": "https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files",
+      "binaries": ["msvcp140.dll", "msvcp140_*.dll", "vcruntime140.dll", "vcruntime140_*.dll", "concrt140.dll", "vccorlib140.dll"],
+      "notice": "Distributable Code of Microsoft Visual Studio, redistributed under its license terms: https://visualstudio.microsoft.com/license-terms/."
+    },
+    {
+      "id": "gst-plugins-rs",
+      "name": "GStreamer Rust plugins (rswebrtc, rsrtp)",
+      "version_var": "GSTREAMER_VERSION",
+      "spdx": "MPL-2.0",
+      "url": "https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs",
+      "source": "https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs at the GStreamer tag; it statically links the Rust crates its Cargo.lock pins, each under its own license",
+      "binaries": ["libgstrs*.so", "gstrs*.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/MPL-2.0.txt"}]
+    },
+    {
+      "id": "libnice",
+      "name": "libnice",
+      "version": "the GStreamer build's libnice subproject",
+      "spdx": "LGPL-2.1-only OR MPL-1.1",
+      "url": "https://libnice.freedesktop.org/",
+      "source": "https://gitlab.freedesktop.org/libnice/libnice (distributed here under LGPL-2.1)",
+      "binaries": ["libnice.so*", "libgstnice.so", "nice-*.dll", "gstnice.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/LGPL-2.1.txt"}]
+    },
+    {
+      "id": "libcamera",
+      "name": "libcamera",
+      "version_var": "LIBCAMERA_VERSION",
+      "spdx": "LGPL-2.1-or-later",
+      "url": "https://libcamera.org/",
+      "source": "https://git.libcamera.org/libcamera/libcamera.git",
+      "binaries": ["libcamera.so*", "libcamera-base.so*", "libgstlibcamera.so"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/LGPL-2.1.txt"}]
+    },
+    {
+      "id": "orc",
+      "name": "ORC (Optimized Inner Loop Runtime Compiler)",
+      "version": "the GStreamer build's orc subproject",
+      "spdx": "BSD-2-Clause",
+      "url": "https://gitlab.freedesktop.org/gstreamer/orc",
+      "binaries": ["liborc-0.4.so*", "orc-0.4-*.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/orc-COPYING.txt"}]
+    },
+    {
+      "id": "gstreamer",
+      "name": "GStreamer (core, base, good, bad, ugly, libav)",
+      "version_var": "GSTREAMER_VERSION",
+      "spdx": "LGPL-2.0-or-later",
+      "url": "https://gstreamer.freedesktop.org/",
+      "source": "https://gitlab.freedesktop.org/gstreamer/gstreamer at the GStreamer tag",
+      "binaries": ["libgst*-1.0.so*", "libgst*.so", "gst*-1.0-*.dll", "gst*.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/LGPL-2.1.txt"}]
+    },
+    {
+      "id": "glib",
+      "name": "GLib",
+      "version": "the GStreamer build's glib subproject",
+      "spdx": "LGPL-2.1-or-later",
+      "url": "https://gitlab.gnome.org/GNOME/glib",
+      "source": "https://gitlab.gnome.org/GNOME/glib",
+      "binaries": ["glib-2.0-*.dll", "gobject-2.0-*.dll", "gmodule-2.0-*.dll", "gio-2.0-*.dll", "gthread-2.0-*.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/LGPL-2.1.txt"}]
+    },
+    {
+      "id": "gettext-libintl",
+      "name": "GNU gettext runtime (libintl)",
+      "version": "the GStreamer build's proxy-libintl subproject",
+      "spdx": "LGPL-2.1-or-later",
+      "url": "https://www.gnu.org/software/gettext/",
+      "source": "https://github.com/frida/proxy-libintl",
+      "binaries": ["intl-*.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/LGPL-2.1.txt"}]
+    },
+    {
+      "id": "libffi",
+      "name": "libffi",
+      "version": "the GStreamer build's libffi subproject",
+      "spdx": "MIT",
+      "url": "https://github.com/libffi/libffi",
+      "binaries": ["ffi-*.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/libffi-LICENSE.txt"}]
+    },
+    {
+      "id": "ffmpeg",
+      "name": "FFmpeg",
+      "version_var": "FFMPEG_VERSION",
+      "spdx": "GPL-3.0-or-later",
+      "url": "https://ffmpeg.org/",
+      "source": "https://git.ffmpeg.org/ffmpeg.git at the FFmpeg tag, configured --enable-gpl --enable-version3",
+      "binaries": ["libavcodec.so*", "libavfilter.so*", "libavformat.so*", "libavutil.so*", "libavdevice.so*", "libswresample.so*", "libswscale.so*", "libpostproc.so*", "avcodec-*.dll", "avfilter-*.dll", "avformat-*.dll", "avutil-*.dll", "avdevice-*.dll", "swresample-*.dll", "swscale-*.dll", "postproc-*.dll"],
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/GPL-3.0.txt"}]
+    },
+    {
+      "id": "gcc-runtime",
+      "name": "GCC runtime libraries (libstdc++, libgcc_s, libgomp)",
+      "version_var": "GCC_VERSION",
+      "spdx": "GPL-3.0-or-later WITH GCC-exception-3.1",
+      "url": "https://gcc.gnu.org/",
+      "source": "https://ftp.gnu.org/gnu/gcc/ at the GCC version",
+      "binaries": ["libstdc++.so*", "libgcc_s.so*", "libgomp.so*", "libatomic.so*"],
+      "texts": [
+        {"root": "repo", "path": "packaging/third-party/texts/GPL-3.0.txt"},
+        {"root": "repo", "path": "packaging/third-party/texts/GCC-exception-3.1.txt"}
+      ]
+    },
+    {
+      "id": "nlohmann-json",
+      "name": "JSON for Modern C++ (nlohmann/json)",
+      "version": "the third_party/NLOHMANN_JSON submodule pin",
+      "spdx": "MIT",
+      "url": "https://github.com/nlohmann/json",
+      "linked": ["native", "wheel"],
+      "texts": [{"root": "repo", "path": "third_party/NLOHMANN_JSON/LICENSE.MIT"}]
+    },
+    {
+      "id": "tomlplusplus",
+      "name": "toml++",
+      "version": "the third_party/tomlplusplus submodule pin",
+      "spdx": "MIT",
+      "url": "https://github.com/marzer/tomlplusplus",
+      "linked": ["native", "wheel"],
+      "texts": [{"root": "repo", "path": "third_party/tomlplusplus/LICENSE"}]
+    },
+    {
+      "id": "abseil",
+      "name": "Abseil C++ (flags)",
+      "version": "the abseil-cpp pin in third_party/CMakeLists.txt",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/abseil/abseil-cpp",
+      "linked": ["native"],
+      "texts": [{"root": "abseil", "path": "LICENSE"}]
+    },
+    {
+      "id": "rust-std",
+      "name": "Rust standard library",
+      "version": "the Rust toolchain that built this package",
+      "spdx": "MIT OR Apache-2.0",
+      "url": "https://www.rust-lang.org/",
+      "linked": ["native", "wheel"],
+      "texts": [
+        {"root": "repo", "path": "packaging/third-party/texts/rust-LICENSE-MIT.txt"},
+        {"root": "repo", "path": "packaging/third-party/texts/rust-LICENSE-APACHE.txt"}
+      ]
+    },
+    {
+      "id": "nanobind",
+      "name": "nanobind",
+      "version": "the third_party/nanobind submodule pin",
+      "spdx": "BSD-3-Clause",
+      "url": "https://github.com/wjakob/nanobind",
+      "linked": ["wheel"],
+      "texts": [{"root": "repo", "path": "third_party/nanobind/LICENSE"}]
+    },
+    {
+      "id": "robin-map",
+      "name": "robin-map (bundled by nanobind)",
+      "version": "nanobind's ext/robin_map submodule pin",
+      "spdx": "MIT",
+      "url": "https://github.com/Tessil/robin-map",
+      "linked": ["wheel"],
+      "texts": [{"root": "repo", "path": "third_party/nanobind/ext/robin_map/LICENSE"}]
+    }
+  ]
+}

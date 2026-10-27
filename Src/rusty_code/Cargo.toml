@@ -3,6 +3,7 @@ name = "rusty_code"
 version = "0.1.0"
 authors = ["Jonas Heinle <contact@jonasheinle.de>"]
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 cxx = "1.0"

@@ -15,6 +15,8 @@ enumerate inbound files privately or use recursive tar exclusions for those root
 Windows CLI and demo executables carry `images/faviconNew.ico` through the shared CMake resource helper.
 The MSIX stages the project LICENSE independently of the bundle's `bin` and verifies its finished payload.
 When MSIX is selected, missing makeappx, the project manifest or the project logo fails the build; `-SkipMSIX` is the explicit opt-out.
+Every package carries `THIRD-PARTY-NOTICES.txt`, written at install time from `packaging/third-party/components.json`;
+a shipped binary with no license source fails the install. Name a new dependency there; never relax the gate.
 Library and CLI diagnostics go through `kataglyphis::log`, which release (`NDEBUG`) builds limit to warnings and errors;
 never add a direct `g_print`, `printf` or `std::cout` diagnostic to `Src/`.
 
@@ -416,6 +418,17 @@ written out rather than linked.
   A new bound class with mutable state needs the same. `Test/python/test_threading.py` crashes
   without them, on the GIL wheel too, because the runs release the GIL.
 
+- **The third-party notices are generated, gated and checked per package**
+  ([`third_party_licenses.rst`](docs/source/third_party_licenses.rst)). `cmake/ThirdPartyNotices.cmake`
+  runs `scripts/packaging/third_party_notices.py` as the last install step: Linux after the ELF closure,
+  Windows only when `KATAGLYPHIS_PACKAGE_DLL_DIR` is set, the wheel for its `python_bindings` component.
+  A Linux library a Debian package owns is listed with its `copyright` file, searched in the closure's
+  order with the compiler's runtime directory first; everything else needs an inventory entry, first match
+  wins. Rust crates come from the hub's `stage-cargo-licenses.py` offline, so a `Cargo.lock` bump that
+  changes `unicode-ident` needs its `packaging/third-party/cargo-license-policy.json` key and SHA-256
+  moved too. `Src/rusty_code/LICENSE` is that collector's copy of `LICENSE`; the test fails when they differ.
+  Linux ONNX Runtime texts go through `stage_ort_texts.py`: the chain build's `licenses/` once the image
+  carries it (hub ca303de0), until then the same-version chain wheel with a `WARN`; never a PyPI wheel.
 - **The Linux packages carry the image's own GStreamer, never the distro's** (owner, 2026-10-17;
   the mechanism is the hub's
   [`linux-build-basics.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/linux-build-basics.md#gstreamer-loads-from-the-package-alone)).

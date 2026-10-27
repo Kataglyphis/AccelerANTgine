@@ -1,5 +1,6 @@
 # Only this project's identity; the CPack wiring is ANTfrastructure's CPackCommon.
 include(CPackCommon)
+include(ThirdPartyNotices)
 
 kataglyphis_cpack_common(
   VENDOR
@@ -111,6 +112,13 @@ endif()
 
 # The compiler's libstdc++, the chain ORT and the image's glibc: GCC 16.2's and glibc 2.43 are newer than Debian 13's.
 get_filename_component(_ort_lib_dir "${_ONNXRUNTIME_LIB}" DIRECTORY)
+set(_closure_search
+    "${_ort_lib_dir}"
+    "${_gst_lib_dir}"
+    "${_ffmpeg_lib_dir}"
+    "/opt/libcamera/lib"
+    "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+    "/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
 kataglyphis_install_linux_closure(
   LOADER
   PRIVATE_DIR
@@ -119,13 +127,11 @@ kataglyphis_install_linux_closure(
   ${PROJECT_NAME}
   ${PROJECT_NAME}_cli
   SEARCH
-  "${_ort_lib_dir}"
-  "${_gst_lib_dir}"
-  "${_ffmpeg_lib_dir}"
-  "/opt/libcamera/lib"
-  "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
-  "/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+  ${_closure_search}
   PROTECT
   "lib/accelerantgine/libonnxruntime*")
+# After the closure: the notices list exactly what each generator is about to pack, in the closure's search order.
+accelerantgine_install_linux_notices(SEARCH ${_closure_search})
+accelerantgine_install_windows_notices()
 
 include(CPack)

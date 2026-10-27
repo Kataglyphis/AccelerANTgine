@@ -88,6 +88,50 @@ load_project_metadata() {
   PROJECT_NAME_META="${project_name}"
   VERSION_SUFFIX_META="${project_version:-${git_sha:-unknown}}"
 }
+# Each package must carry the project license, ONNX Runtime's texts, the notices a fresh install writes and the logo.
+verify_release_licenses() {
+  local build_dir="$1" reference artifact verifier appimage_verifier member
+  local -A icons=(
+    ["share/icons/hicolor/256x256/apps/${APP_ID}.png"]="${WORKSPACE_DIR}/images/logo.png"
+    ["share/icons/hicolor/scalable/apps/${APP_ID}.svg"]="${WORKSPACE_DIR}/images/logo.svg")
+  local -a rules=() names=(
+    "share/licenses/${PROJECT_NAME_META}/THIRD-PARTY-NOTICES.txt"
+    "share/licenses/${PROJECT_NAME_META}/LICENSE"
+    "share/licenses/onnxruntime/LICENSE"
+    "share/licenses/onnxruntime/ThirdPartyNotices.txt")
+  verifier="$(antfrastructure_path linux/scripts/verify_package_license.py)"
+  appimage_verifier="$(antfrastructure_path linux/scripts/06-packaging/verify-native-appimage-license.sh)"
+  reference="$(mktemp -d)"
+  cmake --install "${build_dir}" --prefix "${reference}/usr" > /dev/null
+  for member in "${names[@]}"; do
+    [[ -s "${reference}/usr/${member}" ]] || die "the install tree lacks ${member}"
+    rules+=(--require "*${member}=${reference}/usr/${member}")
+  done
+  for member in "${!icons[@]}"; do
+    rules+=(--require "*${member}=${icons[${member}]}")
+  done
+  shopt -s nullglob
+  local -a artifacts=("${build_dir}"/*.deb "${build_dir}"/*.tar.gz "${build_dir}"/*.flatpak "${build_dir}"/*.AppImage)
+  shopt -u nullglob
+  [[ "${#artifacts[@]}" -gt 0 ]] || die "no release package to check for licenses in ${build_dir}"
+  for artifact in "${artifacts[@]}"; do
+    if [[ "${artifact}" == *.AppImage ]]; then
+      for member in "${names[@]}"; do
+        bash "${appimage_verifier}" "${artifact}" "$(uname -m)" "usr/${member}" "${reference}/usr/${member}" ||
+          die "${artifact##*/} lacks ${member}"
+      done
+      for member in "${!icons[@]}"; do
+        bash "${appimage_verifier}" "${artifact}" "$(uname -m)" "usr/${member}" "${icons[${member}]}" ||
+          die "${artifact##*/} lacks the project logo ${member}"
+      done
+    else
+      python3 "${verifier}" "${artifact}" "${rules[@]}" || die "${artifact##*/} lacks a license text"
+    fi
+    info "licenses verified: ${artifact##*/}"
+  done
+  rm -rf -- "${reference}"
+}
+
 # Not the hub's container helper: this also runs on a dev box, where AUTO_INSTALL_FLATPAK and sudo apt apply.
 ensure_flatpak_tools() {
   local -a missing_cmds=()
@@ -247,6 +291,9 @@ if [[ "${DO_FLATPAK}" -eq 1 ]]; then
       "${FLATPAK_BRANCH}" "${FLATPAK_ARCH}"
   fi
 fi
+
+load_project_metadata "${BUILD_RELEASE_DIR}"
+verify_release_licenses "${BUILD_RELEASE_DIR}"
 
 if [[ "${DO_CALLGRIND}" -eq 1 ]]; then
   if ! has_tool valgrind; then

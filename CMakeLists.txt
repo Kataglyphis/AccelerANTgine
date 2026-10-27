@@ -203,6 +203,11 @@ if(UNIX AND NOT APPLE)
     FILES ${CMAKE_CURRENT_SOURCE_DIR}/images/Engine_logo.png
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
     RENAME ${PROJECT_APP_ID}.png)
+  # The source logo too, so desktops that scale icons never upscale the 256 px rendering.
+  install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/images/logo.svg
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
+    RENAME ${PROJECT_APP_ID}.svg)
 endif()
 
 # This tree only: embedded in a Flutter runner, CMAKE_SOURCE_DIR is the runner's, whose targets are not ours.

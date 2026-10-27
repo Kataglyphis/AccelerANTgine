@@ -154,6 +154,26 @@ function Copy-BuildMediaRuntime {
     if ($CopyOrtBeside) { $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $BuildRoot }
 }
 
+# The install-time notices list every DLL the closure added; each ZIP and MSI must carry that exact list.
+function Assert-InstallerNotice {
+    param(
+        [Parameter(Mandatory)][string]$Bundle,
+        [Parameter(Mandatory)][string]$PackageDir,
+        [string[]]$Installer = @()
+    )
+    $notices = Join-Path $Bundle 'licenses\THIRD-PARTY-NOTICES.txt'
+    if (-not (Test-Path -LiteralPath $notices -PathType Leaf)) { throw "The install tree lacks $notices" }
+    $zips = @($Installer | Where-Object { $_ -like '*.zip' })
+    $msis = @($Installer | Where-Object { $_ -like '*.msi' })
+    if ($zips.Count -eq 0 -or $msis.Count -eq 0) { throw 'CPack produced no ZIP or no MSI for third-party notice verification' }
+    foreach ($zip in $zips) {
+        Assert-PackageLicense -Path (Join-Path $PackageDir $zip) -Pattern '*/licenses/THIRD-PARTY-NOTICES.txt' -LicensePath $notices
+    }
+    foreach ($msi in $msis) {
+        Assert-MsiPackageLicense -Path (Join-Path $PackageDir $msi) -FileName 'THIRD-PARTY-NOTICES.txt' -LicensePath $notices
+    }
+}
+
 $FastBuildDir = Get-OrDefault $FastBuildDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.FastBuildDir')
 $LogDir = Get-OrDefault $LogDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.LogDir')
 
@@ -473,6 +493,7 @@ try {
                 Assert-OrtWheelLicensesInPackage -Path (Join-Path $portable.Packages $zip) -LicenseDirectory $ortLicenses `
                     -Format archive -ArchivePrefix ([IO.Path]::GetFileNameWithoutExtension($zip))
             }
+            Assert-InstallerNotice -Bundle $portable.Bundle -PackageDir $portable.Packages -Installer $portable.Installers
             Write-BuildLog -Context $Context -Message "Portable bundle $($portable.Bundle), complete as installed; packages: $($portable.Installers -join ', ')"
         }
 
@@ -569,6 +590,11 @@ try {
                 $licenseSource = Join-Path $Workspace 'LICENSE'
                 $payloadExtra += Copy-PackageLicense -Path $licenseSource -Destination $payloadDir
                 $ortLicenses = Copy-OrtWheelLicenses -OrtDll (Join-Path $payloadDir 'onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $payloadDir
+                # The payload is the bundle's bin\, so the bundle's notices describe it.
+                $bundleLicenses = Join-Path $Workspace "dist\windows-$packageArch\bundle\licenses"
+                $bundleNotices = Join-Path $bundleLicenses 'THIRD-PARTY-NOTICES.txt'
+                Copy-Item -LiteralPath @('THIRD-PARTY-NOTICES.txt', 'third-party-inventory.json', 'third-party' | ForEach-Object { Join-Path $bundleLicenses $_ }) `
+                    -Destination (Join-Path $payloadDir 'licenses') -Recurse -Force -ErrorAction Stop
                 $payloadExtra += Join-Path $payloadDir 'licenses'
 
                 Write-BuildLog -Context $Context -Message "Creating MSIX package (version $packageVersion)..."
@@ -595,6 +621,7 @@ try {
                 $licenseVerifier = Join-Path $Workspace 'third_party\ANTfrastructure\linux\scripts\verify_package_license.py'
                 Invoke-BuildExternal -Context $Context -File 'python' -Parameters @($licenseVerifier, $msixFile, '--require', "LICENSE=$licenseSource") | Out-Null
                 Assert-OrtWheelLicensesInPackage -Path $msixFile -LicenseDirectory $ortLicenses -Format archive
+                Assert-PackageLicense -Path $msixFile -Pattern 'licenses/THIRD-PARTY-NOTICES.txt' -LicensePath $bundleNotices
 
                 Write-BuildLog -Context $Context -Message "MSIX package created: $msixFile"
             }

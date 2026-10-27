@@ -72,6 +72,8 @@ if(KATAGLYPHIS_PYTHON_STUBS)
     DESTINATION kataglyphis_inference
     COMPONENT python_bindings)
 endif()
+include(ThirdPartyNotices)
+accelerantgine_install_wheel_notices(python_bindings)
 
 # --- CTest hook (only active in configurations that enable testing) ----------
 if(BUILD_TESTING)

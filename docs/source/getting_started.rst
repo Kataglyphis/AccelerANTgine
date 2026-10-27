@@ -39,6 +39,9 @@ glibc and EGL alone (``CHANGELOG.md``, *Unreleased*).
    sudo apt install ./AccelerANTgine-*-Linux-$(uname -m)-*.deb   # or: unpack the tarball, run usr/bin/AccelerANTgine
    AccelerANTgine --version
 
+Every package carries the project license and the list of its third-party components with their
+license texts: :doc:`third_party_licenses`.
+
 Logging
 -------
 

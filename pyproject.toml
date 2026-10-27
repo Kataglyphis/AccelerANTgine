@@ -47,6 +47,8 @@ cmake.version = ">=3.31.6"
 build.targets = ["kataglyphis_python", "kataglyphis_python_stub"]
 install.components = ["python_bindings"]
 wheel.packages = []
+# Only the real license: the default globs also matched the placeholder LICENSE.rtf.
+wheel.license-files = ["LICENSE"]
 
 [tool.scikit-build.cmake.define]
 KATAGLYPHIS_BUILD_PYTHON_BINDINGS = "ON"

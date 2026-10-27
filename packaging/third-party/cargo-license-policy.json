@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "packages": {
+    "unicode-ident@1.0.27": {
+      "reviewed_expression": "(MIT OR Apache-2.0) AND Unicode-3.0",
+      "files": [
+        {
+          "root": "package",
+          "path": "LICENSE-UNICODE",
+          "sha256": "f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1",
+          "provenance": "crates.io unicode-ident 1.0.27 archive"
+        }
+      ]
+    }
+  }
+}

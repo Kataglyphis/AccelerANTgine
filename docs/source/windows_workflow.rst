@@ -6,9 +6,9 @@ then run the built application and tests on the Windows host with PowerShell.
 
 The package build selects ONNX Runtime's original license and notices from the image wheel
 whose DLL matches the chain runtime byte for byte. The install tree, CPack ZIP and MSIX are
-checked for both texts. MSI and NSIS are generated from the same install rules, but their
-finished artifacts are not independently checked for these texts. Other native components
-have separate license requirements.
+checked for both texts. Every other component of the DLL closure is listed, with its license
+text, in ``licenses/THIRD-PARTY-NOTICES.txt``, which the ZIP, MSI and MSIX are checked for;
+NSIS packs the same install tree but is not opened (:doc:`third_party_licenses`).
 
 Build In The Container
 ----------------------

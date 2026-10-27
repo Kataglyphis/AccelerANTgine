@@ -54,6 +54,7 @@ tested on Linux x64, arm64 and riscv64 and on Windows x64 and arm64.
    inference_preprocessing
    development_workflow
    windows_workflow
+   third_party_licenses
    api_reference
    graphviz_files
    test_results
