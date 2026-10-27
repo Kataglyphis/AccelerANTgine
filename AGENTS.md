@@ -86,6 +86,8 @@ CI uses ANTfrastructure's composite actions (`prepare-linux-ci-host`, `run-in-li
 The on-request Windows x64 lint job calls the shared PowerShell quality workflow with analyzer
 warnings advisory and parser failures fatal. Keep module installation in its shared retrying
 bootstrap so a transient PowerShell Gallery lookup does not break the lane.
+Windows source-structure tests use the hub's `Get-TestScriptAst` so a malformed build script
+fails before its AST is inspected.
 
 **CMake modules: this repo's `cmake/` first, then the hub's.** `CMakeLists.txt` puts this repo's
 `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on `CMAKE_MODULE_PATH` and includes every

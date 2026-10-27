@@ -252,6 +252,8 @@ One entry point per platform, and CI runs exactly these:
 The on-request Windows x64 PowerShell lint job calls ANTfrastructure's reusable
 ``powershell-quality.yml`` with analyzer warnings advisory. Its shared bootstrap reads the hub's
 version pin and retries transient PowerShell Gallery failures; parser failures stay fatal.
+The Windows build-wiring Pester suite imports ANTfrastructure's AST reader, which rejects a
+malformed build script before checking its build steps.
 
 .. code-block:: bash
 

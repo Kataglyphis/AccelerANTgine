@@ -56,6 +56,7 @@ Its [Windows workflow](https://hardwareacceleratedai.jonasheinle.de/windows_work
 describes the shared container source selection used by both Windows wrappers.
 The Windows x64 lint job calls ANTfrastructure's shared PowerShell quality workflow, which installs
 the pinned analyzer with retries when PowerShell Gallery is temporarily unavailable.
+Windows build-wiring tests use the shared AST reader to reject syntax errors before checking steps.
 A release needs no build:
 [Install From A Release](https://hardwareacceleratedai.jonasheinle.de/getting_started.html#install-from-a-release).
 

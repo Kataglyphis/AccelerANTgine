@@ -20,6 +20,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Reuse ANTfrastructure's Windows AST reader in the ONNX Runtime build-wiring suite, so malformed
+  build scripts fail before their steps are inspected.
 - Route the Windows x64 PowerShell lint job through ANTfrastructure's reusable quality workflow,
   so the pinned analyzer uses the shared retrying Gallery installer.
 - Use ANTfrastructure's shared value-option parser in eight Linux CI entry scripts; one local
