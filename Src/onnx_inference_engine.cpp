@@ -20,6 +20,7 @@ module;
 module kataglyphis.onnx_inference;
 
 import kataglyphis.project_config;
+import kataglyphis.log;
 
 namespace kataglyphis::inference {
 
@@ -31,7 +32,7 @@ namespace {
     auto ort_succeeded(OrtStatus *status) -> bool
     {
         if (status == nullptr) { return true; }
-        std::fprintf(stderr, "ONNX Runtime: %s\n", Ort::GetApi().GetErrorMessage(status));
+        log::error("ONNX Runtime: {}", Ort::GetApi().GetErrorMessage(status));
         Ort::GetApi().ReleaseStatus(status);
         return false;
     }

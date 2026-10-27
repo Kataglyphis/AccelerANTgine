@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added
+
+- `kataglyphis::log` with levels: release (`NDEBUG`) builds print warnings and errors only, Debug
+  builds everything; `ACCELERANTGINE_LOG_LEVEL` and the CLI's `--log_level` override it (#1).
+
 ### Changed
 
 - Install ONNX Runtime's original license and notices from the DLL-matched image wheel;
@@ -32,6 +37,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 - Restore the Linux lanes: `cmake/SystemLibDependencies.cmake` is cmake-formatted again, and
   ANTfrastructure's `CPackCommon` is included at top level, because its include guard kept the
   package closure's script paths in `Src/`'s scope and `cpack` ran `bash` on an empty path.
+- Route the library's and the CLI's progress messages through the logger instead of printing them
+  unconditionally.
 - Fail selected MSIX packaging when its SDK tool, manifest or project logo is missing; keep explicit `-SkipMSIX`.
 - Embed the project icon into the Windows CLI and demo using ANTfrastructure's shared CMake resource helper.
 - Include and verify the project license in the Windows MSIX payload.

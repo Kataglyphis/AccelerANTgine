@@ -28,6 +28,7 @@ builds and tests it on five lanes in the family's container images.
 
 Windows packages carry the ONNX Runtime license and notices from the image wheel matching
 the packaged DLL; see the [Windows workflow](docs/source/windows_workflow.rst).
+Release builds log warnings and errors only; `--log_level` or `ACCELERANTGINE_LOG_LEVEL` raises the level.
 
 Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan,
 and `--apply` to update. It checks every direct submodule against its remote default branch and

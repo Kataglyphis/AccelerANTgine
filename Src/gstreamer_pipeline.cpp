@@ -19,6 +19,7 @@ module;
 module kataglyphis.gstreamer_pipeline;
 
 import kataglyphis.project_config;
+import kataglyphis.log;
 
 namespace kataglyphis::gstreamer {
 
@@ -35,14 +36,14 @@ namespace {
         if (pipeline != nullptr) { gst_object_ref_sink(pipeline); }
 
         if (error != nullptr) {
-            g_printerr("%s: %s\n", failure_context, error->message);
+            log::error("{}: {}", failure_context, error->message);
             g_error_free(error);
             if (pipeline != nullptr) { gst_object_unref(pipeline); }
             return std::unexpected(GStreamerError::PipelineCreationFailed);
         }
 
         if (pipeline == nullptr) {
-            g_printerr("%s returned null\n", failure_context);
+            log::error("{} returned null", failure_context);
             return std::unexpected(GStreamerError::PipelineCreationFailed);
         }
 

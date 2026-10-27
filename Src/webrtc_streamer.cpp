@@ -24,6 +24,7 @@ module kataglyphis.webrtc_streamer;
 
 import kataglyphis.project_config;
 import kataglyphis.config_loader;
+import kataglyphis.log;
 
 namespace kataglyphis::webrtc {
 
@@ -81,7 +82,7 @@ namespace {
         gchar *uri = gst_filename_to_uri(absolute_path.string().c_str(), &error);
         if (uri == nullptr) {
             if (error != nullptr) {
-                g_printerr("Failed to convert file path to URI: %s\n", error->message);
+                log::error("Failed to convert file path to URI: {}", error->message);
                 g_error_free(error);
             }
             return {};
@@ -300,7 +301,7 @@ struct WebRTCStreamer::Impl
         std::string error_message = (error != nullptr) ? error->message : "Unknown error";
         if (debug_info != nullptr) { error_message += " (" + std::string(debug_info) + ")"; }
 
-        g_printerr("Pipeline error: %s\n", error_message.c_str());
+        log::error("Pipeline error: {}", error_message);
         impl->report_error(WebRTCError::MediaError, error_message);
 
         if (error != nullptr) { g_error_free(error); }
@@ -320,8 +321,8 @@ struct WebRTCStreamer::Impl
         GstState new_state;
         gst_message_parse_state_changed(msg, &old_state, &new_state, nullptr);
 
-        g_print(
-          "Pipeline state: %s -> %s\n", gst_element_state_get_name(old_state), gst_element_state_get_name(new_state));
+        log::debug(
+          "Pipeline state: {} -> {}", gst_element_state_get_name(old_state), gst_element_state_get_name(new_state));
 
         if (new_state == GST_STATE_PLAYING) {
             impl->set_state(StreamState::Streaming);
@@ -336,7 +337,7 @@ struct WebRTCStreamer::Impl
     static auto on_bus_eos(GstBus * /* bus */, GstMessage * /* msg */, gpointer user_data) -> gboolean
     {
         auto *impl = static_cast<Impl *>(user_data);
-        g_print("End of stream\n");
+        log::info("End of stream");
         impl->set_state(StreamState::Disconnected);
         return TRUE;
     }
@@ -351,14 +352,14 @@ struct WebRTCStreamer::Impl
 
         const gchar *name = gst_structure_get_name(structure);
         if (g_str_has_prefix(name, "webrtcsink") != 0) {
-            g_print("WebRTC event: %s\n", name);
+            log::debug("WebRTC event: {}", name);
 
             // Check for connection established
             if (g_str_has_suffix(name, "consumer-added") != 0) {
-                g_print("WebRTC peer connected!\n");
+                log::info("WebRTC peer connected");
                 impl->set_state(StreamState::Streaming);
             } else if (g_str_has_suffix(name, "consumer-removed") != 0) {
-                g_print("WebRTC peer disconnected\n");
+                log::info("WebRTC peer disconnected");
             }
         }
 
@@ -428,7 +429,7 @@ auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, 
     GError *error = nullptr;
     if (gst_init_check(argc, argv, &error) == 0) {
         if (error != nullptr) {
-            g_printerr("GStreamer init failed: %s\n", error->message);
+            log::error("GStreamer init failed: {}", error->message);
             g_error_free(error);
         }
         return std::unexpected(WebRTCError::InitializationFailed);
@@ -437,18 +438,18 @@ auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, 
     // Verify webrtcsink is available
     GstElementFactory *factory = gst_element_factory_find("webrtcsink");
     if (factory == nullptr) {
-        g_printerr("webrtcsink element not found. Checking for webrtcbin fallback...\n");
+        log::warning("webrtcsink element not found; checking for the webrtcbin fallback");
 
         // Fall back to webrtcbin if webrtcsink is not available
         factory = gst_element_factory_find("webrtcbin");
         if (factory == nullptr) {
-            g_printerr("Neither webrtcsink nor webrtcbin found!\n");
+            log::error("Neither webrtcsink nor webrtcbin found");
             // No gst_deinit: it cannot be undone, and the process may still use GStreamer elsewhere.
             return std::unexpected(WebRTCError::InitializationFailed);
         }
-        g_print("Using webrtcbin (manual signalling required)\n");
+        log::info("Using webrtcbin (manual signalling required)");
     } else {
-        g_print("Using webrtcsink (automatic signalling)\n");
+        log::info("Using webrtcsink (automatic signalling)");
     }
     gst_object_unref(factory);
 
@@ -498,7 +499,7 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
 
     // Build pipeline
     std::string pipeline_desc = impl_->build_pipeline_description();
-    g_print("Pipeline: %s\n", pipeline_desc.c_str());
+    log::debug("Pipeline: {}", pipeline_desc);
 
     GError *error = nullptr;
     impl_->pipeline = gst_parse_launch(pipeline_desc.c_str(), &error);
@@ -507,7 +508,7 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
 
     if (error != nullptr) {
         std::string error_msg = error->message;
-        g_printerr("Pipeline creation failed: %s\n", error_msg.c_str());
+        log::error("Pipeline creation failed: {}", error_msg);
         g_error_free(error);
         impl_->destroy_pipeline();
         return std::unexpected(WebRTCError::PipelineCreationFailed);
@@ -517,7 +518,7 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
 
     // Get webrtcsink element
     impl_->webrtcsink = gst_bin_get_by_name(GST_BIN(impl_->pipeline), "ws");
-    if (impl_->webrtcsink != nullptr) { g_print("Found webrtcsink element\n"); }
+    if (impl_->webrtcsink != nullptr) { log::debug("Found webrtcsink element"); }
 
     // Set up bus watches
     GstBus *bus = gst_element_get_bus(impl_->pipeline);
@@ -543,13 +544,13 @@ auto WebRTCStreamer::start() -> std::expected<void, WebRTCError>
     impl_->main_loop_thread = std::thread([this]() -> void { g_main_loop_run(impl_->main_loop); });
 
     // Start the pipeline
-    g_print("Starting pipeline...\n");
-    g_print("Connecting to signalling server: %s\n", impl_->config.signalling_server_uri.c_str());
+    log::info("Starting pipeline");
+    log::info("Connecting to signalling server: {}", impl_->config.signalling_server_uri);
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_PLAYING);
 
     if (ret == GST_STATE_CHANGE_FAILURE) {
-        g_printerr("Failed to start pipeline\n");
+        log::error("Failed to start pipeline");
         impl_->set_state(StreamState::Error);
         return std::unexpected(WebRTCError::StateChangeFailed);
     }
@@ -563,7 +564,7 @@ auto WebRTCStreamer::start() -> std::expected<void, WebRTCError>
         return std::unexpected(WebRTCError::StateChangeFailed);
     }
 
-    g_print("Pipeline started, waiting for peers to connect...\n");
+    log::info("Pipeline started, waiting for peers to connect");
 
     return {};
 }
@@ -572,7 +573,7 @@ auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
 {
     if (impl_->pipeline == nullptr) { return {}; }
 
-    g_print("Stopping pipeline...\n");
+    log::info("Stopping pipeline");
 
     // Only a running pipeline drains an EOS; one that never started leaks it and would wait a second for nothing.
     GstState current = GST_STATE_NULL;
@@ -741,7 +742,7 @@ auto create_webrtc_stream_from_config(const std::filesystem::path &config_path,
     if (auto config_result = config::load_webrtc_config(config_path); config_result) {
         webrtc_config = *config_result;
     } else {
-        g_printerr("Failed to load config from %s, using defaults\n", config_path.string().c_str());
+        log::warning("Failed to load config from {}, using defaults", config_path.string());
     }
 
     return create_configured_streamer(create_stream_config_from_webrtc_config(

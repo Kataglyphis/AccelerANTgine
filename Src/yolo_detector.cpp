@@ -22,6 +22,7 @@ module kataglyphis.yolo_detector;
 import kataglyphis.onnx_inference;
 import kataglyphis.gstreamer_pipeline;
 import kataglyphis.project_config;
+import kataglyphis.log;
 
 namespace kataglyphis::detection {
 
@@ -510,7 +511,7 @@ struct VideoDetectorPipeline::Impl
         if (on_error) {
             on_error(detection.error());
         } else if (changed) {
-            std::fprintf(stderr, "Video detection failed: %d\n", static_cast<int>(detection.error()));
+            log::error("Video detection failed: {}", static_cast<int>(detection.error()));
         }
     }
 };

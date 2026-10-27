@@ -15,6 +15,8 @@ enumerate inbound files privately or use recursive tar exclusions for those root
 Windows CLI and demo executables carry `images/faviconNew.ico` through the shared CMake resource helper.
 The MSIX stages the project LICENSE independently of the bundle's `bin` and verifies its finished payload.
 When MSIX is selected, missing makeappx, the project manifest or the project logo fails the build; `-SkipMSIX` is the explicit opt-out.
+Library and CLI diagnostics go through `kataglyphis::log`, which release (`NDEBUG`) builds limit to warnings and errors;
+never add a direct `g_print`, `printf` or `std::cout` diagnostic to `Src/`.
 
 Laid out per ANTfrastructure's
 [`shared/templates/AGENTS.md.template`](third_party/ANTfrastructure/shared/templates/AGENTS.md.template).

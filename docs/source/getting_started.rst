@@ -39,6 +39,21 @@ glibc and EGL alone (``CHANGELOG.md``, *Unreleased*).
    sudo apt install ./AccelerANTgine-*-Linux-$(uname -m)-*.deb   # or: unpack the tarball, run usr/bin/AccelerANTgine
    AccelerANTgine --version
 
+Logging
+-------
+
+The library and the CLI log through ``kataglyphis::log``. A build with ``NDEBUG`` (Release,
+RelWithDebInfo) prints warnings and errors only; a Debug build prints everything.
+``ACCELERANTGINE_LOG_LEVEL`` (``debug``, ``info``, ``warning``, ``error`` or ``off``) overrides
+that default for any program that loads the library, and the CLI's ``--log_level`` takes the same
+values. An embedder can route messages with ``kataglyphis::log::set_sink``. Streaming errors still
+reach ``set_error_callback``; logging only adds text.
+
+.. code-block:: sh
+
+   AccelerANTgine --webrtc --source test --log_level info
+   ACCELERANTGINE_LOG_LEVEL=debug AccelerANTgine --webrtc --source test
+
 Clone The Repository
 --------------------
 

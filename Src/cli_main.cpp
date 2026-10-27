@@ -14,6 +14,7 @@ import kataglyphis.inference;
 import kataglyphis.webrtc_streamer;
 import kataglyphis.config_loader;
 import kataglyphis.project_config;
+import kataglyphis.log;
 
 ABSL_FLAG(bool, webrtc, false, "Start WebRTC streaming");
 ABSL_FLAG(std::string, config, "", "Load settings from JSON config file");
@@ -28,6 +29,11 @@ ABSL_FLAG(std::uint32_t, height, 0, "Video height in pixels (0 = use config defa
 ABSL_FLAG(std::uint32_t, fps, 0, "Framerate (0 = use config default)");
 ABSL_FLAG(std::string, encoder, "h264-hw", "Encoder: h264-hw, h264-sw, vp8, vp9");
 ABSL_FLAG(std::uint32_t, bitrate, 0, "Bitrate in kbps (0 = use config default)");
+ABSL_FLAG(std::string,
+  log_level,
+  "",
+  "Log level: debug, info, warning, error or off (default: warning in release builds, debug otherwise; "
+  "ACCELERANTGINE_LOG_LEVEL sets it too)");
 ABSL_FLAG(bool,
   gst_check,
   false,
@@ -114,7 +120,7 @@ auto parse_video_source(std::string_view name) -> kataglyphis::webrtc::VideoSour
     if (name == "test") { return kataglyphis::webrtc::VideoSource::TestPattern; }
     if (name == "file") { return kataglyphis::webrtc::VideoSource::File; }
     if (name == "uri") { return kataglyphis::webrtc::VideoSource::Uri; }
-    if (name != "libcamera") { std::cerr << "Warning: unknown source '" << name << "', falling back to libcamera\n"; }
+    if (name != "libcamera") { kataglyphis::log::warning("unknown source '{}', falling back to libcamera", name); }
     return kataglyphis::webrtc::VideoSource::Libcamera;
 }
 
@@ -123,7 +129,7 @@ auto parse_video_encoder(std::string_view name) -> kataglyphis::webrtc::VideoEnc
     if (name == "h264-sw") { return kataglyphis::webrtc::VideoEncoder::H264_Software; }
     if (name == "vp8") { return kataglyphis::webrtc::VideoEncoder::VP8; }
     if (name == "vp9") { return kataglyphis::webrtc::VideoEncoder::VP9; }
-    if (name != "h264-hw") { std::cerr << "Warning: unknown encoder '" << name << "', falling back to h264-hw\n"; }
+    if (name != "h264-hw") { kataglyphis::log::warning("unknown encoder '{}', falling back to h264-hw", name); }
     return kataglyphis::webrtc::VideoEncoder::H264_Hardware;
 }
 
@@ -185,6 +191,15 @@ auto main(int argc, char **argv) -> int
 
     absl::ParseCommandLine(argc, argv);
 
+    if (const std::string requested = absl::GetFlag(FLAGS_log_level); !requested.empty()) {
+        const auto parsed = kataglyphis::log::parse_level(requested);
+        if (!parsed) {
+            std::cerr << "Unknown --log_level '" << requested << "'; use debug, info, warning, error or off\n";
+            return 2;
+        }
+        kataglyphis::log::set_level(*parsed);
+    }
+
     if (absl::GetFlag(FLAGS_gst_check)) { return check_gstreamer(&argc, &argv); }
 
     const bool start_webrtc = absl::GetFlag(FLAGS_webrtc);
@@ -206,13 +221,13 @@ auto main(int argc, char **argv) -> int
     const std::string config_file_path = absl::GetFlag(FLAGS_config);
 
     if (!config_file_path.empty()) {
-        std::cout << "Loading configuration from: " << config_file_path << '\n';
+        kataglyphis::log::info("Loading configuration from: {}", config_file_path);
         auto result = kataglyphis::config::load_webrtc_config(config_file_path);
         if (result) {
             webrtc_config = *result;
-            std::cout << "Configuration loaded successfully\n";
+            kataglyphis::log::info("Configuration loaded successfully");
         } else {
-            std::cerr << "Warning: Failed to load config file, using defaults\n";
+            kataglyphis::log::warning("Failed to load config file, using defaults");
         }
     }
 
@@ -221,7 +236,7 @@ auto main(int argc, char **argv) -> int
 
     apply_cli_overrides(config, override_flags);
 
-    std::cout << "Initializing WebRTC streaming...\n";
+    kataglyphis::log::info("Initializing WebRTC streaming");
 
     auto init_result = kataglyphis::webrtc::WebRTCStreamer::initialize(&argc, &argv);
     if (!init_result) {
@@ -233,7 +248,7 @@ auto main(int argc, char **argv) -> int
 
     streamer.set_state_callback(
       [](kataglyphis::webrtc::StreamState old_state, kataglyphis::webrtc::StreamState new_state) -> void {
-          std::cout << "State: " << state_to_string(old_state) << " -> " << state_to_string(new_state) << '\n';
+          kataglyphis::log::info("State: {} -> {}", state_to_string(old_state), state_to_string(new_state));
       });
 
     streamer.set_error_callback([](kataglyphis::webrtc::WebRTCError /*error*/, const std::string &message) -> void {
@@ -246,9 +261,9 @@ auto main(int argc, char **argv) -> int
         return 1;
     }
 
-    std::cout << "Connecting to signalling server: " << config.signalling_server_uri << '\n';
-    std::cout << "Producer ID: " << streamer.get_producer_id() << '\n';
-    std::cout << "Resolution: " << config.width << "x" << config.height << "@" << config.framerate << "fps\n";
+    kataglyphis::log::info("Connecting to signalling server: {}", config.signalling_server_uri);
+    kataglyphis::log::info("Producer ID: {}", streamer.get_producer_id());
+    kataglyphis::log::info("Resolution: {}x{}@{}fps", config.width, config.height, config.framerate);
 
     auto start_result = streamer.start();
     if (!start_result) {
@@ -272,11 +287,11 @@ auto main(int argc, char **argv) -> int
         }
     }
 
-    std::cout << "\nStopping stream...\n";
+    kataglyphis::log::info("Stopping stream");
     (void)streamer.stop();
 
     kataglyphis::webrtc::WebRTCStreamer::deinitialize();
 
-    std::cout << "Done.\n";
+    kataglyphis::log::info("Done");
     return 0;
 }
