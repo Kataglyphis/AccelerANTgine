@@ -31,6 +31,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- Dependencies from the hub's local Renovate run: the fuzztest, Google Benchmark, nlohmann/json
+  and spdlog submodules at their default-branch tips (2026-10-24 to 2026-10-27), and refreshed
+  `Src/rusty_code/Cargo.lock` (cc 1.10.0) and `uv.lock` (pytest 9.2.0).
 - Install ONNX Runtime's original license and notices from the DLL-matched image wheel;
   verify the Windows install tree, ZIP and MSIX.
 
