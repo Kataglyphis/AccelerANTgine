@@ -71,6 +71,8 @@ Tests
 No suite loads a model file. CMake writes the hub's tiny GenAI model into the build tree at
 configure time (``kataglyphis_use_tiny_genai_model``), and the tests read its ``fixture.json``:
 greedy decoding of ``abc`` yields ``defg``, and from the byte ``0xBF`` it runs to the end token.
+The build also copies it beside each suite, where a staged suite or one whose build tree moved, such
+as the Windows lane's debug run, finds it once the configure-time path is gone.
 The commit suite covers the C++ and C calls, the CLI cases cover the chat mode, the compile suite
 the C17 header, and ``Test/python/test_text_generation.py`` the binding, including eight threads on
 one generator. The model release ModelANT publishes for real use is

@@ -53,6 +53,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- A suite finds the tiny GenAI model beside itself once its configure-time path is gone: the Windows
+  debug run starts the suites from a moved build tree, looked in the working directory and aborted.
 - The Windows test bundle walks the staged GenAI DLL's own imports: GenAI is loaded at run time, so
   the suites' walk missed its `msvcp140_atomic_wait.dll`, and the arm64 device check refused the bundle.
 - The C API header is fenced from clang-tidy's fixes: the Windows lane rewrote its declarations into C++

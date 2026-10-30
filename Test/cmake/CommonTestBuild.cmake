@@ -120,5 +120,11 @@ function(kataglyphis_use_tiny_genai_model target_name)
       OUTPUT_QUIET COMMAND_ERROR_IS_FATAL ANY)
     set_property(GLOBAL PROPERTY KATAGLYPHIS_TINY_GENAI_WRITTEN TRUE)
   endif()
+  target_sources(${target_name} PRIVATE "${PROJECT_SOURCE_DIR}/Test/common/kataglyphis_test_paths.cpp")
+  # A staged suite, or one whose build tree moved, finds the model beside itself.
+  add_custom_command(
+    TARGET ${target_name}
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${_model}" "$<TARGET_FILE_DIR:${target_name}>/test-models/tiny-genai")
   target_compile_definitions(${target_name} PRIVATE KATAGLYPHIS_TINY_GENAI_MODEL="${_model}")
 endfunction()

@@ -150,6 +150,13 @@ TEST_F(TextGeneration, EmptyMessagesOrNoBudgetAreInvalid)
       text::TextGenError::InvalidOptions);
 }
 
+TEST(TextGenerationSetup, TheModelLiesBesideTheSuiteForAStagedOrMovedBuild)
+{
+    const auto beside = kataglyphis::test::executable_dir();
+    EXPECT_TRUE(beside.is_absolute()) << beside;
+    EXPECT_TRUE(std::filesystem::exists(beside / "test-models" / "tiny-genai" / "genai_config.json")) << beside;
+}
+
 TEST(TextGenerationSetup, AnUninitializedGeneratorRefuses)
 {
     text::TextGenerator generator;
