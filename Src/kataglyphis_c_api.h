@@ -10,6 +10,9 @@
 extern "C" {
 #endif
 
+// C consumers include this header, so clang-tidy's C++ rewrites (trailing returns, using) must not touch it.
+// NOLINTBEGIN
+
 KATAGLYPHIS_C_API int kataglyphis_add(int lhs, int rhs);
 
 /* Text generation on the chain's ONNX Runtime GenAI; docs/source/text_generation.rst is the contract. */
@@ -83,6 +86,8 @@ KATAGLYPHIS_C_API void kataglyphis_text_generator_destroy(kataglyphis_text_gener
 
 /** A static English sentence for every status, including unknown ones. */
 KATAGLYPHIS_C_API const char *kataglyphis_text_status_message(int status);
+
+// NOLINTEND
 
 #ifdef __cplusplus
 }

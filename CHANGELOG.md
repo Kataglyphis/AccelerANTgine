@@ -53,6 +53,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- The C API header is fenced from clang-tidy's fixes: the Windows lane rewrote its declarations into C++
+  trailing returns, which the C17 consumer could not compile.
 - The time to the first token includes the prefill: the clock starts before the prompt is encoded,
   not after GenAI took it in.
 - The text C API compiles under GCC 16, which needs `<functional>` and `<typeinfo>` visible where
