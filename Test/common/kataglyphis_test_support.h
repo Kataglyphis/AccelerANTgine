@@ -244,6 +244,16 @@ template<typename Expected> auto error_of(const Expected &result) -> std::option
 inline auto missing_path(std::string_view name) -> std::filesystem::path
 { return std::filesystem::temp_directory_path() / "kataglyphis-test-does-not-exist" / std::string(name); }
 
+#ifdef KATAGLYPHIS_TINY_GENAI_MODEL
+// The configure-time GenAI test model, or the copy a staged suite carries, since Invoke-StagedTests runs beside it.
+inline auto tiny_genai_model_dir() -> std::filesystem::path
+{
+    const std::filesystem::path built{ KATAGLYPHIS_TINY_GENAI_MODEL };
+    if (std::filesystem::exists(built / "genai_config.json")) { return built; }
+    return std::filesystem::current_path() / "test-models" / "tiny-genai";
+}
+#endif
+
 }// namespace kataglyphis::test
 
 #endif// KATAGLYPHIS_TEST_SUPPORT_H

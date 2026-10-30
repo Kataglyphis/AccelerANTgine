@@ -296,6 +296,12 @@ written out rather than linked.
   Windows arm64 run job, and the `*.onnx` guard in `.gitignore` stays as it is. The shipped
   `resources/configs/inference_config.toml` is compiled into the suites
   (`kataglyphis_embed_text_file`) for the same reason.
+- **The GenAI tests generate their model too.** `kataglyphis_use_tiny_genai_model` in
+  `Test/cmake/CommonTestBuild.cmake` runs the hub's `tiny-genai-model.py` at configure time, so a
+  hub pin without it fails the configure, and the tests read the generator's `fixture.json` rather
+  than retyping its tokens. The library loads GenAI at run time and never links it; a lane without
+  the chain GenAI fails `initialize` with `LibraryUnavailable`
+  (`docs/source/text_generation.rst`).
 - **A GStreamer test skips when an element is missing; Windows stages four plugins.**
   `KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS` probes through the library and names the missing
   element in its `GTEST_SKIP`. GStreamer looks for plugins in the directory of

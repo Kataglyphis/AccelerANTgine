@@ -20,6 +20,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- `kataglyphis.text_generation`: language models on the chain's ONNX Runtime GenAI, loaded at run
+  time, so the library does not link GenAI and the packages are unchanged. `TextGenerator` applies
+  the model's chat template, streams decoded text, stops at the end token or the budget, cancels
+  from any thread and reports the time to the first token and the decode rate
+  (`docs/source/text_generation.rst`). The C API adds `kataglyphis_text_generator_create`,
+  `_generate`, `_cancel`, `_destroy`, `kataglyphis_text_options_default` and
+  `kataglyphis_text_status_message`; nothing existing moves, so OmniAccelerANT's plugin keeps
+  building. Python gets `TextGenerator`, the CLI `--chat_model`, `--prompt` and `--max_new_tokens`.
+  The tests generate the hub's tiny GenAI model at configure time.
+
 - Every package lists its third-party components with version, SPDX license, source and license
   texts in `THIRD-PARTY-NOTICES.txt`: the Linux `.deb`, tarball, AppImage and Flatpak, the Windows
   MSI, NSIS, ZIP and MSIX, and the Python wheel (#2). The install step fails on a shipped binary

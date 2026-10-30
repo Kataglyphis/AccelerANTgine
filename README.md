@@ -79,6 +79,7 @@ A release needs no build:
 | Prerequisites, installing a release, presets, the Rust crate, Python bindings | [Getting Started](https://hardwareacceleratedai.jonasheinle.de/getting_started.html) |
 | Key features, project layout, dependencies, what CI builds with | [Overview](https://hardwareacceleratedai.jonasheinle.de/overview.html) |
 | Frame formats, model contracts and inference errors | [Inference and preprocessing](https://hardwareacceleratedai.jonasheinle.de/inference_preprocessing.html) |
+| Language models on ONNX Runtime GenAI: C++, C, Python and the CLI | [Text generation](https://hardwareacceleratedai.jonasheinle.de/text_generation.html) |
 | The test suites, shared CI argument checks, profiling, static analysis and tools | [Development Workflow](https://hardwareacceleratedai.jonasheinle.de/development_workflow.html) |
 | Windows container builds, shared runtime staging and host runs | [Windows Workflow](https://hardwareacceleratedai.jonasheinle.de/windows_workflow.html) |
 | The C++ and C API | [API Reference](https://hardwareacceleratedai.jonasheinle.de/api_reference.html) |
