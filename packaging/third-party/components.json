@@ -80,6 +80,17 @@
       "texts": [{"root": "repo", "path": "packaging/third-party/texts/LGPL-2.1.txt"}]
     },
     {
+      "id": "libpisp",
+      "name": "libpisp (Raspberry Pi PiSP helpers, a libcamera subproject)",
+      "version": "v1.5.0, the revision libcamera's subprojects/libpisp.wrap pins",
+      "spdx": "BSD-2-Clause AND MIT",
+      "url": "https://github.com/raspberrypi/libpisp",
+      "source": "https://github.com/raspberrypi/libpisp/tree/v1.5.0",
+      "binaries": ["libpisp.so*"],
+      "notice": "nlohmann/json (MIT) is compiled in; its four kernel uapi headers are GPL-2.0-only WITH Linux-syscall-note, which leaves userspace code that uses them under its own license.",
+      "texts": [{"root": "repo", "path": "packaging/third-party/texts/libpisp-LICENSE.txt"}, {"root": "repo", "path": "third_party/NLOHMANN_JSON/LICENSE.MIT"}]
+    },
+    {
       "id": "orc",
       "name": "ORC (Optimized Inner Loop Runtime Compiler)",
       "version": "the GStreamer build's orc subproject",

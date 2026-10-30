@@ -53,6 +53,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- The text C API compiles under GCC 16, which needs `<functional>` and `<typeinfo>` visible where
+  it instantiates `std::function`; an import of the module that includes them is not enough.
+- The arm64 packages list libpisp, which libcamera builds for its Raspberry Pi pipeline; the notices
+  step had failed every arm64 package since it landed.
 - Restore the Linux lanes: `cmake/SystemLibDependencies.cmake` is cmake-formatted again, and
   ANTfrastructure's `CPackCommon` is included at top level, because its include guard kept the
   package closure's script paths in `Src/`'s scope and `cpack` ran `bash` on an empty path.

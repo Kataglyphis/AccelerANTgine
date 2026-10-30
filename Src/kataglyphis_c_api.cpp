@@ -4,9 +4,11 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <new>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <vector>
 
 module kataglyphis.c_api;
