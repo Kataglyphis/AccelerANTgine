@@ -53,6 +53,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- The time to the first token includes the prefill: the clock starts before the prompt is encoded,
+  not after GenAI took it in.
 - The text C API compiles under GCC 16, which needs `<functional>` and `<typeinfo>` visible where
   it instantiates `std::function`; an import of the module that includes them is not enough.
 - The arm64 packages list libpisp, which libcamera builds for its Raspberry Pi pipeline; the notices

@@ -207,8 +207,10 @@ struct TextGenerator::Impl
       OgaTokenizerStream *stream,
       const TextCallback &on_text,
       GenerationResult &result) const -> std::expected<void, TextGenError>;
-    auto decode(OgaGenerator *generator, const TextCallback &on_text, GenerationResult &result) const
-      -> std::expected<void, TextGenError>;
+    auto decode(OgaGenerator *generator,
+      const TextCallback &on_text,
+      GenerationResult &result,
+      Clock::time_point start) const -> std::expected<void, TextGenError>;
     void
       finish(GenerationResult &result, Clock::time_point start, Clock::time_point first, Clock::time_point end) const;
 };
@@ -292,15 +294,16 @@ auto TextGenerator::Impl::next_token(OgaGenerator *generator,
     return {};
 }
 
-auto TextGenerator::Impl::decode(OgaGenerator *generator, const TextCallback &on_text, GenerationResult &result) const
-  -> std::expected<void, TextGenError>
+auto TextGenerator::Impl::decode(OgaGenerator *generator,
+  const TextCallback &on_text,
+  GenerationResult &result,
+  Clock::time_point start) const -> std::expected<void, TextGenError>
 {
     OgaTokenizerStream *raw_stream = nullptr;
     if (!succeeded(*api, api->CreateTokenizerStream(tokenizer.get(), &raw_stream), "tokenizer stream")) {
         return std::unexpected(TextGenError::TokenizerFailed);
     }
     const Stream stream{ raw_stream, { api } };
-    const auto start = Clock::now();
     auto first = start;
     while (!api->GeneratorIsDone(generator)) {
         if (cancel.load()) {
@@ -388,13 +391,15 @@ auto TextGenerator::generate(const std::vector<ChatMessage> &messages,
     if (impl_->model == nullptr) { return std::unexpected(TextGenError::NotInitialized); }
     if (messages.empty() || options.max_new_tokens <= 0) { return std::unexpected(TextGenError::InvalidOptions); }
     impl_->cancel.store(false);
+    // The clock starts before the prompt goes in, so the first token's time includes the prefill.
+    const auto start = Clock::now();
     auto prompt = impl_->prompt_tokens(messages);
     if (!prompt) { return std::unexpected(prompt.error()); }
     GenerationResult result;
     result.prompt_tokens = impl_->api->SequencesGetSequenceCount(prompt->get(), 0);
     auto generator = impl_->make_generator(**prompt, result.prompt_tokens, options);
     if (!generator) { return std::unexpected(generator.error()); }
-    if (auto decoded = impl_->decode(generator->get(), on_text, result); !decoded) {
+    if (auto decoded = impl_->decode(generator->get(), on_text, result, start); !decoded) {
         return std::unexpected(decoded.error());
     }
     return result;
