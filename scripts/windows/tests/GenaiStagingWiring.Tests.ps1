@@ -34,9 +34,10 @@ Describe 'ONNX Runtime GenAI staging for the staged suites' {
         } finally { $env:ONNX_GENAI_ROOT = $saved }
     }
 
-    It 'stages GenAI and the test model beside the suites in Stage Tests (mutation)' {
+    It 'stages GenAI, its own imports and the test model beside the suites in Stage Tests (mutation)' {
         $text = (Get-UniqueBuildAstNode -Ast $ast -StepName 'Stage Tests (').Extent.Text
         ($text -match 'Copy-ChainGenaiBeside -Destination \$tests') | Should Be $true
+        ($text -match 'Copy-PeImportClosure -Path @\(\$genai\)') | Should Be $true
         ($text -match "Join-Path \`$fastBuildReleaseDirFull 'test-models'") | Should Be $true
     }
 }

@@ -53,6 +53,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- The Windows test bundle walks the staged GenAI DLL's own imports: GenAI is loaded at run time, so
+  the suites' walk missed its `msvcp140_atomic_wait.dll`, and the arm64 device check refused the bundle.
 - The C API header is fenced from clang-tidy's fixes: the Windows lane rewrote its declarations into C++
   trailing returns, which the C17 consumer could not compile.
 - The time to the first token includes the prefill: the clock starts before the prompt is encoded,

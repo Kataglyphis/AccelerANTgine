@@ -527,7 +527,9 @@ try {
                 # The build's own bin first, so a suite that imports the engine gets this build's AccelerANTgine.dll.
                 $search = @(Join-Path $fastBuildReleaseDirFull 'bin') + @(Get-ProductDllSearchPath -Arch $TargetArch)
                 $closure = @(Copy-PeImportClosure -Path $suites -SearchDirectory $search -Destination $tests -Arch $TargetArch)
-                $closure += @(Copy-ChainGenaiBeside -Destination $tests)
+                $genai = Copy-ChainGenaiBeside -Destination $tests
+                # GenAI is loaded at run time, so the suites' import walk never reaches the CRT it needs itself.
+                $closure += @($genai) + @(Copy-PeImportClosure -Path @($genai) -SearchDirectory $search -Destination $tests -Arch $TargetArch)
                 # The suites look for the configure-time GenAI test model beside themselves once its build path is gone.
                 Copy-Item -LiteralPath (Join-Path $fastBuildReleaseDirFull 'test-models') -Destination $tests -Recurse -Force
                 # GStreamer looks for plugins in <flat dir>\lib\gstreamer-1.0; their own imports join the closure beside the suites.
