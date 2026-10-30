@@ -25,7 +25,9 @@ enum class OnnxError {
     SessionNotInitialized,
     OutputNotFound,
     InvalidOutputType,
-    InvalidOutputShape
+    InvalidOutputShape,
+    ProfilingNotEnabled,
+    ProfilingFailed
 };
 
 // Exported: a member defined in a module interface is not inline, so importers link against this one.
@@ -54,6 +56,7 @@ struct InferenceResult
 };
 
 enum class ExecutionMode { Sequential, Parallel };
+enum class ExecutionProvider { Cpu, Cuda, MigraphX, DirectML };
 
 struct SessionConfig
 {
@@ -63,6 +66,9 @@ struct SessionConfig
     bool enable_cuda = false;
     bool enable_memory_pattern = true;
     ExecutionMode execution_mode{ ExecutionMode::Sequential };
+    ExecutionProvider execution_provider{ ExecutionProvider::Cpu };
+    int device_id = 0;
+    std::filesystem::path profiling_prefix;
 };
 
 class KATAGLYPHIS_CPP_API OnnxInferenceEngine
@@ -79,6 +85,8 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
     [[nodiscard]] auto initialize(const SessionConfig &config) -> std::expected<void, OnnxError>;
 
     [[nodiscard]] auto is_initialized() const -> bool;
+
+    [[nodiscard]] auto end_profiling() -> std::expected<std::string, OnnxError>;
 
     [[nodiscard]] auto run_inference(std::span<const float> input_data,
       const TensorShape &input_shape,

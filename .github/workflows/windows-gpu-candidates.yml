@@ -1,0 +1,158 @@
+name: Windows x64 GPU package candidates
+
+on:
+  workflow_dispatch:
+    inputs:
+      verify-gpu:
+        description: Profile the finished candidate on vendor-labelled GPU runners
+        type: boolean
+        default: false
+      amd-device-index:
+        description: DXGI adapter index for the AMD DirectML runner
+        type: string
+        default: '0'
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: windows-gpu-candidates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    outputs:
+      repository: ${{ steps.image.outputs.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - name: Verify pinned GPU packaging APIs before image pull
+        shell: pwsh
+        run: |
+          ./scripts/windows/Test-WindowsGpuHub.ps1
+          python scripts/linux/tests/test-gpu-workflow-artifacts.py
+          if ($LASTEXITCODE -ne 0) { throw 'GPU artifact rerun checks failed.' }
+          python third_party/ANTfrastructure/shared/python/tests/test_verify_ort_profile.py
+          if ($LASTEXITCODE -ne 0) { throw 'ORT profile verifier tests failed.' }
+      - name: Read the pinned registry image repository
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(bash third_party/ANTfrastructure/linux/scripts/ci-image-ref.sh --windows)"
+          repository="${image%:*}"
+          [[ -n "$repository" && "$repository" != "$image" ]] || { echo 'Invalid image reference' >&2; exit 1; }
+          printf 'repository=%s\n' "$repository" >> "$GITHUB_OUTPUT"
+
+  candidate:
+    needs: preflight
+    runs-on: windows-2025
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vendor: nvidia
+            tag: winamd64-nvidia
+          - vendor: amd
+            tag: winamd64-rocm
+    steps:
+      - name: Prepare host and pull GPU image
+        id: prep
+        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-windows-container-host@develop
+        with:
+          image: ${{ format('{0}:{1}', needs.preflight.outputs.repository, matrix.tag) }}
+          target-arch: amd64
+          submodules: 'true'
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GHCR_PAT }}
+      - name: Build and verify the GPU package candidate
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-windows-container@develop
+        with:
+          image: ${{ format('{0}:{1}', needs.preflight.outputs.repository, matrix.tag) }}
+          target-arch: amd64
+          file: C:\ws\scripts\windows\Build-Windows.ps1
+          file-args: |
+            -WorkspaceDir
+            C:\ws
+            -BuildTargets
+            clangcl-release
+            -OrtVariant
+            ${{ matrix.vendor }}
+            -SkipFormat
+      - name: Test candidate startup on the clean host
+        shell: pwsh
+        env:
+          WORKSPACE: ${{ steps.prep.outputs.workspace }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:WORKSPACE 'dist/windows-x64-gpu-${{ matrix.vendor }}/bundle/bin/AccelerANTgine.exe'
+          & (Join-Path $env:WORKSPACE 'scripts/windows/Test-WindowsGpuCleanHost.ps1') -Executable $exe
+      - name: Upload the unverified GPU candidate
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unverified-accelerantgine-windows-x64-${{ matrix.vendor }}
+          overwrite: true
+          path: ${{ steps.prep.outputs.workspace }}/dist/windows-x64-gpu-${{ matrix.vendor }}
+          if-no-files-found: error
+
+  gpu-profile:
+    if: ${{ inputs.verify-gpu }}
+    needs: candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vendor: nvidia
+            device: cuda
+            runner: gpu-nvidia-cuda
+          - vendor: amd
+            device: directml
+            runner: gpu-amd-directml
+    runs-on: [self-hosted, Windows, X64, '${{ matrix.runner }}']
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.0.0
+        with:
+          python-version: '3.14'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unverified-accelerantgine-windows-x64-${{ matrix.vendor }}
+          path: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}
+      - name: Require model operators on the requested GPU
+        shell: pwsh
+        env:
+          DEVICE: ${{ matrix.device }}
+          DIRECTML_INDEX: ${{ inputs.amd-device-index }}
+          CANDIDATE_DIR: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py --lock models/models.lock
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch the locked model.' }
+          $artifacts = @(Get-ChildItem -LiteralPath $env:CANDIDATE_DIR -Filter '*.zip' -File -Recurse)
+          if ($artifacts.Count -ne 1) { throw "Expected one candidate ZIP, found $($artifacts.Count)" }
+          $stage = Join-Path $env:RUNNER_TEMP "accelerantgine-profile-$env:DEVICE-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $null = New-Item -ItemType Directory -Path $stage
+          & "$env:SystemRoot\System32\tar.exe" -xf $artifacts[0].FullName -C $stage
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot unpack the candidate ZIP.' }
+          $demos = @(Get-ChildItem -LiteralPath $stage -Filter 'AccelerANTgine_demo.exe' -File -Recurse)
+          if ($demos.Count -ne 1) { throw "Expected one packaged demo, found $($demos.Count)" }
+          $index = '0'
+          if ($env:DEVICE -eq 'directml') {
+            $index = $env:DIRECTML_INDEX
+            python third_party/ANTfrastructure/windows/scripts/diagnostics/verify-dxgi-adapter.py --vendor amd --index $index
+            if ($LASTEXITCODE -ne 0) { throw 'The selected DirectML adapter is not a physical AMD GPU.' }
+          }
+          & $demos[0].FullName --onnx-only --model (Join-Path $env:GITHUB_WORKSPACE 'models/deim_dfine_n_coco.onnx') --device $env:DEVICE --device-id $index --profile (Join-Path $stage 'ort-profile')
+          if ($LASTEXITCODE -ne 0) { throw 'The candidate GPU inference failed.' }
+          $profiles = @(Get-ChildItem -LiteralPath $stage -Filter 'ort-profile*.json' -File)
+          if ($profiles.Count -ne 1) { throw "Expected one ORT profile, found $($profiles.Count)" }
+          python third_party/ANTfrastructure/shared/python/verify_ort_profile.py $profiles[0].FullName --device $env:DEVICE
+          if ($LASTEXITCODE -ne 0) { throw 'No model operator ran on the requested GPU provider.' }

@@ -1,3 +1,4 @@
+#include <charconv>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
@@ -29,7 +30,10 @@ static void print_detection_results(const detection::DetectionResult &result)
     }
 }
 
-static auto run_onnx_inference_example(const std::string &model_path) -> int
+static auto run_onnx_inference_example(const std::string &model_path,
+  inference::ExecutionProvider provider,
+  int device_id,
+  const std::filesystem::path &profile_prefix) -> int
 {
     std::cout << "=== ONNX Runtime Inference Example ===\n\n";
 
@@ -38,6 +42,9 @@ static auto run_onnx_inference_example(const std::string &model_path) -> int
     auto config = inference::create_default_session_config(model_path);
     config.intra_op_num_threads = 4;
     config.inter_op_num_threads = 4;
+    config.execution_provider = provider;
+    config.device_id = device_id;
+    config.profiling_prefix = profile_prefix;
 
     std::cout << "Initializing ONNX Runtime with model: " << model_path << "\n";
 
@@ -51,6 +58,11 @@ static auto run_onnx_inference_example(const std::string &model_path) -> int
 
     auto input_names = engine.get_input_names();
     auto output_names = engine.get_output_names();
+
+    if (input_names.size() != 1) {
+        std::cerr << "The ONNX example requires a model with exactly one input\n";
+        return 1;
+    }
 
     std::cout << "Model inputs:\n";
     for (const auto &name : input_names) {
@@ -104,6 +116,15 @@ static auto run_onnx_inference_example(const std::string &model_path) -> int
             std::cout << output.shape.dimensions[j];
         }
         std::cout << "] (" << output.data.size() << " elements)\n";
+    }
+
+    if (!profile_prefix.empty()) {
+        const auto profile = engine.end_profiling();
+        if (!profile) {
+            std::cerr << "Could not finish ONNX Runtime profiling\n";
+            return 1;
+        }
+        std::cout << "Profile: " << *profile << "\n";
     }
 
     return 0;
@@ -165,7 +186,8 @@ static auto run_gstreamer_pipeline_example() -> int
     return 0;
 }
 
-static auto run_yolo_detection_example(const std::string &model_path) -> int
+static auto
+  run_yolo_detection_example(const std::string &model_path, inference::ExecutionProvider provider, int device_id) -> int
 {
     std::cout << "\n=== YOLO Detection Example ===\n\n";
 
@@ -173,6 +195,8 @@ static auto run_yolo_detection_example(const std::string &model_path) -> int
 
     detection::YoloConfig config;
     config.model_path = model_path;
+    config.execution_provider = provider;
+    config.device_id = device_id;
     config.input_width = 640;
     config.input_height = 640;
     config.confidence_threshold = 0.25F;
@@ -247,6 +271,9 @@ static void print_usage(const char *program_name)
               << "Options:\n"
               << "  --model <path>     ONNX model (default: models/deim_dfine_n_coco.onnx, models/README.md)\n"
               << "  --onnx-only        Run only ONNX inference example\n"
+              << "  --device <name>    cpu, cuda, migraphx or directml (default: cpu)\n"
+              << "  --device-id <id>   Provider device index (default: 0)\n"
+              << "  --profile <prefix> Write an ONNX Runtime operator profile for the ONNX example\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
               << "  --yolo-only        Run only YOLO detection example\n"
               << "  --video-only       Run only video detection example\n"
@@ -264,12 +291,38 @@ auto main(int argc, char *argv[]) -> int
     bool run_gstreamer = false;
     bool run_yolo = false;
     bool run_video = false;
+    auto provider = inference::ExecutionProvider::Cpu;
+    int device_id = 0;
+    std::filesystem::path profile_prefix;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
 
         if (arg == "--model" && i + 1 < argc) {
             model_path = argv[++i];
+        } else if (arg == "--device" && i + 1 < argc) {
+            const std::string device = argv[++i];
+            if (device == "cpu") {
+                provider = inference::ExecutionProvider::Cpu;
+            } else if (device == "cuda") {
+                provider = inference::ExecutionProvider::Cuda;
+            } else if (device == "migraphx") {
+                provider = inference::ExecutionProvider::MigraphX;
+            } else if (device == "directml") {
+                provider = inference::ExecutionProvider::DirectML;
+            } else {
+                std::cerr << "Unknown device: " << device << "\n";
+                return 2;
+            }
+        } else if (arg == "--device-id" && i + 1 < argc) {
+            const std::string value = argv[++i];
+            const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), device_id);
+            if (error != std::errc{} || end != value.data() + value.size() || device_id < 0) {
+                std::cerr << "Invalid device index: " << value << "\n";
+                return 2;
+            }
+        } else if (arg == "--profile" && i + 1 < argc) {
+            profile_prefix = argv[++i];
         } else if (arg == "--onnx-only") {
             run_onnx = true;
         } else if (arg == "--gstreamer-only") {
@@ -286,6 +339,9 @@ auto main(int argc, char *argv[]) -> int
         } else if (arg == "--help") {
             print_usage(argv[0]);
             return 0;
+        } else {
+            std::cerr << "Unknown or incomplete option: " << arg << "\n";
+            return 2;
         }
     }
 
@@ -301,7 +357,7 @@ auto main(int argc, char *argv[]) -> int
     int result = 0;
 
     if (run_onnx) {
-        result = run_onnx_inference_example(model_path);
+        result = run_onnx_inference_example(model_path, provider, device_id, profile_prefix);
         if (result != 0) {
             std::cerr << "ONNX inference example failed!\n";
             return result;
@@ -317,7 +373,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_yolo) {
-        result = run_yolo_detection_example(model_path);
+        result = run_yolo_detection_example(model_path, provider, device_id);
         if (result != 0) {
             std::cerr << "YOLO detection example failed!\n";
             return result;

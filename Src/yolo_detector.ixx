@@ -77,6 +77,8 @@ struct YoloConfig
     int num_classes{ 80 };
     YoloOutputLayout output_layout{ YoloOutputLayout::CenterObjectnessScores };
     FramePreprocessMode preprocess_mode{ FramePreprocessMode::Stretch };
+    inference::ExecutionProvider execution_provider{ inference::ExecutionProvider::Cpu };
+    int device_id = 0;
 };
 
 class KATAGLYPHIS_CPP_API YoloDetector

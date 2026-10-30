@@ -85,6 +85,10 @@ auto onnx_error_name(kataglyphis::inference::OnnxError error) -> const char *
         return "InvalidOutputType";
     case OnnxError::InvalidOutputShape:
         return "InvalidOutputShape";
+    case OnnxError::ProfilingNotEnabled:
+        return "ProfilingNotEnabled";
+    case OnnxError::ProfilingFailed:
+        return "ProfilingFailed";
     }
     return "UnknownError";
 }
@@ -145,11 +149,19 @@ void bind_onnx(nb::module_ &m)
       .value("SessionNotInitialized", OnnxError::SessionNotInitialized)
       .value("OutputNotFound", OnnxError::OutputNotFound)
       .value("InvalidOutputType", OnnxError::InvalidOutputType)
-      .value("InvalidOutputShape", OnnxError::InvalidOutputShape);
+      .value("InvalidOutputShape", OnnxError::InvalidOutputShape)
+      .value("ProfilingNotEnabled", OnnxError::ProfilingNotEnabled)
+      .value("ProfilingFailed", OnnxError::ProfilingFailed);
 
     nb::enum_<ExecutionMode>(m, "ExecutionMode")
       .value("Sequential", ExecutionMode::Sequential)
       .value("Parallel", ExecutionMode::Parallel);
+
+    nb::enum_<ExecutionProvider>(m, "ExecutionProvider")
+      .value("Cpu", ExecutionProvider::Cpu)
+      .value("Cuda", ExecutionProvider::Cuda)
+      .value("MigraphX", ExecutionProvider::MigraphX)
+      .value("DirectML", ExecutionProvider::DirectML);
 
     nb::class_<SessionConfig>(m, "SessionConfig")
       .def(nb::init<>())
@@ -158,7 +170,9 @@ void bind_onnx(nb::module_ &m)
       .def_rw("inter_op_num_threads", &SessionConfig::inter_op_num_threads, nb::lock_self())
       .def_rw("enable_cuda", &SessionConfig::enable_cuda, nb::lock_self())
       .def_rw("enable_memory_pattern", &SessionConfig::enable_memory_pattern, nb::lock_self())
-      .def_rw("execution_mode", &SessionConfig::execution_mode, nb::lock_self());
+      .def_rw("execution_mode", &SessionConfig::execution_mode, nb::lock_self())
+      .def_rw("execution_provider", &SessionConfig::execution_provider, nb::lock_self())
+      .def_rw("device_id", &SessionConfig::device_id, nb::lock_self());
 
     m.def("default_session_config",
       &create_default_session_config,
@@ -286,7 +300,9 @@ void bind_yolo(nb::module_ &m)
       .def_rw("nms_threshold", &YoloConfig::nms_threshold, nb::lock_self())
       .def_rw("input_width", &YoloConfig::input_width, nb::lock_self())
       .def_rw("input_height", &YoloConfig::input_height, nb::lock_self())
-      .def_rw("num_classes", &YoloConfig::num_classes, nb::lock_self());
+      .def_rw("num_classes", &YoloConfig::num_classes, nb::lock_self())
+      .def_rw("execution_provider", &YoloConfig::execution_provider, nb::lock_self())
+      .def_rw("device_id", &YoloConfig::device_id, nb::lock_self());
 
     nb::class_<YoloDetector>(m, "YoloDetector")
       .def(nb::init<>())

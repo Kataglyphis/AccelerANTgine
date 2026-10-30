@@ -20,6 +20,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- Windows GPU package builds stage selected image GStreamer plugins and their DLL closure for portable,
+  installer and MSIX layouts. The package notice gate still requires verified dependency license
+  provenance; the currently cached image also lacks the VP8 encoder.
+
+- Inference and YOLO configurations expose CUDA, MIGraphX and DirectML provider selection and
+  a device ID. GPU providers require a matching ONNX Runtime and its dependencies.
+- Linux CPack can opt into NVIDIA or AMD provider staging with distinct artifact names and
+  host runtime search paths once the shared ANTfrastructure packaging APIs are adopted.
+- A manual Linux GPU candidate workflow covers NVIDIA x64 and arm64 and AMD x64. Its artifacts
+  are unverified until the shared tooling is adopted and GPU inference is checked on hardware.
+- Windows local builds accept an optional ``-ParallelJobs`` limit; the default is unchanged.
+
 - Every package lists its third-party components with version, SPDX license, source and license
   texts in `THIRD-PARTY-NOTICES.txt`: the Linux `.deb`, tarball, AppImage and Flatpak, the Windows
   MSI, NSIS, ZIP and MSIX, and the Python wheel (#2). The install step fails on a shipped binary
@@ -42,6 +54,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   ANTfrastructure's nested DocumANTation submodule and the local Renovate update path.
 
 ### Fixed
+
+- Run the Windows GPU candidate startup check with only system DLL paths and a fresh
+  GStreamer registry, so an installed SDK cannot mask missing package dependencies.
 
 - Restore the Linux lanes: `cmake/SystemLibDependencies.cmake` is cmake-formatted again, and
   ANTfrastructure's `CPackCommon` is included at top level, because its include guard kept the

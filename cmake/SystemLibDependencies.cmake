@@ -35,6 +35,21 @@ pkg_check_modules(
   glib-2.0>=2.70)
 
 # ONNX Runtime: the family's chain build only, from one prefix, with no system, vendor or pkg-config fallback.
+set(KATAGLYPHIS_ORT_VARIANT
+    "cpu"
+    CACHE STRING "Package ONNX Runtime variant: cpu, nvidia or amd")
+set_property(
+  CACHE KATAGLYPHIS_ORT_VARIANT
+  PROPERTY STRINGS
+           cpu
+           nvidia
+           amd)
+include(OrtPackageVariant)
+accelerantgine_validate_ort_package_variant(
+  "${KATAGLYPHIS_ORT_VARIANT}"
+  "${CMAKE_SYSTEM_NAME}"
+  "${CMAKE_SYSTEM_PROCESSOR}"
+  "${PROJECT_IS_TOP_LEVEL}")
 set(ONNXRUNTIME_ROOT
     ""
     CACHE PATH "Chain-built ONNX Runtime prefix (default: the family image's)")
@@ -49,6 +64,12 @@ elseif(WIN32)
     )
   endif()
   set(_ort_root "$ENV{ONNX_ROOT}")
+elseif(
+  NOT
+  KATAGLYPHIS_ORT_VARIANT
+  STREQUAL
+  "cpu")
+  set(_ort_root "/usr/local/lib/onnxruntime-gpu")
 else()
   set(_ort_root "/usr/local/lib/onnxruntime-cpu")
 endif()
@@ -108,10 +129,29 @@ message(STATUS "  Headers: ${_ONNXRUNTIME_INCLUDE_DIR}")
 if(WIN32)
   set(_ort_install_files "${_ort_runtime}")
   foreach(_ort_companion onnxruntime_providers_shared.dll DirectML.dll)
-    if(EXISTS "${_ort_root}/bin/${_ort_companion}")
-      list(APPEND _ort_install_files "${_ort_root}/bin/${_ort_companion}")
+    if(KATAGLYPHIS_ORT_VARIANT STREQUAL "cpu")
+      set(_ort_companion_path "${_ort_root}/bin/${_ort_companion}")
+    else()
+      accelerantgine_find_windows_ort_file("${_ort_root}" "${_ort_companion}" _ort_companion_path)
+    endif()
+    if(EXISTS "${_ort_companion_path}" AND NOT IS_DIRECTORY "${_ort_companion_path}")
+      list(APPEND _ort_install_files "${_ort_companion_path}")
     endif()
   endforeach()
+  if(PROJECT_IS_TOP_LEVEL AND KATAGLYPHIS_ORT_VARIANT STREQUAL "nvidia")
+    accelerantgine_find_windows_ort_file("${_ort_root}" "onnxruntime_providers_cuda.dll" _ort_cuda)
+    accelerantgine_find_windows_ort_file("${_ort_root}" "onnxruntime_providers_shared.dll" _ort_shared)
+    if(NOT _ort_cuda OR NOT _ort_shared)
+      message(FATAL_ERROR "NVIDIA packages require the chain CUDA provider and its shared bridge")
+    endif()
+    list(APPEND _ort_install_files "${_ort_cuda}")
+  elseif(PROJECT_IS_TOP_LEVEL AND KATAGLYPHIS_ORT_VARIANT STREQUAL "amd")
+    accelerantgine_find_windows_ort_file("${_ort_root}" "DirectML.dll" _ort_directml)
+    accelerantgine_find_windows_ort_file("${_ort_root}" "onnxruntime_providers_shared.dll" _ort_shared)
+    if(NOT _ort_directml OR NOT _ort_shared)
+      message(FATAL_ERROR "AMD Windows packages require the chain DirectML redistributable and shared provider bridge")
+    endif()
+  endif()
   install(FILES ${_ort_install_files} DESTINATION ${CMAKE_INSTALL_BINDIR})
   if(PROJECT_IS_TOP_LEVEL AND KATAGLYPHIS_PACKAGE_DLL_DIR)
     install(FILES "${KATAGLYPHIS_PACKAGE_DLL_DIR}/licenses/onnxruntime/LICENSE"

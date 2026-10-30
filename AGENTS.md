@@ -103,7 +103,7 @@ MSIX, media and ONNX wiring tests share `BuildAstFixture.psm1`; missing or ambig
 **CMake modules: this repo's `cmake/` first, then the hub's.** `CMakeLists.txt` puts this repo's
 `cmake/` ahead of `third_party/ANTfrastructure/cmake/` on `CMAKE_MODULE_PATH` and includes every
 module by name, so a local module of the same name wins. Local `cmake/` holds only this project's own policy (`ProjectOptions.cmake`,
-`CPackOptions.cmake`, `SystemLibDependencies.cmake`, `MsvcRuntime.cmake`, `fuzztest_compat/`);
+`CPackOptions.cmake`, `SystemLibDependencies.cmake`, `OrtPackageVariant.cmake`, `MsvcRuntime.cmake`, `fuzztest_compat/`);
 everything else, `Test/cmake/CommonTestBuild.cmake`'s GoogleTest registration (`GTestDiscovery`)
 included, resolves by name from
 [`third_party/ANTfrastructure/cmake`](third_party/ANTfrastructure/cmake/README.md).

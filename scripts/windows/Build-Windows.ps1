@@ -26,6 +26,8 @@ param(
     [switch]$SkipMSIX,
     [switch]$ContinueOnError,
     [switch]$StopOnError,
+    [ValidateSet('cpu', 'nvidia', 'amd')][string]$OrtVariant = 'cpu',
+    [ValidateRange(0, 1024)][int]$ParallelJobs = 0,
     # amd64 (alias x64) or arm64; empty means the image's WINDOWS_TARGET_ARCH, else amd64.
     [string]$TargetArch = '',
     # Release also builds the four suites and stages them in dist\windows-<arch>-tests (arm64 run job, x64 host run).
@@ -74,6 +76,16 @@ if ($isCross -and $notCross.Count -gt 0) {
 try { Import-BuildModule @('WindowsOrtProvenance.Common', 'WindowsOrtPayload.Common', 'WindowsMsiLicense.Common', 'WindowsOrtLicense.Common') } catch {
     throw "This build needs ANTfrastructure's WindowsOrtPayload.Common (hub commit 73a8dd74 of 2026-09-25, third_party/ANTfrastructure/docs/onnxruntime-single-source.md § The shared Windows glue); move third_party/ANTfrastructure to it or later. ($($_.Exception.Message))"
 }
+if ($OrtVariant -ne 'cpu') {
+    if ($TargetArch -ne 'amd64') { throw 'Windows GPU packages require x64; Windows ARM GPU packages are excluded.' }
+    if ($requestedTargets.Count -ne 1 -or $requestedTargets[0] -ne 'clangcl-release' -or $StageTests) {
+        throw 'Windows GPU candidates require only -BuildTargets clangcl-release without -StageTests.'
+    }
+    & (Join-Path $PSScriptRoot 'Test-WindowsGpuHub.ps1')
+    & (Join-Path $PSScriptRoot 'Test-WindowsGpuImage.ps1') -Variant $OrtVariant -OnnxRoot $env:ONNX_ROOT -WheelDir (Get-OrtChainWheelStore) -TargetArch $TargetArch
+}
+$distName = "windows-$packageArch"
+if ($OrtVariant -ne 'cpu') { $distName += "-gpu-$OrtVariant" }
 
 # The build table: a preset rename is a data edit, and every row carries its own environment override.
 $configPathResolved = Get-OrDefault $ConfigPath (Join-Path $PSScriptRoot 'Build-Windows.config.psd1')
@@ -154,6 +166,43 @@ function Copy-BuildMediaRuntime {
     if ($CopyOrtBeside) { $null = Copy-ChainOrtBeside -OnnxRoot $env:ONNX_ROOT -Destination $BuildRoot }
 }
 
+# Plugins are loaded dynamically and must seed the same PE closure as the engine.
+function Get-ImageGStreamerPackagePlugins {
+    param([Parameter(Mandatory)][string]$Arch)
+    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
+    $source = Join-Path (Split-Path -Parent $gstBin) 'lib\gstreamer-1.0'
+    $required = @('coreelements', 'app', 'videotestsrc', 'videoconvertscale', 'playback', 'webrtc', 'nice', 'dtls', 'srtp', 'sctp', 'rtpmanager', 'rtp')
+    $optional = @('videorate', 'rawparse', 'videoparsersbad', 'debugutilsbad', 'libav', 'jpeg', 'png', 'multifile', 'isomp4', 'rswebrtc', 'rsrtp', 'vpx', 'openh264', 'mediafoundation', 'winks', 'typefindfunctions')
+    foreach ($name in $required) {
+        if (-not (Test-Path -LiteralPath (Join-Path $source "gst$name.dll") -PathType Leaf)) {
+            throw "Required GStreamer plugin gst$name.dll is missing from $source"
+        }
+    }
+    foreach ($name in ($required + $optional)) {
+        $file = Join-Path $source "gst$name.dll"
+        if (Test-Path -LiteralPath $file -PathType Leaf) {
+            $null = Assert-PeTargetMachine -Path $file -Arch $Arch -Context 'GStreamer package plugin'
+            $file
+        }
+    }
+}
+
+function Copy-ImageGStreamerPackagePlugins {
+    param([Parameter(Mandatory)][string]$Destination, [Parameter(Mandatory)][string[]]$Plugins)
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    # A previous image may have contained optional plugins that the current image no longer supplies.
+    foreach ($old in @(Get-ChildItem -LiteralPath $Destination -Force)) {
+        if ($old.PSIsContainer -or $old.Name -notmatch '^gst[a-zA-Z0-9_-]+\.dll$') {
+            throw "Unexpected file in GStreamer plugin staging directory: $($old.FullName)"
+        }
+        Remove-Item -LiteralPath $old.FullName -Force -ErrorAction Stop
+    }
+    foreach ($file in $Plugins) {
+        Copy-Item -LiteralPath $file -Destination $Destination -Force
+        Join-Path $Destination (Split-Path -Leaf $file)
+    }
+}
+
 # The install-time notices list every DLL the closure added; each ZIP and MSI must carry that exact list.
 function Assert-InstallerNotice {
     param(
@@ -175,6 +224,7 @@ function Assert-InstallerNotice {
 }
 
 $FastBuildDir = Get-OrDefault $FastBuildDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.FastBuildDir')
+if ($OrtVariant -ne 'cpu') { $FastBuildDir = Join-Path $FastBuildDir "gpu-$OrtVariant" }
 $LogDir = Get-OrDefault $LogDir (Get-ConfigValue -Config $BuildConfig -Path 'Build.LogDir')
 
 # Resolve workspace
@@ -228,6 +278,7 @@ try {
     $fastBuildProfileFull = Join-Path $fastLocalCache $cfgProfile.BuildDir
     # A cross build keeps its own tree beside the host's, so neither clobbers the other.
     $releaseBuildDir = if ($isCross) { "$($cfgRelease.BuildDir)-$TargetArch" } else { $cfgRelease.BuildDir }
+    if ($OrtVariant -ne 'cpu') { $releaseBuildDir += "-gpu-$OrtVariant" }
     $fastBuildReleaseDirFull = Join-Path $fastLocalCache $releaseBuildDir
 
     $BuildTargets = $BuildTargets -join ',' -split ',' | ForEach-Object { $_.Trim() }
@@ -285,7 +336,7 @@ try {
                 Invoke-CmakeConfigureAndBuild -Context $Context `
                     -BuildPath $fastBuildMsvcFull `
                     -Preset $cfgMsvc.Preset `
-                    -Configuration $cfgMsvc.Configuration
+                    -Configuration $cfgMsvc.Configuration -ParallelJobs $ParallelJobs
             } finally { Pop-Location }
 
             # This lane links Microsoft's ASan runtime, which is not interchangeable with LLVM's.
@@ -307,7 +358,7 @@ try {
                 Invoke-CmakeConfigureAndBuild -Context $Context `
                     -BuildPath $fastBuildClangFull `
                     -Preset $cfgClang.Preset `
-                    -Configuration $cfgClang.Configuration `
+                    -Configuration $cfgClang.Configuration -ParallelJobs $ParallelJobs `
                     -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON') +
                         @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
@@ -403,7 +454,7 @@ try {
                 Invoke-CmakeConfigureAndBuild -Context $Context `
                     -BuildPath $fastBuildProfileFull `
                     -Preset $cfgProfile.Preset `
-                    -Configuration $cfgProfile.Configuration `
+                    -Configuration $cfgProfile.Configuration -ParallelJobs $ParallelJobs `
                     -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
             } finally { Pop-Location }
 
@@ -449,15 +500,18 @@ try {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Release Build" -Critical -Script {
             # Only this lane cleans, since a package must inherit nothing; CPack installs package-dlls beside the executables.
             $packageDlls = Join-Path $fastBuildReleaseDirFull 'package-dlls'
+            $imagePlugins = @(if ($OrtVariant -ne 'cpu') { Get-ImageGStreamerPackagePlugins -Arch $TargetArch })
             Push-Location $Workspace
             try {
                 Invoke-CmakeConfigureAndBuild -Context $Context `
                     -BuildPath $fastBuildReleaseDirFull `
                     -Preset $cfgRelease.Preset `
-                    -Configuration $cfgRelease.Configuration `
+                    -Configuration $cfgRelease.Configuration -ParallelJobs $ParallelJobs `
                     -CleanBuildRoot `
                     -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON',
-                            "-DKATAGLYPHIS_PACKAGE_DLL_DIR=$($packageDlls -replace '\\', '/')") +
+                            "-DKATAGLYPHIS_PACKAGE_DLL_DIR=$($packageDlls -replace '\\', '/')",
+                            "-DKATAGLYPHIS_ORT_VARIANT=$OrtVariant") +
+                        @(if ($OrtVariant -ne 'cpu') { "-DKATAGLYPHIS_GST_PLUGIN_DIR=$((Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -replace '\\', '/')" }) +
                         @(if ($StageTests) { '-DBUILD_TESTING=ON', '-DKATAGLYPHIS_RELEASE_TESTS=ON' }) +
                         @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
             } finally { Pop-Location }
@@ -465,8 +519,21 @@ try {
             Copy-BuildMediaRuntime -Context $Context -BuildRoot $fastBuildReleaseDirFull
             # Everything the engine imports transitively that a clean machine lacks.
             New-Item -ItemType Directory -Force -Path $packageDlls | Out-Null
-            $engine = @('AccelerANTgine.exe', 'AccelerANTgine.dll') | ForEach-Object { Join-Path $fastBuildReleaseDirFull "bin\$_" }
-            $closure = @(Copy-PeImportClosure -Path $engine -SearchDirectory @(Get-ProductDllSearchPath -Arch $TargetArch) -Destination $packageDlls -Arch $TargetArch)
+            $engine = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll') | ForEach-Object { Join-Path $fastBuildReleaseDirFull "bin\$_" }
+            $plugins = @(if ($OrtVariant -ne 'cpu') { Copy-ImageGStreamerPackagePlugins -Destination (Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -Plugins $imagePlugins })
+            $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
+            $search = @(Get-ProductDllSearchPath -Arch $TargetArch -RuntimeBin $gstBin)
+            if (@($plugins | Where-Object { (Split-Path -Leaf $_) -ieq 'gstlibav.dll' }).Count) {
+                $ffmpegRoot = if ($env:FFMPEG_ROOT) { $env:FFMPEG_ROOT } else { Join-Path (Split-Path -Parent $gstBin) 'ffmpeg' }
+                $ffmpegBin = Join-Path $ffmpegRoot 'bin'
+                foreach ($pattern in @('avcodec-*.dll', 'avfilter-*.dll', 'avformat-*.dll', 'avutil-*.dll')) {
+                    if (@(Get-ChildItem -LiteralPath $ffmpegBin -Filter $pattern -File -ErrorAction SilentlyContinue).Count -eq 0) {
+                        throw "gstlibav.dll requires $pattern in $ffmpegBin"
+                    }
+                }
+                $search += $ffmpegBin
+            }
+            $closure = @(Copy-PeImportClosure -Path @($engine + $plugins) -SearchDirectory $search -Destination $packageDlls -Arch $TargetArch)
             $null = Copy-OrtWheelLicenses -OrtDll (Join-Path $env:ONNX_ROOT 'bin\onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $packageDlls
             Write-BuildLog -Context $Context -Message "Package DLL closure ($TargetArch): $(@($closure | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
             # The NSIS/WiX/ZIP installers pack the install tree, not bin\: G6 proves that tree first.
@@ -481,7 +548,7 @@ try {
         # The uploaded install tree plus installers; arm64's setup .exe is NSIS's x86 stub too, which the device job installs.
         Invoke-BuildStep -Context $Context -StepName "Portable Bundle ($TargetArch)" -Critical -Script {
             # -RequireCompleteInstall: the installers pack the install tree, so a DLL the closure has to add is one they would all lack.
-            $portable = New-PortableBundle -BuildDir $fastBuildReleaseDirFull -DistDir (Join-Path $Workspace "dist\windows-$packageArch") `
+            $portable = New-PortableBundle -BuildDir $fastBuildReleaseDirFull -DistDir (Join-Path $Workspace "dist\$distName") `
                 -Configuration $cfgRelease.Configuration -Arch $TargetArch -RequireCompleteInstall `
                 -Runner { param($File, [string[]]$Arguments) $null = Invoke-BuildExternal -Context $Context -File $File -Parameters $Arguments }
             $null = Assert-ChainOrtTree -Root $portable.Bundle -OrtDirectory (Join-Path $portable.Bundle 'bin')
@@ -494,6 +561,10 @@ try {
                     -Format archive -ArchivePrefix ([IO.Path]::GetFileNameWithoutExtension($zip))
             }
             Assert-InstallerNotice -Bundle $portable.Bundle -PackageDir $portable.Packages -Installer $portable.Installers
+            if ($OrtVariant -ne 'cpu') {
+                & (Join-Path $PSScriptRoot 'Test-WindowsGpuPackages.ps1') -Variant $OrtVariant -OnnxRoot $env:ONNX_ROOT `
+                    -WheelDir (Get-OrtChainWheelStore) -Bundle $portable.Bundle -PackageDir $portable.Packages
+            }
             Write-BuildLog -Context $Context -Message "Portable bundle $($portable.Bundle), complete as installed; packages: $($portable.Installers -join ', ')"
         }
 
@@ -547,7 +618,7 @@ try {
             Invoke-BuildStep -Context $Context -StepName "MSIX Packaging" -Critical -Script {
                 $msixWorkspace = Join-Path $Workspace "packaging\msix"
                 $msixTemplate = Join-Path $msixWorkspace "AppxManifest.template.xml"
-                $msixOutput = Join-Path $Workspace "dist\windows-$packageArch\msix"
+                $msixOutput = Join-Path $Workspace "dist\$distName\msix"
                 # Intermediates stay in the build tree: dist\windows-<arch> is uploaded whole, so it holds products only.
                 $msixWork = Join-Path $fastBuildReleaseDirFull "msix"
                 $stagingRoot = Join-Path $msixWork "staging"
@@ -569,6 +640,13 @@ try {
 
                 # Invoke-MsixPackage never clears the staging tree, so the extra assets placed here survive.
                 if (Test-Path $stagingRoot) { Remove-Item $stagingRoot -Recurse -Force }
+                if ($OrtVariant -ne 'cpu') {
+                    $bundlePlugins = Join-Path $Workspace "dist\$distName\bundle\lib\gstreamer-1.0"
+                    if (-not (Test-Path -LiteralPath $bundlePlugins -PathType Container)) { throw "Missing bundled GStreamer plugins: $bundlePlugins" }
+                    $stagingLib = Join-Path $stagingRoot 'lib'
+                    New-Item -ItemType Directory -Path $stagingLib -Force | Out-Null
+                    Copy-Item -LiteralPath $bundlePlugins -Destination $stagingLib -Recurse -Force
+                }
                 $stagingAssets = Join-Path $stagingRoot "Assets"
                 New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
                 foreach ($extraAsset in @("SmallTile.png", "LargeTile.png", "SplashScreen.png")) {
@@ -577,21 +655,25 @@ try {
 
                 $packageVersion = Get-PackageVersion -WorkspacePath $Workspace
                 New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
-                $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_${packageArch}.msix"
+                $msixSuffix = if ($OrtVariant -eq 'cpu') { '' } else { "-gpu-$OrtVariant" }
+                $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_${packageArch}${msixSuffix}.msix"
 
                 # The bundle's bin\ whole: without the chain ORT a client loads System32's Windows ML copy.
                 $payloadDir = Join-Path $msixWork "payload"
                 if (Test-Path $payloadDir) { Remove-Item $payloadDir -Recurse -Force }
                 New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
-                $bundleBin = Join-Path $Workspace "dist\windows-$packageArch\bundle\bin"
+                $bundleBin = Join-Path $Workspace "dist\$distName\bundle\bin"
                 Copy-Item -LiteralPath @(Get-ChildItem -LiteralPath $bundleBin -File | Where-Object { $_.Extension -in '.exe', '.dll' } | ForEach-Object FullName) -Destination $payloadDir
                 $null = Assert-ChainOrtTree -Root $payloadDir
                 $payloadExtra = @(Get-ChildItem -LiteralPath $payloadDir -Filter '*.dll' -File | ForEach-Object FullName)
+                $demo = Join-Path $payloadDir 'AccelerANTgine_demo.exe'
+                if (-not (Test-Path -LiteralPath $demo -PathType Leaf)) { throw 'Missing packaged inference demo.' }
+                $payloadExtra += $demo
                 $licenseSource = Join-Path $Workspace 'LICENSE'
                 $payloadExtra += Copy-PackageLicense -Path $licenseSource -Destination $payloadDir
                 $ortLicenses = Copy-OrtWheelLicenses -OrtDll (Join-Path $payloadDir 'onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $payloadDir
                 # The payload is the bundle's bin\, so the bundle's notices describe it.
-                $bundleLicenses = Join-Path $Workspace "dist\windows-$packageArch\bundle\licenses"
+                $bundleLicenses = Join-Path $Workspace "dist\$distName\bundle\licenses"
                 $bundleNotices = Join-Path $bundleLicenses 'THIRD-PARTY-NOTICES.txt'
                 Copy-Item -LiteralPath @('THIRD-PARTY-NOTICES.txt', 'third-party-inventory.json', 'third-party' | ForEach-Object { Join-Path $bundleLicenses $_ }) `
                     -Destination (Join-Path $payloadDir 'licenses') -Recurse -Force -ErrorAction Stop
@@ -622,6 +704,11 @@ try {
                 Invoke-BuildExternal -Context $Context -File 'python' -Parameters @($licenseVerifier, $msixFile, '--require', "LICENSE=$licenseSource") | Out-Null
                 Assert-OrtWheelLicensesInPackage -Path $msixFile -LicenseDirectory $ortLicenses -Format archive
                 Assert-PackageLicense -Path $msixFile -Pattern 'licenses/THIRD-PARTY-NOTICES.txt' -LicensePath $bundleNotices
+                if ($OrtVariant -ne 'cpu') {
+                    & (Join-Path $PSScriptRoot 'Test-WindowsGpuPackages.ps1') -Variant $OrtVariant -OnnxRoot $env:ONNX_ROOT `
+                        -WheelDir (Get-OrtChainWheelStore) -Bundle (Join-Path $Workspace "dist\$distName\bundle") `
+                        -PackageDir (Join-Path $Workspace "dist\$distName\packages") -MsixPath $msixFile
+                }
 
                 Write-BuildLog -Context $Context -Message "MSIX package created: $msixFile"
             }

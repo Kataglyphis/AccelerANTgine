@@ -1,0 +1,175 @@
+name: Linux GPU package candidates
+
+on:
+  workflow_dispatch:
+    inputs:
+      verify-gpu:
+        description: Profile the finished candidate on vendor-labelled GPU runners
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: linux-gpu-candidate-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+jobs:
+  build:
+    name: GPU candidate (${{ matrix.vendor }}, ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vendor: nvidia
+            tag: latest-nvidia
+            arch: x64
+            platform: linux/amd64
+            runner: ubuntu-26.04
+          - vendor: nvidia
+            tag: latest-nvidia
+            arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-26.04-arm
+          - vendor: amd
+            tag: latest-rocm
+            arch: x64
+            platform: linux/amd64
+            runner: ubuntu-26.04
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    steps:
+      - name: Check out pinned sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+      - name: Check pinned GPU packaging APIs
+        shell: bash
+        run: |
+          bash scripts/linux/tests/test-ci-gpu-candidate.sh
+          bash scripts/linux/tests/test-profile-gpu-candidate.sh
+          bash scripts/linux/tests/test-check-clean-host-inference.sh
+          python3 scripts/linux/tests/test-gpu-workflow-artifacts.py
+          bash scripts/linux/tests/test-ci-release-ort-variant.sh
+          bash scripts/linux/tests/test-verify-gpu-packages.sh
+          cmake -DHUB_DIR="$GITHUB_WORKSPACE/third_party/ANTfrastructure" -P cmake/VerifyGpuPackagingHub.cmake
+          test -f third_party/ANTfrastructure/shared/python/verify_ort_profile.py
+          python3 -I third_party/ANTfrastructure/shared/python/tests/test_verify_ort_profile.py
+      - name: Select registry image
+        id: image
+        shell: bash
+        run: |
+          cpu_image="$(bash third_party/ANTfrastructure/linux/scripts/ci-image-ref.sh --linux)"
+          printf 'ref=%s:%s\n' "${cpu_image%:*}" '${{ matrix.tag }}' >> "$GITHUB_OUTPUT"
+      - name: Prepare disk and pull the GPU image
+        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-linux-ci-host@develop
+        with:
+          image: ${{ steps.image.outputs.ref }}
+          checkout: 'false'
+          free-disk-space: 'true'
+          pull-first: 'false'
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GHCR_PAT }}
+      - name: Build and check package candidates
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          image: ${{ steps.image.outputs.ref }}
+          extra-args: >-
+            --platform ${{ matrix.platform }}
+            -e GPU_VARIANT=${{ matrix.vendor }}
+            -e CARGO_HOME=/tmp/cargo
+            -e SCCACHE_DISABLE=1
+          script: bash scripts/linux/ci-gpu-candidate.sh
+      - name: Upload unverified candidates
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}
+          overwrite: true
+          if-no-files-found: error
+          path: |
+            build-gpu/*.tar.gz
+            build-gpu/*.deb
+            build-gpu/*.AppImage
+
+  clean-host:
+    name: Clean-host package startup (${{ matrix.vendor }}, ${{ matrix.arch }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vendor: nvidia
+            arch: x64
+            runner: ubuntu-26.04
+          - vendor: nvidia
+            arch: arm64
+            runner: ubuntu-26.04-arm
+          - vendor: amd
+            arch: x64
+            runner: ubuntu-26.04
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out the locked model fetcher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - name: Fetch the locked model
+        shell: bash
+        run: python3 -I third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py --lock models/models.lock
+      - name: Install and start the packages
+        uses: Kataglyphis/ANTfrastructure/.github/actions/clean-host-package-check@develop
+        with:
+          artifact: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}
+          scan-elves: 'false'
+          deb: '*.deb'
+          deb-command: AccelerANTgine --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo /usr/bin/AccelerANTgine_demo "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx"
+          tarball: '*.tar.gz'
+          tarball-command: ./usr/bin/AccelerANTgine --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo ./usr/bin/AccelerANTgine_demo "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx"
+          appimage: '*.AppImage'
+          appimage-command: '"$APPIMAGE" --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --appimage "$APPIMAGE" "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx"'
+
+  gpu-profile:
+    if: ${{ inputs.verify-gpu }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vendor: nvidia
+            arch: x64
+            runner-arch: X64
+            runner: gpu-nvidia-cuda
+            device: cuda
+          - vendor: nvidia
+            arch: arm64
+            runner-arch: ARM64
+            runner: gpu-nvidia-cuda
+            device: cuda
+          - vendor: amd
+            arch: x64
+            runner-arch: X64
+            runner: gpu-amd-rocm
+            device: migraphx
+    runs-on: [self-hosted, Linux, '${{ matrix.runner-arch }}', '${{ matrix.runner }}']
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}-${{ matrix.arch }}
+      - name: Require model operators on the requested GPU
+        shell: bash
+        env:
+          DEVICE: ${{ matrix.device }}
+          CANDIDATE_DIR: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}-${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          python3 -I third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py --lock models/models.lock
+          bash scripts/linux/profile-gpu-candidate.sh "$CANDIDATE_DIR" \
+            "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx" "$DEVICE"

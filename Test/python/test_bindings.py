@@ -76,6 +76,15 @@ def test_session_config_defaults():
     cfg = ki.SessionConfig()
     assert cfg.intra_op_num_threads == 4
     assert cfg.execution_mode == ki.ExecutionMode.Sequential
+    assert cfg.execution_provider == ki.ExecutionProvider.Cpu
+    assert cfg.device_id == 0
+    cfg.execution_provider = ki.ExecutionProvider.MigraphX
+    assert cfg.execution_provider == ki.ExecutionProvider.MigraphX
+    yolo = ki.YoloConfig()
+    yolo.execution_provider = ki.ExecutionProvider.DirectML
+    yolo.device_id = 1
+    assert yolo.execution_provider == ki.ExecutionProvider.DirectML
+    assert yolo.device_id == 1
 
 
 @needs_onnx

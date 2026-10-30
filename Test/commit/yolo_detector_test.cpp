@@ -106,6 +106,18 @@ TEST(YoloDetector, DetectBeforeInitializeFails)
     EXPECT_EQ(result.error(), detection::OnnxError::SessionNotInitialized);
 }
 
+TEST(YoloDetector, PassesDeviceSelectionToTheInferenceSession)
+{
+    const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    auto config = two_class_config(model);
+    config.device_id = -1;
+    detection::YoloDetector detector;
+    const auto result = detector.initialize(config);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), detection::OnnxError::SessionCreationFailed);
+    EXPECT_FALSE(detector.is_initialized());
+}
+
 TEST(YoloDetector, AMissingModelIsModelLoadFailed)
 {
     detection::YoloDetector detector;

@@ -1,5 +1,8 @@
-# Only ADDS the ubuntu-26.04 preview labels that the pinned actionlint predates; it disables no rule.
+# Adds hosted preview and GPU runner labels; it disables no rule.
 self-hosted-runner:
   labels:
     - ubuntu-26.04
     - ubuntu-26.04-arm
+    - gpu-nvidia-cuda
+    - gpu-amd-rocm
+    - gpu-amd-directml

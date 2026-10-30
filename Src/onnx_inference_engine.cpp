@@ -4,12 +4,16 @@ module;
 
 #define ORT_NO_EXCEPTIONS
 #include <onnxruntime_cxx_api.h>
+#ifdef _WIN32
+#include <dml_provider_factory.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <expected>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -192,14 +196,16 @@ namespace {
 
 struct OnnxInferenceEngine::Impl
 {
-    // Run is thread-safe in ORT, so runs share the lock; initialize replaces the session and takes it alone.
+    // DirectML requires Run calls on the same session to be serialized.
     mutable std::shared_mutex mutex;
+    mutable std::mutex directml_run_mutex;
     std::unique_ptr<Ort::Env> env;
     std::unique_ptr<Ort::Session> session;
     std::unique_ptr<Ort::SessionOptions> session_options;
     Ort::AllocatorWithDefaultOptions allocator;
     SessionConfig config;
     bool initialized{ false };
+    bool profiling_active{ false };
 
     std::vector<std::string> input_names_cache;
     std::vector<std::string> output_names_cache;
@@ -209,6 +215,7 @@ struct OnnxInferenceEngine::Impl
     void reset()
     {
         initialized = false;
+        profiling_active = false;
         input_name_ptrs.clear();
         output_name_ptrs.clear();
         input_names_cache.clear();
@@ -234,28 +241,68 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     impl_->reset();
     impl_->config = config;
 
+    if (config.device_id < 0
+        || (config.enable_cuda && config.execution_provider != ExecutionProvider::Cpu
+            && config.execution_provider != ExecutionProvider::Cuda)) {
+        return std::unexpected(OnnxError::SessionCreationFailed);
+    }
+    const auto provider = config.enable_cuda ? ExecutionProvider::Cuda : config.execution_provider;
+
     const OrtApi &api = Ort::GetApi();
     impl_->env = std::make_unique<Ort::Env>(OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING, "KataglyphisOnnxRuntime");
     impl_->session_options = std::make_unique<Ort::SessionOptions>();
     OrtSessionOptions *options = *impl_->session_options;
 
-    const auto execution_mode = config.execution_mode == ExecutionMode::Parallel ? ORT_PARALLEL : ORT_SEQUENTIAL;
+    if (!config.profiling_prefix.empty()
+        && !ort_succeeded(api.EnableProfiling(options, config.profiling_prefix.c_str()))) {
+        impl_->reset();
+        return std::unexpected(OnnxError::ProfilingFailed);
+    }
+
+    const auto execution_mode =
+      provider != ExecutionProvider::DirectML && config.execution_mode == ExecutionMode::Parallel ? ORT_PARALLEL
+                                                                                                  : ORT_SEQUENTIAL;
     if (!ort_succeeded(api.SetIntraOpNumThreads(options, config.intra_op_num_threads))
         || !ort_succeeded(api.SetInterOpNumThreads(options, config.inter_op_num_threads))
         || !ort_succeeded(api.SetSessionExecutionMode(options, execution_mode))
-        || !ort_succeeded(
-          config.enable_memory_pattern ? api.EnableMemPattern(options) : api.DisableMemPattern(options))) {
+        || !ort_succeeded(config.enable_memory_pattern && provider != ExecutionProvider::DirectML
+                            ? api.EnableMemPattern(options)
+                            : api.DisableMemPattern(options))) {
         impl_->reset();
         return std::unexpected(OnnxError::SessionCreationFailed);
     }
 
-    if (config.enable_cuda) {
+    if (provider == ExecutionProvider::Cuda) {
         OrtCUDAProviderOptions cuda_options{};
-        cuda_options.device_id = 0;
+        cuda_options.device_id = config.device_id;
         if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options))) {
             impl_->reset();
             return std::unexpected(OnnxError::SessionCreationFailed);
         }
+    } else if (provider == ExecutionProvider::MigraphX) {
+        OrtMIGraphXProviderOptions migraphx_options{};
+        migraphx_options.device_id = config.device_id;
+        migraphx_options.migraphx_mem_limit = (std::numeric_limits<std::size_t>::max)();
+        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_MIGraphX(options, &migraphx_options))) {
+            impl_->reset();
+            return std::unexpected(OnnxError::SessionCreationFailed);
+        }
+    } else if (provider == ExecutionProvider::DirectML) {
+#ifdef _WIN32
+        const void *provider_api = nullptr;
+        if (!ort_succeeded(api.GetExecutionProviderApi("DML", ORT_API_VERSION, &provider_api))
+            || provider_api == nullptr
+            || !ort_succeeded(static_cast<const OrtDmlApi *>(provider_api)
+                ->SessionOptionsAppendExecutionProvider_DML(options, config.device_id))) {
+#endif
+            impl_->reset();
+            return std::unexpected(OnnxError::SessionCreationFailed);
+#ifdef _WIN32
+        }
+#endif
+    } else if (provider != ExecutionProvider::Cpu) {
+        impl_->reset();
+        return std::unexpected(OnnxError::SessionCreationFailed);
     }
 
     OrtSession *session = nullptr;
@@ -280,6 +327,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
       });
 
     impl_->initialized = true;
+    impl_->profiling_active = !config.profiling_prefix.empty();
 
     return {};
 }
@@ -290,12 +338,32 @@ auto OnnxInferenceEngine::is_initialized() const -> bool
     return impl_->initialized;
 }
 
+auto OnnxInferenceEngine::end_profiling() -> std::expected<std::string, OnnxError>
+{
+    const std::unique_lock lock(impl_->mutex);
+    if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+    if (!impl_->profiling_active) { return std::unexpected(OnnxError::ProfilingNotEnabled); }
+    char *filename = nullptr;
+    const auto &api = Ort::GetApi();
+    if (!ort_succeeded(api.SessionEndProfiling(*impl_->session, impl_->allocator, &filename)) || filename == nullptr) {
+        return std::unexpected(OnnxError::ProfilingFailed);
+    }
+    const std::string result(filename);
+    const bool freed = ort_succeeded(api.AllocatorFree(impl_->allocator, filename));
+    impl_->profiling_active = false;
+    if (!freed) { return std::unexpected(OnnxError::ProfilingFailed); }
+    return result;
+}
+
 auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
   const TensorShape &input_shape,
   const std::string &input_name) -> std::expected<InferenceResult, OnnxError>
 {
     const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+
+    std::unique_lock run_lock(impl_->directml_run_mutex, std::defer_lock);
+    if (impl_->config.execution_provider == ExecutionProvider::DirectML) { run_lock.lock(); }
 
     const auto expected_size = input_shape.total_elements();
     if (input_data.size() != expected_size) { return std::unexpected(OnnxError::InvalidInputShape); }
@@ -324,6 +392,9 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
 {
     const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+
+    std::unique_lock run_lock(impl_->directml_run_mutex, std::defer_lock);
+    if (impl_->config.execution_provider == ExecutionProvider::DirectML) { run_lock.lock(); }
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 

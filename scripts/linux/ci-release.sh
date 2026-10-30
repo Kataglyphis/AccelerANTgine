@@ -16,6 +16,7 @@ COMPILER="clang"
 
 BUILD_RELEASE_DIR="build-release"
 CLANG_RELEASE_PRESET="linux-release-clang"
+ORT_VARIANT=cpu
 DO_CALLGRIND=0
 DO_APPIMAGE=1
 DO_FLATPAK=1
@@ -41,6 +42,7 @@ Options:
   --compiler <name>             Compiler label (default: clang)
   --build-release-dir <dir>     Build directory (default: build-release)
   --clang-release-preset <name> CMake preset (default: linux-release-clang)
+  --ort-variant <name>          cpu, nvidia or amd (default: cpu; GPU requires --no-flatpak)
   --callgrind                   Run valgrind/callgrind (default: off)
   --appimage                    Build AppImage (default: on)
   --no-appimage                 Disable AppImage build
@@ -187,6 +189,10 @@ while [[ $# -gt 0 ]]; do
       CLANG_RELEASE_PRESET="$2"
       shift 2
       ;;
+    --ort-variant)
+      ORT_VARIANT="${2:?--ort-variant expects a value}"
+      shift 2
+      ;;
     --flatpak-runtime)
       FLATPAK_RUNTIME="$2"
       shift 2
@@ -246,6 +252,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "${ORT_VARIANT}" in
+  cpu) ;;
+  nvidia|amd)
+    [[ "${DO_FLATPAK}" -eq 0 ]] || die "GPU package variants require --no-flatpak"
+    ;;
+  *) die "Unknown ONNX Runtime package variant: ${ORT_VARIANT}" ;;
+esac
+
 if [[ "${COMPILER:-}" != "clang" ]]; then
   info "Skipping release packaging for compiler '${COMPILER:-unknown}'"
   exit 0
@@ -260,13 +274,18 @@ info "Building release with preset: ${CLANG_RELEASE_PRESET}"
 
 # The /workspace safe.directory default is wrong on a dev box, where `git rev-parse` would then refuse.
 CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
+gpu_configure_args=()
+if [[ "${ORT_VARIANT}" != cpu ]]; then
+  gpu_configure_args=(--configure-arg "-DKATAGLYPHIS_ORT_VARIANT=${ORT_VARIANT}")
+fi
 cmake_build_main \
   --preset "${CLANG_RELEASE_PRESET}" \
   --build-dir "${BUILD_RELEASE_DIR}" \
   --clean-build-dir true \
   --mb-per-job 2000 \
   --configure-arg "-DCMAKE_LINK_WHAT_YOU_USE=FALSE" \
-  --configure-arg "-DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}"
+  --configure-arg "-DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}" \
+  "${gpu_configure_args[@]}"
 
 cmake --build "${BUILD_RELEASE_DIR}" --target package
 

@@ -1,7 +1,7 @@
 module;
 
 #include "kataglyphis_export.h"
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
 #include "bundled_gstreamer.hpp"
 #endif
 #include <array>
@@ -413,7 +413,7 @@ auto WebRTCStreamer::locate_elements() -> std::vector<ElementLocation>
 
 auto WebRTCStreamer::bundled_plugin_dir() -> std::string
 {
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
     return bundled_gstreamer::plugin_dir();
 #else
     return {};
@@ -426,6 +426,9 @@ auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, 
 
     if (g_gstreamer_initialized.load()) { return {}; }
 
+#if defined(_WIN32)
+    bundled_gstreamer::configure();
+#endif
     GError *error = nullptr;
     if (gst_init_check(argc, argv, &error) == 0) {
         if (error != nullptr) {

@@ -2,6 +2,7 @@
 #include <chrono>
 #include <csignal>
 #include <iostream>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -71,8 +72,15 @@ auto check_gstreamer(int *argc, char ***argv) -> int
               << '\n';
     int failures = 0;
     for (const auto &location : kataglyphis::webrtc::WebRTCStreamer::locate_elements()) {
-        const bool optional = location.element == "libcamerasrc" || location.element == "openh264enc";
-        const bool outside = location.found && !bundled.empty() && !location.plugin_file.starts_with(bundled + "/");
+        const bool optional = location.element == "libcamerasrc" || location.element == "openh264enc"
+#if defined(_WIN32)
+                              || location.element == "v4l2src"
+#endif
+          ;
+        std::error_code error;
+        const bool outside = location.found && !bundled.empty()
+                             && !std::filesystem::equivalent(std::filesystem::u8path(location.plugin_file).parent_path(),
+                               std::filesystem::u8path(bundled), error);
         const char *verdict = location.found ? (outside ? "OUTSIDE" : "ok") : (optional ? "absent" : "MISSING");
         std::cout << verdict << ' ' << location.element << ' ' << location.plugin_file << '\n';
         if ((!location.found && !optional) || outside) { ++failures; }

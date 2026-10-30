@@ -74,3 +74,49 @@ __attribute__((constructor)) void use_bundled_gstreamer()
 
 }// namespace
 #endif
+
+#if defined(_WIN32)
+#include "bundled_gstreamer.hpp"
+#include <windows.h>
+#include <filesystem>
+#include <string>
+#include <system_error>
+#include <vector>
+#include <gst/gst.h>
+#include <mutex>
+
+namespace kataglyphis::bundled_gstreamer {
+namespace { const char anchor = 0; }
+
+auto plugin_dir() -> std::string
+{
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+          reinterpret_cast<LPCWSTR>(&anchor), &module)) { return {}; }
+    std::vector<wchar_t> name(32768);
+    const DWORD length = GetModuleFileNameW(module, name.data(), static_cast<DWORD>(name.size()));
+    if (length == 0 || length >= name.size()) { return {}; }
+    const auto base = std::filesystem::path(std::wstring(name.data(), length)).parent_path();
+    for (const auto &candidate : { base / "gstreamer-1.0", base / "lib/gstreamer-1.0", base / "../lib/gstreamer-1.0" }) {
+        std::error_code error;
+        const auto path = std::filesystem::canonical(candidate, error);
+        if (error || !std::filesystem::is_directory(path, error) || error) { continue; }
+        const auto utf8 = path.generic_u8string();
+        return { reinterpret_cast<const char *>(utf8.data()), utf8.size() };
+    }
+    return {};
+}
+
+void configure()
+{
+    static std::once_flag once;
+    std::call_once(once, [] {
+        const auto plugins = plugin_dir();
+        if (plugins.empty()) { return; }
+        g_setenv("GST_PLUGIN_PATH_1_0", plugins.c_str(), FALSE);
+        g_setenv("GST_PLUGIN_SYSTEM_PATH_1_0", "", FALSE);
+        g_setenv("GST_REGISTRY_FORK", "no", FALSE);
+    });
+}
+}
+#endif

@@ -1,6 +1,9 @@
 module;
 
 #include "kataglyphis_export.h"
+#if defined(_WIN32)
+#include "bundled_gstreamer.hpp"
+#endif
 #include <atomic>
 #include <cstring>
 #include <expected>
@@ -279,6 +282,9 @@ auto GStreamerPipeline::initialize_gstreamer(int *argc, char ***argv) -> std::ex
 
     if (g_gstreamer_initialized.load()) { return {}; }
 
+#if defined(_WIN32)
+    bundled_gstreamer::configure();
+#endif
     GError *error = nullptr;
     if (gst_init_check(argc, argv, &error) == 0) {
         if (error != nullptr) { g_error_free(error); }

@@ -322,6 +322,8 @@ auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, O
     impl_->config = config;
 
     auto session_config = inference::create_default_session_config(config.model_path);
+    session_config.execution_provider = config.execution_provider;
+    session_config.device_id = config.device_id;
 
     auto result = impl_->engine.initialize(session_config);
     if (!result) { return std::unexpected(result.error()); }

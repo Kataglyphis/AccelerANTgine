@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -45,6 +47,37 @@ TEST(OnnxEngine, DefaultSessionConfigIsSequentialCpuWithFourThreads)
     EXPECT_FALSE(config.enable_cuda);
     EXPECT_TRUE(config.enable_memory_pattern);
     EXPECT_EQ(config.execution_mode, inference::ExecutionMode::Sequential);
+    EXPECT_TRUE(config.profiling_prefix.empty());
+}
+
+TEST(OnnxEngine, ProfilingIsOptInAndRecordsTheExecutionProvider)
+{
+    const TempFile model("kataglyphis-profile", ".onnx", kataglyphis::test::relu_model());
+    inference::OnnxInferenceEngine engine;
+    const auto before_init = engine.end_profiling();
+    ASSERT_FALSE(before_init.has_value());
+    EXPECT_EQ(before_init.error(), inference::OnnxError::SessionNotInitialized);
+    auto config = inference::create_default_session_config(model.path());
+    ASSERT_TRUE(engine.initialize(config).has_value());
+    const auto disabled = engine.end_profiling();
+    ASSERT_FALSE(disabled.has_value());
+    EXPECT_EQ(disabled.error(), inference::OnnxError::ProfilingNotEnabled);
+    config.profiling_prefix = model.path().string() + "-profile";
+    ASSERT_TRUE(engine.initialize(config).has_value());
+    const std::vector<float> input{ -1, 0, 1, 2 };
+    ASSERT_TRUE(engine.run_inference(input, shape({ 1, 4 }), "X").has_value());
+    const auto profile = engine.end_profiling();
+    ASSERT_TRUE(profile.has_value());
+    std::ifstream file(*profile);
+    ASSERT_TRUE(file.good());
+    const std::string contents{ std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
+    EXPECT_NE(contents.find("CPUExecutionProvider"), std::string::npos);
+    file.close();
+    std::error_code ignored;
+    std::filesystem::remove(*profile, ignored);
+    const auto finished = engine.end_profiling();
+    ASSERT_FALSE(finished.has_value());
+    EXPECT_EQ(finished.error(), inference::OnnxError::ProfilingNotEnabled);
 }
 
 TEST(OnnxEngine, RejectsIntegerAndBooleanOutputsBeforeReadingTheirStorage)
@@ -329,3 +362,31 @@ TEST(OnnxEngine, ACudaRequestWithoutCudaFailsInsteadOfAborting)
         EXPECT_FALSE(engine.is_initialized());
     }
 }
+
+TEST(OnnxEngine, RejectsConflictingProvidersAndInvalidDevice)
+{
+    const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());
+    auto config = inference::create_default_session_config(model.path());
+    config.enable_cuda = true;
+    config.execution_provider = inference::ExecutionProvider::MigraphX;
+    inference::OnnxInferenceEngine engine;
+    EXPECT_EQ(engine.initialize(config).error(), inference::OnnxError::SessionCreationFailed);
+    EXPECT_FALSE(engine.is_initialized());
+
+    config.enable_cuda = false;
+    config.device_id = -1;
+    EXPECT_EQ(engine.initialize(config).error(), inference::OnnxError::SessionCreationFailed);
+    EXPECT_FALSE(engine.is_initialized());
+}
+
+#ifndef _WIN32
+TEST(OnnxEngine, DirectMLRequestOnNonWindowsFails)
+{
+    const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());
+    auto config = inference::create_default_session_config(model.path());
+    config.execution_provider = inference::ExecutionProvider::DirectML;
+    inference::OnnxInferenceEngine engine;
+    EXPECT_EQ(engine.initialize(config).error(), inference::OnnxError::SessionCreationFailed);
+    EXPECT_FALSE(engine.is_initialized());
+}
+#endif

@@ -1,0 +1,5 @@
+if(NOT DEFINED HUB_DIR OR HUB_DIR STREQUAL "")
+  message(FATAL_ERROR "HUB_DIR is required")
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/OrtPackageVariant.cmake")
+accelerantgine_require_gpu_packaging_hub("${HUB_DIR}" _gpu_helper)

@@ -31,6 +31,8 @@ the packaged DLL; see the [Windows workflow](docs/source/windows_workflow.rst).
 Every package and wheel lists its third-party components with their license texts in `THIRD-PARTY-NOTICES.txt`
 ([licenses](https://hardwareacceleratedai.jonasheinle.de/third_party_licenses.html)).
 Release builds log warnings and errors only; `--log_level` or `ACCELERANTGINE_LOG_LEVEL` raises the level.
+Linux GPU package staging is opt-in and requires a newer ANTfrastructure pin; see
+[ONNX execution providers](docs/source/getting_started.rst#onnx-execution-providers).
 
 Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan,
 and `--apply` to update. It checks every direct submodule against its remote default branch and

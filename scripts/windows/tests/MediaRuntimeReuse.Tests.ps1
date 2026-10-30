@@ -42,6 +42,45 @@ Describe 'Windows media runtime reuse' {
         ($calls -join ',') | Should Be 'warning,bundle,ort-proof,crt'
     }
 
+    It 'stages required and present optional package plugins and rejects an incomplete image' {
+        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
+        . ([scriptblock]::Create((Get-BuildFunctionSource -Ast $ast -Name 'Get-ImageGStreamerPackagePlugins')))
+        . ([scriptblock]::Create((Get-BuildFunctionSource -Ast $ast -Name 'Copy-ImageGStreamerPackagePlugins')))
+        function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
+        $bin = Join-Path $TestDrive 'package-image\bin'
+        $plugins = Join-Path $TestDrive 'package-image\lib\gstreamer-1.0'
+        $null = New-Item -ItemType Directory -Force -Path $bin, $plugins
+        $required = @('coreelements', 'app', 'videotestsrc', 'videoconvertscale', 'playback', 'webrtc', 'nice', 'dtls', 'srtp', 'sctp', 'rtpmanager', 'rtp')
+        foreach ($name in ($required + 'vpx')) { [IO.File]::WriteAllText((Join-Path $plugins "gst$name.dll"), $name) }
+        Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $bin } -ScriptBlock {
+            $destination = Join-Path $TestDrive 'staged-plugins'
+            $selected = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
+            $files = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $selected)
+            $files.Count | Should Be 13
+            (Get-Content -LiteralPath (Join-Path $destination 'gstvpx.dll') -Raw) | Should Be 'vpx'
+            Remove-Item -LiteralPath (Join-Path $plugins 'gstvpx.dll')
+            $withoutVpx = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
+            $withoutVpx.Count | Should Be 12
+            $null = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $withoutVpx)
+            (Test-Path -LiteralPath (Join-Path $destination 'gstvpx.dll')) | Should Be $false
+            Remove-Item -LiteralPath (Join-Path $plugins 'gstwebrtc.dll')
+            $message = try { Get-ImageGStreamerPackagePlugins -Arch amd64; '' } catch { $_.Exception.Message }
+            ($message -match 'gstwebrtc.dll is missing') | Should Be $true
+        }
+    }
+
+    It 'seeds the closure with plugins and installs them into each package layout' {
+        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
+        @((Get-TestAstCommands -Ast $ast -Name 'Copy-PeImportClosure') | Where-Object { $_.Extent.Text -match '\$engine \+ \$plugins' }).Count | Should Be 1
+        $script = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1') -Raw
+        $script.Contains('Copy-Item -LiteralPath $bundlePlugins -Destination $stagingLib -Recurse -Force') | Should Be $true
+        $script.Contains("`$imagePlugins = @(if (`$OrtVariant -ne 'cpu')") | Should Be $true
+        $script.Contains('-RuntimeBin $gstBin') | Should Be $true
+        $script.Contains('$search += $ffmpegBin') | Should Be $true
+        $cmake = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\..\cmake\CPackOptions.cmake') -Raw
+        $cmake.Contains('install(DIRECTORY "${KATAGLYPHIS_GST_PLUGIN_DIR}/" DESTINATION "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")') | Should Be $true
+    }
+
     It 'warns when the selected GStreamer bin is missing' {
         $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
         $definition = Get-BuildFunctionSource -Ast $ast -Name 'Write-MissingGStreamerBinWarning'
