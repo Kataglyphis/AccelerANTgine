@@ -16,6 +16,7 @@ import kataglyphis.webrtc_streamer;
 import kataglyphis.config_loader;
 import kataglyphis.project_config;
 import kataglyphis.log;
+import kataglyphis.text_generation;
 
 ABSL_FLAG(bool, webrtc, false, "Start WebRTC streaming");
 ABSL_FLAG(std::string, config, "", "Load settings from JSON config file");
@@ -35,6 +36,9 @@ ABSL_FLAG(std::string,
   "",
   "Log level: debug, info, warning, error or off (default: warning in release builds, debug otherwise; "
   "ACCELERANTGINE_LOG_LEVEL sets it too)");
+ABSL_FLAG(std::string, chat_model, "", "ONNX Runtime GenAI model directory: answer --prompt with it and exit");
+ABSL_FLAG(std::string, prompt, "", "The user message --chat_model answers");
+ABSL_FLAG(int, max_new_tokens, 128, "Token budget of the --chat_model reply");
 ABSL_FLAG(bool,
   gst_check,
   false,
@@ -59,6 +63,33 @@ struct CliOverrideFlags
 };
 
 void signal_handler(int /*signal*/) { g_running.store(false); }
+
+// The reply goes to stdout as it is generated, the speed figures to stderr.
+auto chat(const std::string &model_dir, const std::string &prompt, int max_new_tokens) -> int
+{
+    if (prompt.empty()) {
+        std::cerr << "--chat_model needs a --prompt\n";
+        return 2;
+    }
+    kataglyphis::text::TextGenerator generator;
+    if (const auto loaded = generator.initialize(model_dir); !loaded) {
+        std::cerr << "Cannot load " << model_dir << ": " << kataglyphis::text::to_string(loaded.error()) << '\n';
+        return 1;
+    }
+    kataglyphis::text::GenerationOptions options;
+    options.max_new_tokens = max_new_tokens;
+    const auto result = generator.generate({ { .role = "user", .content = prompt } },
+      options,
+      [](std::string_view piece) -> void { std::cout << piece << std::flush; });
+    std::cout << '\n';
+    if (!result) {
+        std::cerr << "Generation failed: " << kataglyphis::text::to_string(result.error()) << '\n';
+        return 1;
+    }
+    std::cerr << result->tokens.size() << " tokens, " << result->time_to_first_token_ms << " ms to the first, "
+              << result->decode_tokens_per_second << " tokens/s\n";
+    return 0;
+}
 
 // A missing required element, or one a package loads from outside its own plugins, fails the check.
 auto check_gstreamer(int *argc, char ***argv) -> int
@@ -209,6 +240,9 @@ auto main(int argc, char **argv) -> int
     }
 
     if (absl::GetFlag(FLAGS_gst_check)) { return check_gstreamer(&argc, &argv); }
+    if (const std::string model = absl::GetFlag(FLAGS_chat_model); !model.empty()) {
+        return chat(model, absl::GetFlag(FLAGS_prompt), absl::GetFlag(FLAGS_max_new_tokens));
+    }
 
     const bool start_webrtc = absl::GetFlag(FLAGS_webrtc);
     if (!start_webrtc) {

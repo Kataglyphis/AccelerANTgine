@@ -73,17 +73,18 @@ def test_onnx_uninitialized_inference_raises():
 
 @needs_onnx
 def test_session_config_defaults():
+    assert ki.ExecutionProvider.CPU is not ki.OnnxExecutionProvider.Cpu
     cfg = ki.SessionConfig()
     assert cfg.intra_op_num_threads == 4
     assert cfg.execution_mode == ki.ExecutionMode.Sequential
-    assert cfg.execution_provider == ki.ExecutionProvider.Cpu
+    assert cfg.execution_provider == ki.OnnxExecutionProvider.Cpu
     assert cfg.device_id == 0
-    cfg.execution_provider = ki.ExecutionProvider.MigraphX
-    assert cfg.execution_provider == ki.ExecutionProvider.MigraphX
+    cfg.execution_provider = ki.OnnxExecutionProvider.MigraphX
+    assert cfg.execution_provider == ki.OnnxExecutionProvider.MigraphX
     yolo = ki.YoloConfig()
-    yolo.execution_provider = ki.ExecutionProvider.DirectML
+    yolo.execution_provider = ki.OnnxExecutionProvider.DirectML
     yolo.device_id = 1
-    assert yolo.execution_provider == ki.ExecutionProvider.DirectML
+    assert yolo.execution_provider == ki.OnnxExecutionProvider.DirectML
     assert yolo.device_id == 1
 
 

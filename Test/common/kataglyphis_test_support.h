@@ -244,6 +244,19 @@ template<typename Expected> auto error_of(const Expected &result) -> std::option
 inline auto missing_path(std::string_view name) -> std::filesystem::path
 { return std::filesystem::temp_directory_path() / "kataglyphis-test-does-not-exist" / std::string(name); }
 
+#ifdef KATAGLYPHIS_TINY_GENAI_MODEL
+// The directory of the running suite; kataglyphis_test_paths.cpp keeps the OS headers out of every test.
+auto executable_dir() -> std::filesystem::path;
+
+// The configure-time GenAI test model, else the copy beside the suite: a staged or moved build has no configure path.
+inline auto tiny_genai_model_dir() -> std::filesystem::path
+{
+    const std::filesystem::path built{ KATAGLYPHIS_TINY_GENAI_MODEL };
+    if (std::filesystem::exists(built / "genai_config.json")) { return built; }
+    return executable_dir() / "test-models" / "tiny-genai";
+}
+#endif
+
 }// namespace kataglyphis::test
 
 #endif// KATAGLYPHIS_TEST_SUPPORT_H

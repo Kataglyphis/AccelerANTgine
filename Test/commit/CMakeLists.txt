@@ -51,4 +51,17 @@ target_link_libraries(
           spdlog
           ${PROJECT_NAME})
 
+kataglyphis_use_tiny_genai_model(${COMMIT_TEST_SUITE})
+
 kataglyphis_configure_gtest_discovery(${COMMIT_TEST_SUITE})
+
+# The CLI's chat mode on the tiny model: the reply first, then the speed figures.
+if(TARGET ${PROJECT_NAME}_cli)
+  add_test(NAME Cli.ChatAnswersThePromptOnStdout
+           COMMAND $<TARGET_FILE:${PROJECT_NAME}_cli> --chat_model "${CMAKE_BINARY_DIR}/test-models/tiny-genai"
+                   --prompt abc --max_new_tokens 4)
+  set_tests_properties(Cli.ChatAnswersThePromptOnStdout PROPERTIES PASS_REGULAR_EXPRESSION "^defg\n4 tokens, ")
+  add_test(NAME Cli.ChatWithoutAPromptFails COMMAND $<TARGET_FILE:${PROJECT_NAME}_cli> --chat_model
+                                                    "${CMAKE_BINARY_DIR}/test-models/tiny-genai")
+  set_tests_properties(Cli.ChatWithoutAPromptFails PROPERTIES WILL_FAIL TRUE)
+endif()

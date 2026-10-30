@@ -103,3 +103,28 @@ function(kataglyphis_configure_library_test_target target_name)
   kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/third_party/ModelANT/contracts/inference-v1.json"
                               kInferenceContract)
 endfunction()
+
+# Generated at configure, never stored: third_party/ANTfrastructure/docs/language-ai.md#the-test-model
+function(kataglyphis_use_tiny_genai_model target_name)
+  set(_model "${CMAKE_BINARY_DIR}/test-models/tiny-genai")
+  get_property(_written GLOBAL PROPERTY KATAGLYPHIS_TINY_GENAI_WRITTEN)
+  if(NOT _written)
+    find_package(
+      Python3
+      COMPONENTS Interpreter
+      REQUIRED)
+    execute_process(
+      COMMAND
+        "${Python3_EXECUTABLE}" -I
+        "${PROJECT_SOURCE_DIR}/third_party/ANTfrastructure/linux/scripts/lib/tiny-genai-model.py" --out "${_model}"
+      OUTPUT_QUIET COMMAND_ERROR_IS_FATAL ANY)
+    set_property(GLOBAL PROPERTY KATAGLYPHIS_TINY_GENAI_WRITTEN TRUE)
+  endif()
+  target_sources(${target_name} PRIVATE "${PROJECT_SOURCE_DIR}/Test/common/kataglyphis_test_paths.cpp")
+  # A staged suite, or one whose build tree moved, finds the model beside itself.
+  add_custom_command(
+    TARGET ${target_name}
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${_model}" "$<TARGET_FILE_DIR:${target_name}>/test-models/tiny-genai")
+  target_compile_definitions(${target_name} PRIVATE KATAGLYPHIS_TINY_GENAI_MODEL="${_model}")
+endfunction()

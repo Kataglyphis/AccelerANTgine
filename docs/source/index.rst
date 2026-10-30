@@ -52,6 +52,7 @@ tested on Linux x64, arm64 and riscv64 and on Windows x64 and arm64.
    overview
    getting_started
    inference_preprocessing
+   text_generation
    development_workflow
    windows_workflow
    third_party_licenses

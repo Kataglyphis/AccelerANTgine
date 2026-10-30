@@ -52,4 +52,5 @@ target_link_libraries(
           spdlog
           ${PROJECT_NAME})
 
+kataglyphis_use_tiny_genai_model(${COMPILE_TEST_SUITE})
 kataglyphis_configure_gtest_discovery(${COMPILE_TEST_SUITE})

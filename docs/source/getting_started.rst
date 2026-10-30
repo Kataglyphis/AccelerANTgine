@@ -57,7 +57,7 @@ ONNX execution providers
 Inference defaults to CPU. Embedders can choose ``ExecutionProvider::Cuda`` for NVIDIA,
 ``ExecutionProvider::MigraphX`` for AMD on Linux, or ``ExecutionProvider::DirectML`` for a
 DirectX 12 GPU on Windows in either ``SessionConfig`` or ``YoloConfig``. The Python bindings
-expose the same ``ExecutionProvider`` values and ``execution_provider`` and ``device_id`` fields.
+expose these values as ``OnnxExecutionProvider`` with ``execution_provider`` and ``device_id`` fields.
 The existing ``enable_cuda`` field remains supported. A conflicting provider and CUDA request,
 negative device ID, or unavailable provider fails initialization. ONNX Runtime may still run
 unsupported model operations on its CPU provider. DirectML sessions use sequential execution,

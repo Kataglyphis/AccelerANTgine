@@ -203,6 +203,17 @@ function Copy-ImageGStreamerPackagePlugins {
     }
 }
 
+# GenAI loads at run time, so no import closure finds it; a staged suite needs the chain DLL beside it.
+function Copy-ChainGenaiBeside {
+    param([Parameter(Mandatory)][string]$Destination)
+    if (-not $env:ONNX_GENAI_ROOT) { throw 'ONNX_GENAI_ROOT is not set; the staged suites cannot load ONNX Runtime GenAI' }
+    $dll = @('bin', 'lib') | ForEach-Object { Join-Path (Join-Path $env:ONNX_GENAI_ROOT $_) 'onnxruntime-genai.dll' } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if (-not $dll) { throw "ONNX_GENAI_ROOT ($env:ONNX_GENAI_ROOT) holds no onnxruntime-genai.dll in bin\ or lib\" }
+    Copy-Item -LiteralPath $dll -Destination $Destination -Force
+    return (Join-Path $Destination 'onnxruntime-genai.dll')
+}
+
 # The install-time notices list every DLL the closure added; each ZIP and MSI must carry that exact list.
 function Assert-InstallerNotice {
     param(
@@ -587,6 +598,11 @@ try {
                 # The build's own bin first, so a suite that imports the engine gets this build's AccelerANTgine.dll.
                 $search = @(Join-Path $fastBuildReleaseDirFull 'bin') + @(Get-ProductDllSearchPath -Arch $TargetArch)
                 $closure = @(Copy-PeImportClosure -Path $suites -SearchDirectory $search -Destination $tests -Arch $TargetArch)
+                $genai = Copy-ChainGenaiBeside -Destination $tests
+                # GenAI is loaded at run time, so the suites' import walk never reaches the CRT it needs itself.
+                $closure += @($genai) + @(Copy-PeImportClosure -Path @($genai) -SearchDirectory $search -Destination $tests -Arch $TargetArch)
+                # The suites look for the configure-time GenAI test model beside themselves once its build path is gone.
+                Copy-Item -LiteralPath (Join-Path $fastBuildReleaseDirFull 'test-models') -Destination $tests -Recurse -Force
                 # GStreamer looks for plugins in <flat dir>\lib\gstreamer-1.0; their own imports join the closure beside the suites.
                 Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $tests
                 $plugins = @(Get-ChildItem -LiteralPath (Join-Path $tests 'lib\gstreamer-1.0') -Filter '*.dll' -File | ForEach-Object FullName)

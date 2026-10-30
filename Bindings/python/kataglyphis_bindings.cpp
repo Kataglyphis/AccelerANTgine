@@ -1,6 +1,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/filesystem.h>
+#include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/vector.h>
@@ -18,6 +19,7 @@
 
 import kataglyphis.inference;
 import kataglyphis.config_loader;
+import kataglyphis.text_generation;
 #if HAS_ONNXRUNTIME
 import kataglyphis.onnx_inference;
 import kataglyphis.yolo_detector;
@@ -157,7 +159,7 @@ void bind_onnx(nb::module_ &m)
       .value("Sequential", ExecutionMode::Sequential)
       .value("Parallel", ExecutionMode::Parallel);
 
-    nb::enum_<ExecutionProvider>(m, "ExecutionProvider")
+    nb::enum_<ExecutionProvider>(m, "OnnxExecutionProvider")
       .value("Cpu", ExecutionProvider::Cpu)
       .value("Cuda", ExecutionProvider::Cuda)
       .value("MigraphX", ExecutionProvider::MigraphX)
@@ -413,6 +415,122 @@ void bind_config(nb::module_ &m)
     m.def("get_default_webrtc_config", &get_default_webrtc_config, "Get the default WebRTC configuration.");
 }
 
+namespace text = kataglyphis::text;
+
+[[noreturn]] void raise_text(const char *context, text::TextGenError error)
+{ throw std::runtime_error(std::format("{} failed: {}", context, text::to_string(error))); }
+
+// Calls Python without letting an exception cross the exception-free core: a failure cancels and is raised afterwards.
+struct PythonTextSink
+{
+    nb::handle callable;
+    text::TextGenerator *generator = nullptr;
+    PyObject *raised = nullptr;
+
+    void operator()(std::string_view piece)
+    {
+        const nb::gil_scoped_acquire acquire;
+        if (raised != nullptr) { return; }
+        PyObject *text_piece = PyUnicode_DecodeUTF8(piece.data(), static_cast<Py_ssize_t>(piece.size()), "replace");
+        PyObject *returned = text_piece != nullptr ? PyObject_CallOneArg(callable.ptr(), text_piece) : nullptr;
+        Py_XDECREF(text_piece);
+        if (returned == nullptr) {
+            raised = PyErr_GetRaisedException();
+            generator->request_cancel();
+        }
+        Py_XDECREF(returned);
+    }
+
+    void reraise()
+    {
+        if (raised == nullptr) { return; }
+        PyErr_SetRaisedException(raised);
+        raised = nullptr;
+        throw nb::python_error();
+    }
+};
+
+void bind_text(nb::module_ &m)
+{
+    using text::ExecutionProvider;
+    using text::FinishReason;
+    using text::GenerationOptions;
+    using text::GenerationResult;
+    using text::TextGenerator;
+
+    nb::enum_<ExecutionProvider>(m, "ExecutionProvider")
+      .value("CPU", ExecutionProvider::Cpu)
+      .value("CUDA", ExecutionProvider::Cuda)
+      .value("DIRECTML", ExecutionProvider::DirectML);
+    nb::enum_<FinishReason>(m, "FinishReason")
+      .value("STOP", FinishReason::Stop)
+      .value("LENGTH", FinishReason::Length)
+      .value("CANCELLED", FinishReason::Cancelled);
+
+    nb::class_<GenerationOptions>(m, "GenerationOptions")
+      .def(nb::init<>())
+      .def_rw("max_new_tokens", &GenerationOptions::max_new_tokens, nb::lock_self())
+      .def_rw("temperature", &GenerationOptions::temperature, nb::lock_self())
+      .def_rw("top_p", &GenerationOptions::top_p, nb::lock_self())
+      .def_rw("top_k", &GenerationOptions::top_k, nb::lock_self());
+
+    nb::class_<GenerationResult>(m, "GenerationResult")
+      .def_ro("text", &GenerationResult::text)
+      .def_ro("tokens", &GenerationResult::tokens)
+      .def_ro("finish_reason", &GenerationResult::finish_reason)
+      .def_ro("prompt_tokens", &GenerationResult::prompt_tokens)
+      .def_ro("time_to_first_token_ms", &GenerationResult::time_to_first_token_ms)
+      .def_ro("decode_tokens_per_second", &GenerationResult::decode_tokens_per_second);
+
+    nb::class_<TextGenerator>(m, "TextGenerator")
+      .def(nb::init<>())
+      .def(
+        "initialize",
+        [](TextGenerator &self, const std::filesystem::path &model_dir, ExecutionProvider provider) {
+            std::expected<void, text::TextGenError> result;
+            {
+                nb::gil_scoped_release release;
+                result = self.initialize(model_dir, provider);
+            }
+            if (!result) { raise_text("initialize", result.error()); }
+        },
+        "model_dir"_a,
+        "provider"_a = ExecutionProvider::Cpu,
+        "Load a GenAI model directory. Releases the GIL while the model loads.")
+      .def("is_initialized", &TextGenerator::is_initialized)
+      .def(
+        "generate",
+        [](TextGenerator &self,
+          const std::vector<std::pair<std::string, std::string>> &messages,
+          const GenerationOptions &options,
+          const nb::object &on_text) {
+            std::vector<text::ChatMessage> chat;
+            chat.reserve(messages.size());
+            for (const auto &[role, content] : messages) { chat.push_back({ role, content }); }
+            const GenerationOptions snapshot = options;
+            PythonTextSink sink{ on_text, &self };
+            text::TextCallback forward;
+            if (!on_text.is_none()) {
+                forward = [&sink](std::string_view piece) { sink(piece); };
+            }
+            std::expected<GenerationResult, text::TextGenError> result;
+            {
+                nb::gil_scoped_release release;
+                result = self.generate(chat, snapshot, forward);
+            }
+            sink.reraise();
+            if (!result) { raise_text("generate", result.error()); }
+            return std::move(*result);
+        },
+        "messages"_a,
+        "options"_a.lock() = GenerationOptions{},
+        "on_text"_a = nb::none(),
+        "Generate a reply to (role, content) messages; on_text receives each decoded piece. Releases the GIL.")
+      .def("request_cancel",
+        &TextGenerator::request_cancel,
+        "End a running generate() after its current token; safe from any thread.");
+}
+
 }// namespace
 
 NB_MODULE(_core, m)
@@ -427,6 +545,7 @@ NB_MODULE(_core, m)
       .def("version", &kataglyphis::inference::MyCalculator::version);
 
     bind_config(m);
+    bind_text(m);
 #if HAS_ONNXRUNTIME
     bind_onnx(m);
     bind_yolo(m);

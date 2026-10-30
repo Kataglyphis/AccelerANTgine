@@ -139,6 +139,7 @@ else()
 endif()
 
 target_link_libraries(${PROJECT_NAME} PUBLIC rusty_code)
+target_link_libraries(${PROJECT_NAME} PRIVATE onnxruntime_genai::headers)
 
 if(TARGET ${PROJECT_NAME}_cli)
   target_link_libraries(${PROJECT_NAME}_cli PRIVATE ${PROJECT_NAME} absl::flags_parse)

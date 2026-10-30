@@ -44,8 +44,10 @@ the Flatpak and the Windows install proof get the list of exactly what they pack
   The first matching entry wins, so specific patterns precede broad ones. Versions come from
   ANTfrastructure's ``versions.env`` where the image pins them.
 - **Tracked texts:** ``packaging/third-party/texts/`` holds the texts that no build input carries:
-  LGPL-2.1, GPL-3.0 with the GCC Runtime Library Exception, MPL-2.0, ORC's and libffi's licenses,
-  and the Rust standard library's MIT and Apache-2.0 texts.
+  LGPL-2.1, GPL-3.0 with the GCC Runtime Library Exception, MPL-2.0, ORC's, libffi's and libpisp's
+  licenses, and the Rust standard library's MIT and Apache-2.0 texts. libpisp is the subproject
+  libcamera builds for its Raspberry Pi pipeline on arm64; its text is the ``LICENSE`` of the tag its
+  wrap pins.
 - **Debian packages:** on Linux, a bundled library that the closure found in a Debian package's
   files is listed under that package, with its ``/usr/share/doc/<package>/copyright`` and every
   ``/usr/share/common-licenses`` text the copyright file cites. The lookup searches the closure's

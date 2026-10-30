@@ -1,5 +1,9 @@
+#include "kataglyphis_c_api.h"
+#include "kataglyphis_test_support.h"
+
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <type_traits>
@@ -11,11 +15,14 @@ import kataglyphis.gstreamer_pipeline;
 import kataglyphis.inference;
 import kataglyphis.onnx_inference;
 import kataglyphis.project_config;
+import kataglyphis.text_generation;
 import kataglyphis.toml_config;
 import kataglyphis.webrtc_streamer;
 import kataglyphis.yolo_detector;
 
 extern "C" int kataglyphis_c_header_consumer_add(int lhs, int rhs);
+extern "C" int
+  kataglyphis_c_header_consumer_generate(const char *model_dir, size_t *bytes, kataglyphis_text_stats *stats);
 
 namespace {
 
@@ -32,6 +39,7 @@ namespace detection = kataglyphis::detection;
 namespace gstreamer = kataglyphis::gstreamer;
 namespace webrtc = kataglyphis::webrtc;
 namespace cfg = kataglyphis::config;
+namespace text = kataglyphis::text;
 
 TEST(CApiContract, TheHeaderCompilesAsCAndLinks) { EXPECT_EQ(kataglyphis_c_header_consumer_add(20, 22), 42); }
 
@@ -41,6 +49,54 @@ TEST(CApiContract, TheModuleExportsTheSameFunction)
     EXPECT_EQ(kataglyphis_add(20, 22), kataglyphis_c_header_consumer_add(20, 22));
 }
 
+TEST(CApiContract, TheCHeaderDrivesTextGeneration)
+{
+    std::size_t bytes = 0;
+    kataglyphis_text_stats stats{};
+    ASSERT_EQ(kataglyphis_c_header_consumer_generate(
+                kataglyphis::test::tiny_genai_model_dir().string().c_str(), &bytes, &stats),
+      KATAGLYPHIS_TEXT_OK);
+    EXPECT_EQ(bytes, 4U);
+    EXPECT_EQ(stats.completion_tokens, 4U);
+    EXPECT_EQ(stats.prompt_tokens, 3U);
+    EXPECT_EQ(stats.finish_reason, KATAGLYPHIS_TEXT_FINISH_LENGTH);
+}
+
+TEST(CApiContract, TextStatusesAreTheCppErrorsShiftedByOne)
+{
+    // The C codes are an ABI: a reordered TextGenError would renumber them for every embedder.
+    static_assert(KATAGLYPHIS_TEXT_OK == 0);
+    static_assert(as_int(text::TextGenError::LibraryUnavailable) + 1 == KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE);
+    static_assert(as_int(text::TextGenError::ModelLoadFailed) + 1 == KATAGLYPHIS_TEXT_MODEL_LOAD_FAILED);
+    static_assert(as_int(text::TextGenError::ProviderUnavailable) + 1 == KATAGLYPHIS_TEXT_PROVIDER_UNAVAILABLE);
+    static_assert(as_int(text::TextGenError::TokenizerFailed) + 1 == KATAGLYPHIS_TEXT_TOKENIZER_FAILED);
+    static_assert(as_int(text::TextGenError::ChatTemplateFailed) + 1 == KATAGLYPHIS_TEXT_CHAT_TEMPLATE_FAILED);
+    static_assert(as_int(text::TextGenError::EncodeFailed) + 1 == KATAGLYPHIS_TEXT_ENCODE_FAILED);
+    static_assert(as_int(text::TextGenError::InvalidOptions) + 1 == KATAGLYPHIS_TEXT_INVALID_ARGUMENT);
+    static_assert(as_int(text::TextGenError::GenerationFailed) + 1 == KATAGLYPHIS_TEXT_GENERATION_FAILED);
+    static_assert(as_int(text::TextGenError::NotInitialized) + 1 == KATAGLYPHIS_TEXT_NOT_INITIALIZED);
+    for (int status = KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE; status <= KATAGLYPHIS_TEXT_NOT_INITIALIZED; ++status) {
+        EXPECT_EQ(std::string(kataglyphis_text_status_message(status)),
+          std::string(text::to_string(static_cast<text::TextGenError>(status - 1))));
+    }
+    EXPECT_EQ(std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_OK)), "success");
+    EXPECT_EQ(std::string(kataglyphis_text_status_message(-1)), "unknown status");
+    EXPECT_EQ(std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_NOT_INITIALIZED + 1)), "unknown status");
+}
+
+TEST(CApiContract, TextOptionDefaultsAreTheCppDefaults)
+{
+    kataglyphis_text_options options{};
+    kataglyphis_text_options_default(&options);
+    const text::GenerationOptions defaults;
+    EXPECT_EQ(options.max_new_tokens, defaults.max_new_tokens);
+    EXPECT_DOUBLE_EQ(options.temperature, defaults.temperature);
+    EXPECT_DOUBLE_EQ(options.top_p, defaults.top_p);
+    EXPECT_EQ(options.top_k, defaults.top_k);
+    EXPECT_EQ(defaults.max_new_tokens, 128);
+    EXPECT_DOUBLE_EQ(defaults.temperature, 0.0);
+}
+
 TEST(CppApiContract, ResourceOwnersAreMoveOnly)
 {
     static_assert(kMoveOnly<inference::OnnxInferenceEngine>);
@@ -48,6 +104,7 @@ TEST(CppApiContract, ResourceOwnersAreMoveOnly)
     static_assert(kMoveOnly<detection::VideoDetectorPipeline>);
     static_assert(kMoveOnly<gstreamer::GStreamerPipeline>);
     static_assert(kMoveOnly<webrtc::WebRTCStreamer>);
+    static_assert(kMoveOnly<text::TextGenerator>);
     SUCCEED();
 }
 

@@ -173,3 +173,38 @@ if(EXISTS "${_ort_root}/include/onnxruntime/core/providers/cpu")
   target_include_directories(onnxruntime::onnxruntime INTERFACE "${_ort_root}/include/onnxruntime/core/providers/cpu")
 endif()
 message(STATUS "ONNX Runtime imported target created successfully")
+
+# ONNX Runtime GenAI: its C header only; Src/text_generation.cpp loads the chain library at run time.
+set(ONNXRUNTIME_GENAI_ROOT
+    ""
+    CACHE PATH "Chain-built ONNX Runtime GenAI prefix (default: the family image's)")
+if(ONNXRUNTIME_GENAI_ROOT)
+  set(_genai_root "${ONNXRUNTIME_GENAI_ROOT}")
+elseif(WIN32)
+  if(NOT DEFINED ENV{ONNX_GENAI_ROOT} OR "$ENV{ONNX_GENAI_ROOT}" STREQUAL "")
+    message(
+      FATAL_ERROR
+        "ONNX Runtime GenAI: ONNX_GENAI_ROOT is not set. Build inside the family Windows image, or pass -DONNXRUNTIME_GENAI_ROOT=<a chain-built GenAI prefix>."
+    )
+  endif()
+  set(_genai_root "$ENV{ONNX_GENAI_ROOT}")
+else()
+  set(_genai_root "/usr/local/lib/onnxruntime-genai")
+endif()
+file(TO_CMAKE_PATH "${_genai_root}" _genai_root)
+unset(_ONNXRUNTIME_GENAI_INCLUDE_DIR CACHE)
+find_path(
+  _ONNXRUNTIME_GENAI_INCLUDE_DIR
+  NAMES ort_genai_c.h
+  PATHS "${_genai_root}/include" "${_genai_root}"
+  NO_DEFAULT_PATH)
+if(NOT _ONNXRUNTIME_GENAI_INCLUDE_DIR)
+  message(
+    FATAL_ERROR
+      "ONNX Runtime GenAI: no ort_genai_c.h under ${_genai_root}. Only the family image's chain build is allowed; nothing else is searched."
+  )
+endif()
+add_library(onnxruntime_genai::headers INTERFACE IMPORTED)
+set_target_properties(onnxruntime_genai::headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
+                                                            "${_ONNXRUNTIME_GENAI_INCLUDE_DIR}")
+message(STATUS "Found chain-built ONNX Runtime GenAI headers at: ${_ONNXRUNTIME_GENAI_INCLUDE_DIR}")
