@@ -287,7 +287,8 @@ cmake_build_main \
   --configure-arg "-DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}" \
   "${gpu_configure_args[@]}"
 
-cmake --build "${BUILD_RELEASE_DIR}" --target package
+# Validate AppStream metadata without depending on website availability.
+AS_VALIDATE_NONET=1 cmake --build "${BUILD_RELEASE_DIR}" --target package
 
 if [[ "${DO_FLATPAK}" -eq 1 ]]; then
   [[ -n "${FLATPAK_OUT_DIR}" ]] || FLATPAK_OUT_DIR="${BUILD_RELEASE_DIR}"
