@@ -41,6 +41,25 @@ def expand(template: str, vendor: str, arch: str, attempt: int) -> str:
 
 
 class ArtifactReruns(unittest.TestCase):
+    def test_workflows_can_be_called_without_cancelling_their_caller(self):
+        for workflow in (LINUX, WINDOWS):
+            text = workflow.read_text(encoding="utf-8")
+            call = text.split("  workflow_call:\n", 1)[1].split("\npermissions:", 1)[0]
+            self.assertRegex(
+                call,
+                r"(?ms)^      verify-gpu:\n        type: boolean\n        default: false$",
+            )
+            self.assertRegex(call, r"(?ms)^      GHCR_PAT:\n        required: false$")
+            self.assertIn(
+                "${{ github.workflow }}",
+                text.split("\nconcurrency:\n", 1)[1].split("\njobs:", 1)[0],
+            )
+            if workflow == WINDOWS:
+                self.assertRegex(
+                    call,
+                    r"(?ms)^      amd-device-index:\n        type: string\n        default: '0'$",
+                )
+
     def test_profile_downloads_ignore_stale_candidates(self):
         for workflow, reference in (
             (LINUX, '"$CANDIDATE_DIR"'),
@@ -122,7 +141,9 @@ class ArtifactReruns(unittest.TestCase):
 
     def test_windows_profiles_isolate_gstreamer_and_keep_gpu_runtime_path(self):
         job = WINDOWS.read_text(encoding="utf-8").split("\n  gpu-profile:\n", 1)[1]
-        calls = [line for line in job.splitlines() if "Test-WindowsGpuCleanHost.ps1" in line]
+        calls = [
+            line for line in job.splitlines() if "Test-WindowsGpuCleanHost.ps1" in line
+        ]
         self.assertEqual(len(calls), 2)
         self.assertTrue(all("-PreserveGpuRuntimePath" in call for call in calls))
         self.assertTrue(any("'--onnx-only'" in call for call in calls))

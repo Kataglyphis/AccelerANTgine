@@ -11,13 +11,24 @@ on:
         description: DXGI adapter index for the AMD DirectML runner
         type: string
         default: '0'
+  workflow_call:
+    inputs:
+      verify-gpu:
+        type: boolean
+        default: false
+      amd-device-index:
+        type: string
+        default: '0'
+    secrets:
+      GHCR_PAT:
+        required: false
 
 permissions:
   contents: read
   packages: read
 
 concurrency:
-  group: windows-gpu-candidates-${{ github.ref }}
+  group: windows-gpu-candidates-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

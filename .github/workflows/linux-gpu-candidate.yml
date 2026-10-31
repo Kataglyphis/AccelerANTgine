@@ -7,13 +7,21 @@ on:
         description: Profile the finished candidate on vendor-labelled GPU runners
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      verify-gpu:
+        type: boolean
+        default: false
+    secrets:
+      GHCR_PAT:
+        required: false
 
 permissions:
   contents: read
   packages: read
 
 concurrency:
-  group: linux-gpu-candidate-${{ github.ref }}
+  group: linux-gpu-candidate-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
