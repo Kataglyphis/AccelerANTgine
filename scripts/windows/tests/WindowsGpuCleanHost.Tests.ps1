@@ -34,6 +34,15 @@ exit /b 0
             $env:PATH | Should Be 'C:\contaminated-path'
             $env:GST_PLUGIN_PATH_1_0 | Should Be 'C:\contaminated-plugin'
             $env:GST_REGISTRY_1_0 | Should Be 'C:\contaminated-registry'
+            & $script -Executable (Join-Path $env:SystemRoot 'System32\cmd.exe') -Arguments @('/d', '/c', $command) -PreserveGpuRuntimePath
+            $lines = @(Get-Content -LiteralPath $probe)
+            $lines[0] | Should Be 'C:\contaminated-path'
+            $lines[2] | Should Be 'UNSET'
+            $lines[3] | Should Be $lines[1]
+            $lines[4] | Should Be (Join-Path $lines[1] 'registry.bin')
+            (Test-Path -LiteralPath $lines[1]) | Should Be $false
+            $env:PATH | Should Be 'C:\contaminated-path'
+            $env:GST_PLUGIN_PATH_1_0 | Should Be 'C:\contaminated-plugin'
         } finally {
             foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
         }
@@ -41,10 +50,15 @@ exit /b 0
 
     It 'fails when the candidate exits unsuccessfully' {
         $script = Join-Path $PSScriptRoot '..\Test-WindowsGpuCleanHost.ps1'
-        $message = try {
-            & $script -Executable (Join-Path $env:SystemRoot 'System32\cmd.exe') -Arguments @('/d', '/c', 'exit 17')
-            ''
-        } catch { $_.Exception.Message }
-        $message | Should Match 'Candidate startup failed: 17'
+        $previous = [Environment]::GetEnvironmentVariable('GST_PLUGIN_PATH_1_0', 'Process')
+        try {
+            $env:GST_PLUGIN_PATH_1_0 = 'C:\contaminated-plugin'
+            $message = try {
+                & $script -Executable (Join-Path $env:SystemRoot 'System32\cmd.exe') -Arguments @('/d', '/c', 'exit 17') -PreserveGpuRuntimePath
+                ''
+            } catch { $_.Exception.Message }
+            $message | Should Match 'Candidate startup failed: 17'
+            $env:GST_PLUGIN_PATH_1_0 | Should Be 'C:\contaminated-plugin'
+        } finally { [Environment]::SetEnvironmentVariable('GST_PLUGIN_PATH_1_0', $previous, 'Process') }
     }
 }

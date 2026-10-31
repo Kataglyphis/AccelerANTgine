@@ -169,14 +169,12 @@ jobs:
             python third_party/ANTfrastructure/windows/scripts/diagnostics/verify-dxgi-adapter.py --vendor amd --index $index
             if ($LASTEXITCODE -ne 0) { throw 'The selected DirectML adapter is not a physical AMD GPU.' }
           }
-          & $demos[0].FullName --onnx-only --model (Join-Path $env:GITHUB_WORKSPACE 'models/deim_dfine_n_coco.onnx') --device $env:DEVICE --device-id $index --profile (Join-Path $stage 'ort-profile')
-          if ($LASTEXITCODE -ne 0) { throw 'The candidate GPU inference failed.' }
+          & scripts/windows/Test-WindowsGpuCleanHost.ps1 -Executable $demos[0].FullName -PreserveGpuRuntimePath -Arguments @('--onnx-only', '--model', (Join-Path $env:GITHUB_WORKSPACE 'models/deim_dfine_n_coco.onnx'), '--device', $env:DEVICE, '--device-id', $index, '--profile', (Join-Path $stage 'ort-profile'))
           $profiles = @(Get-ChildItem -LiteralPath $stage -Filter 'ort-profile*.json' -File)
           if ($profiles.Count -ne 1) { throw "Expected one ORT profile, found $($profiles.Count)" }
           python third_party/ANTfrastructure/shared/python/verify_ort_profile.py $profiles[0].FullName --device $env:DEVICE
           if ($LASTEXITCODE -ne 0) { throw 'No model operator ran on the requested GPU provider.' }
-          & $demos[0].FullName --video-check --model (Join-Path $env:GITHUB_WORKSPACE 'models/deim_dfine_n_coco.onnx') --device $env:DEVICE --device-id $index --profile (Join-Path $stage 'video-profile')
-          if ($LASTEXITCODE -ne 0) { throw 'GStreamer video inference failed.' }
+          & scripts/windows/Test-WindowsGpuCleanHost.ps1 -Executable $demos[0].FullName -PreserveGpuRuntimePath -Arguments @('--video-check', '--model', (Join-Path $env:GITHUB_WORKSPACE 'models/deim_dfine_n_coco.onnx'), '--device', $env:DEVICE, '--device-id', $index, '--profile', (Join-Path $stage 'video-profile'))
           $videoProfiles = @(Get-ChildItem -LiteralPath $stage -Filter 'video-profile*.json' -File)
           if ($videoProfiles.Count -ne 1) { throw "Expected one video ORT profile, found $($videoProfiles.Count)" }
           python third_party/ANTfrastructure/shared/python/verify_ort_profile.py $videoProfiles[0].FullName --device $env:DEVICE

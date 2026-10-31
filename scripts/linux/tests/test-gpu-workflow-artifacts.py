@@ -120,6 +120,14 @@ class ArtifactReruns(unittest.TestCase):
             expand(name, "amd", "x64", 1), expand(name, "nvidia", "x64", 1)
         )
 
+    def test_windows_profiles_isolate_gstreamer_and_keep_gpu_runtime_path(self):
+        job = WINDOWS.read_text(encoding="utf-8").split("\n  gpu-profile:\n", 1)[1]
+        calls = [line for line in job.splitlines() if "Test-WindowsGpuCleanHost.ps1" in line]
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all("-PreserveGpuRuntimePath" in call for call in calls))
+        self.assertTrue(any("'--onnx-only'" in call for call in calls))
+        self.assertTrue(any("'--video-check'" in call for call in calls))
+
 
 if __name__ == "__main__":
     unittest.main()

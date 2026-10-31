@@ -1,12 +1,15 @@
 #requires -Version 7.0
 <#
 .SYNOPSIS
-  Runs the GPU bundle's GStreamer startup check without inherited SDK paths or plugin caches.
+  Runs a GPU bundle check without inherited GStreamer plugin paths or caches.
+.PARAMETER PreserveGpuRuntimePath
+  Keep the host PATH for GPU SDK libraries while still isolating GStreamer plugins and registry.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Executable,
-    [string[]]$Arguments = @('--gst_check')
+    [string[]]$Arguments = @('--gst_check'),
+    [switch]$PreserveGpuRuntimePath
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -22,7 +25,11 @@ foreach ($name in $variables) { $previous[$name] = [Environment]::GetEnvironment
 New-Item -ItemType Directory -Path $scratch -ErrorAction Stop | Out-Null
 try {
     foreach ($name in $variables) { Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue }
-    $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+    if ($PreserveGpuRuntimePath) {
+        [Environment]::SetEnvironmentVariable('PATH', $previous['PATH'], 'Process')
+    } else {
+        $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+    }
     # A real empty directory avoids PowerShell/.NET versions that remove empty environment values.
     $env:GST_PLUGIN_SYSTEM_PATH_1_0 = $scratch
     $env:GST_REGISTRY_1_0 = Join-Path $scratch 'registry.bin'
