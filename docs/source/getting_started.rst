@@ -146,7 +146,8 @@ license gate. Its retained binaries ran CPU and DirectML inference, and a separa
 test build profiled a model operator on the host's AMD adapter. These results do not verify a
 finished plugin-bearing GPU package or execution on every target machine.
 The manually dispatched Windows GPU workflow labels its outputs unverified and is separate
-from releases. The MSI upgrade identity and MSIX
+from releases. Linux and Windows candidate uploads use attempt-specific names and are not
+overwritten; rerun the producer as well when repeating a downstream-only check. The MSI upgrade identity and MSIX
 package identity are shared with the CPU build, so switching variants replaces or requires
 uninstalling the existing installation; they cannot be installed side by side. Windows ARM
 GPU packages are excluded. Neither these checks nor a package build prove GPU inference.

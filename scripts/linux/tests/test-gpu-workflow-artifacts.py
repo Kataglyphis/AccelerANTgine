@@ -18,14 +18,14 @@ def contract(text: str, prefix: str, references: int) -> str:
     if len(names) != references or len(set(names)) != 1:
         raise ValueError("upload and download artifact names differ")
     template = names[0]
-    if "github.run_attempt" in template:
-        raise ValueError("artifact name changes on a partial rerun")
+    if "${{ github.run_attempt }}" not in template:
+        raise ValueError("candidate artifacts must be scoped to the current attempt")
     upload = re.search(
         r"(?ms)uses: actions/upload-artifact@[^\n]+\n\s+with:\n(.*?)(?=^\s+- name:|^  [\w-]+:|\Z)",
         text,
     )
-    if not upload or "overwrite: true" not in upload.group(1):
-        raise ValueError("rerun-all cannot replace a previous candidate")
+    if not upload or "overwrite: false" not in upload.group(1):
+        raise ValueError("candidate artifacts must not replace earlier uploads")
     return template
 
 
@@ -107,37 +107,42 @@ class ArtifactReruns(unittest.TestCase):
         first = {expand(name, vendor, arch, 1): "attempt-1" for vendor, arch in rows}
         self.assertEqual(len(first), len(rows))
         partial = [expand(name, vendor, arch, 2) for vendor, arch in rows]
-        self.assertTrue(all(candidate in first for candidate in partial))
+        self.assertTrue(all(candidate not in first for candidate in partial))
         for candidate in partial:
             first[candidate] = "attempt-2"
-        self.assertEqual(len(first), len(rows))
-        self.assertTrue(all(value == "attempt-2" for value in first.values()))
+        self.assertEqual(len(first), 2 * len(rows))
+        self.assertEqual(list(first.values()).count("attempt-1"), len(rows))
+        self.assertEqual(list(first.values()).count("attempt-2"), len(rows))
         with self.assertRaises(ValueError):
             contract(
-                text.replace("overwrite: true", "overwrite: false"),
+                text.replace("overwrite: false", "overwrite: true", 1),
                 "accelerantgine-unverified-gpu-",
                 3,
             )
         with self.assertRaises(ValueError):
             contract(
-                text.replace(
-                    "${{ github.run_id }}",
-                    "${{ github.run_id }}-${{ github.run_attempt }}",
-                ),
+                text.replace("-attempt-${{ github.run_attempt }}", ""),
                 "accelerantgine-unverified-gpu-",
                 3,
             )
 
-    def test_windows_candidate_is_stable_and_replaceable(self):
-        name = contract(
-            WINDOWS.read_text(encoding="utf-8"),
-            "unverified-accelerantgine-windows-x64-",
-            2,
+    def test_windows_candidate_is_attempt_scoped_and_immutable(self):
+        text = WINDOWS.read_text(encoding="utf-8")
+        prefix = "unverified-accelerantgine-windows-x64-"
+        name = contract(text, prefix, 2)
+        self.assertNotEqual(
+            expand(name, "amd", "x64", 1), expand(name, "amd", "x64", 2)
         )
-        self.assertEqual(expand(name, "amd", "x64", 1), expand(name, "amd", "x64", 2))
         self.assertNotEqual(
             expand(name, "amd", "x64", 1), expand(name, "nvidia", "x64", 1)
         )
+        for mutant in (
+            text.replace("overwrite: false", "overwrite: true", 1),
+            text.replace("-attempt-${{ github.run_attempt }}", ""),
+            text.replace(name, name + "-different", 1),
+        ):
+            with self.assertRaises(ValueError):
+                contract(mutant, prefix, 2)
 
     def test_windows_profiles_isolate_gstreamer_and_keep_gpu_runtime_path(self):
         job = WINDOWS.read_text(encoding="utf-8").split("\n  gpu-profile:\n", 1)[1]
