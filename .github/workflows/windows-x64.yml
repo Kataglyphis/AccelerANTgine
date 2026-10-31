@@ -40,14 +40,6 @@ jobs:
     secrets:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
 
-  # No -FailOnAnalyzer yet: parse and AST-trap errors fail, PSScriptAnalyzer stays advisory until triaged.
-  lint-powershell:
-    name: PowerShell lint (scripts)
-    uses: Kataglyphis/ANTfrastructure/.github/workflows/powershell-quality.yml@develop
-    with:
-      lint-path: scripts
-      analyzer-strict: false
-
   pester-tests:
     name: Pester suites (scripts/windows/tests, generated artifacts)
     runs-on: windows-2025

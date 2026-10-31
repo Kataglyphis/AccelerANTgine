@@ -54,6 +54,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- A develop push runs the hub's PowerShell lint and complexity workflow once: `windows-x64.yml` no
+  longer calls it beside `powershell-quality.yml`.
+
 - The packaged inference demo defaults to its package's GPU provider for NVIDIA and AMD builds;
   CPU builds and the library API still default to CPU, and ``--device cpu`` remains available.
 - Dependencies from the hub's local Renovate run: the fuzztest, Google Benchmark, nlohmann/json

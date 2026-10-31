@@ -502,10 +502,11 @@ fails at CreateComputeSystem on host/image OS-build skew).
 **CI lanes** follow the owner's fleet convention of 2026-09-24: kebab-case files, one file per
 platform + arch, display names `<Platform> <Arch> · <what>`. They are `linux-x64.yml` and
 `linux-arm64.yml` (each calls the containerized `reusable-linux.yml` once per compiler),
-`windows-x64.yml` (the container build through the hub's `container-ci-windows.yml`, a
-`lint-powershell` job over `scripts/` with the hub's `Invoke-Lint.ps1`, and a `pester-tests` job
-over `scripts/windows/tests/` plus the hub's `shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1`), `windows-arm64-cross.yml`, `linux-riscv64.yml`, `lint-gates.yml`
-and `submodule-pins.yml`.
+`windows-x64.yml` (the container build through the hub's `container-ci-windows.yml` and a
+`pester-tests` job over `scripts/windows/tests/` plus the hub's
+`shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1`), `windows-arm64-cross.yml`, `linux-riscv64.yml`,
+`lint-gates.yml`, `submodule-pins.yml` and `powershell-quality.yml`, the one caller of the hub's
+PowerShell lint and complexity workflow, on every push.
 Both Windows container callers request `submodules: 'true'`: their build inputs are direct
 submodules, while a recursive checkout follows ANTfrastructure's documentation cycle.
 
