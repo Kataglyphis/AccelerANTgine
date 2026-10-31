@@ -100,6 +100,30 @@ auto onnx_error_name(kataglyphis::inference::OnnxError error) -> const char *
 
 using CpuFloatArray = nb::ndarray<const float, nb::c_contig, nb::device::cpu>;
 
+auto yolo_image_dimensions(const CpuFloatArray &image, std::uint32_t width, std::uint32_t height)
+  -> std::pair<std::uint32_t, std::uint32_t>
+{
+    std::size_t spatial = 0;
+    if (image.ndim() == 3 && image.shape(0) == 3) {
+        spatial = 1;
+    } else if (image.ndim() == 4 && image.shape(0) == 1 && image.shape(1) == 3) {
+        spatial = 2;
+    } else if (image.ndim() >= 3) {
+        throw std::invalid_argument("image must have CHW or single-batch NCHW layout, with 3 RGB channels");
+    }
+    if ((width == 0) != (height == 0)) {
+        throw std::invalid_argument("width and height must both be specified or both omitted");
+    }
+    if (width != 0) { return { width, height }; }
+    if (spatial == 0) { throw std::invalid_argument("width and height are required for a flattened image"); }
+    const auto image_height = image.shape(spatial);
+    const auto image_width = image.shape(spatial + 1);
+    if (image_height == 0 || image_width == 0 || image_height > UINT32_MAX || image_width > UINT32_MAX) {
+        throw std::invalid_argument("image dimensions must be positive 32-bit values");
+    }
+    return { static_cast<std::uint32_t>(image_width), static_cast<std::uint32_t>(image_height) };
+}
+
 auto shape_from_array(const CpuFloatArray &array) -> kataglyphis::inference::TensorShape
 {
     kataglyphis::inference::TensorShape shape;
@@ -330,16 +354,12 @@ void bind_yolo(nb::module_ &m)
       .def(
         "detect",
         [](YoloDetector &self, const CpuFloatArray &image, std::uint32_t width, std::uint32_t height) {
-            // Infer width/height from an (H, W) or (H, W, C) array when not given.
-            if (width == 0 && height == 0 && image.ndim() >= 2) {
-                height = static_cast<std::uint32_t>(image.shape(0));
-                width = static_cast<std::uint32_t>(image.shape(1));
-            }
+            const auto [original_width, original_height] = yolo_image_dimensions(image, width, height);
             const std::span<const float> data(image.data(), image.size());
             std::expected<DetectionResult, OnnxError> result;
             {
                 nb::gil_scoped_release release;
-                result = self.detect(data, width, height);
+                result = self.detect(data, original_width, original_height);
             }
             if (!result) { raise_onnx("detect", result.error()); }
             return std::move(*result);
@@ -347,7 +367,8 @@ void bind_yolo(nb::module_ &m)
         "image"_a,
         "width"_a = 0,
         "height"_a = 0,
-        "Detect objects in a float32 image. Width/height default to the array's (H, W) shape. Releases the GIL.")
+        "Detect in normalized RGB float32 CHW or single-batch NCHW. Width/height describe the original frame. Releases "
+        "the GIL.")
       .def_static("get_coco_class_name", &YoloDetector::get_coco_class_name, "class_id"_a);
 }
 

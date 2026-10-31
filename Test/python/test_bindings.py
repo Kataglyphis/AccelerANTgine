@@ -115,3 +115,25 @@ def test_yolo_end_to_end_rows_decode_using_selected_layout(tmp_path):
     assert box.class_id == 2
     assert box.confidence == pytest.approx(0.8)
     assert (box.x, box.y, box.width, box.height) == pytest.approx((0.25, 0.25, 2.5, 1.5))
+
+    image = rows.reshape(3, 2, 3)
+    for array in (image, image[np.newaxis, ...]):
+        inferred = detector.detect(array)
+        assert (inferred.original_width, inferred.original_height) == (3, 2)
+        box = inferred.boxes[0]
+        assert (box.x, box.y, box.width, box.height) == pytest.approx((0.25, 0.25, 2.5, 1.5))
+
+        scaled = detector.detect(array, width=6, height=4)
+        assert (scaled.original_width, scaled.original_height) == (6, 4)
+        box = scaled.boxes[0]
+        assert (box.x, box.y, box.width, box.height) == pytest.approx((0.5, 0.5, 5.0, 3.0))
+
+    for array in (np.zeros((2, 3, 3), dtype=np.float32), np.zeros((2, 3, 2, 3), dtype=np.float32)):
+        with pytest.raises(ValueError, match="CHW or single-batch NCHW"):
+            detector.detect(array, width=3, height=2)
+    with pytest.raises(ValueError, match="width and height are required"):
+        detector.detect(rows)
+    with pytest.raises(ValueError, match="both be specified"):
+        detector.detect(image, width=3)
+    flattened = detector.detect(rows, width=3, height=2)
+    assert flattened.boxes[0].class_id == 2

@@ -7,6 +7,12 @@ model input and maps detections back to the original frame. ``detect_from_gstrea
 callers that already have normalized RGB NCHW floats; its width and height describe the
 original image for stretch coordinate mapping.
 
+The Python ``YoloDetector.detect`` binding accepts contiguous float32 RGB tensors in ``[3, H, W]``
+or ``[1, 3, H, W]`` order. If the original frame dimensions differ from the input tensor,
+pass both ``width`` and ``height`` to map boxes to that frame. When omitted, they default to
+the tensor's spatial dimensions. Flattened arrays remain supported with both dimensions explicit;
+the binding does not convert interleaved HWC pixels or normalize byte values.
+
 Frame memory
 ------------
 
