@@ -304,7 +304,7 @@ Useful Tools
 - `NSIS <https://nsis.sourceforge.io/Main_Page>`_
 - `doxygen <https://www.doxygen.nl/index.html>`_
 - `cppcheck <https://cppcheck.sourceforge.io/>`_
-- `cmake <https://cmake.org/>`_
+- `cmake <https://github.com/Kitware/CMake>`_
 - `valgrind <https://valgrind.org/>`_
 - `clangtidy <https://github.com/llvm/llvm-project>`_
 - `visualstudio <https://visualstudio.microsoft.com/de/>`_
