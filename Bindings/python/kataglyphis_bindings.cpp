@@ -295,6 +295,10 @@ void bind_yolo(nb::module_ &m)
       .def_ro("original_width", &DetectionResult::original_width)
       .def_ro("original_height", &DetectionResult::original_height);
 
+    nb::enum_<YoloOutputLayout>(m, "YoloOutputLayout")
+      .value("CenterObjectnessScores", YoloOutputLayout::CenterObjectnessScores)
+      .value("CornersScoreClass", YoloOutputLayout::CornersScoreClass);
+
     nb::class_<YoloConfig>(m, "YoloConfig")
       .def(nb::init<>())
       .def_rw("model_path", &YoloConfig::model_path, nb::lock_self())
@@ -303,6 +307,7 @@ void bind_yolo(nb::module_ &m)
       .def_rw("input_width", &YoloConfig::input_width, nb::lock_self())
       .def_rw("input_height", &YoloConfig::input_height, nb::lock_self())
       .def_rw("num_classes", &YoloConfig::num_classes, nb::lock_self())
+      .def_rw("output_layout", &YoloConfig::output_layout, nb::lock_self())
       .def_rw("execution_provider", &YoloConfig::execution_provider, nb::lock_self())
       .def_rw("device_id", &YoloConfig::device_id, nb::lock_self());
 

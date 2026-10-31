@@ -5,6 +5,7 @@ Run with the staged package on the path, e.g.:
 """
 
 import pytest
+from onnx_models import yolo_reshape_model
 
 ki = pytest.importorskip("kataglyphis_inference")
 
@@ -91,3 +92,26 @@ def test_session_config_defaults():
 @needs_onnx
 def test_yolo_coco_class_name():
     assert ki.YoloDetector.get_coco_class_name(0) == "person"
+
+
+@needs_onnx
+def test_yolo_end_to_end_rows_decode_using_selected_layout(tmp_path):
+    np = pytest.importorskip("numpy")
+    model = tmp_path / "detections.onnx"
+    model.write_bytes(yolo_reshape_model(height=2, width=3, rows=3, values=6))
+    config = ki.YoloConfig()
+    assert config.output_layout == ki.YoloOutputLayout.CenterObjectnessScores
+    config.model_path = model
+    config.input_width, config.input_height = 3, 2
+    config.output_layout = ki.YoloOutputLayout.CornersScoreClass
+    detector = ki.YoloDetector()
+    detector.initialize(config)
+
+    rows = np.zeros((3, 6), dtype=np.float32)
+    rows[0] = [0.25, 0.25, 2.75, 1.75, 0.8, 2.0]
+    result = detector.detect(rows.reshape(3, 2, 3), width=3, height=2)
+    assert len(result.boxes) == 1
+    box = result.boxes[0]
+    assert box.class_id == 2
+    assert box.confidence == pytest.approx(0.8)
+    assert (box.x, box.y, box.width, box.height) == pytest.approx((0.25, 0.25, 2.5, 1.5))
