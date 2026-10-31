@@ -95,42 +95,7 @@ class ArtifactReruns(unittest.TestCase):
                 else ("candidate", "gpu-profile")
             )
             count = 14 if has_promotion else 3 if workflow == LINUX else 2
-            trigger = text.split("\npermissions:", 1)[0]
-            self.assertEqual(trigger.count("      invocation-scope:"), 2)
-            self.assertEqual(trigger.count("        default: default"), 2)
-            self.assertIn("GPU_INVOCATION_SCOPE: ${{ inputs.invocation-scope }}", text)
-            self.assertIn("scripts/linux/gpu-invocation-scope.py", text)
-            self.assertIn("suffix: ${{ steps.scope.outputs.suffix }}", text)
-            artifacts = [
-                line
-                for line in text.splitlines()
-                if re.match(
-                    r"\s+(?:name|artifact): (?:accelerantgine-unverified-gpu-|unverified-accelerantgine-|verified-accelerantgine-)",
-                    line,
-                )
-            ]
-            self.assertEqual(len(artifacts), count)
             suffix = "${{ " + dependency + " }}"
-            groups = []
-            for job in jobs:
-                body = text.split(f"\n  {job}:\n", 1)[1]
-                body = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", body, maxsplit=1)[0]
-                group = re.search(r"(?m)^      group: (.+)$", body)
-                self.assertIsNotNone(group, job)
-                self.assertIn(suffix, group.group(1))
-                self.assertIn("${{ matrix.vendor }}", group.group(1))
-                self.assertNotIn("${{ inputs.invocation-scope }}", group.group(1))
-                self.assertIn("cancel-in-progress:", body)
-                self.assertNotEqual(
-                    expand(group.group(1), "amd", "x64", 1, "-scope-first"),
-                    expand(group.group(1), "amd", "x64", 1, "-scope-second"),
-                )
-                groups.append(group.group(1))
-            self.assertEqual(len(groups), len(set(groups)))
-            for line in artifacts:
-                with self.subTest(workflow=workflow.name, artifact=line):
-                    self.assertIn(suffix, line)
-                    self.assertIn("${{ github.run_attempt }}", line)
             prefixes = (
                 {
                     "accelerantgine-unverified-gpu-": 3,
@@ -145,23 +110,70 @@ class ArtifactReruns(unittest.TestCase):
                 if workflow == LINUX
                 else {"unverified-accelerantgine-windows-x64-": 2}
             )
-            for prefix, references in prefixes.items():
-                names = [line.split(": ", 1)[1] for line in artifacts if prefix in line]
-                self.assertEqual(len(names), references, prefix)
-                self.assertEqual(len(set(names)), 1, prefix)
-                name = names[0]
-                self.assertNotEqual(
-                    expand(name, "nvidia", "x64", 1, "-scope-all"),
-                    expand(name, "nvidia", "x64", 1, "-scope-single"),
-                )
-            for line in text.splitlines():
-                if (
-                    "path:" in line or "CANDIDATE_DIR:" in line
-                ) and "/accelerantgine-gpu-" in line:
-                    self.assertIn(suffix, line)
+            self.assert_scope_inputs(text)
+            self.assert_scoped_concurrency(text, jobs, suffix)
+            self.assert_scoped_artifacts(workflow, text, suffix, count, prefixes)
+            self.assert_scoped_paths(text, suffix)
         self.assertIn(
             "needs: [preflight, candidate]", WINDOWS.read_text(encoding="utf-8")
         )
+
+    def assert_scope_inputs(self, text):
+        trigger = text.split("\npermissions:", 1)[0]
+        self.assertEqual(trigger.count("      invocation-scope:"), 2)
+        self.assertEqual(trigger.count("        default: default"), 2)
+        self.assertIn("GPU_INVOCATION_SCOPE: ${{ inputs.invocation-scope }}", text)
+        self.assertIn("scripts/linux/gpu-invocation-scope.py", text)
+        self.assertIn("suffix: ${{ steps.scope.outputs.suffix }}", text)
+
+    def assert_scoped_concurrency(self, text, jobs, suffix):
+        groups = []
+        for job in jobs:
+            body = text.split(f"\n  {job}:\n", 1)[1]
+            body = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", body, maxsplit=1)[0]
+            group = re.search(r"(?m)^      group: (.+)$", body)
+            self.assertIsNotNone(group, job)
+            self.assertIn(suffix, group.group(1))
+            self.assertIn("${{ matrix.vendor }}", group.group(1))
+            self.assertNotIn("${{ inputs.invocation-scope }}", group.group(1))
+            self.assertIn("cancel-in-progress:", body)
+            self.assertNotEqual(
+                expand(group.group(1), "amd", "x64", 1, "-scope-first"),
+                expand(group.group(1), "amd", "x64", 1, "-scope-second"),
+            )
+            groups.append(group.group(1))
+        self.assertEqual(len(groups), len(set(groups)))
+
+    def assert_scoped_artifacts(self, workflow, text, suffix, count, prefixes):
+        artifacts = [
+            line
+            for line in text.splitlines()
+            if re.match(
+                r"\s+(?:name|artifact): (?:accelerantgine-unverified-gpu-|unverified-accelerantgine-|verified-accelerantgine-)",
+                line,
+            )
+        ]
+        self.assertEqual(len(artifacts), count)
+        for line in artifacts:
+            with self.subTest(workflow=workflow.name, artifact=line):
+                self.assertIn(suffix, line)
+                self.assertIn("${{ github.run_attempt }}", line)
+        for prefix, references in prefixes.items():
+            names = [line.split(": ", 1)[1] for line in artifacts if prefix in line]
+            self.assertEqual(len(names), references, prefix)
+            self.assertEqual(len(set(names)), 1, prefix)
+            name = names[0]
+            self.assertNotEqual(
+                expand(name, "nvidia", "x64", 1, "-scope-all"),
+                expand(name, "nvidia", "x64", 1, "-scope-single"),
+            )
+
+    def assert_scoped_paths(self, text, suffix):
+        for line in text.splitlines():
+            if (
+                "path:" in line or "CANDIDATE_DIR:" in line
+            ) and "/accelerantgine-gpu-" in line:
+                self.assertIn(suffix, line)
 
     def test_workflows_can_be_called_without_cancelling_their_caller(self):
         for workflow in (LINUX, WINDOWS):
