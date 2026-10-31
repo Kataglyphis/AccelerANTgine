@@ -190,7 +190,9 @@ if(TARGET ${PROJECT_NAME}_cli)
   install(TARGETS ${PROJECT_NAME}_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 option(KATAGLYPHIS_PACKAGE_DEMO_MODEL "Install the locked demo model and its notices" OFF)
-if(PROJECT_IS_TOP_LEVEL AND KATAGLYPHIS_PACKAGE_DEMO_MODEL AND NOT TARGET ${PROJECT_NAME}_demo)
+if(PROJECT_IS_TOP_LEVEL
+   AND KATAGLYPHIS_PACKAGE_DEMO_MODEL
+   AND NOT TARGET ${PROJECT_NAME}_demo)
   message(FATAL_ERROR "Packaging the demo model requires the ONNX Runtime demo target")
 endif()
 if(TARGET ${PROJECT_NAME}_demo)
@@ -198,7 +200,10 @@ if(TARGET ${PROJECT_NAME}_demo)
   if(PROJECT_IS_TOP_LEVEL AND KATAGLYPHIS_PACKAGE_DEMO_MODEL)
     target_compile_definitions(${PROJECT_NAME}_demo PRIVATE KATAGLYPHIS_BUNDLED_DEMO_MODEL=1)
     foreach(_dir CMAKE_INSTALL_BINDIR CMAKE_INSTALL_LIBDIR CMAKE_INSTALL_DATAROOTDIR)
-      if(NOT "${${_dir}}" MATCHES "^[A-Za-z0-9_+.-]+(/[A-Za-z0-9_+.-]+)*$"
+      if(NOT
+         "${${_dir}}"
+         MATCHES
+         "^[A-Za-z0-9_+.-]+(/[A-Za-z0-9_+.-]+)*$"
          OR "${${_dir}}" MATCHES "(^|/)\\.\\.?(/|$)")
         message(FATAL_ERROR "${_dir} must be a relocatable relative install directory: ${${_dir}}")
       endif()
@@ -207,10 +212,16 @@ if(TARGET ${PROJECT_NAME}_demo)
       set(DEMO_MODEL_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}/models")
     else()
       set(DEMO_MODEL_INSTALL_DIR "${CMAKE_INSTALL_DATAROOTDIR}/accelerantgine/models")
-      file(RELATIVE_PATH _demo_model_from_private "/${CMAKE_INSTALL_LIBDIR}/accelerantgine"
-           "/${DEMO_MODEL_INSTALL_DIR}/deim_dfine_n_coco.onnx")
-      file(RELATIVE_PATH _demo_model_from_bin "/${CMAKE_INSTALL_BINDIR}"
-           "/${DEMO_MODEL_INSTALL_DIR}/deim_dfine_n_coco.onnx")
+      file(
+        RELATIVE_PATH
+        _demo_model_from_private
+        "/${CMAKE_INSTALL_LIBDIR}/accelerantgine"
+        "/${DEMO_MODEL_INSTALL_DIR}/deim_dfine_n_coco.onnx")
+      file(
+        RELATIVE_PATH
+        _demo_model_from_bin
+        "/${CMAKE_INSTALL_BINDIR}"
+        "/${DEMO_MODEL_INSTALL_DIR}/deim_dfine_n_coco.onnx")
       target_compile_definitions(
         ${PROJECT_NAME}_demo PRIVATE "KATAGLYPHIS_DEMO_MODEL_FROM_PRIVATE=\"${_demo_model_from_private}\""
                                      "KATAGLYPHIS_DEMO_MODEL_FROM_BIN=\"${_demo_model_from_bin}\"")
