@@ -3,6 +3,14 @@ set(CMAKE_C_CLANG_TIDY "")
 
 include(FetchContent)
 
+# Directory options, not CMAKE_CXX_FLAGS: try_compile checks run unoptimised, where _FORTIFY_SOURCE warns.
+if(TARGET myproject_dependency_hardening)
+  get_target_property(_dependency_hardening_options myproject_dependency_hardening INTERFACE_COMPILE_OPTIONS)
+  get_target_property(_dependency_hardening_definitions myproject_dependency_hardening INTERFACE_COMPILE_DEFINITIONS)
+  add_compile_options(${_dependency_hardening_options})
+  add_compile_definitions(${_dependency_hardening_definitions})
+endif()
+
 FetchContent_Declare(
   abseil-cpp
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
@@ -27,7 +35,11 @@ FetchContent_MakeAvailable(abseil-cpp)
 
 # include google test to project
 if(BUILD_TESTING)
-  FetchContent_Declare(googletest URL https://github.com/google/googletest/archive/refs/tags/v1.18.0.zip)
+  # A googletest bump moves the URL and its hash together; Renovate refuses to move a hashed archive alone.
+  FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.18.0.zip
+    URL_HASH SHA256=63b9c77751a5b8f492486005f67533fdc58682b67476fcb91650be5958d5195a)
   set(gtest_force_shared_crt
       ON
       CACHE BOOL "" FORCE)

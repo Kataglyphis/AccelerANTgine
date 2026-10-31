@@ -224,6 +224,24 @@ macro(myproject_global_options)
   endif()
 endmacro()
 
+# The hub's Hardening module adds neither PIE nor BIND_NOW nor dependency flags; the Linux package gate requires all three.
+macro(myproject_enable_linux_release_hardening target)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT MSVC)
+    include(CheckPIESupported)
+    check_pie_supported(LANGUAGES C CXX)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    target_link_options(
+      ${target}
+      INTERFACE
+      LINKER:-z,relro
+      LINKER:-z,now)
+    message(STATUS "*** PIE and -z relro -z now enabled")
+    # Statically linked dependency code ships inside the executables; third_party/ applies these flags to it.
+    add_library(myproject_dependency_hardening INTERFACE)
+    myproject_enable_hardening(myproject_dependency_hardening OFF FALSE)
+  endif()
+endmacro()
+
 macro(myproject_local_options)
   myproject_create_option_targets()
 
@@ -281,6 +299,9 @@ macro(myproject_local_options)
       set(ENABLE_UBSAN_MINIMAL_RUNTIME FALSE)
     endif()
     myproject_enable_hardening(myproject_options OFF ${ENABLE_UBSAN_MINIMAL_RUNTIME})
+  endif()
+  if(myproject_ENABLE_HARDENING)
+    myproject_enable_linux_release_hardening(myproject_options)
   endif()
 
   if(NOT

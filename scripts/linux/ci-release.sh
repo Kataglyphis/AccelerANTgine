@@ -314,6 +314,7 @@ fi
 
 load_project_metadata "${BUILD_RELEASE_DIR}"
 verify_release_licenses "${BUILD_RELEASE_DIR}"
+bash "${_SCRIPT_DIR}/verify-package-hardening.sh" "${BUILD_RELEASE_DIR}" || die "the release packages are not hardened"
 
 if [[ "${DO_CALLGRIND}" -eq 1 ]]; then
   if ! has_tool valgrind; then

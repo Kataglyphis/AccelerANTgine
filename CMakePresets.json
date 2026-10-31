@@ -135,7 +135,8 @@
       "installDir": "${sourceDir}/build-release/",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_TESTING": "FALSE"
+        "BUILD_TESTING": "FALSE",
+        "myproject_ENABLE_HARDENING": "ON"
       }
     },
     {
@@ -199,7 +200,8 @@
       "installDir": "${sourceDir}/build/",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_TESTING": "FALSE"
+        "BUILD_TESTING": "FALSE",
+        "myproject_ENABLE_HARDENING": "ON"
       }
     },
     {

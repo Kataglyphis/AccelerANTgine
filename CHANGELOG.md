@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Security (2026-10-31)
+
+- The Linux release presets turn on `myproject_ENABLE_HARDENING`: fortify, stack protector,
+  stack-clash and CET compile flags on the project and its static dependencies, PIE executables and
+  `-z relro -z now`. `ci-release.sh` fails unless the `.deb` and `.tar.gz` show them in the CLI,
+  the demo and `libAccelerANTgine.so` (`verify-package-hardening.sh`). v0.0.3's packages lack
+  BIND_NOW, the stack protector and fortify everywhere.
+- googletest's archive is checked against its SHA256 (`URL_HASH`); a wrong hash fails configure.
+- The GPU candidate workflows check out without persisting the job token (`persist-credentials: false`).
+
 ### Added
 
 - Profile the extracted Linux DEB on the selected GPU alongside the candidate tarball and AppImage.

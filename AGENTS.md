@@ -147,6 +147,9 @@ is what you want, update the gitlink **and** fix the fallout in the same change.
   every move of either. Measured 2026-10-07: abseil 20260817.0 against FuzzTest 2026-06-29 (which
   pins 20260526.0) passes the clang Debug suites (ASan + UBSan), `fuzzTestSuite`, the TSan build
   and the GCC suites in `:latest`.
+- **A FetchContent archive carries `URL_HASH SHA256=`** of the exact URL it names (googletest's
+  tag zip in `third_party/CMakeLists.txt`). Renovate refuses to move a hashed archive, so move the
+  URL and its hash together by hand; a stale hash fails configure with `does not match expected value`.
 - `third_party/ANTfrastructure`'s **own** nested submodule is a build input here.
   The locked `docs` group in `pyproject.toml` installs the family's Sphinx theme, which `docs/source/conf.py` calls
   (`setup_theme()`), from
@@ -471,6 +474,15 @@ unknown flags and a missing value must fail before a product build starts. The L
 runs `scripts/linux/tests/test-ci-value-options.sh` over all eight modes and broken-map mutants.
 The same lane tests locked docs installation and both wheel ABI sequences with
 `test-ci-docs-uv.sh` and `test-ci-python-lock.sh`; neither compiles the native wheels.
+
+**Linux release presets harden, and the packages prove it.** Only `linux-release-clang` and
+`linux-release-GNU` set `myproject_ENABLE_HARDENING`: the hub's `Hardening.cmake` flags on project
+targets and statically linked dependencies, plus PIE and `-z relro -z now`
+(`cmake/ProjectOptions.cmake`). Windows presets and Android builds leave it off. `ci-release.sh`
+then runs `verify-package-hardening.sh`, which fails unless the `.deb` and the `.tar.gz` ship a
+PIE, BIND_NOW, stack-protected CLI and demo and a BIND_NOW, stack-protected library, with a
+`__*_chk` import in the CLI and the library. Never drop a check to pass a package;
+`test-verify-package-hardening.sh` holds each case.
 
 **The pre-commit hook** installs from the locked `docs` group into a `uv` venv; the commands are in
 `docs/source/development_workflow.rst` § *Static Analysis And Formatting*.

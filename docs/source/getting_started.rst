@@ -228,6 +228,44 @@ Each preset names its own build directory, e.g. ``build/`` for
    cmake --preset <configurePreset-name>
    cmake --build --preset <buildPreset-name>
 
+Release Hardening
+^^^^^^^^^^^^^^^^^
+
+``linux-release-clang`` and ``linux-release-GNU`` are the only presets that set
+``myproject_ENABLE_HARDENING``. With GCC or Clang on Linux it adds:
+
+- ANTfrastructure's ``Hardening.cmake`` flags: ``-D_FORTIFY_SOURCE=3``,
+  ``-fstack-protector-strong``, ``-fstack-clash-protection``, ``-fcf-protection`` where the target
+  supports it, and ``_GLIBCXX_ASSERTIONS``;
+- the same compile flags on the statically linked dependencies in ``third_party/``, whose code
+  ships inside the CLI;
+- PIE executables and ``-z relro -z now`` links (``cmake/ProjectOptions.cmake``).
+
+The Windows presets leave it off: the hub's MSVC flag set is not proved under clang-cl. Android
+builds configure without these presets and stay off too.
+
+``scripts/linux/ci-release.sh`` checks the result with ``scripts/linux/verify-package-hardening.sh``
+inside both the ``.deb`` and the ``.tar.gz``:
+
+.. list-table::
+   :header-rows: 1
+
+   * - ELF
+     - Required
+   * - ``AccelerANTgine`` (the CLI)
+     - PIE (type ``DYN`` with ``INTERP``), BIND_NOW, ``__stack_chk_fail``, a ``__*_chk`` import
+   * - ``AccelerANTgine_demo``
+     - PIE, BIND_NOW, ``__stack_chk_fail``
+   * - ``libAccelerANTgine.so``
+     - BIND_NOW, ``__stack_chk_fail``, a ``__*_chk`` import
+
+The demo calls no libc function that ``_FORTIFY_SOURCE`` can bound, so it has no ``__*_chk``
+import to require. The gate does not check CET/IBT notes, ``GNU_RELRO`` segments, static
+linking, the other bundled libraries, the AppImage or the Flatpak. Run it on any package directory
+with ``bash scripts/linux/verify-package-hardening.sh build-release``;
+``scripts/linux/tests/test-verify-package-hardening.sh`` (lint-gates lane) builds synthetic
+packages with each property removed.
+
 The Rust Crate
 ^^^^^^^^^^^^^^
 
