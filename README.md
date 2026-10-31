@@ -20,25 +20,16 @@
 
 [**Docs site**](https://hardwareacceleratedai.jonasheinle.de/)
 
-AccelerANTgine is a C++23 library
-that runs ONNX Runtime models on GStreamer media and streams over WebRTC, exposed three ways: a C
-API for native embedders, Python bindings and a CLI. It is the inference core that
-[OmniAccelerANT](https://github.com/Kataglyphis/OmniAccelerANT)'s native plugin links, and CI
-builds and tests it on five lanes in the family's container images.
+AccelerANTgine is a C++23 library running ONNX Runtime models on GStreamer media and streaming over WebRTC. It exposes a C API, Python bindings and a CLI.
+[OmniAccelerANT](https://github.com/Kataglyphis/OmniAccelerANT)'s native plugin links it; CI builds and tests five lanes in the family's container images.
 
 Windows packages carry the ONNX Runtime license and notices from the image wheel matching
 the packaged DLL; see the [Windows workflow](docs/source/windows_workflow.rst).
 Every package and wheel lists its third-party components with their license texts in `THIRD-PARTY-NOTICES.txt`
 ([licenses](https://hardwareacceleratedai.jonasheinle.de/third_party_licenses.html)).
 Release builds log warnings and errors only; `--log_level` or `ACCELERANTGINE_LOG_LEVEL` raises the level.
-Linux GPU package staging is opt-in and requires a newer ANTfrastructure pin; see
-[ONNX execution providers](docs/source/getting_started.rst#onnx-execution-providers).
 
-Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan,
-and `--apply` to update. It checks every direct submodule against its remote default branch and
-initializes missing checkouts when applying, including the tooling hub when needed. CI checks the
-wrapper and config; see
-[the shared Renovate guide](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md).
+Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan, and `--apply` to update. It checks direct submodules against their remote default branches and initializes missing checkouts on apply. CI checks the wrapper and config; see [the shared Renovate guide](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md).
 The CMake formatter uses ANTfrastructure's locked uv tool project on both platforms.
 
 Python dependencies are declared in `pyproject.toml` and locked in `uv.lock`; the documentation
@@ -52,6 +43,14 @@ environment uses `uv sync --locked --only-group docs --python 3.14` after recurs
 - **Five CI lanes:** Linux x64, arm64 and riscv64, Windows x64 and arm64.
 - **Tested without a model file:** four C++ suites and the Python tests, the Debug ones under ASan, UBSan and TSan.
 - **Releases that start outside the image:** `.deb`, tarball, AppImage, setup `.exe`, MSI, MSIX, zip and Python wheels.
+
+## GPU package candidates
+
+On demand: [Linux](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-gpu-candidate.yml) targets NVIDIA x64/arm64 and AMD x64;
+[Windows](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-gpu-candidates.yml) targets NVIDIA/AMD x64. Open a successful run and download the matching artifact under **Artifacts**
+(sign-in required). Candidates are unverified, separate from releases and need matching host GPU drivers and runtimes.
+The infrastructure pin and missing Windows image inputs currently block builds; see [getting started](docs/source/getting_started.rst) for formats and verification.
+CPU packages remain available through the existing lanes.
 
 ## Quick start
 
