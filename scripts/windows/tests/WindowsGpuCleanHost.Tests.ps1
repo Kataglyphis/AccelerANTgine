@@ -9,7 +9,7 @@ Describe 'Windows GPU clean-host startup' {
 @echo off
 echo %PATH%>"%ACCELERANT_HOST_PROBE%"
 echo %CD%>>"%ACCELERANT_HOST_PROBE%"
-if defined GST_PLUGIN_PATH_1_0 (echo PRESENT>>"%ACCELERANT_HOST_PROBE%") else (echo UNSET>>"%ACCELERANT_HOST_PROBE%")
+if defined GST_PLUGIN_PATH_1_0 (echo %GST_PLUGIN_PATH_1_0%>>"%ACCELERANT_HOST_PROBE%") else (echo UNSET>>"%ACCELERANT_HOST_PROBE%")
 echo %GST_PLUGIN_SYSTEM_PATH_1_0%>>"%ACCELERANT_HOST_PROBE%"
 echo %GST_REGISTRY_1_0%>>"%ACCELERANT_HOST_PROBE%"
 exit /b 0
@@ -32,6 +32,11 @@ exit /b 0
             $lines[4] | Should Be (Join-Path $lines[1] 'registry.bin')
             (Test-Path -LiteralPath $lines[1]) | Should Be $false
             $env:PATH | Should Be 'C:\contaminated-path'
+            $env:GST_PLUGIN_PATH_1_0 | Should Be 'C:\contaminated-plugin'
+            & $script -Executable (Join-Path $env:SystemRoot 'System32\cmd.exe') -Arguments @('/d', '/c', $command) -PoisonPluginPath
+            $lines = @(Get-Content -LiteralPath $probe)
+            $lines[2] | Should Be $lines[1]
+            (Test-Path -LiteralPath $lines[1]) | Should Be $false
             $env:GST_PLUGIN_PATH_1_0 | Should Be 'C:\contaminated-plugin'
             $env:GST_REGISTRY_1_0 | Should Be 'C:\contaminated-registry'
             & $script -Executable (Join-Path $env:SystemRoot 'System32\cmd.exe') -Arguments @('/d', '/c', $command) -PreserveGpuRuntimePath

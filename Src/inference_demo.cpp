@@ -9,10 +9,13 @@
 #include <thread>
 #include <vector>
 
+#include "standalone_gstreamer_environment.hpp"
+
 import kataglyphis.onnx_inference;
 import kataglyphis.gstreamer_pipeline;
 import kataglyphis.yolo_detector;
 import kataglyphis.project_config;
+import kataglyphis.log;
 
 namespace inference = kataglyphis::inference;
 namespace gstreamer = kataglyphis::gstreamer;
@@ -366,6 +369,12 @@ static void print_usage(const char *program_name)
 
 auto main(int argc, char *argv[]) -> int
 {
+#if defined(_WIN32)
+    if (!kataglyphis::standalone_gstreamer::isolate_packaged_plugins()) {
+        kataglyphis::log::error("Could not isolate the packaged GStreamer environment");
+        return 1;
+    }
+#endif
     std::string model_path = "models/deim_dfine_n_coco.onnx";
     bool run_onnx = false;
     bool run_gstreamer = false;

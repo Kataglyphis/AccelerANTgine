@@ -4,12 +4,15 @@
   Runs a GPU bundle check without inherited GStreamer plugin paths or caches.
 .PARAMETER PreserveGpuRuntimePath
   Keep the host PATH for GPU SDK libraries while still isolating GStreamer plugins and registry.
+.PARAMETER PoisonPluginPath
+  Simulate an inherited, empty plugin path to test a finished executable's own isolation.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Executable,
     [string[]]$Arguments = @('--gst_check'),
-    [switch]$PreserveGpuRuntimePath
+    [switch]$PreserveGpuRuntimePath,
+    [switch]$PoisonPluginPath
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -33,6 +36,7 @@ try {
     # A real empty directory avoids PowerShell/.NET versions that remove empty environment values.
     $env:GST_PLUGIN_SYSTEM_PATH_1_0 = $scratch
     $env:GST_REGISTRY_1_0 = Join-Path $scratch 'registry.bin'
+    if ($PoisonPluginPath) { $env:GST_PLUGIN_PATH_1_0 = $scratch }
     Push-Location -LiteralPath $scratch
     try {
         & $executablePath @Arguments

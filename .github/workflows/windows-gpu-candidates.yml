@@ -110,7 +110,7 @@ jobs:
           $demos = @(Get-ChildItem -LiteralPath $stage -Filter 'AccelerANTgine_demo.exe' -File -Recurse)
           if ($demos.Count -ne 1) { throw "Expected one packaged demo, found $($demos.Count)." }
           $model = Join-Path $env:WORKSPACE 'models/deim_dfine_n_coco.onnx'
-          & (Join-Path $env:WORKSPACE 'scripts/windows/Test-WindowsGpuCleanHost.ps1') -Executable $demos[0].FullName -Arguments @('--video-check', '--model', $model, '--device', 'cpu')
+          & (Join-Path $env:WORKSPACE 'scripts/windows/Test-WindowsGpuCleanHost.ps1') -Executable $demos[0].FullName -PoisonPluginPath -Arguments @('--video-check', '--model', $model, '--device', 'cpu')
       - name: Upload the unverified GPU candidate
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -46,7 +46,9 @@ Every package carries the project license and the list of its third-party compon
 license texts: :doc:`third_party_licenses`.
 
 Windows GPU builds stage the image's GStreamer plugins and their runtime dependencies in the
-package. ``AccelerANTgine --gst_check`` verifies the required elements and their origin;
+package. The standalone Windows executables clear inherited plugin, scanner and registry
+settings when the bundled plugin directory is present; library embedders retain their settings.
+``AccelerANTgine --gst_check`` verifies the required elements and their origin;
 on Windows it treats the Linux-only camera sources as optional. The cached Windows images
 inspected during development lack ``vp8enc``, so the check still fails until the image supplies
 it. The install-time license gate also blocks the new plugin closure until the image supplies

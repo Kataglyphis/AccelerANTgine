@@ -10,6 +10,7 @@
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
+#include "standalone_gstreamer_environment.hpp"
 
 import kataglyphis.inference;
 import kataglyphis.webrtc_streamer;
@@ -217,6 +218,12 @@ auto apply_cli_overrides(kataglyphis::webrtc::StreamConfig &config, const CliOve
 
 auto main(int argc, char **argv) -> int
 {
+#if defined(_WIN32)
+    if (!kataglyphis::standalone_gstreamer::isolate_packaged_plugins()) {
+        kataglyphis::log::error("Could not isolate the packaged GStreamer environment");
+        return 1;
+    }
+#endif
     const auto override_flags = detect_cli_override_flags(argc, argv);
 
     absl::SetProgramUsageMessage(
