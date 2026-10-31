@@ -3,12 +3,19 @@ name: Linux GPU package candidates
 on:
   workflow_dispatch:
     inputs:
+      invocation-scope:
+        description: Unique lowercase scope for overlapping calls in the same run
+        type: string
+        default: default
       verify-gpu:
         description: Profile the finished candidate on vendor-labelled GPU runners
         type: boolean
         default: false
   workflow_call:
     inputs:
+      invocation-scope:
+        type: string
+        default: default
       verify-gpu:
         type: boolean
         default: false
@@ -20,12 +27,25 @@ permissions:
   contents: read
   packages: read
 
-concurrency:
-  group: linux-gpu-candidate-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
+
+  scope:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      suffix: ${{ steps.scope.outputs.suffix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate the invocation scope
+        id: scope
+        env:
+          GPU_INVOCATION_SCOPE: ${{ inputs.invocation-scope }}
+        run: python3 -I scripts/linux/gpu-invocation-scope.py
+
+
   build:
+    needs: scope
     name: GPU candidate (${{ matrix.vendor }}, ${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -47,6 +67,9 @@ jobs:
             platform: linux/amd64
             runner: ubuntu-26.04
     runs-on: ${{ matrix.runner }}
+    concurrency:
+      group: accelerantgine-linux-build-${{ github.workflow }}-${{ github.ref }}-${{ needs.scope.outputs.suffix }}-${{ matrix.vendor }}-${{ matrix.arch }}
+      cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
     timeout-minutes: 240
     steps:
       - name: Check out pinned sources
@@ -93,7 +116,7 @@ jobs:
       - name: Upload unverified candidates
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          name: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}${{ needs.scope.outputs.suffix }}
           overwrite: false
           if-no-files-found: error
           path: |
@@ -103,7 +126,7 @@ jobs:
 
   clean-host:
     name: Clean-host package startup (${{ matrix.vendor }}, ${{ matrix.arch }})
-    needs: build
+    needs: [scope, build]
     strategy:
       fail-fast: false
       matrix:
@@ -118,6 +141,9 @@ jobs:
             arch: x64
             runner: ubuntu-26.04
     runs-on: ${{ matrix.runner }}
+    concurrency:
+      group: accelerantgine-linux-clean-${{ github.workflow }}-${{ github.ref }}-${{ needs.scope.outputs.suffix }}-${{ matrix.vendor }}-${{ matrix.arch }}
+      cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
     timeout-minutes: 30
     steps:
       - name: Check out the locked model fetcher
@@ -130,7 +156,7 @@ jobs:
       - name: Install and start the packages
         uses: Kataglyphis/ANTfrastructure/.github/actions/clean-host-package-check@develop
         with:
-          artifact: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          artifact: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}${{ needs.scope.outputs.suffix }}
           scan-elves: 'false'
           deb: '*.deb'
           deb-command: AccelerANTgine --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo /usr/bin/AccelerANTgine_demo "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx"
@@ -141,7 +167,7 @@ jobs:
 
   gpu-profile:
     if: ${{ inputs.verify-gpu }}
-    needs: [build, clean-host]
+    needs: [scope, build, clean-host]
     strategy:
       fail-fast: false
       matrix:
@@ -162,6 +188,9 @@ jobs:
             runner: gpu-amd-rocm
             device: migraphx
     runs-on: [self-hosted, Linux, '${{ matrix.runner-arch }}', '${{ matrix.runner }}']
+    concurrency:
+      group: accelerantgine-linux-profile-${{ github.workflow }}-${{ github.ref }}-${{ needs.scope.outputs.suffix }}-${{ matrix.vendor }}-${{ matrix.arch }}
+      cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -169,13 +198,13 @@ jobs:
           submodules: true
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}-${{ matrix.arch }}
+          name: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}${{ needs.scope.outputs.suffix }}
+          path: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}-${{ matrix.arch }}${{ needs.scope.outputs.suffix }}
       - name: Require model operators on the requested GPU
         shell: bash
         env:
           DEVICE: ${{ matrix.device }}
-          CANDIDATE_DIR: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}-${{ matrix.arch }}
+          CANDIDATE_DIR: ${{ runner.temp }}/accelerantgine-gpu-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.vendor }}-${{ matrix.arch }}${{ needs.scope.outputs.suffix }}
         run: |
           set -euo pipefail
           python3 -I third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py --lock models/models.lock

@@ -152,6 +152,16 @@ package identity are shared with the CPU build, so switching variants replaces o
 uninstalling the existing installation; they cannot be installed side by side. Windows ARM
 GPU packages are excluded. Neither these checks nor a package build prove GPU inference.
 
+Both candidate workflows accept an optional ``invocation-scope``. Its default, ``default``,
+keeps the usual artifact names. A caller invoking a workflow more than once in the same run
+for overlapping GPU targets must use a distinct scope for each invocation: candidate
+artifacts and concurrency groups include that scope. Scopes start with a lowercase letter,
+contain only lowercase letters, digits or hyphens, and are at most 32 characters. Reusing a
+scope for overlapping calls can cancel or fail one call; it does not replace prior artifacts.
+Concurrency is applied per build, clean-host, profile or staging job and GPU target after
+scope validation. A later ordinary dispatch therefore queues or cancels matching jobs,
+not an entire earlier workflow; jobs in other phases may still finish.
+
 Linux GPU packaging requires the shared ANTfrastructure staging and external-runtime closure APIs.
 The currently recorded hub pin does not contain them, so an opt-in build fails during configure
 until a published hub revision with those APIs is adopted. The manually dispatched
