@@ -22,7 +22,7 @@ int main(int argc, char **argv) { return fixture(argc > 1 ? argv[1] : "fixture")
 C
 
 # Explicit on both sides, so a distro compiler default can neither add nor remove a property.
-hardened=(-O2 -fstack-protector-all -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -Wl,-z,relro -Wl,-z,now)
+hardened=(-O2 -fstack-protector-all -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 '-Wl,-z,relro' '-Wl,-z,now')
 build() {
   local out="$1" kind="$2"
   shift 2
