@@ -18,6 +18,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-10-31)
+- **Security audit lane and enforced `sha-pin`.** `security-audit.yml` calls the hub's lockfile audit on push, PR, Mondays and dispatch; the lint gates arm the hub's `sha-pin` workflow convention.
+
 ### Security (2026-10-31)
 
 - The Linux release presets turn on `myproject_ENABLE_HARDENING`: fortify, stack protector,

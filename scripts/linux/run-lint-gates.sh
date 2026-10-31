@@ -3,6 +3,9 @@
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Matches lint-gates.yml's `workflow-conventions: sha-pin`.
+export WORKFLOW_CONVENTIONS_GATE="${WORKFLOW_CONVENTIONS_GATE:-sha-pin}"
+
 # The bootstrap directly, not ci-common.sh: only antfrastructure_exec is needed.
 # shellcheck source=lib/antfrastructure.sh
 source "${_SCRIPT_DIR}/lib/antfrastructure.sh"
