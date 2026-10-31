@@ -94,13 +94,14 @@ class ArtifactReruns(unittest.TestCase):
                 if workflow == LINUX
                 else ("candidate", "gpu-profile")
             )
-            count = 14 if has_promotion else 3 if workflow == LINUX else 2
+            count = 16 if has_promotion else 3 if workflow == LINUX else 2
             suffix = "${{ " + dependency + " }}"
             prefixes = (
                 {
                     "accelerantgine-unverified-gpu-": 3,
                     "unverified-accelerantgine-gpu-input-": 2,
                     "unverified-accelerantgine-gpu-meta-": 4,
+                    "unverified-accelerantgine-gpu-proof-": 2,
                     "unverified-accelerantgine-gpu-clean-": 2,
                     "unverified-accelerantgine-gpu-profile-": 2,
                     "verified-accelerantgine-linux-": 1,

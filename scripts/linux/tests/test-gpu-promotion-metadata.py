@@ -373,6 +373,7 @@ class MetadataTest(unittest.TestCase):
             "GPU_ARCH": "arm64",
             "GPU_ARTIFACT_ID": "59",
             "GPU_ARTIFACT_DIGEST": "sha256:" + "b" * 64,
+            "GPU_PRODUCER_PROOF_SHA256": "d" * 64,
             "GPU_ARTIFACT_FILES": "\n".join(self.files),
         }
 
@@ -392,6 +393,7 @@ class MetadataTest(unittest.TestCase):
         result = self.run_tool("resolve", self.metadata)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("artifact_id=59\n", self.output.read_text())
+        self.assertIn(f"producer_proof_sha256={'d' * 64}\n", self.output.read_text())
         for update in (
             {"GITHUB_RUN_ATTEMPT": "3"},
             {"GITHUB_RUN_ID": "42"},
@@ -410,6 +412,7 @@ class MetadataTest(unittest.TestCase):
         for key, value in (
             ("artifact_id", "0"),
             ("artifact_digest", "f" * 63),
+            ("producer_proof_sha256", "f" * 63),
             ("files", ["../evil.deb", "a.tar.gz", "a.AppImage"]),
             ("files", ["x.deb\nfiles<<BAD", "a.tar.gz", "a.AppImage"]),
             ("files", ["x.deb", "x.deb", "a.AppImage"]),
@@ -547,7 +550,7 @@ class MetadataTest(unittest.TestCase):
             "stage-gpu-artifact",
         ):
             self.assertIn(f"actions/{action}@{HUB}", workflow)
-        self.assertEqual(workflow.count("digest-mismatch: error"), 6)
+        self.assertEqual(workflow.count("digest-mismatch: error"), 8)
         self.assertIn("skip-decompress: true", workflow)
         self.assertIn(
             "artifact-ids: ${{ steps.metadata.outputs.artifact_id }}", workflow

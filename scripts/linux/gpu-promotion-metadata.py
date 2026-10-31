@@ -20,6 +20,7 @@ KEYS = {
     "arch",
     "artifact_id",
     "artifact_digest",
+    "producer_proof_sha256",
     "files",
 }
 
@@ -88,6 +89,7 @@ def output(data):
         stream.write(
             f"artifact_id={data['artifact_id']}\nartifact_digest={data['artifact_digest']}\n"
         )
+        stream.write(f"producer_proof_sha256={data['producer_proof_sha256']}\n")
         stream.write(
             "files<<GPU_PACKAGE_FILES\n"
             + "\n".join(data["files"])
@@ -123,6 +125,7 @@ def main():
             **expected,
             "artifact_id": os.environ["GPU_ARTIFACT_ID"],
             "artifact_digest": os.environ["GPU_ARTIFACT_DIGEST"],
+            "producer_proof_sha256": os.environ["GPU_PRODUCER_PROOF_SHA256"],
             "files": os.environ["GPU_ARTIFACT_FILES"].splitlines(),
         }
     else:
@@ -140,6 +143,8 @@ def main():
         or not NUMBER.fullmatch(data["artifact_id"])
         or not isinstance(data["artifact_digest"], str)
         or not SHA.fullmatch(data["artifact_digest"])
+        or not isinstance(data["producer_proof_sha256"], str)
+        or not re.fullmatch(r"[0-9a-f]{64}", data["producer_proof_sha256"])
     ):
         raise ValueError("invalid artifact ID or digest")
     data["files"] = validate_files(data["files"])
