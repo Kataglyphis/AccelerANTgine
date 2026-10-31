@@ -103,8 +103,9 @@ dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=n
 ``amd`` selects the image's GPU ONNX Runtime and stages its matching provider. CPU is the
 default. NVIDIA targets Linux x64 and arm64; AMD targets Linux x64. MIGraphX device registration
 uses explicit options to avoid a malformed empty model-cache path in the legacy runtime API.
-The commit suite's real GPU regression runs when ``KATAGLYPHIS_TEST_MIGRAPHX=1`` is set on
-a MIGraphX host without ``ORT_MIGRAPHX_MODEL_CACHE_PATH``; it checks the Relu result and profile.
+Configure with ``-DKATAGLYPHIS_TEST_MIGRAPHX=ON`` to include the commit suite's real GPU
+regression on a MIGraphX host without ``ORT_MIGRAPHX_MODEL_CACHE_PATH``; it checks the Relu
+result and profile. The default build omits this hardware-only test.
 A GPU package requires
 the matching vendor driver and CUDA/cuDNN or ROCm/MIGraphX runtime on the host; set its
 ``LD_LIBRARY_PATH`` when those libraries are outside the system loader's search path.

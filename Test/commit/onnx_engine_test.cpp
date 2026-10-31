@@ -393,11 +393,9 @@ TEST(OnnxEngine, InvalidMigraphXDeviceFailsWithoutInitializing)
     EXPECT_FALSE(engine.is_initialized());
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(KATAGLYPHIS_TEST_MIGRAPHX)
 TEST(OnnxEngine, MigraphXInferenceWorksWithoutACacheOverride)
 {
-    const char *requested = std::getenv("KATAGLYPHIS_TEST_MIGRAPHX");
-    if (requested == nullptr || std::string(requested) != "1") { GTEST_SKIP() << "MIGraphX hardware test is opt-in"; }
     ASSERT_EQ(std::getenv("ORT_MIGRAPHX_MODEL_CACHE_PATH"), nullptr);
     const TempFile model("kataglyphis-migraphx", ".onnx", kataglyphis::test::relu_model());
     auto config = inference::create_default_session_config(model.path());
@@ -419,7 +417,9 @@ TEST(OnnxEngine, MigraphXInferenceWorksWithoutACacheOverride)
     std::error_code ignored;
     std::filesystem::remove(*profile, ignored);
 }
+#endif
 
+#ifndef _WIN32
 TEST(OnnxEngine, DirectMLRequestOnNonWindowsFails)
 {
     const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());

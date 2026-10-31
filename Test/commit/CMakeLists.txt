@@ -12,6 +12,7 @@ include(${PROJECT_SRC_DIR}cmake/filters/SetProjectFilters.cmake)
 include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 
 set(COMMIT_TEST_SUITE commitTestSuite)
+option(KATAGLYPHIS_TEST_MIGRAPHX "Include the real MIGraphX hardware regression in the commit suite" OFF)
 
 file(
   GLOB_RECURSE
@@ -36,6 +37,9 @@ kataglyphis_configure_common_test_target(${COMMIT_TEST_SUITE} "${_commit_resourc
 kataglyphis_configure_library_test_target(${COMMIT_TEST_SUITE})
 
 target_sources(${COMMIT_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
+if(KATAGLYPHIS_TEST_MIGRAPHX)
+  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE KATAGLYPHIS_TEST_MIGRAPHX=1)
+endif()
 
 target_link_libraries(
   ${COMMIT_TEST_SUITE}

@@ -32,8 +32,7 @@ Release builds log warnings and errors only; `--log_level` or `ACCELERANTGINE_LO
 Dependency updates: run `bash scripts/linux/renovate-local.sh` to report, `--apply --dry-run` to plan, and `--apply` to update. It checks direct submodules against their remote default branches and initializes missing checkouts on apply. CI checks the wrapper and config; see [the shared Renovate guide](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/dependency-updates.md).
 The CMake formatter uses ANTfrastructure's locked uv tool project on both platforms.
 
-Python dependencies are declared in `pyproject.toml` and locked in `uv.lock`; the documentation
-environment uses `uv sync --locked --only-group docs --python 3.14` after recursive submodule checkout.
+Python dependencies are declared in `pyproject.toml` and locked in `uv.lock`; the documentation environment uses `uv sync --locked --only-group docs --python 3.14` after recursive submodule checkout.
 
 ## Highlights
 
