@@ -68,6 +68,8 @@ jobs:
           }
           cat logs/test-results/third-party-notices.txt
           python3 scripts/linux/tests/test-model-notices.py
+          python3 scripts/linux/tests/test-demo-model-install.py
+          bash scripts/linux/tests/test-demo-model-path.sh
       - name: Test the package hardening gate
         shell: bash
         run: bash scripts/linux/tests/test-verify-package-hardening.sh

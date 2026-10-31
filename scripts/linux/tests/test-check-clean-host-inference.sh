@@ -8,11 +8,13 @@ trap 'rm -rf -- "$work"' EXIT
 export PROOF_DIR="$work"
 touch "$work/model.onnx"
 mkdir -p "$work/usr/bin" "$work/usr/lib/accelerantgine/gstreamer-1.0" "$work/bin"
-touch "$work/usr/lib/accelerantgine/gstreamer-1.0/libgstlibav.so"
+touch "$work/usr/lib/accelerantgine/gstreamer-1.0/libgstlibav.so" "$work/usr/lib/accelerantgine/gstreamer-1.0/libgstjpeg.so"
 cat >"$work/usr/bin/AccelerANTgine_demo" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ $# -eq 5 && ( $1 == --onnx-only || $1 == --video-check ) && $2 == --model && $4 == --device && $5 == cpu ]]
+[[ ( $# -eq 3 || $# -eq 5 ) && ( $1 == --onnx-only || $1 == --video-check ) ]]
+if [[ $# -eq 5 ]]; then [[ $2 == --model && $4 == --device && $5 == cpu ]];
+else [[ $2 == --device && $3 == cpu ]]; fi
 [[ -z ${LD_LIBRARY_PATH+x} ]]
 printf '%s %s\n' "${KATAGLYPHIS_BUNDLED_GLIBC:-host}" "$1" >>"$PROOF_DIR/modes"
 if [[ $1 == --onnx-only ]]; then
@@ -41,6 +43,8 @@ export LD_LIBRARY_PATH=/untrusted KATAGLYPHIS_BUNDLED_GLIBC=unexpected
 bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx"
 bash "$check" --appimage "$work/fake.AppImage" "$work/model.onnx"
 [[ "$(cat "$work/modes")" == $'host --onnx-only\nhost --video-check\n1 --onnx-only\n1 --video-check\nhost --onnx-only\nhost --video-check\n1 --onnx-only\n1 --video-check' ]]
+bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo"
+bash "$check" --appimage "$work/fake.AppImage"
 if BAD_OUTPUT=1 bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx" >/dev/null 2>&1; then
   echo 'Wrong model output unexpectedly passed' >&2
   exit 1
@@ -53,6 +57,12 @@ if BAD_LIBRARY=1 bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work
   echo 'An unresolved libav dependency unexpectedly passed' >&2
   exit 1
 fi
+rm "$work/usr/lib/accelerantgine/gstreamer-1.0/libgstjpeg.so"
+if bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx" >/dev/null 2>&1; then
+  echo 'A missing JPEG plugin unexpectedly passed' >&2
+  exit 1
+fi
+touch "$work/usr/lib/accelerantgine/gstreamer-1.0/libgstjpeg.so"
 if bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/missing.onnx" >/dev/null 2>&1; then
   echo 'A missing model unexpectedly passed' >&2
   exit 1

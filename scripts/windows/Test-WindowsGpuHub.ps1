@@ -8,10 +8,15 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
 $hub = Join-Path $PSScriptRoot '../../third_party/ANTfrastructure'
 foreach ($path in 'shared/python/verify_ort_profile.py', 'shared/python/tests/test_verify_ort_profile.py',
+    'shared/python/verify_locked_files.py', 'linux/scripts/lib/fetch-data-lock.py',
     'windows/scripts/diagnostics/verify-dxgi-adapter.py') {
     if (-not (Test-Path -LiteralPath (Join-Path $hub $path) -PathType Leaf)) {
         throw "Windows GPU candidates need ANTfrastructure's $path."
     }
+}
+$fetcher = Get-Content -LiteralPath (Join-Path $hub 'linux/scripts/lib/fetch-data-lock.py') -Raw
+if ($fetcher -cnotmatch '(?m)^def read_lock\(' -or $fetcher -cnotmatch '(?m)^def matches\(') {
+    throw 'Windows GPU candidates need the locked-model fetcher verification APIs.'
 }
 try { Import-BuildModule @('WindowsOrtLicense.Common', 'WindowsMsiLicense.Common', 'WindowsPackageBinary.Common', 'WindowsOrtPayload.Common') }
 catch { throw "Windows GPU candidates need ANTfrastructure's finished-package and wheel verification APIs. $($_.Exception.Message)" }
@@ -21,7 +26,7 @@ if (-not (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('ProviderDll
 if (-not (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('DirectMlDll')) {
     throw 'Windows GPU candidates need same-wheel DirectML verification.'
 }
-foreach ($command in 'Assert-PackageBinary', 'Get-PackageOrtProviderNames', 'Get-MsiInstalledFileId', 'Assert-PackageLicense', 'Get-ChainOrtRuntimeFile') {
+foreach ($command in 'Assert-PackageBinary', 'Get-PackageOrtProviderNames', 'Assert-PackageOrtFamily', 'Get-MsiInstalledFileId', 'Assert-PackageLicense', 'Get-ChainOrtRuntimeFile') {
     $null = Get-Command -Name $command -ErrorAction Stop
 }
 if (-not (Get-Command Get-MsiInstalledFileId).Parameters.ContainsKey('RootDirectoryId') -or

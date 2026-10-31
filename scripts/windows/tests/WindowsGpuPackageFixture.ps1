@@ -20,6 +20,9 @@ $bin = Join-Path $bundle 'bin'; $licenses = Join-Path $bundle 'licenses\onnxrunt
 $null = New-Item -ItemType Directory -Path $image, $wheelDir, $bin, $licenses, $packages -Force
 $gpuNames = @('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll', 'DirectML.dll')
 $appNames = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll')
+$modelNames = @('deim_dfine_n_coco.onnx', 'deim_dfine_n_coco.LICENSE', 'deim_dfine_n_coco.NOTICE')
+$modelDir = Join-Path $bin 'models'; $null = New-Item -ItemType Directory -Force -Path $modelDir
+foreach ($name in $modelNames) { Set-Content -LiteralPath (Join-Path $modelDir $name) -Value "fixture $name" }
 $pluginDir = Join-Path $bundle 'lib\gstreamer-1.0'; $null = New-Item -ItemType Directory -Force -Path $pluginDir
 $pluginNames = @('gstcoreelements.dll', 'gstwebrtc.dll')
 foreach ($name in $pluginNames) { New-TestPeFile -Path (Join-Path $pluginDir $name) -Tag $name }
@@ -44,12 +47,14 @@ $zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]:
 try {
     foreach ($name in $gpuNames + $appNames) { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $bin $name), "candidate/bin/$name") | Out-Null }
     foreach ($name in $pluginNames) { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $pluginDir $name), "candidate/lib/gstreamer-1.0/$name") | Out-Null }
+    foreach ($name in $modelNames) { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $modelDir $name), "candidate/bin/models/$name") | Out-Null }
 } finally { $zip.Dispose() }
 
 # Build an embedded cabinet and MSI directory/file tables with the CPack install-root shape.
 $items = @(); $index = 0
 foreach ($name in $gpuNames + $appNames) { $items += @{ Id = "f$index"; Source = Join-Path $bin $name; Name = $name; Dir = 'bin' }; $index++ }
 foreach ($name in $pluginNames) { $items += @{ Id = "f$index"; Source = Join-Path $pluginDir $name; Name = $name; Dir = 'gst' }; $index++ }
+foreach ($name in $modelNames) { $items += @{ Id = "f$index"; Source = Join-Path $modelDir $name; Name = $name; Dir = 'models' }; $index++ }
 foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') { $items += @{ Id = "f$index"; Source = Join-Path $licenses $name; Name = $name; Dir = 'ort' }; $index++ }
 $ddf = Join-Path $root 'payload.ddf'
 $lines = @('.OPTION EXPLICIT', '.Set CabinetNameTemplate=payload.cab', ".Set DiskDirectoryTemplate=$root", '.Set MaxDiskSize=0', '.Set Compress=ON')
@@ -68,6 +73,7 @@ try {
         'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''TARGETDIR'', NULL, ''SourceDir'')',
         'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''INSTALL_ROOT'', ''TARGETDIR'', ''AccelerANTgine'')',
         'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''bin'', ''INSTALL_ROOT'', ''bin'')',
+        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''models'', ''bin'', ''models'')',
         'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''lib'', ''INSTALL_ROOT'', ''lib'')',
         'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''gst'', ''lib'', ''gstreamer-1.0'')',
         'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''licenses'', ''INSTALL_ROOT'', ''licenses'')',
@@ -90,14 +96,48 @@ try {
     $null = $db.Commit()
 } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
 
-$proof = Join-Path $fixture 'scripts\windows\Test-WindowsGpuPackages.ps1'
+# Give the verifier a fixture-owned source lock and the same pinned helpers as the real checkout.
+$fixtureRepo = Join-Path $root 'fixture-repo'
+$fixtureScripts = Join-Path $fixtureRepo 'scripts\windows'
+$fixtureHub = Join-Path $fixtureRepo 'third_party\ANTfrastructure'
+$null = New-Item -ItemType Directory -Force -Path $fixtureScripts, (Join-Path $fixtureRepo 'models'), `
+    (Join-Path $fixtureHub 'windows'), (Join-Path $fixtureHub 'linux'), (Join-Path $fixtureHub 'shared')
+foreach ($name in 'Test-WindowsGpuPackages.ps1', 'Test-WindowsGpuImage.ps1', 'Resolve-BuildModule.ps1') {
+    Copy-Item -LiteralPath (Join-Path $fixture "scripts\windows\$name") -Destination $fixtureScripts
+}
+foreach ($part in 'windows/scripts', 'linux/scripts', 'shared/python') {
+    Copy-Item -LiteralPath (Join-Path $fixture "third_party/ANTfrastructure/$part") `
+        -Destination (Join-Path $fixtureHub (Split-Path $part -Parent)) -Recurse
+}
+$fixtureLock = Join-Path $fixtureRepo 'models\models.lock'
+$lockRows = foreach ($name in $modelNames) {
+    $hash = (Get-FileHash -LiteralPath (Join-Path $modelDir $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$hash  $name  https://example.invalid/$name"
+}
+[IO.File]::WriteAllLines($fixtureLock, [string[]]$lockRows, [Text.UTF8Encoding]::new($false))
+$proof = Join-Path $fixtureScripts 'Test-WindowsGpuPackages.ps1'
 $stage = Join-Path $root 'msix-stage'; $null = New-Item -ItemType Directory -Path $stage
 foreach ($name in $gpuNames + $appNames) { Copy-Item -LiteralPath (Join-Path $bin $name) -Destination $stage }
+Copy-Item -LiteralPath $modelDir -Destination $stage -Recurse
 $null = New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib\gstreamer-1.0')
 foreach ($name in $pluginNames) { Copy-Item -LiteralPath (Join-Path $pluginDir $name) -Destination (Join-Path $stage 'lib\gstreamer-1.0') }
 $msix = Join-Path $root 'candidate.msix'
 [IO.Compression.ZipFile]::CreateFromDirectory($stage, $msix)
 & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix
+foreach ($name in $modelNames) {
+    foreach ($mutation in 'changed', 'missing') {
+        $path = Join-Path $modelDir $name
+        $bytes = [IO.File]::ReadAllBytes($path)
+        try {
+            if ($mutation -eq 'changed') { [IO.File]::WriteAllText($path, 'tampered') }
+            else { Remove-Item -LiteralPath $path }
+            $rejected = $false
+            try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
+            catch { if ($_.Exception.Message -notmatch 'do not match models.lock') { throw }; $rejected = $true }
+            if (-not $rejected) { throw "$mutation staged model file was accepted: $name" }
+        } finally { [IO.File]::WriteAllBytes($path, $bytes) }
+    }
+}
 $backup = Join-Path $root 'original.msix'; Copy-Item -LiteralPath $msix -Destination $backup
 $archive = [IO.Compression.ZipFile]::Open($msix, [IO.Compression.ZipArchiveMode]::Update)
 try {
@@ -155,13 +195,20 @@ try {
     [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, (Join-Path $pluginDir 'gstwebrtc.dll'), 'candidate/lib/gstreamer-1.0/gstwebrtc.dll') | Out-Null
 } finally { $archive.Dispose() }
 $originalZip = Join-Path $root 'original.zip'; Copy-Item $zipPath $originalZip
-foreach ($case in @(@{ Path=$zipPath; Member='candidate/bin/AccelerANTgine_demo.exe' }, @{ Path=$msix; Member='AccelerANTgine_demo.exe' })) {
+foreach ($case in @(
+    @{ Path=$zipPath; Member='candidate/bin/AccelerANTgine_demo.exe' },
+    @{ Path=$msix; Member='AccelerANTgine_demo.exe' },
+    @{ Path=$zipPath; Member='candidate/bin/models/deim_dfine_n_coco.onnx' },
+    @{ Path=$msix; Member='models/deim_dfine_n_coco.onnx' },
+    @{ Path=$zipPath; Member='candidate/bin/models/deim_dfine_n_coco.NOTICE' },
+    @{ Path=$msix; Member='models/deim_dfine_n_coco.NOTICE' }
+)) {
     $archive = [IO.Compression.ZipFile]::Open($case.Path, [IO.Compression.ZipArchiveMode]::Update)
     try { $archive.GetEntry($case.Member).Delete() } finally { $archive.Dispose() }
     $rejected = $false
     try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
     catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-    if (-not $rejected) { throw "Missing inference demo accepted: $($case.Path)" }
+    if (-not $rejected) { throw "Missing package member accepted: $($case.Member)" }
     Copy-Item $originalZip $zipPath -Force; Copy-Item $backup $msix -Force
 }
 foreach ($case in @(@{ Path=$zipPath; Member='candidate/lib/gstreamer-1.0/gstwebrtc.dll' }, @{ Path=$msix; Member='lib/gstreamer-1.0/gstwebrtc.dll' })) {
@@ -216,3 +263,45 @@ foreach ($mutation in 'missing', 'altered') {
 }
 Copy-Item -LiteralPath $msiBackup -Destination $msi -Force
 Write-Host 'PASS: missing or altered MSI inference demo rejected'
+
+foreach ($case in @(
+    @{ Path=$zipPath; Member='candidate/bin/models/onnxruntime.dll' },
+    @{ Path=$msix; Member='models/onnxruntime.dll' }
+)) {
+    $archive = [IO.Compression.ZipFile]::Open($case.Path, [IO.Compression.ZipArchiveMode]::Update)
+    try {
+        $entry = $archive.CreateEntry($case.Member)
+        $writer = [IO.StreamWriter]::new($entry.Open())
+        try { $writer.Write('unexpected runtime') } finally { $writer.Dispose() }
+    } finally { $archive.Dispose() }
+    $rejected = $false
+    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
+    catch { if ($_.Exception.Message -notmatch 'ORT family') { throw }; $rejected = $true }
+    if (-not $rejected) { throw "Nested ORT family DLL was accepted: $($case.Member)" }
+    Copy-Item $originalZip $zipPath -Force; Copy-Item $backup $msix -Force
+}
+Write-Host 'PASS: unexpected nested ORT family DLL rejected in ZIP and MSIX'
+
+$nestedRuntime = Join-Path $modelDir 'onnxruntime.dll'
+[IO.File]::WriteAllText($nestedRuntime, 'unexpected runtime')
+try {
+    $rejected = $false
+    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
+    catch { if ($_.Exception.Message -notmatch 'ORT family') { throw }; $rejected = $true }
+    if (-not $rejected) { throw 'Nested staged ORT family DLL was accepted' }
+} finally { Remove-Item -LiteralPath $nestedRuntime -Force }
+
+$installer = New-Object -ComObject WindowsInstaller.Installer
+$db = $installer.OpenDatabase($msi, 1)
+try {
+    $view = $db.OpenView('INSERT INTO `File` (`File`, `FileName`, `Component_`, `Sequence`) VALUES (''f_extra'', ''onnxruntime.dll'', ''c10'', 1)')
+    try { $null = $view.Execute(); $null = $view.Close(); $null = $db.Commit() }
+    finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
+} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
+try {
+    $rejected = $false
+    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
+    catch { if ($_.Exception.Message -notmatch 'ORT family') { throw }; $rejected = $true }
+    if (-not $rejected) { throw 'Duplicate MSI ORT family DLL was accepted' }
+} finally { Copy-Item $msiBackup $msi -Force }
+Write-Host 'PASS: nested staged and duplicate MSI ORT family DLLs rejected'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify the finished tar and DEB GPU runtime against the original wheel.
+# Verify finished GPU packages against the original wheel and locked model.
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then echo 'usage: verify-gpu-packages.sh PACKAGE_DIR nvidia|amd' >&2; exit 2; fi
@@ -9,15 +9,22 @@ case "$2" in
   *) echo 'Unsupported GPU variant' >&2; exit 2 ;;
 esac
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-hub="${ANTFRASTRUCTURE_DIR:-$repo/third_party/ANTfrastructure}/linux/scripts/06-packaging"
+hub_root="${ANTFRASTRUCTURE_DIR:-$repo/third_party/ANTfrastructure}"
+hub="$hub_root/linux/scripts/06-packaging"
+model_verifier="$hub_root/shared/python/verify_locked_files.py"
+model_fetcher="$hub_root/linux/scripts/lib/fetch-data-lock.py"
+[[ -f "$model_verifier" && -f "$model_fetcher" ]] || { echo 'Pinned ANTfrastructure lacks locked-model verification APIs' >&2; exit 1; }
+appimage_verifier="$hub/verify-ort-appimage-payload.sh"
+[[ -f "$appimage_verifier" ]] || { echo 'Pinned ANTfrastructure lacks AppImage GPU payload verification' >&2; exit 1; }
 # shellcheck source=/dev/null
 source "$hub/ort-runtime-bundle.sh"
 package_dir="$(realpath -e "$1")"
 shopt -s nullglob
 tarballs=("$package_dir"/*.tar.gz)
 debs=("$package_dir"/*.deb)
-if [[ ${#tarballs[@]} -ne 1 || ${#debs[@]} -ne 1 ]]; then
-  echo 'Expected one tarball and one DEB' >&2; exit 1
+images=("$package_dir"/*.AppImage)
+if [[ ${#tarballs[@]} -ne 1 || ${#debs[@]} -ne 1 || ${#images[@]} -ne 1 ]]; then
+  echo 'Expected one tarball, one DEB and one AppImage' >&2; exit 1
 fi
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
@@ -87,7 +94,23 @@ mapfile -d '' -t tops < <(find "$work/tar" -mindepth 1 -maxdepth 1 -print0)
 if [[ "${tops[0]##*/}" == usr ]]; then tar_prefix="$work/tar"; else tar_prefix="${tops[0]}"; fi
 verify_tree "$work/tar" "$tar_prefix"
 verify_tree "$work/deb" "$work/deb"
+verify_model() {
+  local root="$1" prefix="$2"
+  python3 -I "$model_verifier" --root "$root" --directory "$prefix/usr/share/accelerantgine/models" \
+    --fetcher "$model_fetcher" --lock "$repo/models/models.lock" \
+    --file deim_dfine_n_coco.onnx --file deim_dfine_n_coco.LICENSE --file deim_dfine_n_coco.NOTICE
+}
+verify_model "$work/tar" "$tar_prefix"
+verify_model "$work/deb" "$work/deb"
+mkdir "$work/appimage"
+cp -- "${images[0]}" "$work/candidate.AppImage"
+chmod u+x "$work/candidate.AppImage"
+env -u LD_PRELOAD -u LD_AUDIT bash "$appimage_verifier" "$work/candidate.AppImage" "$(uname -m)" usr/lib/accelerantgine usr/share/licenses/onnxruntime "$2"
+(cd "$work/appimage" && env -u LD_PRELOAD -u LD_AUDIT "$work/candidate.AppImage" --appimage-extract >/dev/null)
+verify_model "$work/appimage/squashfs-root" "$work/appimage/squashfs-root"
+verify_demo "$work/appimage/squashfs-root" "$work/appimage/squashfs-root"
 for relative in usr/bin/AccelerANTgine_demo usr/lib/accelerantgine/AccelerANTgine_demo; do
   cmp "$tar_prefix/$relative" "$work/deb/$relative" || { echo "GPU packages disagree on $relative" >&2; exit 1; }
+  cmp "$tar_prefix/$relative" "$work/appimage/squashfs-root/$relative" || { echo "AppImage disagrees on $relative" >&2; exit 1; }
 done
-echo 'PASS: finished GPU tar and DEB ORT payloads and notices match one wheel'
+echo 'PASS: finished GPU package ORT payloads and locked models match their sources'

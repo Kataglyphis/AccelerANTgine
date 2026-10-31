@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "demo_device.hpp"
+#include "demo_model.hpp"
 #include "standalone_gstreamer_environment.hpp"
 
 import kataglyphis.onnx_inference;
@@ -21,6 +22,8 @@ import kataglyphis.log;
 namespace inference = kataglyphis::inference;
 namespace gstreamer = kataglyphis::gstreamer;
 namespace detection = kataglyphis::detection;
+
+#include "demo_detector_image.hpp"
 
 static void print_detection_results(const detection::DetectionResult &result)
 {
@@ -36,7 +39,7 @@ static void print_detection_results(const detection::DetectionResult &result)
     }
 }
 
-static auto run_onnx_inference_example(const std::string &model_path,
+static auto run_onnx_inference_example(const std::filesystem::path &model_path,
   inference::ExecutionProvider provider,
   int device_id,
   const std::filesystem::path &profile_prefix) -> int
@@ -192,8 +195,9 @@ static auto run_gstreamer_pipeline_example() -> int
     return 0;
 }
 
-static auto
-  run_yolo_detection_example(const std::string &model_path, inference::ExecutionProvider provider, int device_id) -> int
+static auto run_yolo_detection_example(const std::filesystem::path &model_path,
+  inference::ExecutionProvider provider,
+  int device_id) -> int
 {
     std::cout << "\n=== YOLO Detection Example ===\n\n";
 
@@ -237,7 +241,7 @@ static auto
     return 0;
 }
 
-static auto run_video_detection_example(const std::string &model_path,
+static auto run_video_detection_example(const std::filesystem::path &model_path,
   inference::ExecutionProvider provider,
   int device_id) -> int
 {
@@ -278,7 +282,7 @@ static auto run_video_detection_example(const std::string &model_path,
 }
 
 // A synthetic frame exercises the live video inference path without a camera.
-static auto run_video_detection_check(const std::string &model_path,
+static auto run_video_detection_check(const std::filesystem::path &model_path,
   inference::ExecutionProvider provider,
   int device_id,
   const std::filesystem::path &profile_prefix) -> int
@@ -352,7 +356,7 @@ static void print_usage(const char *program_name)
 {
     std::cout << "Usage: " << program_name << " [options]\n\n"
               << "Options:\n"
-              << "  --model <path>     ONNX model (default: models/deim_dfine_n_coco.onnx, models/README.md)\n"
+              << "  --model <path>     ONNX model (default: bundled model, else models/deim_dfine_n_coco.onnx)\n"
               << "  --onnx-only        Run only ONNX inference example\n"
               << "  --device <name>    cpu, cuda, migraphx or directml (default: " << kataglyphis::demo::default_device
               << ")\n"
@@ -362,6 +366,9 @@ static void print_usage(const char *program_name)
               << "  --yolo-only        Run only YOLO detection example\n"
               << "  --video-only       Run only video detection example\n"
               << "  --video-check      Run model inference on one synthetic GStreamer video frame\n"
+              << "  --detector-image <jpg> --detector-output <json> --profile <prefix>\n"
+              << "                     Profile a JPEG detector run (new output file and profile directory)\n"
+              << "  --detector-repeat-output <json>  Repeat detection in the same session\n"
               << "  --all              Run all examples\n"
               << "  --help             Show this help message\n\n"
               << "Examples:\n"
@@ -377,7 +384,7 @@ auto main(int argc, char *argv[]) -> int
         return 1;
     }
 #endif
-    std::string model_path = "models/deim_dfine_n_coco.onnx";
+    std::filesystem::path model_path = kataglyphis::demo::default_model();
     bool run_onnx = false;
     bool run_gstreamer = false;
     bool run_yolo = false;
@@ -390,6 +397,9 @@ auto main(int argc, char *argv[]) -> int
     }
     int device_id = 0;
     std::filesystem::path profile_prefix;
+    std::filesystem::path detector_image;
+    std::filesystem::path detector_output;
+    std::filesystem::path detector_repeat_output;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -412,6 +422,12 @@ auto main(int argc, char *argv[]) -> int
             }
         } else if (arg == "--profile" && i + 1 < argc) {
             profile_prefix = argv[++i];
+        } else if (arg == "--detector-image" && i + 1 < argc) {
+            detector_image = argv[++i];
+        } else if (arg == "--detector-output" && i + 1 < argc) {
+            detector_output = argv[++i];
+        } else if (arg == "--detector-repeat-output" && i + 1 < argc) {
+            detector_repeat_output = argv[++i];
         } else if (arg == "--onnx-only") {
             run_onnx = true;
         } else if (arg == "--gstreamer-only") {
@@ -436,6 +452,15 @@ auto main(int argc, char *argv[]) -> int
         }
     }
 
+    if (!detector_image.empty() || !detector_output.empty() || !detector_repeat_output.empty()) {
+        if (detector_image.empty() || detector_output.empty() || profile_prefix.empty() || run_onnx || run_gstreamer
+            || run_yolo || run_video || run_video_check) {
+            std::cerr << "Image detection requires an image, output and profile, without other modes\n";
+            return 2;
+        }
+        return run_detector_image(
+          model_path, detector_image, detector_output, detector_repeat_output, *provider, device_id, profile_prefix);
+    }
     if (!run_onnx && !run_gstreamer && !run_yolo && !run_video && !run_video_check) {
         run_onnx = true;
         run_yolo = true;

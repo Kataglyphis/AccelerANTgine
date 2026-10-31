@@ -45,14 +45,14 @@ Python dependencies are declared in `pyproject.toml` and locked in `uv.lock`; th
 
 ## GPU package candidates
 
-On demand: [Linux](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-gpu-candidate.yml) targets NVIDIA x64/arm64 and AMD x64;
-[Windows](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-gpu-candidates.yml) targets NVIDIA/AMD x64. Open a successful run and download the matching artifact under **Artifacts**
-(sign-in required). Candidates are unverified, separate from releases and need matching host GPU drivers and runtimes.
-Both workflows also accept `workflow_call`; GPU hardware profiling remains opt-in.
-The Linux hardware profile runs the packaged demo from the DEB, tarball and AppImage; its runner needs `dpkg-deb`.
-MIGraphX device selection avoids the legacy runtime's malformed empty cache path.
-The infrastructure pin and missing Windows image inputs currently block builds; see [getting started](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/docs/source/getting_started.rst) for formats and verification.
-CPU packages remain available through the existing lanes.
+On demand, [Linux](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-gpu-candidate.yml) targets NVIDIA x64/arm64 and AMD x64;
+[Windows](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-gpu-candidates.yml) targets NVIDIA/AMD x64. Download successful runs' artifacts after signing in.
+Candidates are unverified, separate from releases and need matching host GPU drivers and runtimes.
+Both workflows accept `workflow_call`; GPU hardware profiling remains opt-in.
+Linux `gpu-tuple` selects all combinations or one of `nvidia-x64`, `nvidia-arm64`, `amd-x64`.
+Linux `promote-verified` requires `verify-gpu`, clean-host checks and CPU/GPU detector parity; it stages run-bound packages and receipts without publishing a release.
+The infrastructure pin and missing Windows image inputs currently block builds; CPU lanes remain available.
+See [getting started](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/docs/source/getting_started.rst) for formats, verification and the local AMD diagnostic.
 
 ## Quick start
 

@@ -103,6 +103,16 @@ dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=n
 ``amd`` selects the image's GPU ONNX Runtime and stages its matching provider. CPU is the
 default. NVIDIA targets Linux x64 and arm64; AMD targets Linux x64. MIGraphX device registration
 uses explicit options to avoid a malformed empty model-cache path in the legacy runtime API.
+For a local investigation on AMD hardware, run:
+
+.. code-block:: sh
+
+   bash scripts/linux/diagnose-migraphx-detector.sh DEMO MODEL FIXTURE MODE NEW_EVIDENCE_DIR
+
+Set ``MODE`` to ``exhaustive``, ``skip-rocblas`` or ``skip-no-mlir``. The evidence directory must be new. The diagnostic
+compares two CPU and two same-session GPU detections and checks each operator profile using the
+selected process-local setting. Exhaustive tuning has a four-minute limit. These experiments do
+not qualify a package for release.
 Configure with ``-DKATAGLYPHIS_TEST_MIGRAPHX=ON`` to include the commit suite's real GPU
 regression on a MIGraphX host without ``ORT_MIGRAPHX_MODEL_CACHE_PATH``; it checks the Relu
 result and profile. The default build omits this hardware-only test.
@@ -166,9 +176,17 @@ Linux GPU packaging requires the shared ANTfrastructure staging and external-run
 The currently recorded hub pin does not contain them, so an opt-in build fails during configure
 until a published hub revision with those APIs is adopted. The manually dispatched
 ``Linux GPU package candidates`` workflow is separate from releases and labels its artifacts
-unverified; its clean-host job checks CPU inference, not GPU inference. After a build row fails,
-clean-host checks still run for the other candidates; a missing current-attempt candidate
-fails its own check. GPU profiling waits for all build and clean-host rows to succeed.
+unverified by default; its clean-host job checks CPU inference, not GPU inference. Its optional
+``gpu-tuple`` input defaults to ``all`` and also accepts ``nvidia-x64``, ``nvidia-arm64`` or
+``amd-x64``; selecting one runs that combination independently of the others.
+If one build fails, clean-host checks still run for the other selected candidates; a missing
+candidate fails its own check. Hardware profiling and promotion wait for all selected builds
+and clean-host checks, so select a single tuple to verify it independently of a failing one.
+The ``promote-verified`` input requires ``verify-gpu`` and passing CPU/GPU detector parity on
+supported hardware before any package is staged. It requires matching clean-host and hardware
+profile receipts from the current run attempt for each tuple's DEB, tarball and AppImage.
+The checked artifact is separate from releases. The receipts rely on trusted workflow
+and GPU runners; they are not independently signed.
 On 2026-10-30 an isolated
 AMD x64 release build with those shared changes overlaid matched
 the core and provider files to one ONNX Runtime wheel, passed the notices gate, and produced a

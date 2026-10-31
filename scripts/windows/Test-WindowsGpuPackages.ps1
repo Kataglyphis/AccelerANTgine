@@ -17,7 +17,20 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
 Import-BuildModule @('WindowsMsiLicense.Common', 'WindowsPackageBinary.Common', 'WindowsOrtPayload.Common')
 
+function Assert-LockedDemoModel {
+    $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+    $hub = Join-Path $repo 'third_party/ANTfrastructure'
+    $verifier = Join-Path $hub 'shared/python/verify_locked_files.py'
+    $fetcher = Join-Path $hub 'linux/scripts/lib/fetch-data-lock.py'
+    $lock = Join-Path $repo 'models/models.lock'
+    $modelDir = Join-Path $Bundle 'bin/models'
+    & python -I $verifier --root $Bundle --directory $modelDir --lock $lock --fetcher $fetcher `
+        --file deim_dfine_n_coco.onnx --file deim_dfine_n_coco.LICENSE --file deim_dfine_n_coco.NOTICE
+    if ($LASTEXITCODE -ne 0) { throw 'Staged demo model and notices do not match models.lock.' }
+}
+
 # Re-prove the source immediately before comparing the bytes shipped to users.
+Assert-LockedDemoModel
 & (Join-Path $PSScriptRoot 'Test-WindowsGpuImage.ps1') -Variant $Variant -OnnxRoot $OnnxRoot -WheelDir $WheelDir
 $names = @('onnxruntime.dll')
 if ($Variant -eq 'nvidia') {
@@ -27,6 +40,7 @@ if ($Variant -eq 'nvidia') {
     $names += 'onnxruntime_providers_shared.dll', 'DirectML.dll'
 }
 $sources = [string[]]@($names | ForEach-Object { Get-ChainOrtRuntimeFile -OnnxRoot $OnnxRoot -Name $_ })
+Assert-PackageOrtFamily -Path $Bundle -Directory 'bin' -Name $names
 for ($i = 0; $i -lt $names.Count; $i++) {
     $staged = Join-Path $Bundle "bin\$($names[$i])"
     if (-not (Test-Path -LiteralPath $staged -PathType Leaf) -or
@@ -46,15 +60,19 @@ $pluginDir = Join-Path $Bundle 'lib\gstreamer-1.0'
 $plugins = @(Get-ChildItem -LiteralPath $pluginDir -File -ErrorAction Stop | Sort-Object Name)
 if ($plugins.Count -eq 0) { throw "GPU bundle has no GStreamer plugins: $pluginDir" }
 $pluginMembers = [string[]]@($plugins | ForEach-Object { "lib/gstreamer-1.0/$($_.Name)" })
-$bundleMembers = [string[]]@(@($packageNames | ForEach-Object { "bin/$_" }) + $pluginMembers)
-$msixMembers = [string[]]@($packageNames + $pluginMembers)
-$packageSources = [string[]]@($sources + $appSources + @($plugins | ForEach-Object FullName))
+$modelNames = @('deim_dfine_n_coco.onnx', 'deim_dfine_n_coco.LICENSE', 'deim_dfine_n_coco.NOTICE')
+$modelSources = [string[]]@($modelNames | ForEach-Object { Join-Path $Bundle "bin\models\$_" })
+$bundleMembers = [string[]]@(@($packageNames | ForEach-Object { "bin/$_" }) + $pluginMembers + @($modelNames | ForEach-Object { "bin/models/$_" }))
+$msixMembers = [string[]]@($packageNames + $pluginMembers + @($modelNames | ForEach-Object { "models/$_" }))
+$packageSources = [string[]]@($sources + $appSources + @($plugins | ForEach-Object FullName) + $modelSources)
 $providers = @($names | Where-Object { $_ -clike 'onnxruntime_providers_*.dll' } | Sort-Object)
 $prefix = [IO.Path]::GetFileNameWithoutExtension($zips[0].Name)
+Assert-PackageOrtFamily -Path $zips[0].FullName -Directory "$prefix/bin" -Name $names
 Assert-PackageBinary -Path $zips[0].FullName -Member @($bundleMembers | ForEach-Object { "$prefix/$_" }) -SourcePath $packageSources
 $zipProviders = @(Get-PackageOrtProviderNames -Path $zips[0].FullName -Directory "$prefix/bin")
 if (($providers -join ',') -cne ($zipProviders -join ',')) { throw 'ZIP ORT provider set differs from the proven inputs.' }
 $ids = [string[]]@($bundleMembers | ForEach-Object { Get-MsiInstalledFileId -Path $msis[0].FullName -RelativePath $_ -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine' })
+Assert-PackageOrtFamily -Path $msis[0].FullName -Directory 'bin' -Name $names -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine'
 Assert-PackageBinary -Path $msis[0].FullName -Member $ids -SourcePath $packageSources
 $msiProviders = @(Get-PackageOrtProviderNames -Path $msis[0].FullName -Directory 'bin' -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine')
 if (($providers -join ',') -cne ($msiProviders -join ',')) { throw 'MSI ORT provider set differs from the proven inputs.' }
@@ -64,10 +82,12 @@ foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') {
     Assert-PackageLicense -Path $msis[0].FullName -Pattern $id -LicensePath (Join-Path $licenses $name)
 }
 if ($MsixPath) {
+    Assert-PackageOrtFamily -Path $MsixPath -Name $names
     Assert-PackageBinary -Path $MsixPath -Member $msixMembers -SourcePath $packageSources
     $msixProviders = @(Get-PackageOrtProviderNames -Path $MsixPath -Directory '')
     if (($providers -join ',') -cne ($msixProviders -join ',')) { throw 'MSIX ORT provider set differs from the proven inputs.' }
 }
 # The source wheel might have changed while packages were being checked.
 & (Join-Path $PSScriptRoot 'Test-WindowsGpuImage.ps1') -Variant $Variant -OnnxRoot $OnnxRoot -WheelDir $WheelDir
+Assert-LockedDemoModel
 Write-Host "Windows x64 $Variant GPU package bytes verified; GPU execution remains unverified."

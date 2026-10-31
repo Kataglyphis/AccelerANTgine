@@ -72,6 +72,7 @@ if(UNIX
       videorate
       videofilter
       videotestsrc
+      jpeg
       playback
       typefindfunctions
       rawparse

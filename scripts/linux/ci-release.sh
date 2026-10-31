@@ -272,6 +272,10 @@ fi
 
 info "Building release with preset: ${CLANG_RELEASE_PRESET}"
 
+# Release packages carry the lock-verified default model and its notices.
+model_fetcher="$(antfrastructure_path linux/scripts/lib/fetch-data-lock.py)"
+python3 -I "${model_fetcher}" --lock "${WORKSPACE_DIR}/models/models.lock"
+
 # The /workspace safe.directory default is wrong on a dev box, where `git rev-parse` would then refuse.
 CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
 gpu_configure_args=()
@@ -285,6 +289,7 @@ cmake_build_main \
   --mb-per-job 2000 \
   --configure-arg "-DCMAKE_LINK_WHAT_YOU_USE=FALSE" \
   --configure-arg "-DCPACK_ENABLE_APPIMAGE=${CPACK_APPIMAGE_FLAG}" \
+  --configure-arg "-DKATAGLYPHIS_PACKAGE_DEMO_MODEL=ON" \
   "${gpu_configure_args[@]}"
 
 # Validate AppStream metadata without depending on website availability.

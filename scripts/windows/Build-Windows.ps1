@@ -509,6 +509,9 @@ try {
     # --- Release Build ---
     if ($doRelease) {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Release Build" -Critical -Script {
+            $modelFetcher = Join-Path $Workspace 'third_party\ANTfrastructure\linux\scripts\lib\fetch-data-lock.py'
+            $modelLock = Join-Path $Workspace 'models\models.lock'
+            Invoke-BuildExternal -Context $Context -File 'python' -Parameters @('-I', $modelFetcher, '--lock', $modelLock)
             # Only this lane cleans, since a package must inherit nothing; CPack installs package-dlls beside the executables.
             $packageDlls = Join-Path $fastBuildReleaseDirFull 'package-dlls'
             $imagePlugins = @(if ($OrtVariant -ne 'cpu') { Get-ImageGStreamerPackagePlugins -Arch $TargetArch })
@@ -520,6 +523,7 @@ try {
                     -Configuration $cfgRelease.Configuration -ParallelJobs $ParallelJobs `
                     -CleanBuildRoot `
                     -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON',
+                            '-DKATAGLYPHIS_PACKAGE_DEMO_MODEL=ON',
                             "-DKATAGLYPHIS_PACKAGE_DLL_DIR=$($packageDlls -replace '\\', '/')",
                             "-DKATAGLYPHIS_ORT_VARIANT=$OrtVariant") +
                         @(if ($OrtVariant -ne 'cpu') { "-DKATAGLYPHIS_GST_PLUGIN_DIR=$((Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -replace '\\', '/')" }) +
@@ -685,6 +689,9 @@ try {
                 $demo = Join-Path $payloadDir 'AccelerANTgine_demo.exe'
                 if (-not (Test-Path -LiteralPath $demo -PathType Leaf)) { throw 'Missing packaged inference demo.' }
                 $payloadExtra += $demo
+                $bundleModels = Join-Path $bundleBin 'models'
+                if (-not (Test-Path -LiteralPath $bundleModels -PathType Container)) { throw 'Missing packaged demo model directory.' }
+                $payloadExtra += $bundleModels
                 $licenseSource = Join-Path $Workspace 'LICENSE'
                 $payloadExtra += Copy-PackageLicense -Path $licenseSource -Destination $payloadDir
                 $ortLicenses = Copy-OrtWheelLicenses -OrtDll (Join-Path $payloadDir 'onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $payloadDir

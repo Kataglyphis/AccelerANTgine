@@ -20,6 +20,10 @@ are cached by hash in `KATAGLYPHIS_MODEL_CACHE`, else in `kataglyphis-models` un
 Ship `deim_dfine_n_coco.LICENSE` and `deim_dfine_n_coco.NOTICE` with the model. Its output is
 `[1, 300, 6]`: x1, y1, x2, y2 in the 640x640 input's pixels, the score and the class.
 
+Release packaging fetches and verifies all three files, installs them together, and lists the
+model and its texts in the package's third-party inventory. The packaged demo locates its default
+model relative to its executable; `--model <path>` still selects a different model.
+
 `YoloDetector` reads that layout when `YoloConfig::output_layout` is
 `YoloOutputLayout::CornersScoreClass`, as `Src/inference_demo.cpp` sets it. The default,
 `CenterObjectnessScores`, is the YOLOv5 rows (cx, cy, w, h, objectness, one score per class).

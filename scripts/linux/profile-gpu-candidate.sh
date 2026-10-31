@@ -3,8 +3,14 @@ set -euo pipefail
 
 if [[ $# -ne 3 ]]; then echo 'usage: profile-gpu-candidate.sh ARTIFACT_DIR MODEL DEVICE' >&2; exit 2; fi
 artifact_dir=$1 model=$2 device=$3
+model="$(realpath -e "$model")"
 case "$device" in cpu|cuda|migraphx) ;; *) echo 'Unsupported profile device' >&2; exit 2 ;; esac
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+gpu_env="$repo/third_party/ANTfrastructure/linux/scripts/lib/gpu-profile-env.sh"
+[[ -f "$gpu_env" ]] || { echo 'Pinned ANTfrastructure lacks GPU profile environment isolation' >&2; exit 1; }
+# shellcheck source=/dev/null
+source "$gpu_env"
+declare -F gpu_without_migraphx_overrides >/dev/null || { echo 'Pinned GPU environment helper lacks its API' >&2; exit 1; }
 shopt -s nullglob
 archives=("$artifact_dir"/*.tar.gz)
 [[ ${#archives[@]} -eq 1 ]] || { echo 'Expected one candidate tarball' >&2; exit 1; }
@@ -25,15 +31,15 @@ chmod u+x "$stage/candidate.AppImage"
 run_demo() {
   local demo=$1 registry=$2
   shift 2
-  env -u LD_PRELOAD -u LD_AUDIT -u GST_PLUGIN_PATH -u GST_PLUGIN_PATH_1_0 -u GST_PLUGIN_SYSTEM_PATH \
+  (cd "$stage" && gpu_without_migraphx_overrides env -u LD_PRELOAD -u LD_AUDIT -u GST_PLUGIN_PATH -u GST_PLUGIN_PATH_1_0 -u GST_PLUGIN_SYSTEM_PATH \
     -u GST_PLUGIN_SYSTEM_PATH_1_0 -u GST_PLUGIN_SCANNER -u GST_PLUGIN_SCANNER_1_0 \
     -u GST_REGISTRY -u GST_REGISTRY_1_0 -u GST_REGISTRY_FORK \
-    GST_REGISTRY_1_0="$registry" "$demo" "$@"
+    GST_REGISTRY_1_0="$registry" "$demo" "$@")
 }
 
 profile_package() {
   local root=$1 kind=$2 demo resolved
-  local -a demos profiles
+  local -a demos profiles models
   mapfile -d '' -t demos < <(find "$root" -type f -path '*/usr/bin/AccelerANTgine_demo' -print0)
   [[ ${#demos[@]} -eq 1 && -x ${demos[0]} && ! -L ${demos[0]} ]] || {
     echo "Expected one executable ${kind} demo wrapper" >&2; return 1;
@@ -41,7 +47,7 @@ profile_package() {
   demo=${demos[0]}
   resolved="$(realpath -e "$demo")"
   case "$resolved" in "$root"/*) ;; *) echo "${kind} demo escapes its package" >&2; return 1 ;; esac
-  run_demo "$demo" "$stage/$kind-gst-registry.bin" --onnx-only --model "$model" --profile "$stage/$kind-ort-profile"
+  run_demo "$demo" "$stage/$kind-gst-registry.bin" --onnx-only --profile "$stage/$kind-ort-profile"
   profiles=("$stage/$kind"-ort-profile*.json)
   [[ ${#profiles[@]} -eq 1 ]] || { echo "Expected one ${kind} ORT profile" >&2; return 1; }
   python3 -I "$repo/third_party/ANTfrastructure/shared/python/verify_ort_profile.py" "${profiles[0]}" --device "$device"
@@ -49,6 +55,13 @@ profile_package() {
   profiles=("$stage/$kind"-video-profile*.json)
   [[ ${#profiles[@]} -eq 1 ]] || { echo "Expected one ${kind} video inference ORT profile" >&2; return 1; }
   python3 -I "$repo/third_party/ANTfrastructure/shared/python/verify_ort_profile.py" "${profiles[0]}" --device "$device"
+  if [[ "$device" != cpu ]]; then
+    mapfile -d '' -t models < <(find "$root" -type f -path '*/share/accelerantgine/models/deim_dfine_n_coco.onnx' -print0)
+    [[ ${#models[@]} -eq 1 && ! -L ${models[0]} ]] || { echo "Expected one ${kind} packaged model" >&2; return 1; }
+    resolved="$(realpath -e "${models[0]}")"
+    case "$resolved" in "$root"/*) ;; *) echo "${kind} model escapes its package" >&2; return 1 ;; esac
+    bash "$repo/scripts/linux/check-gpu-detector-parity.sh" "$demo" "$resolved" "$device" "$stage/$kind-detector-parity"
+  fi
 }
 
 profile_package "$stage/tar" tar
