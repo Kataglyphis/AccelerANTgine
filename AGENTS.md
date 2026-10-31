@@ -5,6 +5,8 @@ byte-identical to the chain runtime, install both texts, and check the install t
 
 Guidance for coding agents (and new contributors) working in AccelerANTgine.
 
+The Linux GPU hardware profile checks the demo from each candidate DEB, tarball and AppImage; keep all three required.
+
 **Reuse before adding Bash or PowerShell code.** Search this repository and every direct
 submodule, including `third_party/ANTfrastructure`, for an existing implementation. Call or
 extend its canonical owner, passing project-specific values as arguments. For new behavior

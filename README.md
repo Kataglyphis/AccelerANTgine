@@ -50,6 +50,7 @@ On demand: [Linux](https://github.com/Kataglyphis/AccelerANTgine/actions/workflo
 [Windows](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-gpu-candidates.yml) targets NVIDIA/AMD x64. Open a successful run and download the matching artifact under **Artifacts**
 (sign-in required). Candidates are unverified, separate from releases and need matching host GPU drivers and runtimes.
 Both workflows also accept `workflow_call`; GPU hardware profiling remains opt-in.
+The Linux hardware profile runs the packaged demo from the DEB, tarball and AppImage; its runner needs `dpkg-deb`.
 The infrastructure pin and missing Windows image inputs currently block builds; see [getting started](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/docs/source/getting_started.rst) for formats and verification.
 CPU packages remain available through the existing lanes.
 

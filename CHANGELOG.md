@@ -20,6 +20,7 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Added
 
+- Profile the extracted Linux DEB on the selected GPU alongside the candidate tarball and AppImage.
 - Linux and Windows GPU candidate workflows can be called by other workflows, with optional GPU profiling.
 - Windows GPU package builds stage selected image GStreamer plugins and their DLL closure for portable,
   installer and MSIX layouts. The package notice gate still requires verified dependency license

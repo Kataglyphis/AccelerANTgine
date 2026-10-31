@@ -10,11 +10,14 @@ archives=("$artifact_dir"/*.tar.gz)
 [[ ${#archives[@]} -eq 1 ]] || { echo 'Expected one candidate tarball' >&2; exit 1; }
 appimages=("$artifact_dir"/*.AppImage)
 [[ ${#appimages[@]} -eq 1 ]] || { echo 'Expected one candidate AppImage' >&2; exit 1; }
+debs=("$artifact_dir"/*.deb)
+[[ ${#debs[@]} -eq 1 ]] || { echo 'Expected one candidate DEB' >&2; exit 1; }
 stage="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/accelerantgine-profile.XXXXXXXX")"
 trap 'rm -rf -- "$stage"' EXIT
 stage="$(realpath -e "$stage")"
-mkdir "$stage/tar" "$stage/appimage"
+mkdir "$stage/tar" "$stage/appimage" "$stage/deb"
 tar -xzf "${archives[0]}" -C "$stage/tar"
+dpkg-deb --extract "${debs[0]}" "$stage/deb"
 cp -- "${appimages[0]}" "$stage/candidate.AppImage"
 chmod u+x "$stage/candidate.AppImage"
 (cd "$stage/appimage" && "$stage/candidate.AppImage" --appimage-extract >/dev/null)
@@ -50,3 +53,4 @@ profile_package() {
 
 profile_package "$stage/tar" tar
 profile_package "$stage/appimage/squashfs-root" appimage
+profile_package "$stage/deb" deb
