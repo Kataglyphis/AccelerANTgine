@@ -64,6 +64,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Linux GPU hardware profiling waits for the clean-host package checks to pass,
+  so a failed package startup does not consume a GPU runner or produce a profile.
+
 - Run the Windows GPU candidate startup check with only system DLL paths and a fresh
   GStreamer registry, so an installed SDK cannot mask missing package dependencies.
 

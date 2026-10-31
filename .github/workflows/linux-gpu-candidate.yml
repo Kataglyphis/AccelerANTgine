@@ -133,7 +133,7 @@ jobs:
 
   gpu-profile:
     if: ${{ inputs.verify-gpu }}
-    needs: build
+    needs: [build, clean-host]
     strategy:
       fail-fast: false
       matrix:
