@@ -67,6 +67,7 @@ jobs:
             exit 1
           }
           cat logs/test-results/third-party-notices.txt
+          python3 scripts/linux/tests/test-model-notices.py
       - name: Test the ONNX Runtime package matrix
         shell: bash
         run: bash scripts/linux/tests/test-ort-package-variant.sh

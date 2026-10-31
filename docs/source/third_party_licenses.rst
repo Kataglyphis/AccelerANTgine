@@ -43,6 +43,9 @@ the Flatpak and the Windows install proof get the list of exactly what they pack
   distribution package, with file-name patterns, its SPDX expression and where its texts come from.
   The first matching entry wins, so specific patterns precede broad ones. Versions come from
   ANTfrastructure's ``versions.env`` where the image pins them.
+- **Demo model:** if the package contains the DEIM-D-FINE-N ONNX model, its Apache-2.0 license
+  and notice travel beside the model and are copied into the third-party notice directory.
+  A missing or empty text fails staging.
 - **Tracked texts:** ``packaging/third-party/texts/`` holds the texts that no build input carries:
   LGPL-2.1, GPL-3.0 with the GCC Runtime Library Exception, MPL-2.0, ORC's, libffi's and libpisp's
   licenses, and the Rust standard library's MIT and Apache-2.0 texts. libpisp is the subproject

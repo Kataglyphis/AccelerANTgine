@@ -211,7 +211,11 @@ class Stager:
         if root_name == "install":
             component.texts.append(self.relative(source))
             return
-        target = self.dest / "third-party" / component.ident / Path(relative).name
+        self.copy_text(component, Path(relative).name, data)
+
+    def copy_text(self, component: Component, name: str, data: bytes) -> None:
+        """Copy a component text to its stable package-relative notice location."""
+        target = self.dest / "third-party" / component.ident / name
         if target.exists() and target.read_bytes() != data:
             raise NoticeError(
                 f"{component.ident}: two different texts share the name {target.name}"
@@ -226,6 +230,35 @@ class Stager:
             if matches(name, entry.get("binaries", []), self.platform):
                 return entry
         return None
+
+    def add_assets(self) -> None:
+        """List declared data assets and require their accompanying license texts."""
+        entries = [
+            entry for entry in self.inventory["components"] if entry.get("assets")
+        ]
+        for asset in self.root.rglob("*"):
+            if asset.is_symlink() or not asset.is_file():
+                continue
+            for entry in entries:
+                if not matches(asset.name, entry["assets"], self.platform):
+                    continue
+                component = self.component(entry)
+                component.files.append(self.relative(asset))
+                for name in entry.get("asset_texts", []):
+                    if (
+                        not isinstance(name, str)
+                        or Path(name).name != name
+                        or name in ("", ".", "..")
+                    ):
+                        raise NoticeError(
+                            f"{entry['id']}: invalid asset text name: {name!r}"
+                        )
+                    text = asset.parent / name
+                    data = read_text(text, entry["id"])
+                    target = self.dest / "third-party" / component.ident / name
+                    if self.relative(target) not in component.texts:
+                        self.copy_text(component, name, data)
+                break
 
     def dpkg_owner(self, name: str) -> str | None:
         """Find the package that owns the library the closure copied, searched as the closure searches."""
@@ -462,6 +495,7 @@ class Stager:
             )
         for binary in binaries:
             self.classify(binary)
+        self.add_assets()
         if self.unaccounted:
             raise NoticeError(
                 "binaries with no license source: " + ", ".join(self.unaccounted)

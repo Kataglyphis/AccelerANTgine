@@ -90,6 +90,24 @@ else
   fail "a complete Windows tree was refused"
 fi
 
+# Model data is listed only when shipped, with its accompanying license and notice.
+model_tree="${tmp}/model"
+windows_tree "${model_tree}"
+mkdir -p "${model_tree}/bin/models"
+printf 'model\n' > "${model_tree}/bin/models/deim_dfine_n_coco.onnx"
+printf 'license\n' > "${model_tree}/bin/models/deim_dfine_n_coco.LICENSE"
+printf 'notice\n' > "${model_tree}/bin/models/deim_dfine_n_coco.NOTICE"
+if run_windows "${model_tree}" > "${tmp}/model.log" 2>&1; then
+  expect_grep "${model_tree}/licenses/THIRD-PARTY-NOTICES.txt" "DEIM-D-FINE-N COCO demo model"
+  expect_grep "${model_tree}/licenses/THIRD-PARTY-NOTICES.txt" "License text: licenses/third-party/deim-dfine-n-coco/deim_dfine_n_coco.NOTICE"
+else
+  cat "${tmp}/model.log" >&2
+  fail "the model and its notices were refused"
+fi
+rm "${model_tree}/bin/models/deim_dfine_n_coco.NOTICE"
+if run_windows "${model_tree}" > "${tmp}/missing-model-notice.log" 2>&1; then fail "a model with no notice passed"; fi
+expect_grep "${tmp}/missing-model-notice.log" "deim_dfine_n_coco.NOTICE"
+
 # A DLL nobody declared fails the package and is named.
 unknown="${tmp}/unknown"
 windows_tree "${unknown}"
