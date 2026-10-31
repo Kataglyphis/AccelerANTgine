@@ -17,7 +17,10 @@ set -euo pipefail
 printf '%s %s\n' "${KATAGLYPHIS_BUNDLED_GLIBC:-host}" "$1" >>"$PROOF_DIR/modes"
 if [[ $1 == --onnx-only ]]; then
   if [[ ${BAD_OUTPUT:-0} == 1 ]]; then echo 'bad shape'; else echo 'Output 0 shape: [1, 300, 6] (1800 elements)'; fi
-elif [[ ${BAD_VIDEO:-0} == 1 ]]; then echo 'bad video'; else echo 'GStreamer video frame inference passed'; fi
+else
+  [[ ${GST_PLUGIN_PATH_1_0:-} == */accelerantgine-cpu-check.*/outside-plugins ]]
+  if [[ ${BAD_VIDEO:-0} == 1 ]]; then echo 'bad video'; else echo 'GStreamer video frame inference passed'; fi
+fi
 STUB
 cat >"$work/bin/ldd" <<'STUB'
 #!/usr/bin/env bash

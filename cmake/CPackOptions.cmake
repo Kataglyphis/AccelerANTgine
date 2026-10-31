@@ -206,6 +206,20 @@ kataglyphis_install_linux_closure(
   ${_gpu_closure_args}
   PROTECT
   "lib/accelerantgine/libonnxruntime*")
+if(PROJECT_IS_TOP_LEVEL AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(_gst_launchers "")
+  if(TARGET ${PROJECT_NAME}_cli)
+    string(APPEND _gst_launchers " \"$<TARGET_FILE_NAME:${PROJECT_NAME}_cli>\"")
+  endif()
+  if(TARGET ${PROJECT_NAME}_demo)
+    string(APPEND _gst_launchers " \"$<TARGET_FILE_NAME:${PROJECT_NAME}_demo>\"")
+  endif()
+  if(_gst_launchers)
+    install(
+      CODE "execute_process(COMMAND bash \"${CMAKE_CURRENT_SOURCE_DIR}/scripts/linux/isolate-package-gstreamer.sh\" \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}\"${_gst_launchers} COMMAND_ERROR_IS_FATAL ANY)"
+    )
+  endif()
+endif()
 if(PROJECT_IS_TOP_LEVEL AND _gpu_provider)
   accelerantgine_install_gpu_host_runtime_guard("${_gpu_helper}" "${_gpu_kind}")
 endif()

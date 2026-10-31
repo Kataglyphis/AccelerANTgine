@@ -32,6 +32,9 @@ newer: Debian 13 (tested on a Raspberry Pi 5) and Ubuntu 26.04 have it, Ubuntu
 24.04's 1.24 is too old. After v0.0.3 the packages carry the image's own
 GStreamer and its plugins too (owner, 2026-10-17), and the ``.deb`` depends on
 glibc and EGL alone (``CHANGELOG.md``, *Unreleased*).
+Packaged Linux launchers clear inherited GStreamer plugin, scanner and registry
+settings so the shipped plugins load; library embedders retain their own settings.
+The host GPU SDK library path is still available to GPU packages.
 
 .. code-block:: sh
 

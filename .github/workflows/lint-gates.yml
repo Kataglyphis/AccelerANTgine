@@ -70,6 +70,12 @@ jobs:
       - name: Test the ONNX Runtime package matrix
         shell: bash
         run: bash scripts/linux/tests/test-ort-package-variant.sh
+      - name: Test packaged GStreamer isolation
+        shell: bash
+        run: |
+          bash scripts/linux/tests/test-isolate-package-gstreamer.sh
+          bash scripts/linux/tests/test-package-gstreamer-cmake.sh
+          bash scripts/linux/tests/test-check-clean-host-inference.sh
       - name: Save parser test log
         if: always() && hashFiles('logs/test-results/ci-value-options.txt') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

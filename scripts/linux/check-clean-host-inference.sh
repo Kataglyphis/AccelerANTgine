@@ -39,7 +39,7 @@ for mode in host bundled; do
     echo "Unexpected output from the $mode runtime" >&2
     exit 1
   fi
-  if ! "${args[@]}" "$demo" --video-check --model "$model" --device cpu >"$work/$mode-video.log" 2>&1; then
+  if ! "${args[@]}" GST_PLUGIN_PATH_1_0="$work/outside-plugins" "$demo" --video-check --model "$model" --device cpu >"$work/$mode-video.log" 2>&1; then
     cat "$work/$mode-video.log" >&2
     exit 1
   fi
