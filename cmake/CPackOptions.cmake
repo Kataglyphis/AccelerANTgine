@@ -39,13 +39,20 @@ kataglyphis_cpack_common(
   # NSIS resolves against MAX_PATH, which the full descriptive name overruns in deep workspaces.
   SHORT_WINDOWS_FILE_NAME)
 
-if(WIN32 AND PROJECT_IS_TOP_LEVEL AND NOT KATAGLYPHIS_ORT_VARIANT STREQUAL "cpu")
+if(WIN32
+   AND PROJECT_IS_TOP_LEVEL
+   AND NOT
+       KATAGLYPHIS_ORT_VARIANT
+       STREQUAL
+       "cpu")
   # The GPU lane proves finished ZIP and MSI bytes; do not ship an unverified NSIS payload.
   set(CPACK_GENERATOR "ZIP;WIX")
   string(APPEND CPACK_PACKAGE_FILE_NAME "-gpu-${KATAGLYPHIS_ORT_VARIANT}")
 endif()
 
-if(WIN32 AND PROJECT_IS_TOP_LEVEL AND KATAGLYPHIS_GST_PLUGIN_DIR)
+if(WIN32
+   AND PROJECT_IS_TOP_LEVEL
+   AND KATAGLYPHIS_GST_PLUGIN_DIR)
   install(DIRECTORY "${KATAGLYPHIS_GST_PLUGIN_DIR}/" DESTINATION "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")
 endif()
 

@@ -1,13 +1,19 @@
 include_guard(GLOBAL)
 
-function(accelerantgine_find_windows_ort_file root name out)
+function(
+  accelerantgine_find_windows_ort_file
+  root
+  name
+  out)
   set(_selected "")
   foreach(_directory lib bin)
     if(EXISTS "${root}/${_directory}/${name}" AND NOT IS_DIRECTORY "${root}/${_directory}/${name}")
       set(_selected "${root}/${_directory}/${name}")
     endif()
   endforeach()
-  set(${out} "${_selected}" PARENT_SCOPE)
+  set(${out}
+      "${_selected}"
+      PARENT_SCOPE)
 endfunction()
 
 function(
@@ -30,12 +36,18 @@ function(
   endif()
   string(TOLOWER "${system_processor}" _gpu_arch)
   if(system_name STREQUAL "Windows")
-    if(NOT _gpu_arch MATCHES "^(x86_64|amd64|x64)$")
+    if(NOT
+       _gpu_arch
+       MATCHES
+       "^(x86_64|amd64|x64)$")
       message(FATAL_ERROR "Windows GPU packages require x64")
     endif()
     return()
   endif()
-  if(NOT system_name STREQUAL "Linux")
+  if(NOT
+     system_name
+     STREQUAL
+     "Linux")
     message(FATAL_ERROR "GPU package variants require Linux or Windows")
   endif()
   if(NOT

@@ -77,27 +77,33 @@ __attribute__((constructor)) void use_bundled_gstreamer()
 
 #if defined(_WIN32)
 #include "bundled_gstreamer.hpp"
-#include <windows.h>
 #include <filesystem>
+#include <gst/gst.h>
+#include <mutex>
 #include <string>
 #include <system_error>
 #include <vector>
-#include <gst/gst.h>
-#include <mutex>
+#include <windows.h>
 
 namespace kataglyphis::bundled_gstreamer {
-namespace { const char anchor = 0; }
+namespace {
+    const char anchor = 0;
+}
 
 auto plugin_dir() -> std::string
 {
     HMODULE module = nullptr;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-          reinterpret_cast<LPCWSTR>(&anchor), &module)) { return {}; }
+          reinterpret_cast<LPCWSTR>(&anchor),
+          &module)) {
+        return {};
+    }
     std::vector<wchar_t> name(32768);
     const DWORD length = GetModuleFileNameW(module, name.data(), static_cast<DWORD>(name.size()));
     if (length == 0 || length >= name.size()) { return {}; }
     const auto base = std::filesystem::path(std::wstring(name.data(), length)).parent_path();
-    for (const auto &candidate : { base / "gstreamer-1.0", base / "lib/gstreamer-1.0", base / "../lib/gstreamer-1.0" }) {
+    for (const auto &candidate :
+      { base / "gstreamer-1.0", base / "lib/gstreamer-1.0", base / "../lib/gstreamer-1.0" }) {
         std::error_code error;
         const auto path = std::filesystem::canonical(candidate, error);
         if (error || !std::filesystem::is_directory(path, error) || error) { continue; }
@@ -118,5 +124,5 @@ void configure()
         g_setenv("GST_REGISTRY_FORK", "no", FALSE);
     });
 }
-}
+}// namespace kataglyphis::bundled_gstreamer
 #endif

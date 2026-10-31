@@ -1,8 +1,8 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
-#include <iostream>
 #include <filesystem>
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -109,9 +109,10 @@ auto check_gstreamer(int *argc, char ***argv) -> int
 #endif
           ;
         std::error_code error;
-        const bool outside = location.found && !bundled.empty()
-                             && !std::filesystem::equivalent(std::filesystem::u8path(location.plugin_file).parent_path(),
-                               std::filesystem::u8path(bundled), error);
+        const bool outside =
+          location.found && !bundled.empty()
+          && !std::filesystem::equivalent(
+            std::filesystem::u8path(location.plugin_file).parent_path(), std::filesystem::u8path(bundled), error);
         const char *verdict = location.found ? (outside ? "OUTSIDE" : "ok") : (optional ? "absent" : "MISSING");
         std::cout << verdict << ' ' << location.element << ' ' << location.plugin_file << '\n';
         if ((!location.found && !optional) || outside) { ++failures; }
