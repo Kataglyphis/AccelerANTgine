@@ -16,10 +16,20 @@ touch "${hub}/01-core/modules.sh" "${hub}/01-core/tool-checks.sh" \
 cat > "${hub}/lib/cmake-build.sh" <<'STUB'
 cmake_build_main() { printf '%s\n' "$@" > "${TEST_CONFIGURE_LOG:?}"; exit 0; }
 STUB
-export ANTFRASTRUCTURE_DIR="${work}/hub" TEST_CONFIGURE_LOG="${work}/configure"
+cat > "${hub}/lib/fetch-data-lock.py" <<'STUB'
+import os
+import sys
+from pathlib import Path
+
+if len(sys.argv) != 3 or sys.argv[1] != "--lock":
+    raise SystemExit("expected a locked model input")
+Path(os.environ["TEST_FETCH_LOG"]).write_text(sys.argv[2], encoding="utf-8")
+STUB
+export ANTFRASTRUCTURE_DIR="${work}/hub" TEST_CONFIGURE_LOG="${work}/configure" TEST_FETCH_LOG="${work}/fetch"
 driver="${repo}/scripts/linux/ci-release.sh"
 run() { /usr/bin/bash "$driver" "$@" >/dev/null 2>&1; }
 run --no-flatpak || { echo 'CPU release was rejected' >&2; exit 1; }
+[[ "$(cat "${TEST_FETCH_LOG}")" == "${PWD}/models/models.lock" ]] || { echo 'Locked model fetch was skipped' >&2; exit 1; }
 if grep -q -- '-DKATAGLYPHIS_ORT_VARIANT=' "${TEST_CONFIGURE_LOG}"; then
   echo 'CPU release configure changed' >&2; exit 1
 fi
