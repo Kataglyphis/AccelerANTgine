@@ -101,7 +101,11 @@ select its execution provider and device instead of the path-only factories' CPU
 These options require an ONNX Runtime built with the requested provider and its runtime
 dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=nvidia`` or
 ``amd`` selects the image's GPU ONNX Runtime and stages its matching provider. CPU is the
-default. NVIDIA targets Linux x64 and arm64; AMD targets Linux x64. A GPU package requires
+default. NVIDIA targets Linux x64 and arm64; AMD targets Linux x64. MIGraphX device registration
+uses explicit options to avoid a malformed empty model-cache path in the legacy runtime API.
+The commit suite's real GPU regression runs when ``KATAGLYPHIS_TEST_MIGRAPHX=1`` is set on
+a MIGraphX host without ``ORT_MIGRAPHX_MODEL_CACHE_PATH``; it checks the Relu result and profile.
+A GPU package requires
 the matching vendor driver and CUDA/cuDNN or ROCm/MIGraphX runtime on the host; set its
 ``LD_LIBRARY_PATH`` when those libraries are outside the system loader's search path.
 The package's GPU variant suffix keeps its archives distinct from CPU archives.

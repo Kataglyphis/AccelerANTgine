@@ -51,6 +51,7 @@ On demand: [Linux](https://github.com/Kataglyphis/AccelerANTgine/actions/workflo
 (sign-in required). Candidates are unverified, separate from releases and need matching host GPU drivers and runtimes.
 Both workflows also accept `workflow_call`; GPU hardware profiling remains opt-in.
 The Linux hardware profile runs the packaged demo from the DEB, tarball and AppImage; its runner needs `dpkg-deb`.
+MIGraphX device selection avoids the legacy runtime's malformed empty cache path.
 The infrastructure pin and missing Windows image inputs currently block builds; see [getting started](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/docs/source/getting_started.rst) for formats and verification.
 CPU packages remain available through the existing lanes.
 

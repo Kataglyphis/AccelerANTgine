@@ -280,10 +280,12 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
             return std::unexpected(OnnxError::SessionCreationFailed);
         }
     } else if (provider == ExecutionProvider::MigraphX) {
-        OrtMIGraphXProviderOptions migraphx_options{};
-        migraphx_options.device_id = config.device_id;
-        migraphx_options.migraphx_mem_limit = (std::numeric_limits<std::size_t>::max)();
-        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_MIGraphX(options, &migraphx_options))) {
+        // Generic options avoid the legacy provider's quoted empty cache path.
+        const std::string device_id = std::to_string(config.device_id);
+        const std::string memory_limit = std::to_string((std::numeric_limits<std::size_t>::max)());
+        const char *keys[] = { "device_id", "migraphx_mem_limit" };
+        const char *values[] = { device_id.c_str(), memory_limit.c_str() };
+        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider(options, "MIGraphX", keys, values, 2))) {
             impl_->reset();
             return std::unexpected(OnnxError::SessionCreationFailed);
         }

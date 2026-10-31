@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -379,7 +380,46 @@ TEST(OnnxEngine, RejectsConflictingProvidersAndInvalidDevice)
     EXPECT_FALSE(engine.is_initialized());
 }
 
+TEST(OnnxEngine, InvalidMigraphXDeviceFailsWithoutInitializing)
+{
+    const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());
+    auto config = inference::create_default_session_config(model.path());
+    config.execution_provider = inference::ExecutionProvider::MigraphX;
+    config.device_id = 999;
+    inference::OnnxInferenceEngine engine;
+    const auto result = engine.initialize(config);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), inference::OnnxError::SessionCreationFailed);
+    EXPECT_FALSE(engine.is_initialized());
+}
+
 #ifndef _WIN32
+TEST(OnnxEngine, MigraphXInferenceWorksWithoutACacheOverride)
+{
+    const char *requested = std::getenv("KATAGLYPHIS_TEST_MIGRAPHX");
+    if (requested == nullptr || std::string(requested) != "1") { GTEST_SKIP() << "MIGraphX hardware test is opt-in"; }
+    ASSERT_EQ(std::getenv("ORT_MIGRAPHX_MODEL_CACHE_PATH"), nullptr);
+    const TempFile model("kataglyphis-migraphx", ".onnx", kataglyphis::test::relu_model());
+    auto config = inference::create_default_session_config(model.path());
+    config.execution_provider = inference::ExecutionProvider::MigraphX;
+    config.profiling_prefix = model.path().string() + "-profile";
+    inference::OnnxInferenceEngine engine;
+    ASSERT_TRUE(engine.initialize(config).has_value());
+    const std::vector<float> input{ -1.0F, 0.0F, 2.5F, -3.0F };
+    const auto result = engine.run_inference(input, shape({ 1, 4 }), "X");
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->outputs[0].data, (std::vector<float>{ 0.0F, 0.0F, 2.5F, 0.0F }));
+    const auto profile = engine.end_profiling();
+    ASSERT_TRUE(profile.has_value());
+    std::ifstream file(*profile);
+    ASSERT_TRUE(file.good());
+    const std::string contents{ std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
+    EXPECT_NE(contents.find("MIGraphXExecutionProvider"), std::string::npos);
+    file.close();
+    std::error_code ignored;
+    std::filesystem::remove(*profile, ignored);
+}
+
 TEST(OnnxEngine, DirectMLRequestOnNonWindowsFails)
 {
     const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());

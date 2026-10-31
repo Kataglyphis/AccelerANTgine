@@ -2,6 +2,8 @@
 
 Windows packaging must select ONNX Runtime license texts from an image wheel whose DLL is
 byte-identical to the chain runtime, install both texts, and check the install tree, ZIP and MSIX.
+MIGraphX uses string provider options with explicit device ID and memory limit; the legacy struct
+registration can turn an empty model-cache path into literal quotes in the image's ONNX Runtime.
 
 Guidance for coding agents (and new contributors) working in AccelerANTgine.
 

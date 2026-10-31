@@ -68,6 +68,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Register MIGraphX with explicit device and memory options, avoiding a quoted empty model-cache
+  path produced by the legacy provider-options conversion.
+
 - Linux GPU profiling checks the demo and provider from the finished AppImage as well as the
   tarball, so an AppImage demo or provider failure cannot pass the hardware gate unnoticed.
 
