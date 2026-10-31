@@ -60,6 +60,7 @@ jobs:
 
   select-tuple:
     runs-on: ubuntu-26.04
+    timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:

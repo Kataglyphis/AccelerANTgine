@@ -17,6 +17,282 @@ WORKFLOW = ROOT / ".github/workflows/linux-gpu-candidate.yml"
 HUB = "da0bdf709f491b900a9ed02c821d7cbc3a13c8be"
 
 
+EXPECTED_TUPLES = {
+    "nvidia-x64": (
+        "nvidia",
+        "x64",
+        "latest-nvidia",
+        "linux/amd64",
+        "ubuntu-26.04",
+        "X64",
+        "gpu-nvidia-cuda",
+        "cuda",
+    ),
+    "nvidia-arm64": (
+        "nvidia",
+        "arm64",
+        "latest-nvidia",
+        "linux/arm64",
+        "ubuntu-26.04-arm",
+        "ARM64",
+        "gpu-nvidia-cuda",
+        "cuda",
+    ),
+    "amd-x64": (
+        "amd",
+        "x64",
+        "latest-rocm",
+        "linux/amd64",
+        "ubuntu-26.04",
+        "X64",
+        "gpu-amd-rocm",
+        "migraphx",
+    ),
+}
+
+WORKFLOW_MUTATIONS = (
+    (
+        "promote-verified:\n        type: boolean\n        default: false",
+        "promote-verified:\n        type: boolean\n        default: true",
+    ),
+    (
+        "promote-verified:\n        description: Stage packages after clean-host and CPU/GPU detector parity checks\n        type: boolean\n        default: false",
+        "promote-verified:\n        description: Stage packages after clean-host and CPU/GPU detector parity checks\n        type: boolean\n        default: true",
+    ),
+    (
+        "name: Profile the immutable packages\n        if: ${{ inputs.promote-verified }}",
+        "name: Profile the immutable packages\n        if: ${{ inputs.promote-verified }}\n        continue-on-error: true",
+    ),
+    ("name: Profile the immutable packages", "name: Skip immutable profile"),
+    ("    if: ${{ inputs.verify-gpu }}", "    if: ${{ always() }}"),
+    (
+        "echo '::error::Promotion requires verify-gpu.'\n          exit 1",
+        "echo '::error::Promotion requires verify-gpu.'\n          true",
+    ),
+    (
+        "name: Check pinned GPU packaging APIs\n        shell: bash\n        run: |\n          set -euo pipefail",
+        "name: Check pinned GPU packaging APIs\n        shell: bash\n        run: |\n          true",
+    ),
+    (
+        "${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+        "wrong-tuple",
+    ),
+    ("inputs.promote-verified && inputs.verify-gpu", "always()"),
+    (
+        "needs: [scope, select-tuple, build, clean-host, gpu-profile]",
+        "needs: [scope, select-tuple, build, clean-host]",
+    ),
+    ("needs: [scope, select-tuple]", "needs: missing-selector"),
+    ("needs: [scope, select-tuple, build]", "needs: build"),
+    (
+        "needs: [scope, select-tuple, build, clean-host]",
+        "needs: [build, clean-host]",
+    ),
+    (
+        "matrix: ${{ fromJSON(needs.select-tuple.outputs.matrix) }}",
+        "matrix: {}",
+    ),
+    ("GPU_TUPLE: ${{ inputs.gpu-tuple }}", "GPU_TUPLE: all"),
+    ("${{ matrix.gpu-runner }}", "${{ matrix.runner }}"),
+    (
+        'bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR"',
+        'true # bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR"',
+    ),
+    ("'${{ matrix.device }}'", "'${{ matrix.device }}' || true"),
+    (
+        "test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py",
+        "true # missing comparator",
+    ),
+    (
+        "          bash scripts/linux/tests/test-check-gpu-detector-parity.sh",
+        "          bash scripts/linux/tests/test-check-gpu-detector-parity.sh || true",
+    ),
+    (
+        "          python3 scripts/linux/tests/test-profile-parity-mutations.py",
+        "          python3 scripts/linux/tests/test-profile-parity-mutations.py || true",
+    ),
+    (
+        "          python3 -I third_party/ANTfrastructure/shared/python/tests/test_compare_detector_parity.py",
+        "          python3 -I third_party/ANTfrastructure/shared/python/tests/test_compare_detector_parity.py || true",
+    ),
+    (
+        "          python3 -I third_party/ANTfrastructure/shared/python/compare_detector_parity.py --help | grep -q -- --pairwise",
+        "          true # skipped pairwise API check",
+    ),
+    (
+        "          python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py --help | grep -q -- --min-runs",
+        "          true # skipped profile interval API check",
+    ),
+    (
+        "          test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py || { echo 'Pinned ANTfrastructure lacks detector parity comparison' >&2; exit 1; }",
+        "          test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py || true",
+    ),
+    (
+        "artifact-ids: ${{ steps.metadata.outputs.artifact_id }}",
+        "artifact-ids: 1",
+    ),
+    (
+        "clean-receipt: ${{ runner.temp }}/gpu-clean-receipt/gpu-clean-receipt.json",
+        "clean-receipt: missing.json",
+    ),
+    (
+        "gpu-receipt: ${{ runner.temp }}/gpu-profile-receipt/gpu-profile-receipt.json",
+        "gpu-receipt: missing.json",
+    ),
+    (
+        "archive: ${{ steps.archive.outputs.path }}",
+        "archive: unchecked.zip",
+    ),
+    (
+        "output: ${{ runner.temp }}/gpu-verified-packages",
+        "output: unchecked-packages",
+    ),
+    (f"actions/stage-gpu-artifact@{HUB}", "actions/stage-gpu-artifact@develop"),
+    (
+        "gpu-promotion-metadata.py resolve ",
+        "gpu-promotion-metadata.py ignored ",
+    ),
+)
+
+
+def _contract_defaults_and_steps(
+    workflow, metadata, dispatch, call, hardware, clean_profile, profile
+):
+    return (
+        workflow.count(metadata) == 4
+        and re.search(
+            "(?m)^      promote-verified:\\n        description: [^\\n]+\\n        type: boolean\\n        default: false$",
+            dispatch,
+        )
+        is not None
+        and "      promote-verified:\n        type: boolean\n        default: false"
+        in call
+        and hardware is not None
+        and profile is not None
+        and clean_profile is not None
+        and "        if: ${{ inputs.promote-verified && !inputs.verify-gpu }}"
+        in hardware.group(1).splitlines()
+    )
+
+
+def _contract_matrix_selection(workflow, hardware, preflight):
+    return (
+        "          exit 1" in hardware.group(1).splitlines()
+        and "continue-on-error" not in hardware.group(1)
+        and "          set -euo pipefail" in preflight.splitlines()
+        and workflow.count("gpu-promotion-metadata.py resolve ") == 3
+        and workflow.count("matrix: ${{ fromJSON(needs.select-tuple.outputs.matrix) }}")
+        == 4
+        and "matrix: ${{ steps.matrix.outputs.matrix }}" in workflow
+        and "GPU_TUPLE: ${{ inputs.gpu-tuple }}" in workflow
+    )
+
+
+def _contract_runner_and_parity_tests(workflow, preflight):
+    return (
+        "run: python3 -I scripts/linux/select-gpu-matrix.py" in workflow
+        and "runs-on: [self-hosted, Linux, '${{ matrix.runner-arch }}', '${{ matrix.gpu-runner }}']"
+        in workflow
+        and workflow.count("fail-fast: false") == 4
+        and "          test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py || { echo 'Pinned ANTfrastructure lacks detector parity comparison' >&2; exit 1; }"
+        in preflight.splitlines()
+        and "          bash scripts/linux/tests/test-check-gpu-detector-parity.sh"
+        in preflight.splitlines()
+        and "          python3 scripts/linux/tests/test-profile-parity-mutations.py"
+        in preflight.splitlines()
+        and "          python3 -I third_party/ANTfrastructure/shared/python/tests/test_compare_detector_parity.py"
+        in preflight.splitlines()
+    )
+
+
+def _contract_profile_api_and_conditions(preflight, gpu, clean_profile, profile):
+    return (
+        "          python3 -I third_party/ANTfrastructure/shared/python/compare_detector_parity.py --help | grep -q -- --pairwise"
+        in preflight.splitlines()
+        and "          python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py --help | grep -q -- --min-runs"
+        in preflight.splitlines()
+        and "        if: ${{ inputs.promote-verified }}"
+        in profile.group(1).splitlines()
+        and f"actions/gpu-package-check@{HUB}" in profile.group(1)
+        and "        if: ${{ inputs.promote-verified }}"
+        in clean_profile.group(1).splitlines()
+        and f"actions/clean-host-package-check@{HUB}" in clean_profile.group(1)
+        and "    if: ${{ inputs.verify-gpu }}" in gpu.splitlines()
+    )
+
+
+def _contract_receipt_binding(stage, clean_profile, profile):
+    return (
+        "    if: ${{ inputs.promote-verified && inputs.verify-gpu }}"
+        in stage.splitlines()
+        and all(
+            line in clean_profile.group(1).splitlines()
+            and line in profile.group(1).splitlines()
+            and (line in stage.splitlines())
+            for line in (
+                "          artifact-id: ${{ steps.metadata.outputs.artifact_id }}",
+                "          artifact-digest: ${{ steps.metadata.outputs.artifact_digest }}",
+                "          artifact-files: ${{ steps.metadata.outputs.files }}",
+                "          gpu-vendor: ${{ matrix.vendor }}",
+                "          gpu-arch: ${{ matrix.arch }}",
+            )
+        )
+        and "          gpu-receipt: ${{ runner.temp }}/gpu-clean-receipt.json"
+        in clean_profile.group(1).splitlines()
+        and "          gpu-receipt: ${{ runner.temp }}/gpu-profile-receipt.json"
+        in profile.group(1).splitlines()
+        and "          clean-receipt: ${{ runner.temp }}/gpu-clean-receipt/gpu-clean-receipt.json"
+        in stage.splitlines()
+        and "          gpu-receipt: ${{ runner.temp }}/gpu-profile-receipt/gpu-profile-receipt.json"
+        in stage.splitlines()
+        and "          archive: ${{ steps.archive.outputs.path }}" in stage.splitlines()
+    )
+
+
+def _contract_receipt_and_stage_upload(clean, gpu, stage):
+    return (
+        "          output: ${{ runner.temp }}/gpu-verified-packages"
+        in stage.splitlines()
+        and "          path: ${{ runner.temp }}/gpu-verified-packages/*"
+        in stage.splitlines()
+        and "name: Upload the GPU profile receipt" in gpu
+        and gpu.index("name: Profile the immutable packages")
+        < gpu.index("name: Upload the GPU profile receipt")
+        and "unverified-accelerantgine-gpu-clean-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
+        in clean
+        and "unverified-accelerantgine-gpu-clean-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
+        in stage
+        and "unverified-accelerantgine-gpu-profile-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
+        in gpu
+    )
+
+
+def _contract_stage_and_pins(workflow, stage, profile, checks):
+    return (
+        "unverified-accelerantgine-gpu-profile-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
+        in stage
+        and f"actions/stage-gpu-artifact@{HUB}" in stage
+        and "name: Upload the checked packages" in stage
+        and stage.index(f"actions/stage-gpu-artifact@{HUB}")
+        < stage.index("name: Upload the checked packages")
+        and '          command: env -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND -u KATAGLYPHIS_ORT_DEVICE bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR" "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx" \'${{ matrix.device }}\''
+        in profile.group(1).splitlines()
+        and all(check in workflow for check in checks)
+        and all(
+            f"actions/{action}@{HUB}" in workflow
+            for action in (
+                "clean-host-package-check",
+                "gpu-package-check",
+                "stage-gpu-artifact",
+            )
+        )
+    )
+
+
+def _contract_no_error_suppression(workflow):
+    return "always()" not in workflow and "continue-on-error" not in workflow
+
+
 def promotion_contract(workflow):
     metadata = "unverified-accelerantgine-gpu-meta-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}${{ needs.scope.outputs.suffix }}"
     trigger = workflow.split("\npermissions:", 1)[0]
@@ -57,105 +333,16 @@ def promotion_contract(workflow):
         "skip-decompress: true",
     )
     return (
-        workflow.count(metadata) == 4
-        and re.search(
-            r"(?m)^      promote-verified:\n        description: [^\n]+\n        type: boolean\n        default: false$",
-            dispatch,
+        _contract_defaults_and_steps(
+            workflow, metadata, dispatch, call, hardware, clean_profile, profile
         )
-        is not None
-        and "      promote-verified:\n        type: boolean\n        default: false"
-        in call
-        and hardware is not None
-        and profile is not None
-        and clean_profile is not None
-        and "        if: ${{ inputs.promote-verified && !inputs.verify-gpu }}"
-        in hardware.group(1).splitlines()
-        and "          exit 1" in hardware.group(1).splitlines()
-        and "continue-on-error" not in hardware.group(1)
-        and "          set -euo pipefail" in preflight.splitlines()
-        and workflow.count("gpu-promotion-metadata.py resolve ") == 3
-        and workflow.count("matrix: ${{ fromJSON(needs.select-tuple.outputs.matrix) }}")
-        == 4
-        and "matrix: ${{ steps.matrix.outputs.matrix }}" in workflow
-        and "GPU_TUPLE: ${{ inputs.gpu-tuple }}" in workflow
-        and "run: python3 -I scripts/linux/select-gpu-matrix.py" in workflow
-        and "runs-on: [self-hosted, Linux, '${{ matrix.runner-arch }}', '${{ matrix.gpu-runner }}']"
-        in workflow
-        and workflow.count("fail-fast: false") == 4
-        and "          test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py || { echo 'Pinned ANTfrastructure lacks detector parity comparison' >&2; exit 1; }"
-        in preflight.splitlines()
-        and "          bash scripts/linux/tests/test-check-gpu-detector-parity.sh"
-        in preflight.splitlines()
-        and "          python3 scripts/linux/tests/test-profile-parity-mutations.py"
-        in preflight.splitlines()
-        and "          python3 -I third_party/ANTfrastructure/shared/python/tests/test_compare_detector_parity.py"
-        in preflight.splitlines()
-        and "          python3 -I third_party/ANTfrastructure/shared/python/compare_detector_parity.py --help | grep -q -- --pairwise"
-        in preflight.splitlines()
-        and "          python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py --help | grep -q -- --min-runs"
-        in preflight.splitlines()
-        and "        if: ${{ inputs.promote-verified }}"
-        in profile.group(1).splitlines()
-        and f"actions/gpu-package-check@{HUB}" in profile.group(1)
-        and "        if: ${{ inputs.promote-verified }}"
-        in clean_profile.group(1).splitlines()
-        and f"actions/clean-host-package-check@{HUB}" in clean_profile.group(1)
-        and "    if: ${{ inputs.verify-gpu }}" in gpu.splitlines()
-        and "    if: ${{ inputs.promote-verified && inputs.verify-gpu }}"
-        in stage.splitlines()
-        and all(
-            line in clean_profile.group(1).splitlines()
-            and line in profile.group(1).splitlines()
-            and line in stage.splitlines()
-            for line in (
-                "          artifact-id: ${{ steps.metadata.outputs.artifact_id }}",
-                "          artifact-digest: ${{ steps.metadata.outputs.artifact_digest }}",
-                "          artifact-files: ${{ steps.metadata.outputs.files }}",
-                "          gpu-vendor: ${{ matrix.vendor }}",
-                "          gpu-arch: ${{ matrix.arch }}",
-            )
-        )
-        and "          gpu-receipt: ${{ runner.temp }}/gpu-clean-receipt.json"
-        in clean_profile.group(1).splitlines()
-        and "          gpu-receipt: ${{ runner.temp }}/gpu-profile-receipt.json"
-        in profile.group(1).splitlines()
-        and "          clean-receipt: ${{ runner.temp }}/gpu-clean-receipt/gpu-clean-receipt.json"
-        in stage.splitlines()
-        and "          gpu-receipt: ${{ runner.temp }}/gpu-profile-receipt/gpu-profile-receipt.json"
-        in stage.splitlines()
-        and "          archive: ${{ steps.archive.outputs.path }}" in stage.splitlines()
-        and "          output: ${{ runner.temp }}/gpu-verified-packages"
-        in stage.splitlines()
-        and "          path: ${{ runner.temp }}/gpu-verified-packages/*"
-        in stage.splitlines()
-        and "name: Upload the GPU profile receipt" in gpu
-        and gpu.index("name: Profile the immutable packages")
-        < gpu.index("name: Upload the GPU profile receipt")
-        and "unverified-accelerantgine-gpu-clean-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
-        in clean
-        and "unverified-accelerantgine-gpu-clean-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
-        in stage
-        and "unverified-accelerantgine-gpu-profile-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
-        in gpu
-        and "unverified-accelerantgine-gpu-profile-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
-        in stage
-        and f"actions/stage-gpu-artifact@{HUB}" in stage
-        and "name: Upload the checked packages" in stage
-        and stage.index(f"actions/stage-gpu-artifact@{HUB}")
-        < stage.index("name: Upload the checked packages")
-        and '          command: env -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND -u KATAGLYPHIS_ORT_DEVICE bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR" "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx" \'${{ matrix.device }}\''
-        in profile.group(1).splitlines()
-        and all(check in workflow for check in checks)
-        and all(
-            f"actions/{action}@{HUB}" in workflow
-            for action in (
-                "clean-host-package-check",
-                "gpu-package-check",
-                "stage-gpu-artifact",
-            )
-        )
-        and "always()" not in workflow
-        and "continue-on-error" not in workflow
+        and _contract_matrix_selection(workflow, hardware, preflight)
+        and _contract_runner_and_parity_tests(workflow, preflight)
+        and _contract_profile_api_and_conditions(preflight, gpu, clean_profile, profile)
+        and _contract_receipt_binding(stage, clean_profile, profile)
+        and _contract_receipt_and_stage_upload(clean, gpu, stage)
+        and _contract_stage_and_pins(workflow, stage, profile, checks)
+        and _contract_no_error_suppression(workflow)
     )
 
 
@@ -250,38 +437,7 @@ class MetadataTest(unittest.TestCase):
                 )
 
     def test_tuple_selection_defaults_and_preserves_failure_isolation(self):
-        expected = {
-            "nvidia-x64": (
-                "nvidia",
-                "x64",
-                "latest-nvidia",
-                "linux/amd64",
-                "ubuntu-26.04",
-                "X64",
-                "gpu-nvidia-cuda",
-                "cuda",
-            ),
-            "nvidia-arm64": (
-                "nvidia",
-                "arm64",
-                "latest-nvidia",
-                "linux/arm64",
-                "ubuntu-26.04-arm",
-                "ARM64",
-                "gpu-nvidia-cuda",
-                "cuda",
-            ),
-            "amd-x64": (
-                "amd",
-                "x64",
-                "latest-rocm",
-                "linux/amd64",
-                "ubuntu-26.04",
-                "X64",
-                "gpu-amd-rocm",
-                "migraphx",
-            ),
-        }
+        expected = EXPECTED_TUPLES
         keys = (
             "vendor",
             "arch",
@@ -397,109 +553,7 @@ class MetadataTest(unittest.TestCase):
             "artifact-ids: ${{ steps.metadata.outputs.artifact_id }}", workflow
         )
         self.assertIn("actions/clean-host-package-check@develop", workflow)
-        for before, after in (
-            (
-                "promote-verified:\n        type: boolean\n        default: false",
-                "promote-verified:\n        type: boolean\n        default: true",
-            ),
-            (
-                "promote-verified:\n        description: Stage packages after clean-host and CPU/GPU detector parity checks\n        type: boolean\n        default: false",
-                "promote-verified:\n        description: Stage packages after clean-host and CPU/GPU detector parity checks\n        type: boolean\n        default: true",
-            ),
-            (
-                "name: Profile the immutable packages\n        if: ${{ inputs.promote-verified }}",
-                "name: Profile the immutable packages\n        if: ${{ inputs.promote-verified }}\n        continue-on-error: true",
-            ),
-            ("name: Profile the immutable packages", "name: Skip immutable profile"),
-            ("    if: ${{ inputs.verify-gpu }}", "    if: ${{ always() }}"),
-            (
-                "echo '::error::Promotion requires verify-gpu.'\n          exit 1",
-                "echo '::error::Promotion requires verify-gpu.'\n          true",
-            ),
-            (
-                "name: Check pinned GPU packaging APIs\n        shell: bash\n        run: |\n          set -euo pipefail",
-                "name: Check pinned GPU packaging APIs\n        shell: bash\n        run: |\n          true",
-            ),
-            (
-                "${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
-                "wrong-tuple",
-            ),
-            ("inputs.promote-verified && inputs.verify-gpu", "always()"),
-            (
-                "needs: [scope, select-tuple, build, clean-host, gpu-profile]",
-                "needs: [scope, select-tuple, build, clean-host]",
-            ),
-            ("needs: [scope, select-tuple]", "needs: missing-selector"),
-            ("needs: [scope, select-tuple, build]", "needs: build"),
-            (
-                "needs: [scope, select-tuple, build, clean-host]",
-                "needs: [build, clean-host]",
-            ),
-            (
-                "matrix: ${{ fromJSON(needs.select-tuple.outputs.matrix) }}",
-                "matrix: {}",
-            ),
-            ("GPU_TUPLE: ${{ inputs.gpu-tuple }}", "GPU_TUPLE: all"),
-            ("${{ matrix.gpu-runner }}", "${{ matrix.runner }}"),
-            (
-                'bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR"',
-                'true # bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR"',
-            ),
-            ("'${{ matrix.device }}'", "'${{ matrix.device }}' || true"),
-            (
-                "test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py",
-                "true # missing comparator",
-            ),
-            (
-                "          bash scripts/linux/tests/test-check-gpu-detector-parity.sh",
-                "          bash scripts/linux/tests/test-check-gpu-detector-parity.sh || true",
-            ),
-            (
-                "          python3 scripts/linux/tests/test-profile-parity-mutations.py",
-                "          python3 scripts/linux/tests/test-profile-parity-mutations.py || true",
-            ),
-            (
-                "          python3 -I third_party/ANTfrastructure/shared/python/tests/test_compare_detector_parity.py",
-                "          python3 -I third_party/ANTfrastructure/shared/python/tests/test_compare_detector_parity.py || true",
-            ),
-            (
-                "          python3 -I third_party/ANTfrastructure/shared/python/compare_detector_parity.py --help | grep -q -- --pairwise",
-                "          true # skipped pairwise API check",
-            ),
-            (
-                "          python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py --help | grep -q -- --min-runs",
-                "          true # skipped profile interval API check",
-            ),
-            (
-                "          test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py || { echo 'Pinned ANTfrastructure lacks detector parity comparison' >&2; exit 1; }",
-                "          test -f third_party/ANTfrastructure/shared/python/compare_detector_parity.py || true",
-            ),
-            (
-                "artifact-ids: ${{ steps.metadata.outputs.artifact_id }}",
-                "artifact-ids: 1",
-            ),
-            (
-                "clean-receipt: ${{ runner.temp }}/gpu-clean-receipt/gpu-clean-receipt.json",
-                "clean-receipt: missing.json",
-            ),
-            (
-                "gpu-receipt: ${{ runner.temp }}/gpu-profile-receipt/gpu-profile-receipt.json",
-                "gpu-receipt: missing.json",
-            ),
-            (
-                "archive: ${{ steps.archive.outputs.path }}",
-                "archive: unchecked.zip",
-            ),
-            (
-                "output: ${{ runner.temp }}/gpu-verified-packages",
-                "output: unchecked-packages",
-            ),
-            (f"actions/stage-gpu-artifact@{HUB}", "actions/stage-gpu-artifact@develop"),
-            (
-                "gpu-promotion-metadata.py resolve ",
-                "gpu-promotion-metadata.py ignored ",
-            ),
-        ):
+        for before, after in WORKFLOW_MUTATIONS:
             with self.subTest(before=before):
                 self.assertIn(before, workflow)
                 self.assertFalse(promotion_contract(workflow.replace(before, after)))

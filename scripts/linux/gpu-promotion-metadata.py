@@ -95,6 +95,20 @@ def output(data):
         )
 
 
+def select_packages(path):
+    files = []
+    for pattern in ("*.deb", "*.tar.gz", "*.AppImage"):
+        matches = list(path.glob(pattern))
+        if len(matches) != 1 or matches[0].is_symlink() or not matches[0].is_file():
+            raise ValueError("expected one regular package per format")
+        files.append(matches[0].name)
+    files = validate_files(files)
+    with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+        stream.write(
+            "files<<GPU_PACKAGE_FILES\n" + "\n".join(files) + "\nGPU_PACKAGE_FILES\n"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("select", "create", "resolve"))
@@ -102,19 +116,7 @@ def main():
     args = parser.parse_args()
     expected = identity()
     if args.mode == "select":
-        files = []
-        for pattern in ("*.deb", "*.tar.gz", "*.AppImage"):
-            matches = list(args.path.glob(pattern))
-            if len(matches) != 1 or matches[0].is_symlink() or not matches[0].is_file():
-                raise ValueError("expected one regular package per format")
-            files.append(matches[0].name)
-        files = validate_files(files)
-        with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
-            stream.write(
-                "files<<GPU_PACKAGE_FILES\n"
-                + "\n".join(files)
-                + "\nGPU_PACKAGE_FILES\n"
-            )
+        select_packages(args.path)
         return
     if args.mode == "create":
         data = {
