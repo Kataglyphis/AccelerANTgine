@@ -166,7 +166,10 @@ Linux GPU packaging requires the shared ANTfrastructure staging and external-run
 The currently recorded hub pin does not contain them, so an opt-in build fails during configure
 until a published hub revision with those APIs is adopted. The manually dispatched
 ``Linux GPU package candidates`` workflow is separate from releases and labels its artifacts
-unverified; its clean-host job checks CPU inference, not GPU inference. On 2026-10-30 an isolated
+unverified; its clean-host job checks CPU inference, not GPU inference. After a build row fails,
+clean-host checks still run for the other candidates; a missing current-attempt candidate
+fails its own check. GPU profiling waits for all build and clean-host rows to succeed.
+On 2026-10-30 an isolated
 AMD x64 release build with those shared changes overlaid matched
 the core and provider files to one ONNX Runtime wheel, passed the notices gate, and produced a
 TGZ that started on clean Ubuntu with the host and bundled glibc. A later isolated build also

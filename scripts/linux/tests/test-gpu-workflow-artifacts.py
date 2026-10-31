@@ -175,6 +175,26 @@ class ArtifactReruns(unittest.TestCase):
             ) and "/accelerantgine-gpu-" in line:
                 self.assertIn(suffix, line)
 
+    def test_clean_host_checks_other_rows_after_a_build_failure(self):
+        text = LINUX.read_text(encoding="utf-8")
+        clean = text.split("\n  clean-host:\n", 1)[1].split("\n  gpu-profile:\n", 1)[0]
+        selector = (
+            "needs.select-tuple.result == 'success' && "
+            if "needs: [scope, select-tuple, build]" in clean
+            else ""
+        )
+        self.assertIn(
+            "    if: ${{ !cancelled() && needs.scope.result == 'success' && "
+            + selector
+            + "(needs.build.result == 'success' || needs.build.result == 'failure') }}",
+            clean.splitlines(),
+        )
+        self.assertIn(
+            "artifact: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}${{ needs.scope.outputs.suffix }}",
+            clean,
+        )
+        self.assertNotIn("continue-on-error", clean)
+
     def test_workflows_can_be_called_without_cancelling_their_caller(self):
         for workflow in (LINUX, WINDOWS):
             text = workflow.read_text(encoding="utf-8")

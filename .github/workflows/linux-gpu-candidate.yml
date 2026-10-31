@@ -127,6 +127,7 @@ jobs:
   clean-host:
     name: Clean-host package startup (${{ matrix.vendor }}, ${{ matrix.arch }})
     needs: [scope, build]
+    if: ${{ !cancelled() && needs.scope.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'failure') }}
     strategy:
       fail-fast: false
       matrix:
