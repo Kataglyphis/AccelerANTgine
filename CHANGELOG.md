@@ -81,6 +81,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- `WindowsCiQualityReuse.Tests.ps1` reads the standalone `powershell-quality.yml`, the one caller of the
+  hub's PowerShell quality workflow since `windows-x64.yml` stopped calling it.
 - Register MIGraphX with explicit device and memory options, avoiding a quoted empty model-cache
   path produced by the legacy provider-options conversion.
 
