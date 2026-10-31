@@ -1,6 +1,10 @@
 include_guard(GLOBAL)
 
-function(accelerantgine_demo_default_device variant system_name out)
+function(
+  accelerantgine_demo_default_device
+  variant
+  system_name
+  out)
   if(variant STREQUAL "cpu")
     set(_device cpu)
   elseif(variant STREQUAL "nvidia")
@@ -12,10 +16,16 @@ function(accelerantgine_demo_default_device variant system_name out)
   else()
     message(FATAL_ERROR "No demo device for ${variant} on ${system_name}")
   endif()
-  set(${out} "${_device}" PARENT_SCOPE)
+  set(${out}
+      "${_device}"
+      PARENT_SCOPE)
 endfunction()
 
-function(accelerantgine_configure_demo_device target variant system_name)
+function(
+  accelerantgine_configure_demo_device
+  target
+  variant
+  system_name)
   accelerantgine_demo_default_device("${variant}" "${system_name}" _device)
   target_compile_definitions(${target} PRIVATE "KATAGLYPHIS_DEMO_DEFAULT_DEVICE=\"${_device}\"")
 endfunction()
