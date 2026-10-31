@@ -1,5 +1,25 @@
 include_guard(GLOBAL)
 
+function(accelerantgine_demo_default_device variant system_name out)
+  if(variant STREQUAL "cpu")
+    set(_device cpu)
+  elseif(variant STREQUAL "nvidia")
+    set(_device cuda)
+  elseif(variant STREQUAL "amd" AND system_name STREQUAL "Linux")
+    set(_device migraphx)
+  elseif(variant STREQUAL "amd" AND system_name STREQUAL "Windows")
+    set(_device directml)
+  else()
+    message(FATAL_ERROR "No demo device for ${variant} on ${system_name}")
+  endif()
+  set(${out} "${_device}" PARENT_SCOPE)
+endfunction()
+
+function(accelerantgine_configure_demo_device target variant system_name)
+  accelerantgine_demo_default_device("${variant}" "${system_name}" _device)
+  target_compile_definitions(${target} PRIVATE "KATAGLYPHIS_DEMO_DEFAULT_DEVICE=\"${_device}\"")
+endfunction()
+
 function(
   accelerantgine_find_windows_ort_file
   root

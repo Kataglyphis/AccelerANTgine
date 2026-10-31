@@ -59,7 +59,7 @@ capabilities still depend on the locally available GStreamer installation.
 ONNX execution providers
 ------------------------
 
-Inference defaults to CPU. Embedders can choose ``ExecutionProvider::Cuda`` for NVIDIA,
+The library API defaults to CPU. Embedders can choose ``ExecutionProvider::Cuda`` for NVIDIA,
 ``ExecutionProvider::MigraphX`` for AMD on Linux, or ``ExecutionProvider::DirectML`` for a
 DirectX 12 GPU on Windows in either ``SessionConfig`` or ``YoloConfig``. The Python bindings
 expose these values as ``OnnxExecutionProvider`` with ``execution_provider`` and ``device_id`` fields.
@@ -79,8 +79,10 @@ Use ``directml`` on Windows AMD GPUs or ``migraphx`` on Linux AMD GPUs. The devi
 DXGI adapter index for DirectML and a provider device index for CUDA or MIGraphX. The demo prints
 the generated JSON profile path. With ANTfrastructure checked out, confirm model operators ran
 on the requested provider using ``python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py
-<profile.json> --device cuda`` (use ``python`` on Windows). CPU remains the default, and an
-unavailable explicitly selected provider fails. Profiling is disabled unless ``--profile`` is
+<profile.json> --device cuda`` (use ``python`` on Windows). The demo in a CPU package defaults
+to CPU; NVIDIA packages default to CUDA, Linux AMD packages to MIGraphX, and Windows AMD packages
+to DirectML. Pass ``--device cpu`` to override a GPU package's default. A requested provider that
+cannot initialize fails instead of silently switching to CPU. Profiling is disabled unless ``--profile`` is
 provided; an embedder can set ``SessionConfig::profiling_prefix`` and call ``end_profiling()``.
 The Linux GPU workflow also runs the locked model on CPU from each finished package using both
 the host and bundled glibc loaders. The manually dispatched GPU workflows offer an optional

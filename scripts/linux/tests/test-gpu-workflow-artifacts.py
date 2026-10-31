@@ -127,6 +127,10 @@ class ArtifactReruns(unittest.TestCase):
         self.assertTrue(all("-PreserveGpuRuntimePath" in call for call in calls))
         self.assertTrue(any("'--onnx-only'" in call for call in calls))
         self.assertTrue(any("'--video-check'" in call for call in calls))
+        onnx = next(call for call in calls if "'--onnx-only'" in call)
+        video = next(call for call in calls if "'--video-check'" in call)
+        self.assertNotIn("'--device',", onnx)
+        self.assertIn("'--device', $env:DEVICE", video)
 
 
 if __name__ == "__main__":

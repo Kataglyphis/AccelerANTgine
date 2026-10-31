@@ -168,4 +168,5 @@ post_check "${work}/test.deb" DEB || { cat "${work}/output" >&2; exit 1; }
 if post_check "${work}/test.deb" AppImage; then
   echo 'AppImage generation without a finished AppImage unexpectedly passed' >&2; exit 1
 fi
+bash "${root}/scripts/linux/tests/test-demo-device.sh"
 echo 'ORT package matrix and shared API checks passed'

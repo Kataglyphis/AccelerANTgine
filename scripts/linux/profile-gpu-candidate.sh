@@ -19,7 +19,7 @@ run_demo() {
     -u GST_REGISTRY -u GST_REGISTRY_1_0 -u GST_REGISTRY_FORK \
     GST_REGISTRY_1_0="$stage/gst-registry.bin" "${demos[0]}" "$@"
 }
-run_demo --onnx-only --model "$model" --device "$device" --profile "$stage/ort-profile"
+run_demo --onnx-only --model "$model" --profile "$stage/ort-profile"
 profiles=("$stage"/ort-profile*.json)
 [[ ${#profiles[@]} -eq 1 ]] || { echo 'Expected one ORT profile' >&2; exit 1; }
 python3 -I "$repo/third_party/ANTfrastructure/shared/python/verify_ort_profile.py" "${profiles[0]}" --device "$device"

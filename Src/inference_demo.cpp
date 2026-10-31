@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "demo_device.hpp"
 #include "standalone_gstreamer_environment.hpp"
 
 import kataglyphis.onnx_inference;
@@ -353,7 +354,8 @@ static void print_usage(const char *program_name)
               << "Options:\n"
               << "  --model <path>     ONNX model (default: models/deim_dfine_n_coco.onnx, models/README.md)\n"
               << "  --onnx-only        Run only ONNX inference example\n"
-              << "  --device <name>    cpu, cuda, migraphx or directml (default: cpu)\n"
+              << "  --device <name>    cpu, cuda, migraphx or directml (default: " << kataglyphis::demo::default_device
+              << ")\n"
               << "  --device-id <id>   Provider device index (default: 0)\n"
               << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
@@ -381,7 +383,11 @@ auto main(int argc, char *argv[]) -> int
     bool run_yolo = false;
     bool run_video = false;
     bool run_video_check = false;
-    auto provider = inference::ExecutionProvider::Cpu;
+    auto provider = kataglyphis::demo::parse_device<inference::ExecutionProvider>(kataglyphis::demo::default_device);
+    if (!provider) {
+        kataglyphis::log::error("Invalid packaged default device");
+        return 2;
+    }
     int device_id = 0;
     std::filesystem::path profile_prefix;
 
@@ -392,15 +398,8 @@ auto main(int argc, char *argv[]) -> int
             model_path = argv[++i];
         } else if (arg == "--device" && i + 1 < argc) {
             const std::string device = argv[++i];
-            if (device == "cpu") {
-                provider = inference::ExecutionProvider::Cpu;
-            } else if (device == "cuda") {
-                provider = inference::ExecutionProvider::Cuda;
-            } else if (device == "migraphx") {
-                provider = inference::ExecutionProvider::MigraphX;
-            } else if (device == "directml") {
-                provider = inference::ExecutionProvider::DirectML;
-            } else {
+            provider = kataglyphis::demo::parse_device<inference::ExecutionProvider>(device);
+            if (!provider) {
                 std::cerr << "Unknown device: " << device << "\n";
                 return 2;
             }
@@ -449,7 +448,7 @@ auto main(int argc, char *argv[]) -> int
     int result = 0;
 
     if (run_onnx) {
-        result = run_onnx_inference_example(model_path, provider, device_id, profile_prefix);
+        result = run_onnx_inference_example(model_path, *provider, device_id, profile_prefix);
         if (result != 0) {
             std::cerr << "ONNX inference example failed!\n";
             return result;
@@ -465,7 +464,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_yolo) {
-        result = run_yolo_detection_example(model_path, provider, device_id);
+        result = run_yolo_detection_example(model_path, *provider, device_id);
         if (result != 0) {
             std::cerr << "YOLO detection example failed!\n";
             return result;
@@ -473,7 +472,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_video) {
-        result = run_video_detection_example(model_path, provider, device_id);
+        result = run_video_detection_example(model_path, *provider, device_id);
         if (result != 0) {
             std::cerr << "Video detection example failed!\n";
             return result;
@@ -481,7 +480,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_video_check) {
-        result = run_video_detection_check(model_path, provider, device_id, profile_prefix);
+        result = run_video_detection_check(model_path, *provider, device_id, profile_prefix);
         if (result != 0) { return result; }
     }
 

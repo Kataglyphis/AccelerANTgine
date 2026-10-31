@@ -52,6 +52,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Changed
 
+- The packaged inference demo defaults to its package's GPU provider for NVIDIA and AMD builds;
+  CPU builds and the library API still default to CPU, and ``--device cpu`` remains available.
 - Dependencies from the hub's local Renovate run: the fuzztest, Google Benchmark, nlohmann/json
   and spdlog submodules at their default-branch tips (2026-10-24 to 2026-10-27), and refreshed
   `Src/rusty_code/Cargo.lock` (cc 1.10.0) and `uv.lock` (pytest 9.2.0).
