@@ -13,11 +13,17 @@ trap 'rm -rf -- "$stage"' EXIT
 tar -xzf "${archives[0]}" -C "$stage"
 mapfile -d '' -t demos < <(find "$stage" -type f -path '*/usr/bin/AccelerANTgine_demo' -print0)
 [[ ${#demos[@]} -eq 1 && -x ${demos[0]} ]] || { echo 'Expected one executable packaged demo wrapper' >&2; exit 1; }
-"${demos[0]}" --onnx-only --model "$model" --device "$device" --profile "$stage/ort-profile"
+run_demo() {
+  env -u GST_PLUGIN_PATH -u GST_PLUGIN_PATH_1_0 -u GST_PLUGIN_SYSTEM_PATH \
+    -u GST_PLUGIN_SYSTEM_PATH_1_0 -u GST_PLUGIN_SCANNER -u GST_PLUGIN_SCANNER_1_0 \
+    -u GST_REGISTRY -u GST_REGISTRY_1_0 -u GST_REGISTRY_FORK \
+    GST_REGISTRY_1_0="$stage/gst-registry.bin" "${demos[0]}" "$@"
+}
+run_demo --onnx-only --model "$model" --device "$device" --profile "$stage/ort-profile"
 profiles=("$stage"/ort-profile*.json)
 [[ ${#profiles[@]} -eq 1 ]] || { echo 'Expected one ORT profile' >&2; exit 1; }
 python3 -I "$repo/third_party/ANTfrastructure/shared/python/verify_ort_profile.py" "${profiles[0]}" --device "$device"
-"${demos[0]}" --video-check --model "$model" --device "$device" --profile "$stage/video-profile"
+run_demo --video-check --model "$model" --device "$device" --profile "$stage/video-profile"
 profiles=("$stage"/video-profile*.json)
 [[ ${#profiles[@]} -eq 1 ]] || { echo 'Expected one video inference ORT profile' >&2; exit 1; }
 python3 -I "$repo/third_party/ANTfrastructure/shared/python/verify_ort_profile.py" "${profiles[0]}" --device "$device"
