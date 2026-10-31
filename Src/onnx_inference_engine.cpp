@@ -10,10 +10,10 @@ module;
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <expected>
 #include <filesystem>
-#include <limits>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -282,7 +282,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     } else if (provider == ExecutionProvider::MigraphX) {
         // Generic options avoid the legacy provider's quoted empty cache path.
         const std::string device_id = std::to_string(config.device_id);
-        const std::string memory_limit = std::to_string((std::numeric_limits<std::size_t>::max)());
+        const std::string memory_limit = std::to_string(SIZE_MAX);
         const char *keys[] = { "device_id", "migraphx_mem_limit" };
         const char *values[] = { device_id.c_str(), memory_limit.c_str() };
         if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider(options, "MIGraphX", keys, values, 2))) {
