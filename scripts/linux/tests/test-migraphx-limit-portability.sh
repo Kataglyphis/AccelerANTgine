@@ -11,8 +11,12 @@ line="$(awk '/const std::string memory_limit =/ { print; count++ } END { if (cou
   printf '%s\n' '#define max(a,b) broken_windows_max_macro(a,b)' 'int main() {' "$line"
   printf '%s\n' 'return memory_limit == std::to_string(SIZE_MAX) ? 0 : 1;' '}'
 } > "$work/probe.cpp"
-if command -v clang-tidy >/dev/null 2>&1; then
+if command -v clang-tidy >/dev/null 2>&1 &&
+   clang-tidy --checks='-*,readability-redundant-parentheses' --list-checks 2>/dev/null |
+     grep -q '^[[:space:]]*readability-redundant-parentheses$'; then
   clang-tidy "$work/probe.cpp" --checks='-*,readability-redundant-parentheses' --fix -- -std=c++23 >/dev/null
+else
+  echo 'clang-tidy readability-redundant-parentheses unavailable; testing max macro compilation'
 fi
 "${CXX:-c++}" -std=c++23 "$work/probe.cpp" -o "$work/probe"
 "$work/probe"
