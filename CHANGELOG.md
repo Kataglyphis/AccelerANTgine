@@ -66,6 +66,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Linux GPU profiling checks the demo and provider from the finished AppImage as well as the
+  tarball, so an AppImage demo or provider failure cannot pass the hardware gate unnoticed.
+
 - Linux GPU hardware profiling waits for the clean-host package checks to pass,
   so a failed package startup does not consume a GPU runner or produce a profile.
 

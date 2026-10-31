@@ -85,8 +85,9 @@ to DirectML. Pass ``--device cpu`` to override a GPU package's default. A reques
 cannot initialize fails instead of silently switching to CPU. Profiling is disabled unless ``--profile`` is
 provided; an embedder can set ``SessionConfig::profiling_prefix`` and call ``end_profiling()``.
 The Linux GPU workflow also runs the locked model on CPU from each finished package using both
-the host and bundled glibc loaders. The manually dispatched GPU workflows offer an optional
-self-hosted GPU profiling job; a package's CPU inference alone does not establish GPU use.
+the host and bundled glibc loaders. Its optional self-hosted GPU job profiles the packaged demo
+from both the tarball and the extracted AppImage. AppImage's normal entrypoint launches the main
+application, not the demo. A package's CPU inference alone does not establish GPU use.
 To check the real video path as well, replace ``--onnx-only`` with ``--video-check``. This
 creates one synthetic GStreamer video frame, preprocesses it through the same
 ``VideoDetectorPipeline`` used by applications, and runs the selected ONNX Runtime provider.
