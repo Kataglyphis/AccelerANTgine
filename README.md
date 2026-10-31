@@ -49,7 +49,7 @@ environment uses `uv sync --locked --only-group docs --python 3.14` after recurs
 On demand: [Linux](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/linux-gpu-candidate.yml) targets NVIDIA x64/arm64 and AMD x64;
 [Windows](https://github.com/Kataglyphis/AccelerANTgine/actions/workflows/windows-gpu-candidates.yml) targets NVIDIA/AMD x64. Open a successful run and download the matching artifact under **Artifacts**
 (sign-in required). Candidates are unverified, separate from releases and need matching host GPU drivers and runtimes.
-The infrastructure pin and missing Windows image inputs currently block builds; see [getting started](docs/source/getting_started.rst) for formats and verification.
+The infrastructure pin and missing Windows image inputs currently block builds; see [getting started](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/docs/source/getting_started.rst) for formats and verification.
 CPU packages remain available through the existing lanes.
 
 ## Quick start
