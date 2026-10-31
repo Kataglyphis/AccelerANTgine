@@ -1,9 +1,11 @@
 #include <charconv>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -231,16 +233,22 @@ static auto
     return 0;
 }
 
-static auto run_video_detection_example(const std::string &model_path) -> int
+static auto run_video_detection_example(const std::string &model_path,
+  inference::ExecutionProvider provider,
+  int device_id) -> int
 {
     std::cout << "\n=== Video Detection Pipeline Example ===\n\n";
 
-    auto pipeline_result = detection::create_video_detection_pipeline("test.mp4", model_path, 640, 480);
+    detection::YoloConfig config;
+    config.model_path = model_path;
+    config.execution_provider = provider;
+    config.device_id = device_id;
+    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    auto pipeline_result = detection::create_video_detection_pipeline("test.mp4", config, 640, 480);
 
     if (!pipeline_result) {
-        std::cout << "Video detection pipeline creation failed (expected - no test.mp4)\n";
-        std::cout << "In a real scenario, provide a valid video source.\n";
-        return 0;
+        std::cerr << "Video detection pipeline creation failed: " << static_cast<int>(pipeline_result.error()) << "\n";
+        return 1;
     }
 
     pipeline_result->set_detection_callback(
@@ -265,6 +273,77 @@ static auto run_video_detection_example(const std::string &model_path) -> int
     return 0;
 }
 
+// A synthetic frame exercises the live video inference path without a camera.
+static auto run_video_detection_check(const std::string &model_path,
+  inference::ExecutionProvider provider,
+  int device_id,
+  const std::filesystem::path &profile_prefix) -> int
+{
+    std::mutex mutex;
+    std::condition_variable ready;
+    bool detected = false;
+    bool failed = false;
+
+    detection::VideoDetectionConfig config;
+    config.yolo_config.model_path = model_path;
+    config.yolo_config.execution_provider = provider;
+    config.yolo_config.device_id = device_id;
+    config.yolo_config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    config.gstreamer_config.pipeline_description =
+      "videotestsrc num-buffers=1 pattern=black ! video/x-raw,format=RGB,width=640,height=480,framerate=30/1 "
+      "! appsink name=sink sync=false";
+
+    detection::VideoDetectorPipeline pipeline;
+    if (!pipeline.initialize(config, profile_prefix)) {
+        std::cerr << "Video detector initialization failed\n";
+        return 1;
+    }
+    pipeline.set_detection_callback([&](const detection::DetectionResult &result, const gstreamer::BufferInfo &) {
+        {
+            std::scoped_lock lock(mutex);
+            detected = result.original_width == 640 && result.original_height == 480;
+            failed = !detected;
+        }
+        ready.notify_one();
+    });
+    pipeline.set_error_callback([&](detection::OnnxError error) {
+        std::cerr << "Video inference failed: " << static_cast<int>(error) << "\n";
+        {
+            std::scoped_lock lock(mutex);
+            failed = true;
+        }
+        ready.notify_one();
+    });
+    if (!pipeline.start()) {
+        std::cerr << "Video pipeline failed to start\n";
+        return 1;
+    }
+    {
+        std::unique_lock lock(mutex);
+        (void)ready.wait_for(lock, std::chrono::seconds(60), [&] { return detected || failed; });
+    }
+    const bool stopped = pipeline.stop().has_value();
+    bool success;
+    {
+        std::scoped_lock lock(mutex);
+        success = detected && !failed;
+    }
+    if (!stopped || !success) {
+        std::cerr << "Video pipeline did not produce a valid inference result\n";
+        return 1;
+    }
+    if (!profile_prefix.empty()) {
+        const auto profile = pipeline.end_profiling();
+        if (!profile) {
+            std::cerr << "Could not finish video inference profiling\n";
+            return 1;
+        }
+        std::cout << "Video profile: " << *profile << "\n";
+    }
+    std::cout << "GStreamer video frame inference passed\n";
+    return 0;
+}
+
 static void print_usage(const char *program_name)
 {
     std::cout << "Usage: " << program_name << " [options]\n\n"
@@ -273,10 +352,11 @@ static void print_usage(const char *program_name)
               << "  --onnx-only        Run only ONNX inference example\n"
               << "  --device <name>    cpu, cuda, migraphx or directml (default: cpu)\n"
               << "  --device-id <id>   Provider device index (default: 0)\n"
-              << "  --profile <prefix> Write an ONNX Runtime operator profile for the ONNX example\n"
+              << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
               << "  --yolo-only        Run only YOLO detection example\n"
               << "  --video-only       Run only video detection example\n"
+              << "  --video-check      Run model inference on one synthetic GStreamer video frame\n"
               << "  --all              Run all examples\n"
               << "  --help             Show this help message\n\n"
               << "Examples:\n"
@@ -291,6 +371,7 @@ auto main(int argc, char *argv[]) -> int
     bool run_gstreamer = false;
     bool run_yolo = false;
     bool run_video = false;
+    bool run_video_check = false;
     auto provider = inference::ExecutionProvider::Cpu;
     int device_id = 0;
     std::filesystem::path profile_prefix;
@@ -331,6 +412,8 @@ auto main(int argc, char *argv[]) -> int
             run_yolo = true;
         } else if (arg == "--video-only") {
             run_video = true;
+        } else if (arg == "--video-check") {
+            run_video_check = true;
         } else if (arg == "--all") {
             run_onnx = true;
             run_gstreamer = true;
@@ -345,7 +428,7 @@ auto main(int argc, char *argv[]) -> int
         }
     }
 
-    if (!run_onnx && !run_gstreamer && !run_yolo && !run_video) {
+    if (!run_onnx && !run_gstreamer && !run_yolo && !run_video && !run_video_check) {
         run_onnx = true;
         run_yolo = true;
     }
@@ -381,11 +464,16 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_video) {
-        result = run_video_detection_example(model_path);
+        result = run_video_detection_example(model_path, provider, device_id);
         if (result != 0) {
             std::cerr << "Video detection example failed!\n";
             return result;
         }
+    }
+
+    if (run_video_check) {
+        result = run_video_detection_check(model_path, provider, device_id, profile_prefix);
+        if (result != 0) { return result; }
     }
 
     std::cout << "\nAll examples completed successfully!\n";

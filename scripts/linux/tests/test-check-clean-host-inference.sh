@@ -12,10 +12,12 @@ touch "$work/usr/lib/accelerantgine/gstreamer-1.0/libgstlibav.so"
 cat >"$work/usr/bin/AccelerANTgine_demo" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ $# -eq 5 && $1 == --onnx-only && $2 == --model && $4 == --device && $5 == cpu ]]
+[[ $# -eq 5 && ( $1 == --onnx-only || $1 == --video-check ) && $2 == --model && $4 == --device && $5 == cpu ]]
 [[ -z ${LD_LIBRARY_PATH+x} ]]
-printf '%s\n' "${KATAGLYPHIS_BUNDLED_GLIBC:-host}" >>"$PROOF_DIR/modes"
-if [[ ${BAD_OUTPUT:-0} == 1 ]]; then echo 'bad shape'; else echo 'Output 0 shape: [1, 300, 6] (1800 elements)'; fi
+printf '%s %s\n' "${KATAGLYPHIS_BUNDLED_GLIBC:-host}" "$1" >>"$PROOF_DIR/modes"
+if [[ $1 == --onnx-only ]]; then
+  if [[ ${BAD_OUTPUT:-0} == 1 ]]; then echo 'bad shape'; else echo 'Output 0 shape: [1, 300, 6] (1800 elements)'; fi
+elif [[ ${BAD_VIDEO:-0} == 1 ]]; then echo 'bad video'; else echo 'GStreamer video frame inference passed'; fi
 STUB
 cat >"$work/bin/ldd" <<'STUB'
 #!/usr/bin/env bash
@@ -35,9 +37,13 @@ export PATH="$work/bin:$PATH"
 export LD_LIBRARY_PATH=/untrusted KATAGLYPHIS_BUNDLED_GLIBC=unexpected
 bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx"
 bash "$check" --appimage "$work/fake.AppImage" "$work/model.onnx"
-[[ "$(cat "$work/modes")" == $'host\n1\nhost\n1' ]]
+[[ "$(cat "$work/modes")" == $'host --onnx-only\nhost --video-check\n1 --onnx-only\n1 --video-check\nhost --onnx-only\nhost --video-check\n1 --onnx-only\n1 --video-check' ]]
 if BAD_OUTPUT=1 bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx" >/dev/null 2>&1; then
   echo 'Wrong model output unexpectedly passed' >&2
+  exit 1
+fi
+if BAD_VIDEO=1 bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx" >/dev/null 2>&1; then
+  echo 'A failed video inference unexpectedly passed' >&2
   exit 1
 fi
 if BAD_LIBRARY=1 bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx" >/dev/null 2>&1; then

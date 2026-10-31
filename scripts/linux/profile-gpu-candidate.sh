@@ -17,3 +17,7 @@ mapfile -d '' -t demos < <(find "$stage" -type f -path '*/usr/bin/AccelerANTgine
 profiles=("$stage"/ort-profile*.json)
 [[ ${#profiles[@]} -eq 1 ]] || { echo 'Expected one ORT profile' >&2; exit 1; }
 python3 -I "$repo/third_party/ANTfrastructure/shared/python/verify_ort_profile.py" "${profiles[0]}" --device "$device"
+"${demos[0]}" --video-check --model "$model" --device "$device" --profile "$stage/video-profile"
+profiles=("$stage"/video-profile*.json)
+[[ ${#profiles[@]} -eq 1 ]] || { echo 'Expected one video inference ORT profile' >&2; exit 1; }
+python3 -I "$repo/third_party/ANTfrastructure/shared/python/verify_ort_profile.py" "${profiles[0]}" --device "$device"

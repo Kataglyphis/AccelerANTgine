@@ -92,6 +92,25 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $exe = Join-Path $env:WORKSPACE 'dist/windows-x64-gpu-${{ matrix.vendor }}/bundle/bin/AccelerANTgine.exe'
           & (Join-Path $env:WORKSPACE 'scripts/windows/Test-WindowsGpuCleanHost.ps1') -Executable $exe
+      - name: Run CPU video inference from the finished ZIP on the clean host
+        shell: pwsh
+        env:
+          WORKSPACE: ${{ steps.prep.outputs.workspace }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lock = Join-Path $env:WORKSPACE 'models/models.lock'
+          python -I (Join-Path $env:WORKSPACE 'third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py') --lock $lock
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch the locked model.' }
+          $archives = @(Get-ChildItem -LiteralPath (Join-Path $env:WORKSPACE 'dist/windows-x64-gpu-${{ matrix.vendor }}') -Filter '*.zip' -File -Recurse)
+          if ($archives.Count -ne 1) { throw "Expected one candidate ZIP, found $($archives.Count)." }
+          $stage = Join-Path $env:RUNNER_TEMP "accelerantgine-cpu-video-${{ matrix.vendor }}-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $null = New-Item -ItemType Directory -Path $stage
+          & "$env:SystemRoot\System32\tar.exe" -xf $archives[0].FullName -C $stage
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot unpack the candidate ZIP.' }
+          $demos = @(Get-ChildItem -LiteralPath $stage -Filter 'AccelerANTgine_demo.exe' -File -Recurse)
+          if ($demos.Count -ne 1) { throw "Expected one packaged demo, found $($demos.Count)." }
+          $model = Join-Path $env:WORKSPACE 'models/deim_dfine_n_coco.onnx'
+          & (Join-Path $env:WORKSPACE 'scripts/windows/Test-WindowsGpuCleanHost.ps1') -Executable $demos[0].FullName -Arguments @('--video-check', '--model', $model, '--device', 'cpu')
       - name: Upload the unverified GPU candidate
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -156,3 +175,9 @@ jobs:
           if ($profiles.Count -ne 1) { throw "Expected one ORT profile, found $($profiles.Count)" }
           python third_party/ANTfrastructure/shared/python/verify_ort_profile.py $profiles[0].FullName --device $env:DEVICE
           if ($LASTEXITCODE -ne 0) { throw 'No model operator ran on the requested GPU provider.' }
+          & $demos[0].FullName --video-check --model (Join-Path $env:GITHUB_WORKSPACE 'models/deim_dfine_n_coco.onnx') --device $env:DEVICE --device-id $index --profile (Join-Path $stage 'video-profile')
+          if ($LASTEXITCODE -ne 0) { throw 'GStreamer video inference failed.' }
+          $videoProfiles = @(Get-ChildItem -LiteralPath $stage -Filter 'video-profile*.json' -File)
+          if ($videoProfiles.Count -ne 1) { throw "Expected one video ORT profile, found $($videoProfiles.Count)" }
+          python third_party/ANTfrastructure/shared/python/verify_ort_profile.py $videoProfiles[0].FullName --device $env:DEVICE
+          if ($LASTEXITCODE -ne 0) { throw 'No video model operator ran on the requested GPU provider.' }

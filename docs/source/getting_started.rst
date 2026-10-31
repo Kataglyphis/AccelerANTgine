@@ -78,6 +78,14 @@ provided; an embedder can set ``SessionConfig::profiling_prefix`` and call ``end
 The Linux GPU workflow also runs the locked model on CPU from each finished package using both
 the host and bundled glibc loaders. The manually dispatched GPU workflows offer an optional
 self-hosted GPU profiling job; a package's CPU inference alone does not establish GPU use.
+To check the real video path as well, replace ``--onnx-only`` with ``--video-check``. This
+creates one synthetic GStreamer video frame, preprocesses it through the same
+``VideoDetectorPipeline`` used by applications, and runs the selected ONNX Runtime provider.
+When ``--profile`` is supplied, verify that profile with the same provider checker. The GPU
+workflow checks both the direct ONNX and video profiles; the video check does not need the
+optional GStreamer tensor inference plugins.
+The camera and video detection factories also accept a ``YoloConfig`` overload, so callers can
+select its execution provider and device instead of the path-only factories' CPU default.
 
 These options require an ONNX Runtime built with the requested provider and its runtime
 dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=nvidia`` or

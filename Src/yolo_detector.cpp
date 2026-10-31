@@ -315,6 +315,10 @@ YoloDetector::YoloDetector(YoloDetector &&) noexcept = default;
 auto YoloDetector::operator=(YoloDetector &&) noexcept -> YoloDetector & = default;
 
 auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, OnnxError>
+{ return initialize(config, {}); }
+
+auto YoloDetector::initialize(const YoloConfig &config, const std::filesystem::path &profiling_prefix)
+  -> std::expected<void, OnnxError>
 {
     const std::unique_lock lock(impl_->mutex);
     impl_->initialized = false;
@@ -324,6 +328,7 @@ auto YoloDetector::initialize(const YoloConfig &config) -> std::expected<void, O
     auto session_config = inference::create_default_session_config(config.model_path);
     session_config.execution_provider = config.execution_provider;
     session_config.device_id = config.device_id;
+    session_config.profiling_prefix = profiling_prefix;
 
     auto result = impl_->engine.initialize(session_config);
     if (!result) { return std::unexpected(result.error()); }
@@ -336,6 +341,13 @@ auto YoloDetector::is_initialized() const -> bool
 {
     const std::shared_lock lock(impl_->mutex);
     return impl_->initialized;
+}
+
+auto YoloDetector::end_profiling() -> std::expected<std::string, OnnxError>
+{
+    const std::shared_lock lock(impl_->mutex);
+    if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+    return impl_->engine.end_profiling();
 }
 
 auto YoloDetector::detect(std::span<const float> image_data, std::uint32_t width, std::uint32_t height)
@@ -483,6 +495,9 @@ struct VideoDetectorPipeline::Impl
     std::function<void(OnnxError)> error_callback;
     std::optional<OnnxError> last_error;
     std::atomic<bool> running{ false };
+    std::mutex lifecycle_mutex;
+    bool starting{ false };
+    bool stopping{ false };
     VideoDetectionConfig config;
     // Last, so it is destroyed first: its streaming thread calls into every member above.
     gstreamer::GStreamerPipeline pipeline;
@@ -527,6 +542,10 @@ VideoDetectorPipeline::VideoDetectorPipeline(VideoDetectorPipeline &&) noexcept 
 auto VideoDetectorPipeline::operator=(VideoDetectorPipeline &&) noexcept -> VideoDetectorPipeline & = default;
 
 auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config) -> std::expected<void, OnnxError>
+{ return initialize(config, {}); }
+
+auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config,
+  const std::filesystem::path &profiling_prefix) -> std::expected<void, OnnxError>
 {
 
     impl_->config = config;
@@ -534,7 +553,7 @@ auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config) -> st
     auto init_result = gstreamer::GStreamerPipeline::initialize_gstreamer();
     if (!init_result) { return std::unexpected(OnnxError::SessionCreationFailed); }
 
-    auto detector_result = impl_->detector.initialize(config.yolo_config);
+    auto detector_result = impl_->detector.initialize(config.yolo_config, profiling_prefix);
     if (!detector_result) { return std::unexpected(detector_result.error()); }
 
     auto pipeline_result = impl_->pipeline.create_pipeline(config.gstreamer_config);
@@ -550,18 +569,41 @@ auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config) -> st
 auto VideoDetectorPipeline::start() -> std::expected<void, gstreamer::GStreamerError>
 {
     {
+        const std::scoped_lock lifecycle_lock(impl_->lifecycle_mutex);
+        if (impl_->starting || impl_->stopping) {
+            return std::unexpected(gstreamer::GStreamerError::StateChangeFailed);
+        }
+        impl_->starting = true;
+    }
+    {
         const std::scoped_lock lock(impl_->callback_mutex);
         impl_->last_error.reset();
     }
     auto result = impl_->pipeline.start();
-    if (result) { impl_->running.store(true); }
+    {
+        const std::scoped_lock lifecycle_lock(impl_->lifecycle_mutex);
+        if (result) { impl_->running.store(true); }
+        impl_->starting = false;
+    }
     return result;
 }
 
 auto VideoDetectorPipeline::stop() -> std::expected<void, gstreamer::GStreamerError>
 {
-    impl_->running.store(false);
-    return impl_->pipeline.stop();
+    {
+        const std::scoped_lock lifecycle_lock(impl_->lifecycle_mutex);
+        if (impl_->starting || impl_->stopping) {
+            return std::unexpected(gstreamer::GStreamerError::StateChangeFailed);
+        }
+        impl_->stopping = true;
+    }
+    auto result = impl_->pipeline.stop();
+    {
+        const std::scoped_lock lifecycle_lock(impl_->lifecycle_mutex);
+        if (result) { impl_->running.store(false); }
+        impl_->stopping = false;
+    }
+    return result;
 }
 
 auto VideoDetectorPipeline::pause() -> std::expected<void, gstreamer::GStreamerError>
@@ -594,17 +636,36 @@ auto VideoDetectorPipeline::last_error() const -> std::optional<OnnxError>
 
 auto VideoDetectorPipeline::is_running() const -> bool { return impl_->running.load(); }
 
+auto VideoDetectorPipeline::end_profiling() -> std::expected<std::string, OnnxError>
+{
+    const std::scoped_lock lifecycle_lock(impl_->lifecycle_mutex);
+    if (impl_->running.load() || impl_->starting || impl_->stopping) {
+        return std::unexpected(OnnxError::ProfilingFailed);
+    }
+    return impl_->detector.end_profiling();
+}
+
 auto create_camera_detection_pipeline(const std::string &device,
   const std::filesystem::path &model_path,
   std::uint32_t width,
   std::uint32_t height,
   std::uint32_t fps) -> std::expected<VideoDetectorPipeline, OnnxError>
 {
+    YoloConfig config;
+    config.model_path = model_path;
+    return create_camera_detection_pipeline(device, config, width, height, fps);
+}
 
+auto create_camera_detection_pipeline(const std::string &device,
+  const YoloConfig &yolo_config,
+  std::uint32_t width,
+  std::uint32_t height,
+  std::uint32_t fps) -> std::expected<VideoDetectorPipeline, OnnxError>
+{
     VideoDetectorPipeline pipeline;
     VideoDetectionConfig config;
 
-    config.yolo_config.model_path = model_path;
+    config.yolo_config = yolo_config;
 
     config.gstreamer_config.pipeline_description =
       build_camera_detection_pipeline_description(device, width, height, fps);
@@ -622,11 +683,20 @@ auto create_video_detection_pipeline(const std::string &video_source,
   std::uint32_t width,
   std::uint32_t height) -> std::expected<VideoDetectorPipeline, OnnxError>
 {
+    YoloConfig config;
+    config.model_path = model_path;
+    return create_video_detection_pipeline(video_source, config, width, height);
+}
 
+auto create_video_detection_pipeline(const std::string &video_source,
+  const YoloConfig &yolo_config,
+  std::uint32_t width,
+  std::uint32_t height) -> std::expected<VideoDetectorPipeline, OnnxError>
+{
     VideoDetectorPipeline pipeline;
     VideoDetectionConfig config;
 
-    config.yolo_config.model_path = model_path;
+    config.yolo_config = yolo_config;
 
     config.gstreamer_config.pipeline_description =
       build_video_detection_pipeline_description(video_source, width, height);

@@ -94,7 +94,12 @@ class KATAGLYPHIS_CPP_API YoloDetector
 
     [[nodiscard]] auto initialize(const YoloConfig &config) -> std::expected<void, OnnxError>;
 
+    [[nodiscard]] auto initialize(const YoloConfig &config, const std::filesystem::path &profiling_prefix)
+      -> std::expected<void, OnnxError>;
+
     [[nodiscard]] auto is_initialized() const -> bool;
+
+    [[nodiscard]] auto end_profiling() -> std::expected<std::string, OnnxError>;
 
     [[nodiscard]] auto detect(std::span<const float> image_data, std::uint32_t width, std::uint32_t height)
       -> std::expected<DetectionResult, OnnxError>;
@@ -142,6 +147,9 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
 
     [[nodiscard]] auto initialize(const VideoDetectionConfig &config) -> std::expected<void, OnnxError>;
 
+    [[nodiscard]] auto initialize(const VideoDetectionConfig &config, const std::filesystem::path &profiling_prefix)
+      -> std::expected<void, OnnxError>;
+
     [[nodiscard]] auto start() -> std::expected<void, gstreamer::GStreamerError>;
     [[nodiscard]] auto stop() -> std::expected<void, gstreamer::GStreamerError>;
     [[nodiscard]] auto pause() -> std::expected<void, gstreamer::GStreamerError>;
@@ -156,6 +164,8 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
 
     [[nodiscard]] auto is_running() const -> bool;
 
+    [[nodiscard]] auto end_profiling() -> std::expected<std::string, OnnxError>;
+
   private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
@@ -167,8 +177,19 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
   std::uint32_t height = 480,
   std::uint32_t fps = 30) -> std::expected<VideoDetectorPipeline, OnnxError>;
 
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_camera_detection_pipeline(const std::string &device,
+  const YoloConfig &config,
+  std::uint32_t width = 640,
+  std::uint32_t height = 480,
+  std::uint32_t fps = 30) -> std::expected<VideoDetectorPipeline, OnnxError>;
+
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_video_detection_pipeline(const std::string &video_source,
   const std::filesystem::path &model_path,
+  std::uint32_t width = 640,
+  std::uint32_t height = 480) -> std::expected<VideoDetectorPipeline, OnnxError>;
+
+[[nodiscard]] KATAGLYPHIS_CPP_API auto create_video_detection_pipeline(const std::string &video_source,
+  const YoloConfig &config,
   std::uint32_t width = 640,
   std::uint32_t height = 480) -> std::expected<VideoDetectorPipeline, OnnxError>;
 

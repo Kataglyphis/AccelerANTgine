@@ -9,7 +9,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <mutex>
 #include <string>
@@ -392,6 +394,7 @@ TEST(VideoDetectorPipeline, RunsTheDetectorOnEveryFrame)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
     const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    const TempFile profile_prefix("kataglyphis-video-profile", "", "");
 
     detection::VideoDetectionConfig config;
     config.yolo_config = two_class_config(model);
@@ -400,7 +403,7 @@ TEST(VideoDetectorPipeline, RunsTheDetectorOnEveryFrame)
       "! appsink name=sink sync=false";
 
     detection::VideoDetectorPipeline pipeline;
-    ASSERT_TRUE(pipeline.initialize(config).has_value());
+    ASSERT_TRUE(pipeline.initialize(config, profile_prefix.path()).has_value());
     EXPECT_FALSE(pipeline.is_running());
 
     kataglyphis::test::EventCounter frames;
@@ -418,10 +421,25 @@ TEST(VideoDetectorPipeline, RunsTheDetectorOnEveryFrame)
 
     ASSERT_TRUE(pipeline.start().has_value());
     EXPECT_TRUE(pipeline.is_running());
+    const auto active_profile = pipeline.end_profiling();
+    ASSERT_FALSE(active_profile.has_value());
+    EXPECT_EQ(active_profile.error(), detection::OnnxError::ProfilingFailed);
     EXPECT_TRUE(frames.wait_for(3, kataglyphis::test::kStreamTimeout));
     EXPECT_TRUE(detections.wait_for(3, kataglyphis::test::kStreamTimeout));
     EXPECT_TRUE(pipeline.stop().has_value());
     EXPECT_FALSE(pipeline.is_running());
+
+    const auto profile = pipeline.end_profiling();
+    ASSERT_TRUE(profile.has_value());
+    std::ifstream profile_file(*profile);
+    ASSERT_TRUE(profile_file.is_open());
+    const std::string profile_text{ std::istreambuf_iterator<char>(profile_file), std::istreambuf_iterator<char>() };
+    EXPECT_NE(profile_text.find("CPUExecutionProvider"), std::string::npos);
+    profile_file.close();
+    EXPECT_TRUE(std::filesystem::remove(*profile));
+    const auto second_end = pipeline.end_profiling();
+    ASSERT_FALSE(second_end.has_value());
+    EXPECT_EQ(second_end.error(), detection::OnnxError::ProfilingNotEnabled);
 
     EXPECT_EQ(frames.count(), 3);
     EXPECT_EQ(detections.count(), 3);
@@ -565,4 +583,19 @@ TEST(VideoDetectorPipeline, FactoriesFailOnAMissingModel)
     const auto camera = detection::create_camera_detection_pipeline("/dev/video0", missing, 64, 48, 30);
     ASSERT_FALSE(camera.has_value());
     EXPECT_EQ(camera.error(), detection::OnnxError::ModelLoadFailed);
+}
+
+TEST(VideoDetectorPipeline, FactoriesForwardTheSelectedDeviceConfiguration)
+{
+    ASSERT_TRUE(gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+    const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    auto config = two_class_config(model);
+    config.device_id = -1;
+
+    const auto video = detection::create_video_detection_pipeline("clip.mp4", config, 64, 48);
+    ASSERT_FALSE(video.has_value());
+    EXPECT_EQ(video.error(), detection::OnnxError::SessionCreationFailed);
+    const auto camera = detection::create_camera_detection_pipeline("/dev/video0", config, 64, 48, 30);
+    ASSERT_FALSE(camera.has_value());
+    EXPECT_EQ(camera.error(), detection::OnnxError::SessionCreationFailed);
 }
