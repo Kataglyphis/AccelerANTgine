@@ -104,3 +104,63 @@ def test_one_generator_serves_many_threads(generator, tiny_model):
         thread.join()
     assert not errors
     assert texts == [oracle["continuation"]] * 160
+
+
+TINY_SCHEMA = {
+    "type": "object",
+    "properties": {"a": {"type": "string", "maxLength": 3}},
+    "required": ["a"],
+    "additionalProperties": False,
+    "x-guidance": {"whitespace_flexible": False},
+}
+
+
+def sampled(seed, temperature=1.0):
+    options = budget(32)
+    options.temperature = temperature
+    options.top_k = 0
+    options.seed = seed
+    return options
+
+
+def test_a_repeated_seed_repeats_the_sampled_tokens(generator, tiny_model):
+    _, oracle = tiny_model
+    first = generator.generate([("user", oracle["prompt"])], sampled(1))
+    second = generator.generate([("user", oracle["prompt"])], sampled(1))
+    assert len(first.tokens) == 32
+    assert first.tokens == second.tokens
+
+
+def test_four_seeds_sample_at_least_two_sequences(generator, tiny_model):
+    _, oracle = tiny_model
+    sequences = {tuple(generator.generate([("user", oracle["prompt"])], sampled(seed)).tokens) for seed in range(1, 5)}
+    assert all(len(sequence) >= 16 for sequence in sequences)
+    assert len(sequences) >= 2
+
+
+def test_a_json_schema_holds_the_output_or_is_unsupported(generator, tiny_model):
+    _, oracle = tiny_model
+    options = budget(32)
+    options.json_schema = json.dumps(TINY_SCHEMA, separators=(",", ":"))
+    if sys.platform == "win32":
+        with pytest.raises(RuntimeError, match="no JSON schema support"):
+            generator.generate([("user", oracle["prompt"])], options)
+        return
+    result = generator.generate([("user", oracle["prompt"])], options)
+    parsed = json.loads(result.text)
+    assert set(parsed) == {"a"}
+    assert isinstance(parsed["a"], str)
+    assert len(parsed["a"]) <= 3
+    assert result.finish_reason == ki.FinishReason.STOP
+
+
+def test_a_stop_string_ends_generation_before_it(generator, tiny_model):
+    _, oracle = tiny_model
+    options = budget(len(oracle["continuation_ids"]))
+    options.stop = [oracle["continuation"][2:4]]
+    pieces = []
+    result = generator.generate([("user", oracle["prompt"])], options, pieces.append)
+    assert result.text == oracle["continuation"][:2]
+    assert "".join(pieces) == result.text
+    assert result.finish_reason == ki.FinishReason.STOP
+    assert options.seed is None

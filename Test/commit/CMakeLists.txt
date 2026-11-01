@@ -56,6 +56,7 @@ target_link_libraries(
           ${PROJECT_NAME})
 
 kataglyphis_use_tiny_genai_model(${COMMIT_TEST_SUITE})
+kataglyphis_use_text_contract_model(${COMMIT_TEST_SUITE})
 
 kataglyphis_configure_gtest_discovery(${COMMIT_TEST_SUITE})
 
@@ -68,4 +69,21 @@ if(TARGET ${PROJECT_NAME}_cli)
   add_test(NAME Cli.ChatWithoutAPromptFails COMMAND $<TARGET_FILE:${PROJECT_NAME}_cli> --chat_model
                                                     "${CMAKE_BINARY_DIR}/test-models/tiny-genai")
   set_tests_properties(Cli.ChatWithoutAPromptFails PROPERTIES WILL_FAIL TRUE)
+  add_test(NAME Cli.ChatEndsBeforeAStopString
+           COMMAND $<TARGET_FILE:${PROJECT_NAME}_cli> --chat_model "${CMAKE_BINARY_DIR}/test-models/tiny-genai"
+                   --prompt abc --max_new_tokens 4 --stop zz,fg)
+  set_tests_properties(Cli.ChatEndsBeforeAStopString PROPERTIES PASS_REGULAR_EXPRESSION "^de\n4 tokens, ")
+  add_test(NAME Cli.ChatPassesTheSamplingFlags
+           COMMAND $<TARGET_FILE:${PROJECT_NAME}_cli> --chat_model "${CMAKE_BINARY_DIR}/test-models/tiny-genai"
+                   --prompt abc --max_new_tokens 4 --temperature 0.000001 --seed 7)
+  set_tests_properties(Cli.ChatPassesTheSamplingFlags PROPERTIES PASS_REGULAR_EXPRESSION "^defg\n4 tokens, ")
+  add_test(NAME Cli.ChatFollowsAJsonSchema
+           COMMAND $<TARGET_FILE:${PROJECT_NAME}_cli> --chat_model "${CMAKE_BINARY_DIR}/test-models/tiny-genai"
+                   --prompt abc --max_new_tokens 32 --json_schema "${KATAGLYPHIS_TINY_JSON_SCHEMA}")
+  # The Windows chain's GenAI has no llguidance, so the CLI must name that instead of answering.
+  if(WIN32)
+    set_tests_properties(Cli.ChatFollowsAJsonSchema PROPERTIES PASS_REGULAR_EXPRESSION "no JSON schema support")
+  else()
+    set_tests_properties(Cli.ChatFollowsAJsonSchema PROPERTIES PASS_REGULAR_EXPRESSION "^\\{\"a\":\"#\\$%\"\\}\n")
+  endif()
 endif()

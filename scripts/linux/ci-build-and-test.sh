@@ -40,6 +40,10 @@ esac
 CMAKE_BUILD_SAFE_DIRECTORY="${WORKSPACE_DIR}"
 CTEST_RUN_SAFE_DIRECTORY="${WORKSPACE_DIR}"
 
+ci_fetch_llm_model "${WORKSPACE_DIR}" >/dev/null || die "cannot fetch resources/models/llm.lock"
+# CMake then fails rather than leave the real-model contract suite out.
+export KATAGLYPHIS_REQUIRE_MODEL=1
+
 # `cmake -B` overrides the preset's binaryDir, so ctest always runs the tree just built.
 info "Using preset: ${PRESET}"
 # About 2 GB per TU; the 4000 MB default would halve the job count on memory-capped runners.

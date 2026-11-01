@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -40,6 +41,10 @@ ABSL_FLAG(std::string,
 ABSL_FLAG(std::string, chat_model, "", "ONNX Runtime GenAI model directory: answer --prompt with it and exit");
 ABSL_FLAG(std::string, prompt, "", "The user message --chat_model answers");
 ABSL_FLAG(int, max_new_tokens, 128, "Token budget of the --chat_model reply");
+ABSL_FLAG(double, temperature, 0.0, "Sampling temperature of the --chat_model reply; 0 decodes greedily");
+ABSL_FLAG(int, seed, -1, "Sampling seed of the --chat_model reply; below 0 GenAI draws one");
+ABSL_FLAG(std::string, json_schema, "", "JSON schema the --chat_model reply must follow");
+ABSL_FLAG(std::vector<std::string>, stop, {}, "Comma-separated strings that end the --chat_model reply before them");
 ABSL_FLAG(bool,
   gst_check,
   false,
@@ -65,8 +70,19 @@ struct CliOverrideFlags
 
 void signal_handler(int /*signal*/) { g_running.store(false); }
 
+auto chat_options() -> kataglyphis::text::GenerationOptions
+{
+    kataglyphis::text::GenerationOptions options;
+    options.max_new_tokens = absl::GetFlag(FLAGS_max_new_tokens);
+    options.temperature = absl::GetFlag(FLAGS_temperature);
+    if (const auto seed = absl::GetFlag(FLAGS_seed); seed >= 0) { options.seed = seed; }
+    options.json_schema = absl::GetFlag(FLAGS_json_schema);
+    options.stop = absl::GetFlag(FLAGS_stop);
+    return options;
+}
+
 // The reply goes to stdout as it is generated, the speed figures to stderr.
-auto chat(const std::string &model_dir, const std::string &prompt, int max_new_tokens) -> int
+auto chat(const std::string &model_dir, const std::string &prompt) -> int
 {
     if (prompt.empty()) {
         std::cerr << "--chat_model needs a --prompt\n";
@@ -77,10 +93,8 @@ auto chat(const std::string &model_dir, const std::string &prompt, int max_new_t
         std::cerr << "Cannot load " << model_dir << ": " << kataglyphis::text::to_string(loaded.error()) << '\n';
         return 1;
     }
-    kataglyphis::text::GenerationOptions options;
-    options.max_new_tokens = max_new_tokens;
     const auto result = generator.generate({ { .role = "user", .content = prompt } },
-      options,
+      chat_options(),
       [](std::string_view piece) -> void { std::cout << piece << std::flush; });
     std::cout << '\n';
     if (!result) {
@@ -249,7 +263,7 @@ auto main(int argc, char **argv) -> int
 
     if (absl::GetFlag(FLAGS_gst_check)) { return check_gstreamer(&argc, &argv); }
     if (const std::string model = absl::GetFlag(FLAGS_chat_model); !model.empty()) {
-        return chat(model, absl::GetFlag(FLAGS_prompt), absl::GetFlag(FLAGS_max_new_tokens));
+        return chat(model, absl::GetFlag(FLAGS_prompt));
     }
 
     const bool start_webrtc = absl::GetFlag(FLAGS_webrtc);

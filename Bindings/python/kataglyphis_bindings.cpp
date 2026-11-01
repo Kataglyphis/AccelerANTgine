@@ -1,6 +1,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/filesystem.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
@@ -498,7 +499,10 @@ void bind_text(nb::module_ &m)
       .def_rw("max_new_tokens", &GenerationOptions::max_new_tokens, nb::lock_self())
       .def_rw("temperature", &GenerationOptions::temperature, nb::lock_self())
       .def_rw("top_p", &GenerationOptions::top_p, nb::lock_self())
-      .def_rw("top_k", &GenerationOptions::top_k, nb::lock_self());
+      .def_rw("top_k", &GenerationOptions::top_k, nb::lock_self())
+      .def_rw("seed", &GenerationOptions::seed, nb::lock_self())
+      .def_rw("json_schema", &GenerationOptions::json_schema, nb::lock_self())
+      .def_rw("stop", &GenerationOptions::stop, nb::lock_self());
 
     nb::class_<GenerationResult>(m, "GenerationResult")
       .def_ro("text", &GenerationResult::text)

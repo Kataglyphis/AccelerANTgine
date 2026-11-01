@@ -74,9 +74,16 @@ build_and_test() {
     "${venv}/bin/python" -m pytest "${WORKSPACE_DIR}/Test/python" -v -p no:cacheprovider \
       -o "junit_family=xunit2" --junitxml="${WORKSPACE_DIR}/logs/python-${label}.xml") ||
     die "${label}: Test/python failed"
+  # Its name keeps it out of the run above, which collects every test_*.py without the fetched model.
+  (cd "${BUILD_ROOT}" &&
+    KATAGLYPHIS_TEXT_CONTRACT_MODEL="${CONTRACT_MODEL}" "${venv}/bin/python" -m pytest \
+      "${WORKSPACE_DIR}/Test/python/contract_text_generation.py" -v -p no:cacheprovider \
+      -o "junit_family=xunit2" --junitxml="${WORKSPACE_DIR}/logs/python-contract-${label}.xml") ||
+    die "${label}: the text-generation contract failed"
 }
 
 mkdir -p "${BUILD_ROOT}" "${WORKSPACE_DIR}/logs"
+CONTRACT_MODEL="$(ci_fetch_llm_model "${WORKSPACE_DIR}")" || die "cannot fetch resources/models/llm.lock"
 build_and_test gil "${PYTHON_VERSION}+gil" "${TAG}"
 build_and_test free-threaded "${PYTHON_VERSION}t" "${TAG}t"
 info "Python wheels in ${OUT_DIR}: $(cd "${OUT_DIR}" && ls -- */*.whl | tr '\n' ' ')"

@@ -81,3 +81,11 @@ ci_parse_value_options() {
     parse_cli_value_options _ci_options _ci_remaining ci_unknown_argument "$@"
     [ "${#_ci_remaining[@]}" -eq 0 ] || die "Unknown argument: ${_ci_remaining[0]}"
 }
+
+# Fetches resources/models/llm.lock into resources/models/ and prints the contract model's directory.
+ci_fetch_llm_model() {
+    local workspace="$1" fetcher
+    fetcher="$(antfrastructure_path linux/scripts/lib/fetch-data-lock.py)" || return 1
+    python3 -I "${fetcher}" --lock "${workspace}/resources/models/llm.lock" --extract >&2 || return 1
+    printf '%s\n' "${workspace}/resources/models/smollm2_135m_instruct-cpu"
+}

@@ -31,3 +31,18 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
   Done when every lane builds both wheels from the image's interpreters and passes
   `Test/python` on each, Windows arm64 on the `windows-11-arm` device.
+
+## Done
+
+- [x] **llguidance accepts the hub tiny model's tokenizer** (S, ★★). Probe of 2026-11-01 in
+  `ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest` (index `7d4d4129`, GenAI 0.17.0 built
+  `--use_guidance`): `OgaGeneratorParamsSetGuidance("json_schema", …)` on the model
+  `tiny-genai-model.py` writes is accepted, so the schema tests run on that model and SmolLM2-135M
+  is not needed as a fallback. A loose schema lets greedy decoding loop on whitespace inside `{`;
+  the tight schema
+  `{"type":"object","properties":{"a":{"type":"string","maxLength":3}},"required":["a"],"additionalProperties":false,"x-guidance":{"whitespace_flexible":false}}`
+  decodes the prompt `abc` to `{"a":"#$%"}`, then the end token 256. SmolLM2-135M accepts the same
+  schema (`{"a":"par"}`). At temperature 1.0 with `top_k` 0 the tiny model gives seed 1 a sequence
+  that leaves the successor chain within 24 tokens and seeds 2 to 4 the chain itself, so four
+  seeds give two distinct sequences. The Windows chain builds GenAI with `USE_GUIDANCE=OFF`, so
+  there a schema fails with `JsonSchemaUnsupported` (LAI-H2 in the hub).

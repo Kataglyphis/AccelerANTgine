@@ -18,6 +18,25 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-01, text options: seed, JSON schema, stop)
+- **C ABI change.** `kataglyphis_text_options` gains `struct_size` as its first field, so an
+  embedder built against the previous header must be rebuilt; OmniAccelerANT's
+  `packages/kataglyphis_native_inference` sees it once its `third_party/AccelerANTgine` pin moves.
+  Appended after `top_k`: `seed`, `json_schema`, `stop`/`stop_count` and
+  `token_ids`/`token_id_capacity`. `kataglyphis_text_options_default` sets `struct_size` and every
+  default; `_generate` reads an appended field only when `struct_size` covers it
+  (`KATAGLYPHIS_TEXT_OPTIONS_V1_SIZE` is the smallest accepted). New status
+  `KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED` (10) and macro `KATAGLYPHIS_TEXT_NO_SEED`.
+- `GenerationOptions` gains `seed`, `json_schema` (GenAI's llguidance) and `stop`; `TextGenError`
+  gains `JsonSchemaUnsupported`, returned where GenAI lacks llguidance (the Windows chain). The
+  nanobind `GenerationOptions` and the CLI (`--temperature`, `--seed`, `--json_schema`, `--stop`)
+  carry them.
+- Tests on the tiny model: repeated seed, four seeds, schema output, stop strings, an old-size
+  options struct, and `sizeof`/`offsetof` asserts for every public struct in C++ and C17.
+- `resources/models/llm.lock` pins OrchestrANT's SmolLM2-135M row; Linux CI fetches it and the
+  commit suite and Python lane replay ModelANT's `text-generation-v1` `capital-of-france` ids.
+- BACKLOG records the llguidance probe: the hub tiny model's tokenizer is accepted.
+
 ### Changed (2026-11-01, python-static strict)
 - `python-static.yml` runs the hub's Ruff and ty lane with `strict: true` on push; ty reports 0
   diagnostics, down from 6.

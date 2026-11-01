@@ -75,13 +75,16 @@ TEST(CApiContract, TextStatusesAreTheCppErrorsShiftedByOne)
     static_assert(as_int(text::TextGenError::InvalidOptions) + 1 == KATAGLYPHIS_TEXT_INVALID_ARGUMENT);
     static_assert(as_int(text::TextGenError::GenerationFailed) + 1 == KATAGLYPHIS_TEXT_GENERATION_FAILED);
     static_assert(as_int(text::TextGenError::NotInitialized) + 1 == KATAGLYPHIS_TEXT_NOT_INITIALIZED);
-    for (int status = KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE; status <= KATAGLYPHIS_TEXT_NOT_INITIALIZED; ++status) {
+    static_assert(as_int(text::TextGenError::JsonSchemaUnsupported) + 1 == KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED);
+    for (int status = KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE; status <= KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED;
+      ++status) {
         EXPECT_EQ(std::string(kataglyphis_text_status_message(status)),
           std::string(text::to_string(static_cast<text::TextGenError>(status - 1))));
     }
     EXPECT_EQ(std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_OK)), "success");
     EXPECT_EQ(std::string(kataglyphis_text_status_message(-1)), "unknown status");
-    EXPECT_EQ(std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_NOT_INITIALIZED + 1)), "unknown status");
+    EXPECT_EQ(
+      std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED + 1)), "unknown status");
 }
 
 TEST(CApiContract, TextOptionDefaultsAreTheCppDefaults)
@@ -93,9 +96,44 @@ TEST(CApiContract, TextOptionDefaultsAreTheCppDefaults)
     EXPECT_DOUBLE_EQ(options.temperature, defaults.temperature);
     EXPECT_DOUBLE_EQ(options.top_p, defaults.top_p);
     EXPECT_EQ(options.top_k, defaults.top_k);
+    EXPECT_EQ(options.struct_size, sizeof(kataglyphis_text_options));
+    EXPECT_EQ(options.seed, KATAGLYPHIS_TEXT_NO_SEED);
+    EXPECT_EQ(options.json_schema, nullptr);
+    EXPECT_EQ(options.stop, nullptr);
+    EXPECT_EQ(options.stop_count, 0U);
+    EXPECT_EQ(options.token_ids, nullptr);
+    EXPECT_EQ(options.token_id_capacity, 0U);
+    EXPECT_FALSE(defaults.seed.has_value());
+    EXPECT_TRUE(defaults.json_schema.empty());
+    EXPECT_TRUE(defaults.stop.empty());
     EXPECT_EQ(defaults.max_new_tokens, 128);
     EXPECT_DOUBLE_EQ(defaults.temperature, 0.0);
 }
+
+// The public structs' layout is the ABI an embedder compiled against; c_header_consumer.c holds C to the same numbers.
+static_assert(sizeof(void *) == 8, "every lane builds the 64-bit ABI these offsets describe");
+static_assert(sizeof(kataglyphis_text_message) == 16);
+static_assert(offsetof(kataglyphis_text_message, role) == 0);
+static_assert(offsetof(kataglyphis_text_message, content) == 8);
+static_assert(sizeof(kataglyphis_text_options) == 88);
+static_assert(offsetof(kataglyphis_text_options, struct_size) == 0);
+static_assert(offsetof(kataglyphis_text_options, max_new_tokens) == 8);
+static_assert(offsetof(kataglyphis_text_options, temperature) == 16);
+static_assert(offsetof(kataglyphis_text_options, top_p) == 24);
+static_assert(offsetof(kataglyphis_text_options, top_k) == 32);
+static_assert(offsetof(kataglyphis_text_options, seed) == 40);
+static_assert(offsetof(kataglyphis_text_options, json_schema) == 48);
+static_assert(offsetof(kataglyphis_text_options, stop) == 56);
+static_assert(offsetof(kataglyphis_text_options, stop_count) == 64);
+static_assert(offsetof(kataglyphis_text_options, token_ids) == 72);
+static_assert(offsetof(kataglyphis_text_options, token_id_capacity) == 80);
+static_assert(KATAGLYPHIS_TEXT_OPTIONS_V1_SIZE == 40);
+static_assert(sizeof(kataglyphis_text_stats) == 40);
+static_assert(offsetof(kataglyphis_text_stats, finish_reason) == 0);
+static_assert(offsetof(kataglyphis_text_stats, prompt_tokens) == 8);
+static_assert(offsetof(kataglyphis_text_stats, completion_tokens) == 16);
+static_assert(offsetof(kataglyphis_text_stats, time_to_first_token_ms) == 24);
+static_assert(offsetof(kataglyphis_text_stats, decode_tokens_per_second) == 32);
 
 TEST(CppApiContract, ResourceOwnersAreMoveOnly)
 {

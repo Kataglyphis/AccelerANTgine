@@ -50,6 +50,26 @@ auto budget(std::size_t tokens) -> text::GenerationOptions
     return options;
 }
 
+// Over the whole vocabulary the tiny model leaves about one token in a hundred off its successor chain.
+constexpr std::size_t kSampledTokens = 32;
+
+auto sampled(std::int32_t seed, double temperature = 1.0) -> text::GenerationOptions
+{
+    auto options = budget(kSampledTokens);
+    options.temperature = temperature;
+    options.top_k = 0;
+    options.top_p = 1.0;
+    options.seed = seed;
+    return options;
+}
+
+auto successors(std::int32_t after, std::size_t count) -> std::vector<std::int32_t>
+{
+    std::vector<std::int32_t> ids(count);
+    for (std::size_t i = 0; i < count; ++i) { ids[i] = after + 1 + static_cast<std::int32_t>(i); }
+    return ids;
+}
+
 class TextGeneration : public ::testing::Test
 {
   protected:
@@ -143,6 +163,95 @@ TEST_F(TextGeneration, CancelFromAnotherThreadIsObserved)
     EXPECT_EQ(result->tokens.size(), 1U);
 }
 
+TEST_F(TextGeneration, GreedyDecodingIgnoresTheSeedAndTheSamplingSettings)
+{
+    for (const std::int32_t seed : { 1, 2, 3, 4 }) {
+        const auto result = generator.generate(user(expected.prompt), sampled(seed, 0.0));
+        ASSERT_TRUE(result.has_value()) << seed;
+        EXPECT_EQ(result->tokens, successors(expected.ids.front() - 1, kSampledTokens)) << seed;
+    }
+}
+
+TEST_F(TextGeneration, ARepeatedSeedRepeatsTheSampledTokens)
+{
+    const auto first = generator.generate(user(expected.prompt), sampled(1));
+    const auto second = generator.generate(user(expected.prompt), sampled(1));
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(first->tokens.size(), kSampledTokens);
+    EXPECT_EQ(first->tokens, second->tokens);
+}
+
+TEST_F(TextGeneration, FourSeedsSampleAtLeastTwoSequences)
+{
+    std::set<std::vector<std::int32_t>> sequences;
+    for (const std::int32_t seed : { 1, 2, 3, 4 }) {
+        const auto result = generator.generate(user(expected.prompt), sampled(seed));
+        ASSERT_TRUE(result.has_value()) << seed;
+        EXPECT_GE(result->tokens.size(), 16U) << seed;
+        sequences.insert(result->tokens);
+    }
+    EXPECT_GE(sequences.size(), 2U);
+}
+
+TEST_F(TextGeneration, AJsonSchemaHoldsTheOutputOrIsUnsupported)
+{
+    auto options = budget(kSampledTokens);
+    options.json_schema = kataglyphis::test::kTinyJsonSchema;
+    const auto result = generator.generate(user(expected.prompt), options);
+    if constexpr (!kataglyphis::test::kGenaiHasGuidance) {
+        EXPECT_EQ(kataglyphis::test::error_of(result), text::TextGenError::JsonSchemaUnsupported);
+    } else {
+        ASSERT_TRUE(result.has_value());
+        const auto parsed = nlohmann::json::parse(result->text);
+        ASSERT_TRUE(parsed.is_object());
+        EXPECT_EQ(parsed.size(), 1U);
+        ASSERT_TRUE(parsed.contains("a") && parsed.at("a").is_string());
+        EXPECT_LE(parsed.at("a").get<std::string>().size(), 3U);
+        EXPECT_EQ(result->text, kataglyphis::test::kTinyJsonSchemaOutput);
+        EXPECT_EQ(result->finish_reason, text::FinishReason::Stop);
+    }
+}
+
+TEST_F(TextGeneration, AStopStringEndsGenerationBeforeIt)
+{
+    auto options = budget(expected.ids.size());
+    options.stop = { "zz", expected.continuation.substr(2, 2) };
+    std::string streamed;
+    const auto result =
+      generator.generate(user(expected.prompt), options, [&streamed](std::string_view piece) { streamed += piece; });
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->text, expected.continuation.substr(0, 2));
+    EXPECT_EQ(streamed, result->text);
+    EXPECT_EQ(result->tokens, expected.ids);
+    EXPECT_EQ(result->finish_reason, text::FinishReason::Stop);
+}
+
+TEST_F(TextGeneration, AStopStringThatNeverCompletesReleasesTheHeldText)
+{
+    auto options = budget(expected.ids.size());
+    options.stop = { expected.continuation.substr(expected.continuation.size() - 1) + "!" };
+    std::string streamed;
+    const auto result =
+      generator.generate(user(expected.prompt), options, [&streamed](std::string_view piece) { streamed += piece; });
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->text, expected.continuation);
+    EXPECT_EQ(streamed, expected.continuation);
+    EXPECT_EQ(result->finish_reason, text::FinishReason::Length);
+}
+
+TEST_F(TextGeneration, ANegativeSeedOrAnEmptyStopStringIsInvalid)
+{
+    auto negative = budget(1);
+    negative.seed = -1;
+    EXPECT_EQ(kataglyphis::test::error_of(generator.generate(user(expected.prompt), negative)),
+      text::TextGenError::InvalidOptions);
+    auto empty_stop = budget(1);
+    empty_stop.stop = { "" };
+    EXPECT_EQ(kataglyphis::test::error_of(generator.generate(user(expected.prompt), empty_stop)),
+      text::TextGenError::InvalidOptions);
+}
+
 TEST_F(TextGeneration, EmptyMessagesOrNoBudgetAreInvalid)
 {
     EXPECT_EQ(kataglyphis::test::error_of(generator.generate({}, budget(1))), text::TextGenError::InvalidOptions);
@@ -184,9 +293,10 @@ TEST(TextGenerationSetup, EveryErrorHasItsOwnMessage)
            text::TextGenError::EncodeFailed,
            text::TextGenError::InvalidOptions,
            text::TextGenError::GenerationFailed,
-           text::TextGenError::NotInitialized }) {
+           text::TextGenError::NotInitialized,
+           text::TextGenError::JsonSchemaUnsupported }) {
         EXPECT_FALSE(text::to_string(error).empty());
         messages.insert(text::to_string(error));
     }
-    EXPECT_EQ(messages.size(), 9U);
+    EXPECT_EQ(messages.size(), 10U);
 }

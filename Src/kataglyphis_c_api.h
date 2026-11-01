@@ -27,6 +27,10 @@ KATAGLYPHIS_C_API int kataglyphis_add(int lhs, int rhs);
 #define KATAGLYPHIS_TEXT_INVALID_ARGUMENT 7
 #define KATAGLYPHIS_TEXT_GENERATION_FAILED 8
 #define KATAGLYPHIS_TEXT_NOT_INITIALIZED 9
+#define KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED 10
+
+/** A seed below 0 lets GenAI draw one. */
+#define KATAGLYPHIS_TEXT_NO_SEED (-1)
 
 #define KATAGLYPHIS_TEXT_PROVIDER_CPU 0
 #define KATAGLYPHIS_TEXT_PROVIDER_CUDA 1
@@ -44,13 +48,27 @@ typedef struct kataglyphis_text_message_s
     const char *content;
 } kataglyphis_text_message;
 
+/** New fields are only appended; generate reads a field only when struct_size covers it, else its default. */
 typedef struct kataglyphis_text_options_s
 {
+    size_t struct_size;
     int32_t max_new_tokens;
     double temperature;
     double top_p;
     int32_t top_k;
+    int64_t seed;
+    /** NULL or empty: unconstrained. */
+    const char *json_schema;
+    /** stop_count non-empty strings; generation ends before the first, which the text never contains. */
+    const char *const *stop;
+    size_t stop_count;
+    /** When not NULL, receives the first token_id_capacity generated token ids; stats count them all. */
+    int32_t *token_ids;
+    size_t token_id_capacity;
 } kataglyphis_text_options;
+
+/** The first sized layout: struct_size through top_k. */
+#define KATAGLYPHIS_TEXT_OPTIONS_V1_SIZE offsetof(kataglyphis_text_options, seed)
 
 typedef struct kataglyphis_text_stats_s
 {
@@ -64,7 +82,7 @@ typedef struct kataglyphis_text_stats_s
 /** Each decoded piece, valid only during the call; it must not call back into the generator. */
 typedef void (*kataglyphis_text_callback)(const char *piece, size_t length, void *user_data);
 
-/** The C++ defaults: 128 new tokens, greedy decoding. */
+/** The C++ defaults, struct_size the size this header declares: 128 new tokens, greedy, no seed, schema or stop. */
 KATAGLYPHIS_C_API void kataglyphis_text_options_default(kataglyphis_text_options *options);
 
 KATAGLYPHIS_C_API int

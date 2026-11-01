@@ -104,6 +104,27 @@ function(kataglyphis_configure_library_test_target target_name)
                               kInferenceContract)
 endfunction()
 
+# The schema the tiny-model tests pass; the C++ suites spell the same text in kataglyphis_test_support.h.
+set(KATAGLYPHIS_TINY_JSON_SCHEMA
+    [=[{"type":"object","properties":{"a":{"type":"string","maxLength":3}},"required":["a"],"additionalProperties":false,"x-guidance":{"whitespace_flexible":false}}]=]
+)
+
+# The released SmolLM2 model the contract suite decodes; CI fetches resources/models/llm.lock and requires it.
+function(kataglyphis_use_text_contract_model target_name)
+  set(_model "${PROJECT_SOURCE_DIR}/resources/models/smollm2_135m_instruct-cpu")
+  if(EXISTS "${_model}/genai_config.json")
+    target_sources(${target_name} PRIVATE "${PROJECT_SOURCE_DIR}/Test/contract/text_contract_test.cpp"
+                                          "${PROJECT_SOURCE_DIR}/Test/contract/text_contract_consumer.c")
+    target_compile_definitions(
+      ${target_name}
+      PRIVATE KATAGLYPHIS_TEXT_CONTRACT_MODEL="${_model}"
+              KATAGLYPHIS_TEXT_CONTRACT="${PROJECT_SOURCE_DIR}/third_party/ModelANT/contracts/text-generation-v1.json")
+  elseif("$ENV{KATAGLYPHIS_REQUIRE_MODEL}" STREQUAL "1")
+    message(FATAL_ERROR "KATAGLYPHIS_REQUIRE_MODEL=1 but ${_model} is missing: fetch resources/models/llm.lock with "
+                        "the hub's fetch-data-lock.py --extract")
+  endif()
+endfunction()
+
 # Generated at configure, never stored: third_party/ANTfrastructure/docs/language-ai.md#the-test-model
 function(kataglyphis_use_tiny_genai_model target_name)
   set(_model "${CMAKE_BINARY_DIR}/test-models/tiny-genai")

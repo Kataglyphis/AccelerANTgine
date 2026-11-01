@@ -91,3 +91,6 @@ out/*
 
 # uv-managed Python env for the docs/quality tooling
 .venv/
+# The contract model arrives by resources/models/llm.lock and the hub's fetcher, like models/.
+/resources/models/*
+!/resources/models/llm.lock

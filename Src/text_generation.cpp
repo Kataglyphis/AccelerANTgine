@@ -12,6 +12,7 @@ module;
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <span>
 #include <string>
@@ -67,6 +68,7 @@ namespace {
         decltype(&OgaDestroyGeneratorParams) DestroyGeneratorParams;
         decltype(&OgaGeneratorParamsSetSearchNumber) GeneratorParamsSetSearchNumber;
         decltype(&OgaGeneratorParamsSetSearchBool) GeneratorParamsSetSearchBool;
+        decltype(&OgaGeneratorParamsSetGuidance) GeneratorParamsSetGuidance;
         decltype(&OgaCreateGenerator) CreateGenerator;
         decltype(&OgaDestroyGenerator) DestroyGenerator;
         decltype(&OgaGenerator_AppendTokenSequences) GeneratorAppendTokenSequences;
@@ -128,6 +130,7 @@ namespace {
               && bind(library, "OgaDestroyGeneratorParams", table->DestroyGeneratorParams)
               && bind(library, "OgaGeneratorParamsSetSearchNumber", table->GeneratorParamsSetSearchNumber)
               && bind(library, "OgaGeneratorParamsSetSearchBool", table->GeneratorParamsSetSearchBool)
+              && bind(library, "OgaGeneratorParamsSetGuidance", table->GeneratorParamsSetGuidance)
               && bind(library, "OgaCreateGenerator", table->CreateGenerator)
               && bind(library, "OgaDestroyGenerator", table->DestroyGenerator)
               && bind(library, "OgaGenerator_AppendTokenSequences", table->GeneratorAppendTokenSequences)
@@ -139,12 +142,62 @@ namespace {
         return api.get();
     }
 
-    auto succeeded(const GenaiApi &api, OgaResult *result, std::string_view what) -> bool
+    auto failure(const GenaiApi &api, OgaResult *result, std::string_view what) -> std::optional<std::string>
     {
-        if (result == nullptr) { return true; }
-        log::error("ONNX Runtime GenAI: {}: {}", what, api.ResultGetError(result));
+        if (result == nullptr) { return std::nullopt; }
+        std::string message = api.ResultGetError(result);
+        log::error("ONNX Runtime GenAI: {}: {}", what, message);
         api.DestroyResult(result);
-        return false;
+        return message;
+    }
+
+    auto succeeded(const GenaiApi &api, OgaResult *result, std::string_view what) -> bool
+    { return !failure(api, result, what); }
+
+    // GenAI built without llguidance (the Windows chain) refuses a schema with this text when the generator is created.
+    auto guidance_error(std::string_view message) -> TextGenError
+    {
+        return message.find("Guidance is unavailable") != std::string_view::npos ? TextGenError::JsonSchemaUnsupported
+                                                                                 : TextGenError::InvalidOptions;
+    }
+
+    // The end of the longest stop-string prefix the text ends with: text that may still become a stop string.
+    auto held_back(std::string_view text, const std::vector<std::string> &stop) -> std::size_t
+    {
+        std::size_t longest = 0;
+        for (const auto &candidate : stop) {
+            for (std::size_t length = std::min(candidate.size() - 1, text.size()); length > longest; --length) {
+                if (text.ends_with(std::string_view(candidate).substr(0, length))) {
+                    longest = length;
+                    break;
+                }
+            }
+        }
+        return longest;
+    }
+
+    // The earliest stop string that ends after `from`, as an offset into text.
+    auto stop_position(std::string_view text, const std::vector<std::string> &stop, std::size_t from) -> std::size_t
+    {
+        std::size_t first = std::string_view::npos;
+        for (const auto &candidate : stop) {
+            const std::size_t start = from > candidate.size() ? from - candidate.size() : 0;
+            first = std::min(first, text.find(candidate, start));
+        }
+        return first;
+    }
+
+    void emit(const std::string &text, std::size_t &emitted, std::size_t until, const TextCallback &on_text)
+    {
+        if (until <= emitted) { return; }
+        if (on_text) { on_text(std::string_view(text).substr(emitted, until - emitted)); }
+        emitted = until;
+    }
+
+    auto valid_options(const GenerationOptions &options) -> bool
+    {
+        return options.max_new_tokens > 0 && (!options.seed || *options.seed >= 0)
+               && std::ranges::none_of(options.stop, [](const std::string &stop) { return stop.empty(); });
     }
 
     template<typename T, auto Destroy> struct Release
@@ -203,16 +256,20 @@ struct TextGenerator::Impl
     auto prompt_tokens(const std::vector<ChatMessage> &messages) const -> std::expected<Sequences, TextGenError>;
     auto make_generator(const OgaSequences &prompt, std::size_t prompt_count, const GenerationOptions &options) const
       -> std::expected<Generator, TextGenError>;
-    auto next_token(OgaGenerator *generator,
-      OgaTokenizerStream *stream,
-      const TextCallback &on_text,
-      GenerationResult &result) const -> std::expected<void, TextGenError>;
+    auto configure(OgaGeneratorParams *params, std::size_t prompt_count, const GenerationOptions &options) const
+      -> bool;
+    auto next_token(OgaGenerator *generator, OgaTokenizerStream *stream, GenerationResult &result) const
+      -> std::expected<void, TextGenError>;
     auto decode(OgaGenerator *generator,
+      const GenerationOptions &options,
       const TextCallback &on_text,
       GenerationResult &result,
       Clock::time_point start) const -> std::expected<void, TextGenError>;
-    void
-      finish(GenerationResult &result, Clock::time_point start, Clock::time_point first, Clock::time_point end) const;
+    void finish(GenerationResult &result,
+      bool stopped,
+      Clock::time_point start,
+      Clock::time_point first,
+      Clock::time_point end) const;
 };
 
 auto TextGenerator::Impl::prompt_tokens(const std::vector<ChatMessage> &messages) const
@@ -247,22 +304,11 @@ auto TextGenerator::Impl::make_generator(const OgaSequences &prompt,
         return std::unexpected(TextGenError::GenerationFailed);
     }
     const Params params{ raw_params, { api } };
-    const bool sample = options.temperature > 0.0;
-    const double max_length = static_cast<double>(prompt_count) + options.max_new_tokens;
-    bool configured =
-      succeeded(*api, api->GeneratorParamsSetSearchNumber(params.get(), "max_length", max_length), "max_length")
-      && succeeded(*api, api->GeneratorParamsSetSearchBool(params.get(), "do_sample", sample), "do_sample");
-    if (configured && sample) {
-        configured =
-          succeeded(
-            *api, api->GeneratorParamsSetSearchNumber(params.get(), "temperature", options.temperature), "temperature")
-          && succeeded(*api, api->GeneratorParamsSetSearchNumber(params.get(), "top_p", options.top_p), "top_p")
-          && succeeded(*api, api->GeneratorParamsSetSearchNumber(params.get(), "top_k", options.top_k), "top_k");
-    }
-    if (!configured) { return std::unexpected(TextGenError::InvalidOptions); }
+    if (!configure(params.get(), prompt_count, options)) { return std::unexpected(TextGenError::InvalidOptions); }
     OgaGenerator *raw_generator = nullptr;
-    if (!succeeded(*api, api->CreateGenerator(model.get(), params.get(), &raw_generator), "generator")) {
-        return std::unexpected(TextGenError::GenerationFailed);
+    if (const auto error =
+          failure(*api, api->CreateGenerator(model.get(), params.get(), &raw_generator), "generator")) {
+        return std::unexpected(options.json_schema.empty() ? TextGenError::GenerationFailed : guidance_error(*error));
     }
     Generator generator{ raw_generator, { api } };
     if (!succeeded(*api, api->GeneratorAppendTokenSequences(generator.get(), &prompt), "prompt")) {
@@ -271,9 +317,35 @@ auto TextGenerator::Impl::make_generator(const OgaSequences &prompt,
     return generator;
 }
 
+auto TextGenerator::Impl::configure(OgaGeneratorParams *params,
+  std::size_t prompt_count,
+  const GenerationOptions &options) const -> bool
+{
+    const bool sample = options.temperature > 0.0;
+    const double max_length = static_cast<double>(prompt_count) + options.max_new_tokens;
+    bool configured =
+      succeeded(*api, api->GeneratorParamsSetSearchNumber(params, "max_length", max_length), "max_length")
+      && succeeded(*api, api->GeneratorParamsSetSearchBool(params, "do_sample", sample), "do_sample");
+    if (configured && sample) {
+        configured =
+          succeeded(
+            *api, api->GeneratorParamsSetSearchNumber(params, "temperature", options.temperature), "temperature")
+          && succeeded(*api, api->GeneratorParamsSetSearchNumber(params, "top_p", options.top_p), "top_p")
+          && succeeded(*api, api->GeneratorParamsSetSearchNumber(params, "top_k", options.top_k), "top_k");
+    }
+    if (configured && options.seed) {
+        configured =
+          succeeded(*api, api->GeneratorParamsSetSearchNumber(params, "random_seed", *options.seed), "random_seed");
+    }
+    if (configured && !options.json_schema.empty()) {
+        configured = succeeded(
+          *api, api->GeneratorParamsSetGuidance(params, "json_schema", options.json_schema.c_str(), false), "guidance");
+    }
+    return configured;
+}
+
 auto TextGenerator::Impl::next_token(OgaGenerator *generator,
   OgaTokenizerStream *stream,
-  const TextCallback &on_text,
   GenerationResult &result) const -> std::expected<void, TextGenError>
 {
     const std::int32_t *next = nullptr;
@@ -288,13 +360,12 @@ auto TextGenerator::Impl::next_token(OgaGenerator *generator,
         return std::unexpected(TextGenError::TokenizerFailed);
     }
     // A piece that ends inside a UTF-8 character stays in the stream until it is complete.
-    if (piece == nullptr || *piece == '\0') { return {}; }
-    result.text += piece;
-    if (on_text) { on_text(piece); }
+    if (piece != nullptr) { result.text += piece; }
     return {};
 }
 
 auto TextGenerator::Impl::decode(OgaGenerator *generator,
+  const GenerationOptions &options,
   const TextCallback &on_text,
   GenerationResult &result,
   Clock::time_point start) const -> std::expected<void, TextGenError>
@@ -305,26 +376,37 @@ auto TextGenerator::Impl::decode(OgaGenerator *generator,
     }
     const Stream stream{ raw_stream, { api } };
     auto first = start;
-    while (!api->GeneratorIsDone(generator)) {
+    std::size_t emitted = 0;
+    bool stopped = false;
+    while (!stopped && !api->GeneratorIsDone(generator)) {
         if (cancel.load()) {
             result.finish_reason = FinishReason::Cancelled;
             break;
         }
-        if (auto stepped = next_token(generator, stream.get(), on_text, result); !stepped) { return stepped; }
+        const std::size_t before = result.text.size();
+        if (auto stepped = next_token(generator, stream.get(), result); !stepped) { return stepped; }
         if (result.tokens.size() == 1) { first = Clock::now(); }
+        if (const auto at = stop_position(result.text, options.stop, before); at != std::string::npos) {
+            result.text.resize(at);
+            stopped = true;
+        }
+        emit(result.text, emitted, result.text.size() - (stopped ? 0 : held_back(result.text, options.stop)), on_text);
     }
-    finish(result, start, first, Clock::now());
+    emit(result.text, emitted, result.text.size(), on_text);
+    finish(result, stopped, start, first, Clock::now());
     return {};
 }
 
 void TextGenerator::Impl::finish(GenerationResult &result,
+  bool stopped,
   Clock::time_point start,
   Clock::time_point first,
   Clock::time_point end) const
 {
     if (result.finish_reason != FinishReason::Cancelled) {
-        const bool stopped = !result.tokens.empty() && std::ranges::contains(eos_tokens, result.tokens.back());
-        result.finish_reason = stopped ? FinishReason::Stop : FinishReason::Length;
+        const bool ended =
+          stopped || (!result.tokens.empty() && std::ranges::contains(eos_tokens, result.tokens.back()));
+        result.finish_reason = ended ? FinishReason::Stop : FinishReason::Length;
     }
     if (!result.tokens.empty()) { result.time_to_first_token_ms = milliseconds(first - start); }
     if (result.tokens.size() > 1 && end > first) {
@@ -389,7 +471,7 @@ auto TextGenerator::generate(const std::vector<ChatMessage> &messages,
 {
     const std::unique_lock lock(impl_->mutex);
     if (impl_->model == nullptr) { return std::unexpected(TextGenError::NotInitialized); }
-    if (messages.empty() || options.max_new_tokens <= 0) { return std::unexpected(TextGenError::InvalidOptions); }
+    if (messages.empty() || !valid_options(options)) { return std::unexpected(TextGenError::InvalidOptions); }
     impl_->cancel.store(false);
     // The clock starts before the prompt goes in, so the first token's time includes the prefill.
     const auto start = Clock::now();
@@ -399,7 +481,7 @@ auto TextGenerator::generate(const std::vector<ChatMessage> &messages,
     result.prompt_tokens = impl_->api->SequencesGetSequenceCount(prompt->get(), 0);
     auto generator = impl_->make_generator(**prompt, result.prompt_tokens, options);
     if (!generator) { return std::unexpected(generator.error()); }
-    if (auto decoded = impl_->decode(generator->get(), on_text, result, start); !decoded) {
+    if (auto decoded = impl_->decode(generator->get(), options, on_text, result, start); !decoded) {
         return std::unexpected(decoded.error());
     }
     return result;
@@ -428,6 +510,8 @@ auto to_string(TextGenError error) noexcept -> std::string_view
         return "generation failed";
     case TextGenError::NotInitialized:
         return "the generator is not initialized";
+    case TextGenError::JsonSchemaUnsupported:
+        return "this ONNX Runtime GenAI build has no JSON schema support";
     }
     return "unknown error";
 }

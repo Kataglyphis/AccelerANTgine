@@ -199,9 +199,11 @@ written out rather than linked.
   shared `.pre-commit-config.yaml` regex upstream was extended for exactly this. A file-discovery
   change that drops `.ixx` silently shrinks the format and tidy sets instead of failing.
 - **The C API is the ABI surface.** `Src/kataglyphis_c_api.{h,ixx,cpp}` and `kataglyphis_export.h`
-  are what the native plugin links against: today one function, `kataglyphis_add`, which the
-  Windows plugin reaches through the header and the Linux plugin through
-  `import kataglyphis.c_api;`. The webcam path's `knt_push_frame` is not part of it; the plugin
+  are what the native plugin links against: `kataglyphis_add`, which the Windows plugin reaches
+  through the header and the Linux plugin through `import kataglyphis.c_api;`, and the text
+  generator. `kataglyphis_text_options` is sized: append fields only, read each only when
+  `struct_size` covers it, and update the `sizeof`/`offsetof` asserts in `Test/compile` (C++ and
+  C17) with every layout change (`docs/source/text_generation.rst`). The webcam path's `knt_push_frame` is not part of it; the plugin
   defines and exports that itself. A signature change here breaks a consumer one superproject up,
   which no build in this repo catches.
 - **The docs theme comes from DocumANTation, via ANTfrastructure** (§ 3). A docs venv whose
@@ -308,7 +310,11 @@ written out rather than linked.
   hub pin without it fails the configure, and the tests read the generator's `fixture.json` rather
   than retyping its tokens. The library loads GenAI at run time and never links it; a lane without
   the chain GenAI fails `initialize` with `LibraryUnavailable`
-  (`docs/source/text_generation.rst`).
+  (`docs/source/text_generation.rst`). A JSON-schema test asserts the output on Linux and
+  `JsonSchemaUnsupported` on Windows, whose GenAI has no llguidance; it never skips. The
+  real-model contract (`Test/contract/`, `Test/python/contract_text_generation.py`) needs
+  `resources/models/llm.lock` fetched; CI sets `KATAGLYPHIS_REQUIRE_MODEL=1` so CMake fails
+  without it.
 - **A GStreamer test skips when an element is missing; Windows stages four plugins.**
   `KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS` probes through the library and names the missing
   element in its `GTEST_SKIP`. GStreamer looks for plugins in the directory of

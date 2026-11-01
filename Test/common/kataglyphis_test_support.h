@@ -245,6 +245,19 @@ inline auto missing_path(std::string_view name) -> std::filesystem::path
 { return std::filesystem::temp_directory_path() / "kataglyphis-test-does-not-exist" / std::string(name); }
 
 #ifdef KATAGLYPHIS_TINY_GENAI_MODEL
+// The Windows chain builds GenAI without llguidance, so a JSON schema must fail there with JsonSchemaUnsupported.
+#ifdef _WIN32
+inline constexpr bool kGenaiHasGuidance = false;
+#else
+inline constexpr bool kGenaiHasGuidance = true;
+#endif
+
+// llguidance holds the tiny model to one key and three characters, so greedy decoding of abc must close the object.
+inline constexpr const char *kTinyJsonSchema =
+  R"({"type":"object","properties":{"a":{"type":"string","maxLength":3}},"required":["a"],)"
+  R"("additionalProperties":false,"x-guidance":{"whitespace_flexible":false}})";
+inline constexpr const char *kTinyJsonSchemaOutput = R"({"a":"#$%"})";
+
 // The directory of the running suite; kataglyphis_test_paths.cpp keeps the OS headers out of every test.
 auto executable_dir() -> std::filesystem::path;
 

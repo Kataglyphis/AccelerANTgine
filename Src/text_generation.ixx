@@ -7,6 +7,7 @@ module;
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,6 +26,7 @@ enum class TextGenError {
     InvalidOptions,
     GenerationFailed,
     NotInitialized,
+    JsonSchemaUnsupported,
 };
 
 enum class ExecutionProvider { Cpu, Cuda, DirectML };
@@ -43,6 +45,12 @@ struct GenerationOptions
     double temperature = 0.0;
     double top_p = 1.0;
     int top_k = 50;
+    /// Unset lets GenAI draw one; a set seed repeats the sampled tokens, and a negative one is invalid.
+    std::optional<std::int32_t> seed;
+    /// Empty leaves the output free; otherwise GenAI's llguidance holds it to this JSON schema.
+    std::string json_schema;
+    /// Generation ends before the first of these strings, which the text and on_text never contain.
+    std::vector<std::string> stop;
 };
 
 struct GenerationResult
