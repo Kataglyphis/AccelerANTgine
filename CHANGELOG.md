@@ -34,7 +34,8 @@ belongs in the **Changed** list below with that consequence spelled out.
   tiny GenAI model). Every Linux leg uploads `results.json` and compares it through the hub's
   `bench-history` action (keys `perf-<arch>-<compiler>`); a doubled gated time fails. The Windows
   lanes upload theirs too and report them ungated (`perf-win-x64`, `perf-win-arm64`); the staged
-  suites carry the DEIM model beside them.
+  suites carry the DEIM model beside them. `quality-report.toml` declares the two develop keys,
+  `bench-history-perf-x64-gcc` and `bench-history-perf-x64-clang`, for fleet-health.
 - **An instruction-count check.** `scripts/linux/perf-cachegrind.py` counts `BM_PreprocessFrame` and
   `BM_DetectFrame` under cachegrind and records them per leg; a key with a baseline in
   `perf/cachegrind-baseline.json` fails over max(3 %, 3 x the recorded spread). `x64-clang` and

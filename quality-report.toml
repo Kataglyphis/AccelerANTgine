@@ -5,9 +5,16 @@ schema_version = 1
 build_list = "docs/source/index.rst"
 source = "docs/source"
 
+# The bench-history records every develop push uploads; Windows and arm64 lanes run on request only.
 [[output]]
 kind = "benchmark"
-path = "build/results.json"
+path = "bench-history-perf-x64-gcc.json"
+artifact = "bench-history-perf-x64-gcc"
+
+[[output]]
+kind = "benchmark"
+path = "bench-history-perf-x64-clang.json"
+artifact = "bench-history-perf-x64-clang"
 
 # The build lane keeps its reports in the job workspace only, so these are read from a local run.
 [[artifact]]
