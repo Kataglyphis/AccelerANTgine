@@ -1,0 +1,42 @@
+# Lane outputs and repo metrics for the hub's quality-report.sh, which holds no repo specifics.
+schema_version = 1
+
+[docs]
+build_list = "docs/source/index.rst"
+source = "docs/source"
+
+[[output]]
+kind = "benchmark"
+path = "build/results.json"
+
+# The build lane keeps its reports in the job workspace only, so these are read from a local run.
+[[artifact]]
+name = "ctest"
+kind = "junit"
+path = "docs/test_results.xml"
+
+[[artifact]]
+name = "ctest-tsan"
+kind = "junit"
+path = "docs/test_results_tsan.xml"
+
+[[artifact]]
+name = "python-gil"
+kind = "junit"
+path = "logs/python-gil.xml"
+
+[[artifact]]
+name = "python-free-threaded"
+kind = "junit"
+path = "logs/python-free-threaded.xml"
+
+[[artifact]]
+name = "clang"
+kind = "coverage"
+format = "json"
+path = "build/coverage.json"
+
+[[artifact]]
+name = "clang"
+kind = "clang-tidy"
+path = "logs/code-quality/clang-tidy.txt"
