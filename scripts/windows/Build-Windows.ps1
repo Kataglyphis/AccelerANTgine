@@ -412,7 +412,6 @@ function Invoke-ClangDebugAnalysisStep {
                 SourceSubdirectory = 'Src'
                 Extension          = @('.cpp', '.cc', '.cxx', '.ixx', '.cppm', '.mxx')
                 Checks             = @('-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness,-google-explicit-constructor,-hicpp-explicit-conversions')
-                Fix                = $true
             }
             $cache = Join-Path $fastBuildClangFull 'CMakeCache.txt'
             $compilerLine = Select-String -Path $cache -Pattern '^CMAKE_CXX_COMPILER:[A-Z]+=(.+)$' -ErrorAction SilentlyContinue |

@@ -1,0 +1,218 @@
+[
+ {
+  "id": "skip-gate.skipped-element",
+  "target": "scripts/linux/check-junit-skips.py",
+  "find": "if case.find(\"skipped\") is not None or status in NOT_RUN_STATUSES:",
+  "replace": "if status in NOT_RUN_STATUSES:",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "A GTEST_SKIP or pytest skip writes <skipped>; ignoring it lets a skipped lane pass."
+ },
+ {
+  "id": "skip-gate.not-run-status",
+  "target": "scripts/linux/check-junit-skips.py",
+  "find": "NOT_RUN_STATUSES = frozenset({\"notrun\", \"disabled\", \"skipped\"})",
+  "replace": "NOT_RUN_STATUSES = frozenset({\"disabled\", \"skipped\"})",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "ctest's not-run cases never executed and must fail the gate."
+ },
+ {
+  "id": "skip-gate.verdict",
+  "target": "scripts/linux/check-junit-skips.py",
+  "find": "return 1 if broken or found else 0",
+  "replace": "return 1 if broken else 0",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "Listing skips without failing on them proves nothing."
+ },
+ {
+  "id": "skip-gate.missing-report",
+  "target": "scripts/linux/check-junit-skips.py",
+  "find": "            broken.append(str(exc))\n            continue",
+  "replace": "            continue",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "A report that vanished must fail rather than count as zero skips."
+ },
+ {
+  "id": "skip-gate.empty-report",
+  "target": "scripts/linux/check-junit-skips.py",
+  "find": "    if not cases:\n        raise ValueError(f\"{path}: no <testcase> element\")",
+  "replace": "    if not cases:\n        return 0, []",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "A report with no testcase graded nothing."
+ },
+ {
+  "id": "skip-gate.tsan-report",
+  "target": "scripts/linux/ci-common.sh",
+  "find": "docs/test_results_tsan.xml logs/python-gil.xml",
+  "replace": "logs/python-gil.xml",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "The TSan lane's report must reach the skip gate."
+ },
+ {
+  "id": "skip-gate.pytest-reports",
+  "target": "scripts/linux/ci-common.sh",
+  "find": "logs/python-gil.xml logs/python-free-threaded.xml",
+  "replace": "logs/python-gil.xml",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "Both pytest reports must reach the skip gate."
+ },
+ {
+  "id": "coverage-floor.gcc-lines",
+  "target": "scripts/linux/ci-coverage.sh",
+  "find": "COVERAGE_MIN_LINES_GCC=69",
+  "replace": "COVERAGE_MIN_LINES_GCC=68",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "GCC's line floor is 69 %."
+ },
+ {
+  "id": "coverage-floor.gcc-branches",
+  "target": "scripts/linux/ci-coverage.sh",
+  "find": "COVERAGE_MIN_BRANCHES_GCC=50",
+  "replace": "COVERAGE_MIN_BRANCHES_GCC=49",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "GCC's branch floor is 50 %."
+ },
+ {
+  "id": "coverage-floor.clang-lines",
+  "target": "scripts/linux/ci-coverage.sh",
+  "find": "COVERAGE_MIN_LINES_CLANG=83",
+  "replace": "COVERAGE_MIN_LINES_CLANG=82",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "clang's line floor is 83 %."
+ },
+ {
+  "id": "coverage-floor.clang-branches",
+  "target": "scripts/linux/ci-coverage.sh",
+  "find": "COVERAGE_MIN_BRANCHES_CLANG=68",
+  "replace": "COVERAGE_MIN_BRANCHES_CLANG=67",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "clang's branch floor is 68 %."
+ },
+ {
+  "id": "coverage-floor.gcc-wired",
+  "target": "scripts/linux/ci-coverage.sh",
+  "find": "    || die \"GCC coverage is below its floor (see the line above).\"",
+  "replace": "    || true",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "The GCC leg must fail on its floor, not only print it."
+ },
+ {
+  "id": "coverage-floor.compare",
+  "target": "scripts/linux/check-coverage-floor.py",
+  "find": "             if value < floor]",
+  "replace": "             if value < floor - 1]",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "A figure just below its floor must fail."
+ },
+ {
+  "id": "coverage-floor.no-branches",
+  "target": "scripts/linux/check-coverage-floor.py",
+  "find": "    if total <= 0:\n        raise ValueError(f\"the report counts no {what}\")",
+  "replace": "    if total <= 0:\n        return 100.0",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "A report without branch data must not read as full coverage."
+ },
+ {
+  "id": "ort-chain.marker",
+  "target": "cmake/OrtPackageVariant.cmake",
+  "find": "  if(NOT _ort_chain_hit)\n",
+  "replace": "  if(FALSE)\n",
+  "test": "bash scripts/linux/tests/test-ort-chain-proof.sh",
+  "why": "An ORT without the chain build's source path must be refused."
+ },
+ {
+  "id": "ort-chain.missing",
+  "target": "cmake/OrtPackageVariant.cmake",
+  "find": "    message(FATAL_ERROR \"ONNX Runtime: ${runtime} is missing, so ${root} cannot be proved to be the chain build.\")",
+  "replace": "    return()",
+  "test": "bash scripts/linux/tests/test-ort-chain-proof.sh",
+  "why": "A missing ORT runtime cannot be proved to be the chain build."
+ },
+ {
+  "id": "static.no-fix",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "CODE_QUALITY_CLANG_TIDY_FIX=false",
+  "replace": "CODE_QUALITY_CLANG_TIDY_FIX=true",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "clang-tidy must report, never rewrite the checkout CI builds."
+ },
+ {
+  "id": "static.tidy-log",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "\"${abs_src_files[@]}\" >\"${TIDY_LOG}\" 2>&1 || status=$?",
+  "replace": "\"${abs_src_files[@]}\" || status=$?",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "The clang-tidy findings must reach the quality-report artifact."
+ },
+ {
+  "id": "static.sources-unchanged",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "run_gate sources-unchanged check_sources_unchanged\n",
+  "replace": "\n",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A tool that rewrites Src or Test must fail the lane."
+ },
+ {
+  "id": "static.scan-units",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "[[ \"${units}\" -gt 0 ]]",
+  "replace": "[[ \"${units}\" -ge 0 ]]",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A scan-build that analysed nothing graded nothing."
+ },
+ {
+  "id": "static.scan-status",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "-plist-html --keep-empty --status-bugs",
+  "replace": "-plist-html --keep-empty",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A scan-build finding must fail the lane."
+ },
+ {
+  "id": "static.scan-fresh-tree",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "  rm -rf -- \"${SCAN_BUILD_DIR}\" \"${SCAN_BUILD_REPORTS}\"\n",
+  "replace": "  rm -rf -- \"${SCAN_BUILD_REPORTS}\"\n",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A reused scan tree compiles nothing, so scan-build analyses no unit."
+ },
+ {
+  "id": "static.scan-wrapper",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "\"${_SCRIPT_DIR}/scan-build-cxx.sh\" || return 1",
+  "replace": "\"${CXX}\" || return 1",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "Without the wrapper ccc-analyzer cannot load a module BMI and analyses nothing."
+ },
+ {
+  "id": "static.scan-uncached",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "-B \"$2\" -D COMPILER_CACHE= -D",
+  "replace": "-B \"$2\" -D",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A compiler-cache hit skips the analyzer, so the scan tree must run uncached."
+ },
+ {
+  "id": "static.scan-failures",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "  if [[ -n \"$(find \"${SCAN_BUILD_REPORTS}\" -type d -name failures)\" ]]; then",
+  "replace": "  if false; then",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A unit the analyzer could not parse was never analysed."
+ },
+ {
+  "id": "scan-cxx.modmap",
+  "target": "scripts/linux/scan-build-cxx.sh",
+  "find": "  if [[ \"${arg}\" == @* && -f \"${arg#@}\" ]]; then",
+  "replace": "  if false; then",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "ccc-analyzer drops @modmap files, so they must be expanded first."
+ },
+ {
+  "id": "scan-cxx.pthread",
+  "target": "scripts/linux/scan-build-cxx.sh",
+  "find": "    args+=(-pthread -Xclang -pthread)",
+  "replace": "    args+=(-pthread)",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A BMI built with -pthread refuses to load into an analysis without it."
+ }
+]

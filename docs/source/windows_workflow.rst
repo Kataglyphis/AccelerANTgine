@@ -124,7 +124,7 @@ Build Script Responsibilities
 - has an LLVM coverage step over ``Test\compile\default.profraw``, which finds
   nothing today: the ``x64-ClangCL-Windows-Debug`` preset leaves
   ``myproject_ENABLE_COVERAGE`` off
-- runs ``clang-tidy``
+- runs ``clang-tidy`` as a report, without ``-fix``
 - runs profile benchmarks
 - builds release packages and the portable bundle in ``dist\windows-x64``
 - optionally creates MSIX output (``-SkipMSIX`` skips it), signed with the first

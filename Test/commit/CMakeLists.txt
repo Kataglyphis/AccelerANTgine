@@ -87,3 +87,78 @@ if(TARGET ${PROJECT_NAME}_cli)
     set_tests_properties(Cli.ChatFollowsAJsonSchema PROPERTIES PASS_REGULAR_EXPRESSION "^\\{\"a\":\"#\\$%\"\\}\n")
   endif()
 endif()
+
+# The demo's command line: every mode's refusal path, none of which needs a model.
+if(TARGET ${PROJECT_NAME}_demo)
+  set(_demo_missing_model "${CMAKE_BINARY_DIR}/no-such-model.onnx")
+  function(kataglyphis_add_demo_test name pass)
+    add_test(NAME Demo.${name} COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> ${ARGN})
+    # A matched message ignores the exit status, so a sanitizer report after it must still fail.
+    set_tests_properties(
+      Demo.${name}
+      PROPERTIES PASS_REGULAR_EXPRESSION
+                 "${pass}"
+                 FAIL_REGULAR_EXPRESSION
+                 "Sanitizer|runtime error")
+  endfunction()
+  kataglyphis_add_demo_test(HelpListsEveryMode "--detector-repeat-output <json>" --help)
+  kataglyphis_add_demo_test(
+    OnnxExampleReportsAMissingModel
+    "ONNX inference example failed!"
+    --model
+    "${_demo_missing_model}"
+    --onnx-only)
+  kataglyphis_add_demo_test(
+    YoloExampleReportsAMissingModel
+    "YOLO detection example failed!"
+    --model
+    "${_demo_missing_model}"
+    --yolo-only)
+  kataglyphis_add_demo_test(
+    VideoExampleReportsAMissingFile
+    "Video detection example failed!"
+    --model
+    "${_demo_missing_model}"
+    --video-only)
+  kataglyphis_add_demo_test(
+    VideoCheckReportsAMissingModel
+    "Video detector initialization failed"
+    --model
+    "${_demo_missing_model}"
+    --video-check)
+  kataglyphis_add_demo_test(
+    UnknownDeviceIsRefused
+    "Unknown device: quantum"
+    --device
+    quantum)
+  kataglyphis_add_demo_test(
+    MalformedDeviceIndexIsRefused
+    "Invalid device index: 3x"
+    --device-id
+    3x)
+  kataglyphis_add_demo_test(UnknownOptionIsRefused "Unknown or incomplete option: --frobnicate" --frobnicate)
+  kataglyphis_add_demo_test(
+    ImageDetectionNeedsOutputAndProfile
+    "requires an image, output and profile"
+    --detector-image
+    image.jpg)
+  kataglyphis_add_demo_test(
+    ImageDetectionRefusesOtherModes
+    "requires an image, output and profile"
+    --detector-image
+    image.jpg
+    --detector-output
+    out.json
+    --profile
+    profile
+    --onnx-only)
+  kataglyphis_add_demo_test(
+    ImageDetectionReportsAMissingImage
+    "Could not open the detector image"
+    --detector-image
+    "${CMAKE_BINARY_DIR}/no-such-image.jpg"
+    --detector-output
+    out.json
+    --profile
+    profile)
+endif()

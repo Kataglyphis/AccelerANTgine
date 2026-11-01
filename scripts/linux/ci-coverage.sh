@@ -25,15 +25,26 @@ COVERAGE_LLVM_IGNORE_REGEX=(".*/(third_party|build[^/]*/_deps|_deps|Test|tests|u
 # llvm-cov reports only the object it is given, and Src/ lives in this library, not in the test suites.
 COVERAGE_OBJECT="lib/libAccelerANTgine.so"
 
+# gcovr and llvm-cov count lines and branches differently, so each compiler has its own floor.
+COVERAGE_MIN_LINES_GCC=69
+COVERAGE_MIN_BRANCHES_GCC=50
+COVERAGE_MIN_LINES_CLANG=83
+COVERAGE_MIN_BRANCHES_CLANG=68
+
 if [[ "${COMPILER}" == "gcc" ]]; then
   # The paths baked into .gcno are relative to the build directory, hence the cd.
+  COVERAGE_SUMMARY="${WORKSPACE_DIR}/${BUILD_DIR}/coverage-summary.json"
   COVERAGE_GCOVR_EXTRA_ARGS=(
     --config "${WORKSPACE_DIR}/gcovr.cfg"
     --filter "${WORKSPACE_DIR}/Src/.*"
     --html-details "${WORKSPACE_DIR}/docs/coverage/index.html"
+    --json-summary "${COVERAGE_SUMMARY}"
   )
   mkdir -p "${WORKSPACE_DIR}/docs/coverage"
   ( cd "${BUILD_DIR}" && coverage_run_gcovr "${WORKSPACE_DIR}" )
+  python3 "${_SCRIPT_DIR}/check-coverage-floor.py" "${COVERAGE_SUMMARY}" \
+    --min-lines "${COVERAGE_MIN_LINES_GCC}" --min-branches "${COVERAGE_MIN_BRANCHES_GCC}" \
+    || die "GCC coverage is below its floor (see the line above)."
 else
   # ci-build-and-test.sh's runs wrote the profiles, so this only merges and reports them.
   [[ -d "${PROFRAW_DIR}" ]] \
@@ -59,6 +70,9 @@ else
       "${MERGED_PROFILE}" \
       "coverage.profdata" \
       "${COVERAGE_JSON}" )
+  python3 "${_SCRIPT_DIR}/check-coverage-floor.py" "${BUILD_DIR}/${COVERAGE_JSON}" \
+    --min-lines "${COVERAGE_MIN_LINES_CLANG}" --min-branches "${COVERAGE_MIN_BRANCHES_CLANG}" \
+    || die "clang coverage is below its floor (see the line above)."
 fi
 
 info "Coverage report generated successfully"

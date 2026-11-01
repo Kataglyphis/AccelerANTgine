@@ -16,34 +16,61 @@ kind = "benchmark"
 path = "bench-history-perf-x64-clang.json"
 artifact = "bench-history-perf-x64-clang"
 
-# The build lane keeps its reports in the job workspace only, so these are read from a local run.
+# The Linux x64 build lane uploads these as test-reports-x64-<compiler>; a local run reads the checkout first.
 [[artifact]]
 name = "ctest"
 kind = "junit"
 path = "docs/test_results.xml"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"
+
+[[artifact]]
+name = "ctest-gcc"
+kind = "junit"
+path = "docs/test_results.xml"
+artifact = "test-reports-x64-gcc"
+workflow = "linux-x64.yml"
 
 [[artifact]]
 name = "ctest-tsan"
 kind = "junit"
 path = "docs/test_results_tsan.xml"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"
 
 [[artifact]]
 name = "python-gil"
 kind = "junit"
 path = "logs/python-gil.xml"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"
 
 [[artifact]]
 name = "python-free-threaded"
 kind = "junit"
 path = "logs/python-free-threaded.xml"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"
 
 [[artifact]]
 name = "clang"
 kind = "coverage"
 format = "json"
 path = "build/coverage.json"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"
+
+[[artifact]]
+name = "gcc"
+kind = "coverage"
+format = "json"
+path = "build/coverage-summary.json"
+artifact = "test-reports-x64-gcc"
+workflow = "linux-x64.yml"
 
 [[artifact]]
 name = "clang"
 kind = "clang-tidy"
 path = "logs/code-quality/clang-tidy.txt"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"

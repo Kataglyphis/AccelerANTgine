@@ -75,6 +75,11 @@ if [[ "${COMPILER}" == "clang" ]]; then
 		--out-dir "dist/python"
 fi
 
+# Every report of this leg at once, TSan and pytest included, so no lane's skip goes unread.
+mapfile -t JUNIT_REPORTS < <(ci_junit_reports "${COMPILER}")
+python3 scripts/linux/check-junit-skips.py "${JUNIT_REPORTS[@]}" \
+	|| die "A test skipped or a JUnit report is missing (listed above)."
+
 bash scripts/linux/ci-docs.sh \
 	--workspace-dir "$(pwd)" \
 	--compiler "${COMPILER}" \

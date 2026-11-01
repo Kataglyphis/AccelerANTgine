@@ -163,7 +163,28 @@ broken-map mutants. It does not execute CMake, test binaries or package creation
 ``scripts/linux/ci-coverage.sh`` reports llvm-cov on the clang lane (over
 ``lib/libAccelerANTgine.so``) and gcovr on the GCC lane, where
 ``linux-debug-GNU`` now builds with ``myproject_ENABLE_COVERAGE``. The HTML lands
-in ``docs/coverage/``.
+in ``docs/coverage/``. ``check-coverage-floor.py`` then fails the lane below
+83 % lines / 68 % branches with clang and below 69 % / 50 % with GCC, and prints
+``coverage floor: lines <n>% (minimum <floor>%), branches ...``. GCC also counts the
+demo program, so ``Test/commit`` runs its command-line refusal paths (``Demo.*``).
+
+``ci-run-all.sh`` runs ``check-junit-skips.py`` over every JUnit report of the leg:
+the ctest report, and on clang also the TSan report and both pytest reports. A skipped
+or not-run testcase, a missing report or one without testcases fails the lane.
+
+Each Linux leg uploads ``test-reports-<arch>-<compiler>`` with those reports, the
+coverage summary and ``logs/code-quality/clang-tidy.txt``; ``quality-report.toml``
+reads them as same-commit artifacts.
+
+``.github/workflows/mutations.yml`` proves these gates can fail. It runs the hub's
+``mutation-gates.yml`` over ``scripts/linux/tests/lane-mutations.json``; the recipes
+target the skip gate, the coverage floors, the chain-only ORT proof and the static
+analysis gates, and their tests feed fixture reports and stub tools:
+
+.. code-block:: bash
+
+   python3 third_party/ANTfrastructure/docs/scripts/verify_mutations.py --root . \
+     --manifest scripts/linux/tests/lane-mutations.json
 
 Python Tests
 ^^^^^^^^^^^^
@@ -305,6 +326,14 @@ malformed build script before checking its build steps.
   project actually compiles (``.ixx``, ``.cppm`` and ``.mxx`` included). ``clang++ --analyze``
   runs only when asked for (``--direct-analyze``).
 - **Pinned formatter:** both platforms use ANTfrastructure's ``quality/cmake-format/uv.lock``.
+- **Report, never fix:** clang-tidy runs without ``-fix`` on both platforms; the Linux
+  findings go to ``logs/code-quality/clang-tidy.txt``. The script's last gate,
+  ``sources-unchanged``, runs ``git diff --exit-code -- Src Test``.
+- **scan-build on a fresh tree:** it configures ``build-scan-build/`` uncached through
+  ``scripts/linux/scan-build-cxx.sh``, which restores the module ``@modmap`` files and
+  ``-pthread`` that ccc-analyzer drops, builds the library with ``--status-bugs`` and prints
+  ``scan-build: <n> translation unit(s) analysed``. A finding, a unit the analyzer could not
+  parse, or 0 units fails the lane.
 - **Rewrite or check:** cmake-format rewrites in place, and so does clang-format on Windows. On
   Linux clang-format checks and does not rewrite: it covers every C/C++ file under ``Src/``,
   ``Test/``, ``Bindings/`` and ``cmake/``, and fails the lane when one of them deviates from

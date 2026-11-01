@@ -86,6 +86,19 @@ jobs:
             --release-appimage-out-dir ""
             --release-flatpak-out-dir ""'
 
+      # quality-report.toml reads every JUnit report, the coverage summary and the clang-tidy findings from here.
+      - name: Upload the test, coverage and clang-tidy reports
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports-${{ inputs.arch }}-${{ inputs.compiler }}
+          if-no-files-found: error
+          path: |
+            docs/test_results*.xml
+            logs/python-*.xml
+            build/coverage.json
+            build/coverage-summary.json
+            logs/code-quality/clang-tidy.txt
+
       # perfTestSuite's results.json and the cachegrind counts, which a later baseline is recorded from.
       - name: Upload the benchmark results
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

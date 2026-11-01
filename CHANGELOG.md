@@ -18,6 +18,23 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-01, tests that can fail)
+- clang-tidy reports without `-fix` in `run-static-analysis-format.sh` and `Build-Windows.ps1`; its
+  Linux findings go to `logs/code-quality/clang-tidy.txt`, and the script ends with
+  `git diff --exit-code -- Src Test`.
+- scan-build analyses a fresh, uncached `build-scan-build/` through `scan-build-cxx.sh`, with
+  `--status-bugs`, and fails on 0 analysed units or a unit it could not analyse (it analysed 0 before).
+- `ci-coverage.sh` fails below 83 % lines / 68 % branches (clang) and 69 % / 50 % (GCC);
+  `Test/commit` gains `Demo.*` command-line tests that lift GCC's count back over its floor.
+- The skip gate (`check-junit-skips.py`) reads every JUnit report of a leg, TSan and pytest
+  included; `test_import_keeps_the_interpreters_gil_mode` replaces a skip on the GIL wheel with an
+  assertion.
+- The chain-only ORT proof moves into `accelerantgine_assert_ort_chain_build` in
+  `cmake/OrtPackageVariant.cmake`, unchanged in behaviour.
+- Each Linux leg uploads `test-reports-<arch>-<compiler>`; `quality-report.toml` reads its JUnit,
+  coverage and clang-tidy rows from that artifact.
+- New `mutations.yml` runs the hub's mutation gates over `scripts/linux/tests/lane-mutations.json`.
+
 ### Fixed (2026-11-01, bench-history)
 - The Linux bench-history keys warn instead of gating wall time: run 41271221703 doubled
   `BM_DetectFrame` (+149 %) on a slower hosted CPU at an unchanged instruction count

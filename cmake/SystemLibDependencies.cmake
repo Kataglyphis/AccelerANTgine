@@ -103,20 +103,7 @@ else()
   get_filename_component(_ort_runtime "${_ONNXRUNTIME_LIB}" REALPATH)
   set(_ort_chain_marker "/opt/onnxruntime/onnxruntime/core/")
 endif()
-if(NOT EXISTS "${_ort_runtime}")
-  message(
-    FATAL_ERROR "ONNX Runtime: ${_ort_runtime} is missing, so ${_ort_root} cannot be proved to be the chain build.")
-endif()
-file(
-  STRINGS "${_ort_runtime}" _ort_chain_hit
-  LIMIT_COUNT 1
-  REGEX "${_ort_chain_marker}")
-if(NOT _ort_chain_hit)
-  message(
-    FATAL_ERROR
-      "ONNX Runtime: ${_ort_runtime} is not the family's chain build (no '${_ort_chain_marker}' source path in it). A downloaded, distro or vendor ORT is not allowed."
-  )
-endif()
+accelerantgine_assert_ort_chain_build("${_ort_runtime}" "${_ort_chain_marker}" "${_ort_root}")
 
 set(ONNXRUNTIME_FOUND TRUE)
 set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")

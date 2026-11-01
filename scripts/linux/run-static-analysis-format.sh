@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-static-analysis-format.sh - format, clang-tidy, scan-build; a missing tool is red (third_party/ANTfrastructure/docs/shared-script-libraries.md#the-third-bucket-a-gate-that-could-not-run).
+# run-static-analysis-format.sh - format, clang-tidy, scan-build, unchanged Src/Test; a missing tool is red (third_party/ANTfrastructure/docs/shared-script-libraries.md#the-third-bucket-a-gate-that-could-not-run); not GCC tidy/scan-build or _deps/third_party findings.
 set -euo pipefail
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,8 +30,9 @@ done
 CODE_QUALITY_CPP_FORMAT_EXTENSIONS=(c cc cpp cxx ixx cppm mxx h hh hpp hxx ipp inl)
 CODE_QUALITY_CLANG_TIDY_EXTENSIONS=(cpp cc cxx ixx cppm mxx)
 
+# Report only: an in-place -fix rewrote the checkout CI then built, tested and shipped.
+CODE_QUALITY_CLANG_TIDY_FIX=false
 # Which checks a project tolerates is its own decision, so they stay here.
-CODE_QUALITY_CLANG_TIDY_FIX=true
 CODE_QUALITY_CLANG_TIDY_ARGS=(
   -checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness
   -header-filter=^Src/
@@ -83,11 +84,45 @@ check_clang_format() {
 }
 run_gate clang-format check_clang_format
 
+# quality-report.toml declares this file as the clang-tidy artifact metric.
+TIDY_LOG="logs/code-quality/clang-tidy.txt"
+SCAN_BUILD_DIR="${BUILD_DIR}-scan-build"
+SCAN_BUILD_REPORTS="scan-build-reports"
+SCAN_BUILD_TARGET="AccelerANTgine"
+# ccc-analyzer falls back to gcc without these, and the scan tree runs uncached: a cache hit would skip the analysis.
+SCAN_BUILD_COMPILERS=("--use-cc=clang" "--use-c++=clang++")
+
+# One plist per analysed translation unit; scan-build keeps them with -plist-html --keep-empty.
+scan_build_translation_units() {
+  find "$1" -type f -name '*.plist' | wc -l
+}
+
 # Project-specific analyses: no other consumer runs these.
 run_scan_build() {
-  [[ -d "${BUILD_DIR}" ]] || err "Build directory '${BUILD_DIR}' not found - scan-build needs a configured tree."
-  mkdir -p scan-build-reports
-  scan-build -o scan-build-reports cmake --build "${BUILD_DIR}"
+  local units
+  rm -rf -- "${SCAN_BUILD_DIR}" "${SCAN_BUILD_REPORTS}"
+  mkdir -p "${SCAN_BUILD_REPORTS}"
+  # An already built tree compiles nothing; the preset names clang++ itself, so the tree gets scan-build's wrappers.
+  scan-build "${SCAN_BUILD_COMPILERS[@]}" bash -c \
+    'cmake --preset "$1" -B "$2" -D COMPILER_CACHE= -D CMAKE_C_COMPILER="${CC}" -D CMAKE_CXX_COMPILER="$3"' \
+    configure "${CLANG_DEBUG_PRESET}" "${SCAN_BUILD_DIR}" "${_SCRIPT_DIR}/scan-build-cxx.sh" || return 1
+  scan-build "${SCAN_BUILD_COMPILERS[@]}" -o "${SCAN_BUILD_REPORTS}" -plist-html --keep-empty --status-bugs \
+    --exclude /_deps/ --exclude /third_party/ \
+    cmake --build "${SCAN_BUILD_DIR}" --target "${SCAN_BUILD_TARGET}" || return 1
+  # A unit the analyzer could not parse lands in failures/ and was never analysed.
+  if [[ -n "$(find "${SCAN_BUILD_REPORTS}" -type d -name failures)" ]]; then
+    err "scan-build could not analyse some units; their preprocessed sources are under ${SCAN_BUILD_REPORTS}/*/failures."
+    return 1
+  fi
+  units="$(scan_build_translation_units "${SCAN_BUILD_REPORTS}")"
+  info "scan-build: ${units} translation unit(s) analysed"
+  [[ "${units}" -gt 0 ]] || { err "scan-build analysed no translation unit; it graded nothing."; return 1; }
+}
+
+# clang-tidy -fix is off, so any change under Src or Test here is a tool rewriting the checkout.
+check_sources_unchanged() {
+  info "git diff --exit-code -- Src Test"
+  git -c safe.directory="$(pwd)" diff --exit-code -- Src Test
 }
 
 # The remapped DB copy is removed whatever the verdict.
@@ -100,7 +135,9 @@ run_clang_tidy() {
   local abs_src_files=() status=0
   mapfile -t abs_src_files < <(printf '%s\n' "${SRC_FILES[@]}" | sed "s#^#$(pwd)/#")
   # clang-tidy reads the build's module PCMs, so it must be clang's own LLVM version.
-  code_quality_run_clang_tidy "${CODE_QUALITY_COMPILE_DB_DIR}" "${abs_src_files[@]}" || status=$?
+  mkdir -p "$(dirname "${TIDY_LOG}")"
+  code_quality_run_clang_tidy "${CODE_QUALITY_COMPILE_DB_DIR}" "${abs_src_files[@]}" >"${TIDY_LOG}" 2>&1 || status=$?
+  cat "${TIDY_LOG}"
   code_quality_cleanup_compile_db
   return "${status}"
 }
@@ -115,5 +152,6 @@ else
   # A GCC compile_commands.json carries module flags clang-tidy cannot parse (AGENTS.md section 4).
   info "Skipping clang-tidy and scan-build for compiler='${COMPILER}' (clang-only analyses)."
 fi
+run_gate sources-unchanged check_sources_unchanged
 
 assert_gates

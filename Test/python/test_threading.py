@@ -36,11 +36,10 @@ def run_threads(worker, count=THREADS):
         raise errors[0]
 
 
-@pytest.mark.skipif(not sysconfig.get_config_var("Py_GIL_DISABLED"), reason="not a free-threaded interpreter")
-def test_import_keeps_the_gil_disabled():
+def test_import_keeps_the_interpreters_gil_mode():
     # The module is imported above; a module without Py_MOD_GIL_NOT_USED would have switched the GIL back on.
     assert sys.version_info >= (3, 13)
-    assert sys._is_gil_enabled() is False
+    assert sys._is_gil_enabled() is not bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
 
 
 def test_config_fields_written_from_many_threads():

@@ -1,5 +1,26 @@
 include_guard(GLOBAL)
 
+# Refuses any ORT without the chain build's embedded source path; it cannot tell two chain builds apart.
+function(
+  accelerantgine_assert_ort_chain_build
+  runtime
+  marker
+  root)
+  if(NOT EXISTS "${runtime}")
+    message(FATAL_ERROR "ONNX Runtime: ${runtime} is missing, so ${root} cannot be proved to be the chain build.")
+  endif()
+  file(
+    STRINGS "${runtime}" _ort_chain_hit
+    LIMIT_COUNT 1
+    REGEX "${marker}")
+  if(NOT _ort_chain_hit)
+    message(
+      FATAL_ERROR
+        "ONNX Runtime: ${runtime} is not the family's chain build (no '${marker}' source path in it). A downloaded, distro or vendor ORT is not allowed."
+    )
+  endif()
+endfunction()
+
 function(
   accelerantgine_demo_default_device
   variant

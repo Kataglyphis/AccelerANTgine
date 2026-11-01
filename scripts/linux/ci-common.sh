@@ -22,6 +22,14 @@ antfrastructure_source linux/scripts/lib/cli-value-options.sh
 
 ci_unknown_argument() { die "Unknown argument: $1"; }
 
+# Every JUnit report one leg writes; the skip gate requires each, so a report that vanishes fails too.
+ci_junit_reports() {
+    printf '%s\n' docs/test_results.xml
+    if [[ "$1" == "clang" ]]; then
+        printf '%s\n' docs/test_results_tsan.xml logs/python-gil.xml logs/python-free-threaded.xml
+    fi
+}
+
 ci_parse_value_options() {
     local _ci_lane="$1"
     shift

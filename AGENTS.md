@@ -187,6 +187,13 @@ written out rather than linked.
   the stored error; a successful frame does not erase it. Without a callback the pipeline logs
   a changed error to stderr. Preserve these semantics when changing the streaming path.
 
+- **Static analysis reports; it never rewrites.** clang-tidy runs without `-fix` on Linux and in
+  `Build-Windows.ps1`, writes `logs/code-quality/clang-tidy.txt` (the quality-report clang-tidy
+  metric), and `run-static-analysis-format.sh` ends with `git diff --exit-code -- Src Test` on both
+  compilers. scan-build configures a fresh, uncached `build-scan-build/` through
+  `scan-build-cxx.sh` (ccc-analyzer drops CMake's module `@modmap` files and `-pthread`), runs with
+  `--status-bugs`, and fails on a unit it could not analyse or on 0 analysed units. Run it on a
+  clean worktree: an unstaged edit under `Src/` or `Test/` fails the last gate.
 - **clang-tidy is skipped for GCC on purpose.** A GCC-generated `compile_commands.json` carries
   C++ module flags clang-tidy cannot parse, so `run-static-analysis-format.sh` runs it (and
   scan-build) only when `COMPILER=clang`. Re-enabling it produces a wall of parse errors, not
@@ -338,7 +345,9 @@ written out rather than linked.
 - **On Linux no test may skip, and UBSan is fatal** (2026-10-15). ctest counts a gtest
   `[  SKIPPED ]` as passed in its "100% tests passed" line, so `ci-build-and-test.sh` fails the
   lane on any `<skipped>` in its JUnit file and names the tests: the image carries every element,
-  so a skip there means one went missing. Windows keeps its skips (`webrtcsink`). The Debug
+  so a skip there means one went missing. `ci-run-all.sh` then runs `check-junit-skips.py` over
+  every report of the leg (`ci_junit_reports`: ctest, and on clang also the TSan ctest and both
+  pytest reports); a skipped, not-run or missing report fails. Windows keeps its skips (`webrtcsink`). The Debug
   presets build UBSan recoverable, so the same script exports `UBSAN_OPTIONS=halt_on_error=1`; a
   report used to print and the test still passed.
 - **On clang-cl the fuzz suite is built without sanitizers.** absl's swisstable layout depends on
@@ -536,6 +545,17 @@ then runs `verify-package-hardening.sh`, which fails unless the `.deb` and the `
 PIE, BIND_NOW, stack-protected CLI and demo and a BIND_NOW, stack-protected library, with a
 `__*_chk` import in the CLI and the library. Never drop a check to pass a package;
 `test-verify-package-hardening.sh` holds each case.
+
+**Coverage has a floor per compiler.** `ci-coverage.sh` fails below 83 % lines / 68 % branches with
+clang (llvm-cov over `libAccelerANTgine.so`) and below 69 % / 50 % with GCC (gcovr over `Src/`,
+summary in `build/coverage-summary.json`) through `check-coverage-floor.py`. Raise coverage with
+tests; never lower a floor. Each Linux leg uploads `test-reports-<arch>-<compiler>` (every JUnit
+report, the coverage summary, the clang-tidy log), which `quality-report.toml` reads.
+
+**`mutations.yml` proves those gates can fail.** It calls the hub's `mutation-gates.yml` over
+`scripts/linux/tests/lane-mutations.json`: the skip gate, the coverage floors, the chain-only ORT
+proof (`accelerantgine_assert_ort_chain_build`) and the static-analysis gates, each through fixture
+inputs and stub tools on a hosted runner. Add a recipe with every new gate.
 
 **The pre-commit hook** installs from the locked `docs` group into a `uv` venv; the commands are in
 `docs/source/development_workflow.rst` § *Static Analysis And Formatting*.
