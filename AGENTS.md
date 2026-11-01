@@ -526,7 +526,9 @@ platform + arch, display names `<Platform> <Arch> · <what>`. They are `linux-x6
 `pester-tests` job over `scripts/windows/tests/` plus the hub's
 `shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1`), `windows-arm64-cross.yml`, `linux-riscv64.yml`,
 `lint-gates.yml`, `submodule-pins.yml` and `powershell-quality.yml`, the one caller of the hub's
-PowerShell lint and complexity workflow, on every push.
+PowerShell lint and complexity workflow, on every push. Its complexity verdict is strict on push and
+PR (15 cyclomatic, 5 nesting, 80 lines per function, `scripts/`): refactor into named functions,
+never raise a limit.
 Both Windows container callers request `submodules: 'true'`: their build inputs are direct
 submodules, while a recursive checkout follows ANTfrastructure's documentation cycle.
 

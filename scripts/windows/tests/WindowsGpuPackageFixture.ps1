@@ -14,294 +14,299 @@ function New-FixtureCabinet([string]$Ddf, [string]$Directory) {
         if ($LASTEXITCODE) { throw 'makecab failed creating fixture cabinet' }
     } finally { Pop-Location }
 }
-Import-Module (Join-Path $fixture 'third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function New-TestPeFile
+
+function Write-FixtureCabinet([string]$Directory, [object[]]$Items, [hashtable]$Replace = @{}, [string[]]$Omit = @()) {
+    $lines = @('.OPTION EXPLICIT', '.Set CabinetNameTemplate=payload.cab', ".Set DiskDirectoryTemplate=$Directory", '.Set MaxDiskSize=0', '.Set Compress=ON')
+    foreach ($item in $Items) {
+        if ($item.Name -in $Omit) { continue }
+        $source = if ($Replace.ContainsKey($item.Name)) { $Replace[$item.Name] } else { $item.Source }
+        $lines += "`"$source`" $($item.Id)"
+    }
+    $ddf = Join-Path $Directory 'payload.ddf'
+    [IO.File]::WriteAllLines($ddf, $lines)
+    New-FixtureCabinet -Ddf $ddf -Directory $Directory
+    return (Join-Path $Directory 'payload.cab')
+}
+
+function Remove-FixtureComObject([object[]]$ComObject) {
+    foreach ($object in $ComObject) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($object) }
+}
+
+function Write-FixtureMsiCabinet([string]$Msi, [string]$Cabinet) {
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $db = $installer.OpenDatabase($Msi, 1)
+    try {
+        $view = $db.OpenView('UPDATE `_Streams` SET `Data` = ? WHERE `Name` = ''payload.cab''')
+        $record = $installer.CreateRecord(1)
+        try { $record.SetStream(1, $Cabinet); $null = $view.Execute($record); $null = $view.Close() }
+        finally { Remove-FixtureComObject @($record, $view) }
+        $null = $db.Commit()
+    } finally { Remove-FixtureComObject @($db, $installer) }
+}
+
+function Invoke-FixtureMsiStatement([string]$Msi, [string]$Statement) {
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $db = $installer.OpenDatabase($Msi, 1)
+    try {
+        $view = $db.OpenView($Statement)
+        try { $null = $view.Execute(); $null = $view.Close(); $null = $db.Commit() }
+        finally { Remove-FixtureComObject @($view) }
+    } finally { Remove-FixtureComObject @($db, $installer) }
+}
+
+# Build an embedded cabinet and MSI directory/file tables with the CPack install-root shape.
+function New-FixtureMsi([string]$Msi, [string]$Cabinet, [object[]]$Items) {
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $db = $installer.OpenDatabase($Msi, 3)
+    try {
+        $sql = @(
+            'CREATE TABLE `Directory` (`Directory` CHAR(72) NOT NULL, `Directory_Parent` CHAR(72), `DefaultDir` CHAR(255) NOT NULL PRIMARY KEY `Directory`)',
+            'CREATE TABLE `Component` (`Component` CHAR(72) NOT NULL, `Directory_` CHAR(72) NOT NULL PRIMARY KEY `Component`)',
+            'CREATE TABLE `File` (`File` CHAR(72) NOT NULL, `FileName` CHAR(255) NOT NULL, `Component_` CHAR(72) NOT NULL, `Sequence` SHORT NOT NULL PRIMARY KEY `File`)',
+            'CREATE TABLE `Media` (`DiskId` SHORT NOT NULL, `LastSequence` SHORT NOT NULL, `Cabinet` CHAR(255) PRIMARY KEY `DiskId`)',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''TARGETDIR'', NULL, ''SourceDir'')',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''INSTALL_ROOT'', ''TARGETDIR'', ''AccelerANTgine'')',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''bin'', ''INSTALL_ROOT'', ''bin'')',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''models'', ''bin'', ''models'')',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''lib'', ''INSTALL_ROOT'', ''lib'')',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''gst'', ''lib'', ''gstreamer-1.0'')',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''licenses'', ''INSTALL_ROOT'', ''licenses'')',
+            'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''ort'', ''licenses'', ''onnxruntime'')',
+            # Use format strings because backticks are PowerShell escapes in double-quoted strings.
+            ('INSERT INTO `Media` (`DiskId`, `LastSequence`, `Cabinet`) VALUES (1, {0}, ''#payload.cab'')' -f $Items.Count)
+        )
+        $seq = 0
+        foreach ($item in $Items) {
+            $seq++
+            $sql += 'INSERT INTO `Component` (`Component`, `Directory_`) VALUES (''c{0}'', ''{1}'')' -f $seq, $item.Dir
+            $sql += 'INSERT INTO `File` (`File`, `FileName`, `Component_`, `Sequence`) VALUES (''{0}'', ''{1}'', ''c{2}'', {2})' -f $item.Id, $item.Name, $seq
+        }
+        foreach ($statement in $sql) { $view = $db.OpenView($statement); try { $null = $view.Execute(); $null = $view.Close() } finally { Remove-FixtureComObject @($view) } }
+        $view = $db.OpenView('INSERT INTO `_Streams` (`Name`, `Data`) VALUES (?, ?)')
+        $record = $installer.CreateRecord(2)
+        try { $record.StringData(1) = 'payload.cab'; $record.SetStream(2, $Cabinet); $null = $view.Execute($record); $null = $view.Close() }
+        finally { Remove-FixtureComObject @($record, $view) }
+        $null = $db.Commit()
+    } finally { Remove-FixtureComObject @($db, $installer) }
+}
+
+function Get-FixtureMsiItem([object[]]$Group) {
+    $index = 0
+    foreach ($entry in $Group) {
+        foreach ($name in $entry.Names) {
+            @{ Id = "f$index"; Source = Join-Path $entry.Directory $name; Name = $name; Dir = $entry.Dir }
+            $index++
+        }
+    }
+}
+
+function Add-FixtureZipMember([Collections.IDictionary]$Member, [string]$Directory, [string[]]$Names, [string]$Prefix) {
+    foreach ($name in $Names) { $Member["$Prefix$name"] = Join-Path $Directory $name }
+}
+
+function Remove-FixtureArchiveEntry([string]$Path, [string]$Member) {
+    $archive = [IO.Compression.ZipFile]::Open($Path, [IO.Compression.ZipArchiveMode]::Update)
+    try { $archive.GetEntry($Member).Delete() } finally { $archive.Dispose() }
+}
+
+function Copy-FixtureArchiveEntry([string]$Path, [string]$Member, [string]$Source, [switch]$Replace) {
+    $archive = [IO.Compression.ZipFile]::Open($Path, [IO.Compression.ZipArchiveMode]::Update)
+    try {
+        if ($Replace) { $archive.GetEntry($Member).Delete() }
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $Source, $Member) | Out-Null
+    } finally { $archive.Dispose() }
+}
+
+function Write-FixtureArchiveEntry([string]$Path, [string]$Member, [string]$Text, [switch]$Replace) {
+    $source = Join-Path $script:entryDir "$([guid]::NewGuid().ToString('N')).txt"
+    [IO.File]::WriteAllText($source, $Text)
+    Copy-FixtureArchiveEntry -Path $Path -Member $Member -Source $source -Replace:$Replace
+}
+
+function Write-FixturePayload([string]$Image, [string]$Bin, [string]$Licenses, [string]$ModelDir, [string]$PluginDir) {
+    foreach ($name in $script:modelNames) { Set-Content -LiteralPath (Join-Path $ModelDir $name) -Value "fixture $name" }
+    foreach ($name in $script:pluginNames) { New-TestPeFile -Path (Join-Path $PluginDir $name) -Tag $name }
+    foreach ($name in $script:gpuNames) {
+        New-TestPeFile -Path (Join-Path $Image $name) -Tag $name
+        Copy-Item -LiteralPath (Join-Path $Image $name) -Destination $Bin
+    }
+    foreach ($name in $script:appNames) { New-TestPeFile -Path (Join-Path $Bin $name) -Tag $name }
+    foreach ($name in $script:licenseNames) { Set-Content -LiteralPath (Join-Path $Licenses $name) -Value "original $name" }
+}
+
+# Give the verifier a fixture-owned source lock and the same pinned helpers as the real checkout.
+function New-FixtureRepo([string]$Root, [string]$ModelDir) {
+    $fixtureRepo = Join-Path $Root 'fixture-repo'
+    $fixtureScripts = Join-Path $fixtureRepo 'scripts\windows'
+    $fixtureHub = Join-Path $fixtureRepo 'third_party\ANTfrastructure'
+    $null = New-Item -ItemType Directory -Force -Path $fixtureScripts, (Join-Path $fixtureRepo 'models'), `
+        (Join-Path $fixtureHub 'windows'), (Join-Path $fixtureHub 'linux'), (Join-Path $fixtureHub 'shared')
+    foreach ($name in 'Test-WindowsGpuPackages.ps1', 'Test-WindowsGpuImage.ps1', 'Resolve-BuildModule.ps1') {
+        Copy-Item -LiteralPath (Join-Path $script:fixture "scripts\windows\$name") -Destination $fixtureScripts
+    }
+    foreach ($part in 'windows/scripts', 'linux/scripts', 'shared/python') {
+        Copy-Item -LiteralPath (Join-Path $script:fixture "third_party/ANTfrastructure/$part") `
+            -Destination (Join-Path $fixtureHub (Split-Path $part -Parent)) -Recurse
+    }
+    $fixtureLock = Join-Path $fixtureRepo 'models\models.lock'
+    $lockRows = foreach ($name in $script:modelNames) {
+        $hash = (Get-FileHash -LiteralPath (Join-Path $ModelDir $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $name  https://example.invalid/$name"
+    }
+    [IO.File]::WriteAllLines($fixtureLock, [string[]]$lockRows, [Text.UTF8Encoding]::new($false))
+    return (Join-Path $fixtureScripts 'Test-WindowsGpuPackages.ps1')
+}
+
+function New-FixtureMsix([string]$Root, [string]$Bin, [string]$ModelDir, [string]$PluginDir) {
+    $stage = Join-Path $Root 'msix-stage'; $null = New-Item -ItemType Directory -Path $stage
+    foreach ($name in $script:gpuNames + $script:appNames) { Copy-Item -LiteralPath (Join-Path $Bin $name) -Destination $stage }
+    Copy-Item -LiteralPath $ModelDir -Destination $stage -Recurse
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib\gstreamer-1.0')
+    foreach ($name in $script:pluginNames) { Copy-Item -LiteralPath (Join-Path $PluginDir $name) -Destination (Join-Path $stage 'lib\gstreamer-1.0') }
+    $msixPath = Join-Path $Root 'candidate.msix'
+    [IO.Compression.ZipFile]::CreateFromDirectory($stage, $msixPath)
+    return $msixPath
+}
+
+function Assert-FixtureRejected([hashtable]$Arguments, [string]$Pattern, [string]$Failure) {
+    $rejected = $false
+    try { & $script:proof @Arguments }
+    catch { if ($_.Exception.Message -notmatch $Pattern) { throw }; $rejected = $true }
+    if (-not $rejected) { throw $Failure }
+}
+
+function Restore-FixtureArchive {
+    Copy-Item $script:originalZip $script:zipPath -Force; Copy-Item $script:backup $script:msix -Force
+}
+
+function Assert-FixtureArchiveCaseRejected([object[]]$Cases, [string]$Pattern, [switch]$AddEntry) {
+    foreach ($case in $Cases) {
+        if ($AddEntry) { Write-FixtureArchiveEntry -Path $case.Path -Member $case.Member -Text 'unexpected runtime' }
+        else { Remove-FixtureArchiveEntry -Path $case.Path -Member $case.Member }
+        Assert-FixtureRejected -Arguments $script:msixArgs -Pattern $Pattern -Failure $case.Failure
+        Restore-FixtureArchive
+    }
+}
+
+function Assert-FixtureModelMutationRejected([string]$ModelDir) {
+    foreach ($name in $script:modelNames) {
+        foreach ($mutation in 'changed', 'missing') {
+            $path = Join-Path $ModelDir $name
+            $bytes = [IO.File]::ReadAllBytes($path)
+            try {
+                if ($mutation -eq 'changed') { [IO.File]::WriteAllText($path, 'tampered') }
+                else { Remove-Item -LiteralPath $path }
+                Assert-FixtureRejected -Arguments $script:msixArgs -Pattern 'do not match models.lock' -Failure "$mutation staged model file was accepted: $name"
+            } finally { [IO.File]::WriteAllBytes($path, $bytes) }
+        }
+    }
+}
+
+function Assert-FixtureMsiDemoMutationRejected([string]$Root, [string]$Msi, [string]$MsiBackup, [string]$BadProvider) {
+    foreach ($mutation in 'missing', 'altered') {
+        Copy-Item -LiteralPath $MsiBackup -Destination $Msi -Force
+        $demoDir = Join-Path $Root "demo-$mutation"; $null = New-Item -ItemType Directory -Path $demoDir
+        $omit = @(if ($mutation -eq 'missing') { 'AccelerANTgine_demo.exe' })
+        $demoCab = Write-FixtureCabinet -Directory $demoDir -Items $script:items -Replace @{ 'AccelerANTgine_demo.exe' = $BadProvider } -Omit $omit
+        Write-FixtureMsiCabinet -Msi $Msi -Cabinet $demoCab
+        Assert-FixtureRejected -Arguments $script:msixArgs -Pattern 'package binary verification failed' -Failure "$mutation MSI inference demo was accepted"
+    }
+}
+
+Import-Module (Join-Path $fixture 'third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function New-TestPeFile, New-TestZipFile
 $image = Join-Path $root 'ort\bin'; $wheelDir = Join-Path $root 'wheels'; $bundle = Join-Path $root 'bundle'
 $bin = Join-Path $bundle 'bin'; $licenses = Join-Path $bundle 'licenses\onnxruntime'; $packages = Join-Path $root 'packages'
-$null = New-Item -ItemType Directory -Path $image, $wheelDir, $bin, $licenses, $packages -Force
+$entryDir = Join-Path $root 'entries'
+$null = New-Item -ItemType Directory -Path $image, $wheelDir, $bin, $licenses, $packages, $entryDir -Force
 $gpuNames = @('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll', 'DirectML.dll')
 $appNames = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll')
 $modelNames = @('deim_dfine_n_coco.onnx', 'deim_dfine_n_coco.LICENSE', 'deim_dfine_n_coco.NOTICE')
+$licenseNames = @('LICENSE', 'ThirdPartyNotices.txt')
 $modelDir = Join-Path $bin 'models'; $null = New-Item -ItemType Directory -Force -Path $modelDir
-foreach ($name in $modelNames) { Set-Content -LiteralPath (Join-Path $modelDir $name) -Value "fixture $name" }
 $pluginDir = Join-Path $bundle 'lib\gstreamer-1.0'; $null = New-Item -ItemType Directory -Force -Path $pluginDir
 $pluginNames = @('gstcoreelements.dll', 'gstwebrtc.dll')
-foreach ($name in $pluginNames) { New-TestPeFile -Path (Join-Path $pluginDir $name) -Tag $name }
-foreach ($name in $gpuNames) {
-    New-TestPeFile -Path (Join-Path $image $name) -Tag $name
-    Copy-Item -LiteralPath (Join-Path $image $name) -Destination $bin
-}
-foreach ($name in $appNames) { New-TestPeFile -Path (Join-Path $bin $name) -Tag $name }
-foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') { Set-Content -LiteralPath (Join-Path $licenses $name) -Value "original $name" }
-$wheel = Join-Path $wheelDir 'onnxruntime_gpu-1.0.0-cp315-cp315-win_amd64.whl'
-$zip = [IO.Compression.ZipFile]::Open($wheel, [IO.Compression.ZipArchiveMode]::Create)
-try {
-    foreach ($name in $gpuNames) {
-        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $image $name), "onnxruntime/capi/$name") | Out-Null
-    }
-    foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') {
-        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $licenses $name), "onnxruntime/$name") | Out-Null
-    }
-} finally { $zip.Dispose() }
+Write-FixturePayload -Image $image -Bin $bin -Licenses $licenses -ModelDir $modelDir -PluginDir $pluginDir
+$wheelMembers = [ordered]@{}
+Add-FixtureZipMember $wheelMembers $image $gpuNames 'onnxruntime/capi/'
+Add-FixtureZipMember $wheelMembers $licenses $licenseNames 'onnxruntime/'
+New-TestZipFile -Path (Join-Path $wheelDir 'onnxruntime_gpu-1.0.0-cp315-cp315-win_amd64.whl') -Member $wheelMembers -FileValues
 $zipPath = Join-Path $packages 'candidate.zip'
-$zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
-try {
-    foreach ($name in $gpuNames + $appNames) { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $bin $name), "candidate/bin/$name") | Out-Null }
-    foreach ($name in $pluginNames) { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $pluginDir $name), "candidate/lib/gstreamer-1.0/$name") | Out-Null }
-    foreach ($name in $modelNames) { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $modelDir $name), "candidate/bin/models/$name") | Out-Null }
-} finally { $zip.Dispose() }
+$zipMembers = [ordered]@{}
+Add-FixtureZipMember $zipMembers $bin ($gpuNames + $appNames) 'candidate/bin/'
+Add-FixtureZipMember $zipMembers $pluginDir $pluginNames 'candidate/lib/gstreamer-1.0/'
+Add-FixtureZipMember $zipMembers $modelDir $modelNames 'candidate/bin/models/'
+New-TestZipFile -Path $zipPath -Member $zipMembers -FileValues
 
-# Build an embedded cabinet and MSI directory/file tables with the CPack install-root shape.
-$items = @(); $index = 0
-foreach ($name in $gpuNames + $appNames) { $items += @{ Id = "f$index"; Source = Join-Path $bin $name; Name = $name; Dir = 'bin' }; $index++ }
-foreach ($name in $pluginNames) { $items += @{ Id = "f$index"; Source = Join-Path $pluginDir $name; Name = $name; Dir = 'gst' }; $index++ }
-foreach ($name in $modelNames) { $items += @{ Id = "f$index"; Source = Join-Path $modelDir $name; Name = $name; Dir = 'models' }; $index++ }
-foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') { $items += @{ Id = "f$index"; Source = Join-Path $licenses $name; Name = $name; Dir = 'ort' }; $index++ }
-$ddf = Join-Path $root 'payload.ddf'
-$lines = @('.OPTION EXPLICIT', '.Set CabinetNameTemplate=payload.cab', ".Set DiskDirectoryTemplate=$root", '.Set MaxDiskSize=0', '.Set Compress=ON')
-foreach ($item in $items) { $lines += "`"$($item.Source)`" $($item.Id)" }
-[IO.File]::WriteAllLines($ddf, $lines)
-New-FixtureCabinet -Ddf $ddf -Directory $root
-$cab = Join-Path $root 'payload.cab'; $msi = Join-Path $packages 'candidate.msi'
-$installer = New-Object -ComObject WindowsInstaller.Installer
-$db = $installer.OpenDatabase($msi, 3)
-try {
-    $sql = @(
-        'CREATE TABLE `Directory` (`Directory` CHAR(72) NOT NULL, `Directory_Parent` CHAR(72), `DefaultDir` CHAR(255) NOT NULL PRIMARY KEY `Directory`)',
-        'CREATE TABLE `Component` (`Component` CHAR(72) NOT NULL, `Directory_` CHAR(72) NOT NULL PRIMARY KEY `Component`)',
-        'CREATE TABLE `File` (`File` CHAR(72) NOT NULL, `FileName` CHAR(255) NOT NULL, `Component_` CHAR(72) NOT NULL, `Sequence` SHORT NOT NULL PRIMARY KEY `File`)',
-        'CREATE TABLE `Media` (`DiskId` SHORT NOT NULL, `LastSequence` SHORT NOT NULL, `Cabinet` CHAR(255) PRIMARY KEY `DiskId`)',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''TARGETDIR'', NULL, ''SourceDir'')',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''INSTALL_ROOT'', ''TARGETDIR'', ''AccelerANTgine'')',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''bin'', ''INSTALL_ROOT'', ''bin'')',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''models'', ''bin'', ''models'')',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''lib'', ''INSTALL_ROOT'', ''lib'')',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''gst'', ''lib'', ''gstreamer-1.0'')',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''licenses'', ''INSTALL_ROOT'', ''licenses'')',
-        'INSERT INTO `Directory` (`Directory`, `Directory_Parent`, `DefaultDir`) VALUES (''ort'', ''licenses'', ''onnxruntime'')',
-        "INSERT INTO `Media` (`DiskId`, `LastSequence`, `Cabinet`) VALUES (1, $($items.Count), '#payload.cab')"
-    )
-    # Use format strings because backticks are PowerShell escapes in double-quoted strings.
-    $sql[-1] = 'INSERT INTO `Media` (`DiskId`, `LastSequence`, `Cabinet`) VALUES (1, {0}, ''#payload.cab'')' -f $items.Count
-    $seq = 0
-    foreach ($item in $items) {
-        $seq++
-        $sql += 'INSERT INTO `Component` (`Component`, `Directory_`) VALUES (''c{0}'', ''{1}'')' -f $seq, $item.Dir
-        $sql += 'INSERT INTO `File` (`File`, `FileName`, `Component_`, `Sequence`) VALUES (''{0}'', ''{1}'', ''c{2}'', {2})' -f $item.Id, $item.Name, $seq
-    }
-    foreach ($statement in $sql) { $view = $db.OpenView($statement); try { $null = $view.Execute(); $null = $view.Close() } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) } }
-    $view = $db.OpenView('INSERT INTO `_Streams` (`Name`, `Data`) VALUES (?, ?)')
-    $record = $installer.CreateRecord(2)
-    try { $record.StringData(1) = 'payload.cab'; $record.SetStream(2, $cab); $null = $view.Execute($record); $null = $view.Close() }
-    finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
-    $null = $db.Commit()
-} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
+$items = @(Get-FixtureMsiItem @(
+        @{ Dir = 'bin'; Directory = $bin; Names = $gpuNames + $appNames }
+        @{ Dir = 'gst'; Directory = $pluginDir; Names = $pluginNames }
+        @{ Dir = 'models'; Directory = $modelDir; Names = $modelNames }
+        @{ Dir = 'ort'; Directory = $licenses; Names = $licenseNames }
+    ))
+$cab = Write-FixtureCabinet -Directory $root -Items $items
+$msi = Join-Path $packages 'candidate.msi'
+New-FixtureMsi -Msi $msi -Cabinet $cab -Items $items
 
-# Give the verifier a fixture-owned source lock and the same pinned helpers as the real checkout.
-$fixtureRepo = Join-Path $root 'fixture-repo'
-$fixtureScripts = Join-Path $fixtureRepo 'scripts\windows'
-$fixtureHub = Join-Path $fixtureRepo 'third_party\ANTfrastructure'
-$null = New-Item -ItemType Directory -Force -Path $fixtureScripts, (Join-Path $fixtureRepo 'models'), `
-    (Join-Path $fixtureHub 'windows'), (Join-Path $fixtureHub 'linux'), (Join-Path $fixtureHub 'shared')
-foreach ($name in 'Test-WindowsGpuPackages.ps1', 'Test-WindowsGpuImage.ps1', 'Resolve-BuildModule.ps1') {
-    Copy-Item -LiteralPath (Join-Path $fixture "scripts\windows\$name") -Destination $fixtureScripts
-}
-foreach ($part in 'windows/scripts', 'linux/scripts', 'shared/python') {
-    Copy-Item -LiteralPath (Join-Path $fixture "third_party/ANTfrastructure/$part") `
-        -Destination (Join-Path $fixtureHub (Split-Path $part -Parent)) -Recurse
-}
-$fixtureLock = Join-Path $fixtureRepo 'models\models.lock'
-$lockRows = foreach ($name in $modelNames) {
-    $hash = (Get-FileHash -LiteralPath (Join-Path $modelDir $name) -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$hash  $name  https://example.invalid/$name"
-}
-[IO.File]::WriteAllLines($fixtureLock, [string[]]$lockRows, [Text.UTF8Encoding]::new($false))
-$proof = Join-Path $fixtureScripts 'Test-WindowsGpuPackages.ps1'
-$stage = Join-Path $root 'msix-stage'; $null = New-Item -ItemType Directory -Path $stage
-foreach ($name in $gpuNames + $appNames) { Copy-Item -LiteralPath (Join-Path $bin $name) -Destination $stage }
-Copy-Item -LiteralPath $modelDir -Destination $stage -Recurse
-$null = New-Item -ItemType Directory -Force -Path (Join-Path $stage 'lib\gstreamer-1.0')
-foreach ($name in $pluginNames) { Copy-Item -LiteralPath (Join-Path $pluginDir $name) -Destination (Join-Path $stage 'lib\gstreamer-1.0') }
-$msix = Join-Path $root 'candidate.msix'
-[IO.Compression.ZipFile]::CreateFromDirectory($stage, $msix)
-& $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix
-foreach ($name in $modelNames) {
-    foreach ($mutation in 'changed', 'missing') {
-        $path = Join-Path $modelDir $name
-        $bytes = [IO.File]::ReadAllBytes($path)
-        try {
-            if ($mutation -eq 'changed') { [IO.File]::WriteAllText($path, 'tampered') }
-            else { Remove-Item -LiteralPath $path }
-            $rejected = $false
-            try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-            catch { if ($_.Exception.Message -notmatch 'do not match models.lock') { throw }; $rejected = $true }
-            if (-not $rejected) { throw "$mutation staged model file was accepted: $name" }
-        } finally { [IO.File]::WriteAllBytes($path, $bytes) }
-    }
-}
+$proof = New-FixtureRepo -Root $root -ModelDir $modelDir
+$msix = New-FixtureMsix -Root $root -Bin $bin -ModelDir $modelDir -PluginDir $pluginDir
+$packageArgs = @{ Variant = 'nvidia'; OnnxRoot = (Split-Path $image -Parent); WheelDir = $wheelDir; Bundle = $bundle; PackageDir = $packages }
+$msixArgs = $packageArgs + @{ MsixPath = $msix }
+& $proof @msixArgs
+Assert-FixtureModelMutationRejected -ModelDir $modelDir
 $backup = Join-Path $root 'original.msix'; Copy-Item -LiteralPath $msix -Destination $backup
-$archive = [IO.Compression.ZipFile]::Open($msix, [IO.Compression.ZipArchiveMode]::Update)
-try {
-    $entry = $archive.GetEntry('lib/gstreamer-1.0/gstwebrtc.dll'); $entry.Delete()
-    $entry = $archive.CreateEntry('lib/gstreamer-1.0/gstwebrtc.dll')
-    $writer = [IO.StreamWriter]::new($entry.Open()); try { $writer.Write('tampered') } finally { $writer.Dispose() }
-} finally { $archive.Dispose() }
-$rejected = $false
-try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-if (-not $rejected) { throw 'Modified MSIX GStreamer plugin was accepted' }
+Write-FixtureArchiveEntry -Path $msix -Member 'lib/gstreamer-1.0/gstwebrtc.dll' -Text 'tampered' -Replace
+Assert-FixtureRejected -Arguments $msixArgs -Pattern 'package binary verification failed' -Failure 'Modified MSIX GStreamer plugin was accepted'
 Copy-Item -LiteralPath $backup -Destination $msix -Force
 # Replace the embedded MSI cabinet with one whose GStreamer plugin bytes differ.
 $msiBackup = Join-Path $root 'original.msi'; Copy-Item -LiteralPath $msi -Destination $msiBackup
 $badDir = Join-Path $root 'tampered-cab'; $null = New-Item -ItemType Directory -Path $badDir
 $badProvider = Join-Path $badDir 'tampered.dll'; New-TestPeFile -Path $badProvider -Tag 'tampered'
-$badLines = @('.OPTION EXPLICIT', '.Set CabinetNameTemplate=payload.cab', ".Set DiskDirectoryTemplate=$badDir", '.Set MaxDiskSize=0', '.Set Compress=ON')
-foreach ($item in $items) {
-    $source = if ($item.Name -eq 'gstwebrtc.dll') { $badProvider } else { $item.Source }
-    $badLines += "`"$source`" $($item.Id)"
-}
-$badDdf = Join-Path $badDir 'payload.ddf'; [IO.File]::WriteAllLines($badDdf, $badLines)
-New-FixtureCabinet -Ddf $badDdf -Directory $badDir
-$installer = New-Object -ComObject WindowsInstaller.Installer
-$db = $installer.OpenDatabase($msi, 1)
-try {
-    $view = $db.OpenView('UPDATE `_Streams` SET `Data` = ? WHERE `Name` = ''payload.cab''')
-    $record = $installer.CreateRecord(1)
-    try { $record.SetStream(1, (Join-Path $badDir 'payload.cab')); $null = $view.Execute($record); $null = $view.Close() }
-    finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
-    $null = $db.Commit()
-} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
-$rejected = $false
-try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages }
-catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-if (-not $rejected) { throw 'Modified MSI GStreamer plugin was accepted' }
+Write-FixtureMsiCabinet -Msi $msi -Cabinet (Write-FixtureCabinet -Directory $badDir -Items $items -Replace @{ 'gstwebrtc.dll' = $badProvider })
+Assert-FixtureRejected -Arguments $packageArgs -Pattern 'package binary verification failed' -Failure 'Modified MSI GStreamer plugin was accepted'
 Copy-Item -LiteralPath $msiBackup -Destination $msi -Force
 # Alter the CPack ZIP provider while preserving its other entries.
-$zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Update)
-try {
-    $entry = $zip.GetEntry('candidate/lib/gstreamer-1.0/gstwebrtc.dll'); $entry.Delete()
-    $entry = $zip.CreateEntry('candidate/lib/gstreamer-1.0/gstwebrtc.dll')
-    $writer = [IO.StreamWriter]::new($entry.Open()); try { $writer.Write('tampered') } finally { $writer.Dispose() }
-} finally { $zip.Dispose() }
-$rejected = $false
-try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages }
-catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-if (-not $rejected) { throw 'Modified ZIP GStreamer plugin was accepted' }
+Write-FixtureArchiveEntry -Path $zipPath -Member 'candidate/lib/gstreamer-1.0/gstwebrtc.dll' -Text 'tampered' -Replace
+Assert-FixtureRejected -Arguments $packageArgs -Pattern 'package binary verification failed' -Failure 'Modified ZIP GStreamer plugin was accepted'
 Write-Host 'PASS: synthetic GPU ZIP, MSI and MSIX byte proof and mutated-plugin rejection'
 
 
-$archive = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Update)
-try {
-    $archive.GetEntry('candidate/lib/gstreamer-1.0/gstwebrtc.dll').Delete()
-    [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, (Join-Path $pluginDir 'gstwebrtc.dll'), 'candidate/lib/gstreamer-1.0/gstwebrtc.dll') | Out-Null
-} finally { $archive.Dispose() }
+Copy-FixtureArchiveEntry -Path $zipPath -Member 'candidate/lib/gstreamer-1.0/gstwebrtc.dll' -Source (Join-Path $pluginDir 'gstwebrtc.dll') -Replace
 $originalZip = Join-Path $root 'original.zip'; Copy-Item $zipPath $originalZip
-foreach ($case in @(
-    @{ Path=$zipPath; Member='candidate/bin/AccelerANTgine_demo.exe' },
-    @{ Path=$msix; Member='AccelerANTgine_demo.exe' },
-    @{ Path=$zipPath; Member='candidate/bin/models/deim_dfine_n_coco.onnx' },
-    @{ Path=$msix; Member='models/deim_dfine_n_coco.onnx' },
-    @{ Path=$zipPath; Member='candidate/bin/models/deim_dfine_n_coco.NOTICE' },
-    @{ Path=$msix; Member='models/deim_dfine_n_coco.NOTICE' }
-)) {
-    $archive = [IO.Compression.ZipFile]::Open($case.Path, [IO.Compression.ZipArchiveMode]::Update)
-    try { $archive.GetEntry($case.Member).Delete() } finally { $archive.Dispose() }
-    $rejected = $false
-    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-    catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-    if (-not $rejected) { throw "Missing package member accepted: $($case.Member)" }
-    Copy-Item $originalZip $zipPath -Force; Copy-Item $backup $msix -Force
-}
-foreach ($case in @(@{ Path=$zipPath; Member='candidate/lib/gstreamer-1.0/gstwebrtc.dll' }, @{ Path=$msix; Member='lib/gstreamer-1.0/gstwebrtc.dll' })) {
-    $archive = [IO.Compression.ZipFile]::Open($case.Path, [IO.Compression.ZipArchiveMode]::Update)
-    try { $archive.GetEntry($case.Member).Delete() } finally { $archive.Dispose() }
-    $rejected = $false
-    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-    catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-    if (-not $rejected) { throw "Missing plugin accepted: $($case.Path)" }
-    Copy-Item $originalZip $zipPath -Force; Copy-Item $backup $msix -Force
-}
+Assert-FixtureArchiveCaseRejected -Pattern 'package binary verification failed' -Cases @(
+    @{ Path = $zipPath; Member = 'candidate/bin/AccelerANTgine_demo.exe'; Failure = 'Missing package member accepted: candidate/bin/AccelerANTgine_demo.exe' },
+    @{ Path = $msix; Member = 'AccelerANTgine_demo.exe'; Failure = 'Missing package member accepted: AccelerANTgine_demo.exe' },
+    @{ Path = $zipPath; Member = 'candidate/bin/models/deim_dfine_n_coco.onnx'; Failure = 'Missing package member accepted: candidate/bin/models/deim_dfine_n_coco.onnx' },
+    @{ Path = $msix; Member = 'models/deim_dfine_n_coco.onnx'; Failure = 'Missing package member accepted: models/deim_dfine_n_coco.onnx' },
+    @{ Path = $zipPath; Member = 'candidate/bin/models/deim_dfine_n_coco.NOTICE'; Failure = 'Missing package member accepted: candidate/bin/models/deim_dfine_n_coco.NOTICE' },
+    @{ Path = $msix; Member = 'models/deim_dfine_n_coco.NOTICE'; Failure = 'Missing package member accepted: models/deim_dfine_n_coco.NOTICE' }
+)
+Assert-FixtureArchiveCaseRejected -Pattern 'package binary verification failed' -Cases @(
+    @{ Path = $zipPath; Member = 'candidate/lib/gstreamer-1.0/gstwebrtc.dll'; Failure = "Missing plugin accepted: $zipPath" },
+    @{ Path = $msix; Member = 'lib/gstreamer-1.0/gstwebrtc.dll'; Failure = "Missing plugin accepted: $msix" }
+)
 $missingDir = Join-Path $root 'missing-cab'; $null = New-Item -ItemType Directory -Path $missingDir
-$missingLines = @('.OPTION EXPLICIT', '.Set CabinetNameTemplate=payload.cab', ".Set DiskDirectoryTemplate=$missingDir", '.Set MaxDiskSize=0', '.Set Compress=ON')
-foreach ($item in $items) { if ($item.Name -ne 'gstwebrtc.dll') { $missingLines += "`"$($item.Source)`" $($item.Id)" } }
-$missingDdf = Join-Path $missingDir 'payload.ddf'; [IO.File]::WriteAllLines($missingDdf, $missingLines)
-New-FixtureCabinet -Ddf $missingDdf -Directory $missingDir
-$installer = New-Object -ComObject WindowsInstaller.Installer; $db = $installer.OpenDatabase($msi, 1)
-try {
-    $view = $db.OpenView('UPDATE `_Streams` SET `Data` = ? WHERE `Name` = ''payload.cab'''); $record = $installer.CreateRecord(1)
-    try { $record.SetStream(1, (Join-Path $missingDir 'payload.cab')); $null = $view.Execute($record); $null = $view.Close() }
-    finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
-    $null = $db.Commit()
-} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
-$rejected = $false
-try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages }
-catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-if (-not $rejected) { throw 'Missing MSI plugin was accepted' }
+Write-FixtureMsiCabinet -Msi $msi -Cabinet (Write-FixtureCabinet -Directory $missingDir -Items $items -Omit 'gstwebrtc.dll')
+Assert-FixtureRejected -Arguments $packageArgs -Pattern 'package binary verification failed' -Failure 'Missing MSI plugin was accepted'
 Write-Host 'PASS: missing GStreamer plugin rejected in ZIP, MSI and MSIX'
 
-foreach ($mutation in 'missing', 'altered') {
-    Copy-Item -LiteralPath $msiBackup -Destination $msi -Force
-    $demoDir = Join-Path $root "demo-$mutation"; $null = New-Item -ItemType Directory -Path $demoDir
-    $demoLines = @('.OPTION EXPLICIT', '.Set CabinetNameTemplate=payload.cab', ".Set DiskDirectoryTemplate=$demoDir", '.Set MaxDiskSize=0', '.Set Compress=ON')
-    foreach ($item in $items) {
-        if ($item.Name -eq 'AccelerANTgine_demo.exe' -and $mutation -eq 'missing') { continue }
-        $itemSource = if ($item.Name -eq 'AccelerANTgine_demo.exe') { $badProvider } else { $item.Source }
-        $demoLines += "`"$itemSource`" $($item.Id)"
-    }
-    $demoDdf = Join-Path $demoDir 'payload.ddf'; [IO.File]::WriteAllLines($demoDdf, $demoLines)
-    New-FixtureCabinet -Ddf $demoDdf -Directory $demoDir
-    $installer = New-Object -ComObject WindowsInstaller.Installer; $db = $installer.OpenDatabase($msi, 1)
-    try {
-        $view = $db.OpenView('UPDATE `_Streams` SET `Data` = ? WHERE `Name` = ''payload.cab'''); $record = $installer.CreateRecord(1)
-        try { $record.SetStream(1, (Join-Path $demoDir 'payload.cab')); $null = $view.Execute($record); $null = $view.Close() }
-        finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
-        $null = $db.Commit()
-    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
-    $rejected = $false
-    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-    catch { if ($_.Exception.Message -notmatch 'package binary verification failed') { throw }; $rejected = $true }
-    if (-not $rejected) { throw "$mutation MSI inference demo was accepted" }
-}
+Assert-FixtureMsiDemoMutationRejected -Root $root -Msi $msi -MsiBackup $msiBackup -BadProvider $badProvider
 Copy-Item -LiteralPath $msiBackup -Destination $msi -Force
 Write-Host 'PASS: missing or altered MSI inference demo rejected'
 
-foreach ($case in @(
-    @{ Path=$zipPath; Member='candidate/bin/models/onnxruntime.dll' },
-    @{ Path=$msix; Member='models/onnxruntime.dll' }
-)) {
-    $archive = [IO.Compression.ZipFile]::Open($case.Path, [IO.Compression.ZipArchiveMode]::Update)
-    try {
-        $entry = $archive.CreateEntry($case.Member)
-        $writer = [IO.StreamWriter]::new($entry.Open())
-        try { $writer.Write('unexpected runtime') } finally { $writer.Dispose() }
-    } finally { $archive.Dispose() }
-    $rejected = $false
-    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-    catch { if ($_.Exception.Message -notmatch 'ORT family') { throw }; $rejected = $true }
-    if (-not $rejected) { throw "Nested ORT family DLL was accepted: $($case.Member)" }
-    Copy-Item $originalZip $zipPath -Force; Copy-Item $backup $msix -Force
-}
+Assert-FixtureArchiveCaseRejected -Pattern 'ORT family' -AddEntry -Cases @(
+    @{ Path = $zipPath; Member = 'candidate/bin/models/onnxruntime.dll'; Failure = 'Nested ORT family DLL was accepted: candidate/bin/models/onnxruntime.dll' },
+    @{ Path = $msix; Member = 'models/onnxruntime.dll'; Failure = 'Nested ORT family DLL was accepted: models/onnxruntime.dll' }
+)
 Write-Host 'PASS: unexpected nested ORT family DLL rejected in ZIP and MSIX'
 
 $nestedRuntime = Join-Path $modelDir 'onnxruntime.dll'
 [IO.File]::WriteAllText($nestedRuntime, 'unexpected runtime')
 try {
-    $rejected = $false
-    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-    catch { if ($_.Exception.Message -notmatch 'ORT family') { throw }; $rejected = $true }
-    if (-not $rejected) { throw 'Nested staged ORT family DLL was accepted' }
+    Assert-FixtureRejected -Arguments $msixArgs -Pattern 'ORT family' -Failure 'Nested staged ORT family DLL was accepted'
 } finally { Remove-Item -LiteralPath $nestedRuntime -Force }
 
-$installer = New-Object -ComObject WindowsInstaller.Installer
-$db = $installer.OpenDatabase($msi, 1)
+Invoke-FixtureMsiStatement -Msi $msi -Statement 'INSERT INTO `File` (`File`, `FileName`, `Component_`, `Sequence`) VALUES (''f_extra'', ''onnxruntime.dll'', ''c10'', 1)'
 try {
-    $view = $db.OpenView('INSERT INTO `File` (`File`, `FileName`, `Component_`, `Sequence`) VALUES (''f_extra'', ''onnxruntime.dll'', ''c10'', 1)')
-    try { $null = $view.Execute(); $null = $view.Close(); $null = $db.Commit() }
-    finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
-} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($db); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer) }
-try {
-    $rejected = $false
-    try { & $proof -Variant nvidia -OnnxRoot (Split-Path $image -Parent) -WheelDir $wheelDir -Bundle $bundle -PackageDir $packages -MsixPath $msix }
-    catch { if ($_.Exception.Message -notmatch 'ORT family') { throw }; $rejected = $true }
-    if (-not $rejected) { throw 'Duplicate MSI ORT family DLL was accepted' }
+    Assert-FixtureRejected -Arguments $msixArgs -Pattern 'ORT family' -Failure 'Duplicate MSI ORT family DLL was accepted'
 } finally { Copy-Item $msiBackup $msi -Force }
 Write-Host 'PASS: nested staged and duplicate MSI ORT family DLLs rejected'

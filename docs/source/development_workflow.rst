@@ -249,8 +249,11 @@ Static Analysis And Formatting
 
 One entry point per platform, and CI runs exactly these:
 
-The on-request Windows x64 PowerShell lint job calls ANTfrastructure's reusable
-``powershell-quality.yml`` with analyzer warnings advisory. Its shared bootstrap reads the hub's
+Every push and PR runs ``powershell-quality.yml``, which calls ANTfrastructure's reusable
+``powershell-quality.yml`` over ``scripts`` with ``strict: true``: a unit above 15 cyclomatic, 5 nesting
+or 80 function lines fails it. Analyzer warnings stay advisory unless a dispatch sets ``strict``;
+a dispatch without it only measures complexity. Split a step into a named function rather than
+raising a limit. Its shared bootstrap reads the hub's
 version pin and retries transient PowerShell Gallery failures; parser failures stay fatal.
 The Windows build-wiring Pester suite imports ANTfrastructure's AST reader, which rejects a
 malformed build script before checking its build steps.

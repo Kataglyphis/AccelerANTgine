@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-01)
+- **PowerShell complexity is strict on push and PR.** `Build-Windows.ps1` runs each build step from a
+  named function and the GPU package fixture shares its archive, cabinet and MSI helpers, so `scripts/`
+  has no unit over the hub's limits; `powershell-quality.yml` now fails on a new one. Build behaviour
+  and the fixture's checks are unchanged.
+
 ### Added (2026-10-31)
 - **`scripts/linux/quality-report.sh`** runs the hub's `quality-report.sh` on this checkout; the
   tracked `quality-report.toml` declares the docs build list, lane outputs and repo metrics it reads.
