@@ -91,6 +91,19 @@ function Invoke-BuiltArtifact {
     }
 }
 
+# results.json lands in the product dir, which the lane uploads after this host command for its bench-history job.
+function Invoke-PerfSuite {
+    $perfDir = Join-Path $ProjectRoot "dist\windows-$(Get-WindowsPackageArch -Arch '')\perf"
+    New-Item -ItemType Directory -Force -Path $perfDir | Out-Null
+    $model = Join-Path $ProjectRoot 'models\deim_dfine_n_coco.onnx'
+    $previous = $env:KATAGLYPHIS_DETECTOR_MODEL
+    if (Test-Path -LiteralPath $model -PathType Leaf) { $env:KATAGLYPHIS_DETECTOR_MODEL = $model }
+    try {
+        Invoke-BuiltArtifact -ExecutableName 'perfTestSuite.exe' -RelativeDirectory @('', 'bin') `
+            -Arguments @("--benchmark_out=$(Join-Path $perfDir 'results.json')", '--benchmark_out_format=json')
+    } finally { $env:KATAGLYPHIS_DETECTOR_MODEL = $previous }
+}
+
 # Names the missing or stale DLL behind the hub's one "loader/runtime mismatch" message, searching as the loader does.
 function Write-ImportClosureReport {
     param(
@@ -165,7 +178,7 @@ try {
         }
     } elseif ($Config -eq 'Profile') {
         Write-BuildLog -Context $ctx -Message "--- Performance tests (Google Benchmark) ---"
-        Invoke-BuiltArtifact -ExecutableName 'perfTestSuite.exe' -RelativeDirectory @('', 'bin')
+        Invoke-PerfSuite
     } else {
         # Build-Windows.ps1 -StageTests leaves the Release suites self-contained here; they run as the arm64 job runs them.
         $staged = Join-Path $ProjectRoot "dist\windows-$(Get-WindowsPackageArch -Arch '')-tests"

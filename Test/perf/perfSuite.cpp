@@ -75,12 +75,14 @@ auto skip_or_fail(benchmark::State &state, const char *reason) -> void
     state.SkipWithError(reason);
 }
 
-// The lock-verified model fetch-data-lock.py writes to models/, unless KATAGLYPHIS_DETECTOR_MODEL names another.
+// KATAGLYPHIS_DETECTOR_MODEL, else the configure-time models/ path, else the copy a staged suite carries beside it.
 auto detector_model() -> std::filesystem::path
 {
     const char *model = std::getenv("KATAGLYPHIS_DETECTOR_MODEL");
-    return model != nullptr && *model != '\0' ? std::filesystem::path(model)
-                                              : std::filesystem::path(KATAGLYPHIS_DETECTOR_MODEL);
+    if (model != nullptr && *model != '\0') { return model; }
+    const std::filesystem::path built{ KATAGLYPHIS_DETECTOR_MODEL };
+    if (std::filesystem::exists(built)) { return built; }
+    return kataglyphis::test::executable_dir() / "models" / built.filename();
 }
 
 // One intra-op and one inter-op thread, so a cachegrind instruction count repeats across runs.

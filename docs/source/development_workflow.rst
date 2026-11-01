@@ -203,7 +203,10 @@ runs:
   ``BM_DetectFrame``, ``BM_SessionCreate`` or ``BM_TextGenerateTiny`` doubles. The detector
   benchmarks read ``models/deim_dfine_n_coco.onnx`` (``fetch-data-lock.py --lock models/models.lock``)
   or ``KATAGLYPHIS_DETECTOR_MODEL``; ``BM_TextGenerateTiny`` reads the hub's configure-time tiny
-  GenAI model. Without the model they skip, unless ``KATAGLYPHIS_REQUIRE_MODEL=1``.
+  GenAI model. Without the model they skip, unless ``KATAGLYPHIS_REQUIRE_MODEL=1``. On Windows,
+  ``Start-Windows.ps1 -Config Profile`` writes ``dist\windows-x64\perf\results.json`` and the
+  staged arm64 suite writes ``results.json`` beside itself; each lane's ``bench-history`` job
+  reports them ungated under ``perf-win-x64`` and ``perf-win-arm64``.
 - **Instruction counts:** ``scripts/linux/perf-cachegrind.py --suite build/perfTestSuite --key
   x64-clang`` counts ``BM_PreprocessFrame`` and ``BM_DetectFrame`` per iteration under
   ``valgrind --tool=cachegrind --cache-sim=no`` at one ORT thread, and fails over its

@@ -52,5 +52,36 @@ jobs:
         if ($ucrt.Count -eq 0) { throw 'no arm64 ucrtbased.dll under the Windows SDK' }
         $env:PATH = "$($crt[0].FullName);$($ucrt[0].DirectoryName);$env:PATH"
         & ./Invoke-StagedTests.ps1
+      # The staged perfTestSuite writes results.json beside itself; the bench-history job reads it.
+      test-results-path: results.json
     secrets:
       GHCR_PAT: ${{ secrets.GHCR_PAT }}
+
+  # Ungated until Windows runners have a history to judge against; the Linux keys gate.
+  bench-history:
+    name: Benchmark history (arm64)
+    needs: cross
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Download the benchmark results
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: AccelerANTgine-windows-arm64-test-results
+          path: perf-input
+
+      - name: Benchmark history
+        uses: Kataglyphis/ANTfrastructure/.github/actions/bench-history@develop
+        with:
+          key: perf-win-arm64
+          format: google-benchmark
+          result: perf-input/results.json
+          metrics: >-
+            {"BM_PreprocessFrame": {"direction": "lower"},
+            "BM_DetectFrame": {"direction": "lower"},
+            "BM_SessionCreate": {"direction": "lower"},
+            "BM_TextGenerateTiny": {"direction": "lower"},
+            "*/tokens_per_second": {"direction": "higher"},
+            "*/bytes_per_second": {"direction": "higher"}}

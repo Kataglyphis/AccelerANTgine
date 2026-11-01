@@ -582,7 +582,7 @@ function Invoke-StageTestsStep {
                 @{ exe = 'commitTestSuite.exe'; kind = 'gtest' }
                 @{ exe = 'compileTestSuite.exe'; kind = 'gtest' }
                 @{ exe = 'fuzzTestSuite.exe'; kind = 'gtest' }
-                @{ exe = 'perfTestSuite.exe'; kind = 'exitcode'; args = @('--benchmark_min_time=0.05s') }
+                @{ exe = 'perfTestSuite.exe'; kind = 'exitcode'; args = @('--benchmark_min_time=0.05s', '--benchmark_out=results.json', '--benchmark_out_format=json') }
             )
             $suites = $manifest | ForEach-Object { Join-Path $fastBuildReleaseDirFull $_.exe }
             $missing = @($suites | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
@@ -596,6 +596,9 @@ function Invoke-StageTestsStep {
             $closure += @($genai) + @(Copy-PeImportClosure -Path @($genai) -SearchDirectory $search -Destination $tests -Arch $TargetArch)
             # The suites look for the configure-time GenAI test model beside themselves once its build path is gone.
             Copy-Item -LiteralPath (Join-Path $fastBuildReleaseDirFull 'test-models') -Destination $tests -Recurse -Force
+            # The detector benchmarks read the lock-verified model beside the suite once the configure path is gone.
+            New-Item -ItemType Directory -Force -Path (Join-Path $tests 'models') | Out-Null
+            Copy-Item -LiteralPath (Join-Path $Workspace 'models\deim_dfine_n_coco.onnx') -Destination (Join-Path $tests 'models')
             # GStreamer looks for plugins in <flat dir>\lib\gstreamer-1.0; their own imports join the closure beside the suites.
             Copy-ImageGStreamerTestPlugins -Context $Context -BuildRoot $tests
             $plugins = @(Get-ChildItem -LiteralPath (Join-Path $tests 'lib\gstreamer-1.0') -Filter '*.dll' -File | ForEach-Object FullName)

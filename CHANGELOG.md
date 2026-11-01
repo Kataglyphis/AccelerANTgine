@@ -22,7 +22,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 - **Four benchmarks and a history.** `perfTestSuite` adds `BM_PreprocessFrame`, `BM_DetectFrame`,
   `BM_SessionCreate` (the locked DEIM model, one ORT thread) and `BM_TextGenerateTiny` (the hub's
   tiny GenAI model). Every Linux leg uploads `results.json` and compares it through the hub's
-  `bench-history` action (keys `perf-<arch>-<compiler>`); a doubled gated time fails.
+  `bench-history` action (keys `perf-<arch>-<compiler>`); a doubled gated time fails. The Windows
+  lanes upload theirs too and report them ungated (`perf-win-x64`, `perf-win-arm64`); the staged
+  suites carry the DEIM model beside them.
 - **An instruction-count check.** `scripts/linux/perf-cachegrind.py` counts `BM_PreprocessFrame` and
   `BM_DetectFrame` under cachegrind and records them per leg; a key with a baseline in
   `perf/cachegrind-baseline.json` fails over max(3 %, 3 x the recorded spread). `x64-clang` and
