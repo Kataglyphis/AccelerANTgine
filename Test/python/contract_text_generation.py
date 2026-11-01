@@ -1,10 +1,12 @@
 """ModelANT's text-generation-v1 on the released SmolLM2-135M; ci-python-bindings.sh runs it by name after fetching llm.lock."""
 
+import importlib
 import json
 import os
 import pathlib
 
-import kataglyphis_inference as ki
+# Imported by name like the other suites, since only the installed wheel provides it, never the source tree.
+ki = importlib.import_module("kataglyphis_inference")
 
 CONTRACT = pathlib.Path(__file__).resolve().parents[2] / "third_party" / "ModelANT" / "contracts" / "text-generation-v1.json"
 RELEASED_IDS = [504, 3575, 282, 4649, 314, 7042, 30, 2]

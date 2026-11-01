@@ -26,6 +26,7 @@ ci_parse_value_options() {
     shift 2
   done
 }
+ci_fetch_llm_model() { printf '%s/resources/models/smollm2_135m_instruct-cpu\n' "$1"; }
 STUB
 cat > "${workspace}/bin/uv" <<'STUB'
 #!/usr/bin/env bash
@@ -69,13 +70,16 @@ cd "${workspace}"
 args=(--workspace-dir "${workspace}" --build-root "${tmp}/build root" --out-dir 'dist wheels')
 bash scripts/linux/ci-python-bindings.sh "${args[@]}"
 mapfile -t calls < "${UV_TEST_LOG}"
-[[ ${#calls[@]} -eq 13 ]] || { printf 'expected both wheel lifecycles\n' >&2; exit 1; }
+[[ ${#calls[@]} -eq 15 ]] || { printf 'expected both wheel lifecycles\n' >&2; exit 1; }
 [[ "${calls[0]}" == 'uv build '* && "${calls[2]}" == *' --no-deps '*cp314-linux* &&
    "${calls[3]}" == 'uv export '* && "${calls[4]}" == *' --no-deps -r '* &&
-   "${calls[5]}" == 'python -m pytest '* && "${calls[6]}" == 'uv build '* &&
-   "${calls[8]}" == *' --no-deps '*cp314t-linux* && "${calls[9]}" == 'python -I '* &&
-   "${calls[10]}" == 'uv export '* && "${calls[11]}" == *' --no-deps -r '* &&
-   "${calls[12]}" == 'python -m pytest '* ]] || { printf 'wheel lifecycle changed\n' >&2; exit 1; }
+   "${calls[5]}" == 'python -m pytest '* && "${calls[6]}" == 'python -m pytest '*contract_text_generation.py* &&
+   "${calls[7]}" == 'uv build '* &&
+   "${calls[9]}" == *' --no-deps '*cp314t-linux* && "${calls[10]}" == 'python -I '* &&
+   "${calls[11]}" == 'uv export '* && "${calls[12]}" == *' --no-deps -r '* &&
+   "${calls[13]}" == 'python -m pytest '* && "${calls[14]}" == 'python -m pytest '*contract_text_generation.py* ]] ||
+  { printf 'wheel lifecycle changed\n' >&2; exit 1; }
+[[ "${calls[5]}" != *contract_text_generation.py* ]] || { printf 'the contract joined the model-free run\n' >&2; exit 1; }
 : > "${UV_TEST_LOG}"
 export UV_TEST_FAIL_EXPORT=1
 if bash scripts/linux/ci-python-bindings.sh "${args[@]}"; then
