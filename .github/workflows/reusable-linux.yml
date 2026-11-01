@@ -60,9 +60,11 @@ jobs:
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
         with:
           # CARGO_HOME must be writable: the image default /usr/local/cargo is root-owned and the container runs as non-root.
+          # GITHUB_RUN_ID names the run in perf-cachegrind.py's record, which a baseline cites.
           extra-args: >-
             --privileged --platform ${{ inputs.platform }}
             -e CARGO_HOME=/tmp/cargo
+            -e GITHUB_RUN_ID=${{ github.run_id }}
             ${{ steps.cc.outputs.docker-args }}
           script: >-
             bash -lc 'set -e; bash scripts/linux/ci-run-all.sh
