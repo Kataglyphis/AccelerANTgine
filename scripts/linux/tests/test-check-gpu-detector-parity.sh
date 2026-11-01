@@ -35,6 +35,7 @@ cat >"$work/demo" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 [[ -z ${MIGRAPHX_SKIP_BENCHMARKING+x} && -z ${ORT_MIGRAPHX_MODEL_CACHE_PATH+x} && -z ${MIGRAPHX_UNKNOWN+x} ]]
+[[ ${NEEDS_LIBRARY_PATH:-0} != 1 || -n ${LD_LIBRARY_PATH+x} ]]
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model|--detector-image) shift 2 ;;
@@ -88,7 +89,10 @@ fi
 mv "$work/log-bootstrap.sh" "$work/repo/third_party/ANTfrastructure/linux/scripts/lib/log-bootstrap.sh"
 MIGRAPHX_SKIP_BENCHMARKING=1 ORT_MIGRAPHX_MODEL_CACHE_PATH=/tmp MIGRAPHX_UNKNOWN=poison bash "$check" "$work/demo" "$work/model.onnx" cuda "$work/pass"
 EDGE_PARITY=1 bash "$check" "$work/demo" "$work/model.onnx" cuda "$work/edge"
-bash "$check" "$work/demo" "$work/model.onnx" xnnpack "$work/xnnpack"
+NEEDS_LIBRARY_PATH=1 LD_LIBRARY_PATH=/opt/gcc/lib64 bash "$check" "$work/demo" "$work/model.onnx" xnnpack "$work/xnnpack"
+if NEEDS_LIBRARY_PATH=1 LD_LIBRARY_PATH=/opt/gcc/lib64 bash "$check" "$work/demo" "$work/model.onnx" cuda "$work/gpu-cpu-leg" >/dev/null 2>&1; then
+  echo "A GPU check's CPU leg kept the caller's LD_LIBRARY_PATH" >&2; exit 1
+fi
 if BAD_GPU_PROFILE=1 bash "$check" "$work/demo" "$work/model.onnx" xnnpack "$work/xnnpack-on-cpu" >/dev/null 2>&1; then
   echo 'An XNNPACK request profiled on plain CPU was accepted' >&2; exit 1
 fi

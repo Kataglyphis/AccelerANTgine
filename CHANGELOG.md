@@ -37,7 +37,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 - `Test/golden` and its `golden` ctest label, run by the Linux lanes with the model required: the
   two-cats golden against a recorded demo run, a black frame with 0 boxes, XNNPACK and DNNL parity
   with CPU within 1e-4, XNNPACK's profile through the hub's `verify_ort_profile.py`
-  (`check-gpu-detector-parity.sh` now takes `xnnpack` and `dnnl`), and the thread knobs.
+  (`check-gpu-detector-parity.sh` now takes `xnnpack` and `dnnl`, whose CPU leg keeps the
+  caller's `LD_LIBRARY_PATH`), and the thread knobs.
 
 ### Changed (2026-11-01, CV features)
 - A CUDA, MIGraphX or DirectML request on a runtime without that provider now fails with

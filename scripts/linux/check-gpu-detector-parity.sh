@@ -40,7 +40,8 @@ for run in cpu gpu; do
     -u KATAGLYPHIS_ONNX_BACKEND -u KATAGLYPHIS_ORT_DEVICE -u GST_PLUGIN_PATH -u GST_PLUGIN_PATH_1_0
     -u GST_PLUGIN_SYSTEM_PATH -u GST_PLUGIN_SYSTEM_PATH_1_0 -u GST_PLUGIN_SCANNER -u GST_PLUGIN_SCANNER_1_0
     -u GST_REGISTRY -u GST_REGISTRY_1_0 -u GST_REGISTRY_FORK)
-  [[ "$selected" != cpu ]] || clean+=(-u LD_LIBRARY_PATH)
+  # A GPU's CPU leg proves the package alone; a CPU provider compares with CPU in the same environment.
+  if [[ "$selected" == cpu && "$device" != xnnpack && "$device" != dnnl ]]; then clean+=(-u LD_LIBRARY_PATH); fi
   gpu_without_migraphx_overrides "${clean[@]}" GST_REGISTRY_1_0="$evidence/$run-gst-registry.bin" "$demo" --model "$model" --device "$selected" \
     --detector-image "$fixture" --detector-output "$output" "${repeat[@]}" --profile "$evidence/$run-profile"
   shopt -s nullglob
