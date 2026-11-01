@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-01, python-static strict)
+- `python-static.yml` runs the hub's Ruff and ty lane with `strict: true` on push; ty reports 0
+  diagnostics, down from 6.
+- `Bindings/python/kataglyphis_inference/_core.pyi` is tracked, and `ci-python-bindings.sh` fails
+  when a built wheel's stub differs (`scripts/linux/check-python-stub.py`, tested by
+  `scripts/linux/tests/test-check-python-stub.py` in the lint gates). `stubgen-patterns.txt` adds
+  the `__version__` stubgen skips.
+- The ANTfrastructure pin moves to the hub commit whose `python-static.sh` lets ty resolve
+  `pytest` and the docs theme.
+
 ### Added (2026-11-01)
 - **Four benchmarks and a history.** `perfTestSuite` adds `BM_PreprocessFrame`, `BM_DetectFrame`,
   `BM_SessionCreate` (the locked DEIM model, one ORT thread) and `BM_TextGenerateTiny` (the hub's

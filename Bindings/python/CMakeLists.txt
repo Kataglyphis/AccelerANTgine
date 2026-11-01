@@ -48,6 +48,8 @@ if(KATAGLYPHIS_PYTHON_STUBS)
     "${CMAKE_BINARY_DIR}/python"
     MARKER_FILE
     "${KATAGLYPHIS_PY_STAGE_DIR}/py.typed"
+    PATTERN_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/stubgen-patterns.txt"
     DEPENDS
     kataglyphis_python)
 endif()

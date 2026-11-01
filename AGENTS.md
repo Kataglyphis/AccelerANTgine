@@ -431,6 +431,19 @@ written out rather than linked.
   A new bound class with mutable state needs the same. `Test/python/test_threading.py` crashes
   without them, on the GIL wheel too, because the runs release the GIL.
 
+- **The Python stub is tracked, and the Linux lane fails when it drifts.**
+  `Bindings/python/kataglyphis_inference/_core.pyi` is the stub nanobind's stubgen writes into the
+  build tree, so ty resolves `._core` without a build. `ci-python-bindings.sh` runs
+  `scripts/linux/check-python-stub.py` on both wheels and fails on any byte of difference; after a
+  binding change, copy the built wheel's `kataglyphis_inference/_core.pyi` over the tracked one.
+  `Bindings/python/stubgen-patterns.txt` adds `__version__`, which stubgen skips. The check does
+  not see Windows-built stubs or a build without ONNX Runtime.
+
+- **Python static analysis is strict on push.** `python-static.yml` calls the hub's lane with
+  `strict: true`, so one Ruff finding or ty diagnostic fails it. The hub hands ty its quality
+  environment (`pytest`) and the pinned docs theme (`docs/source/conf.py`); never add a ty
+  ignore or rule override to pass it.
+
 - **The third-party notices are generated, gated and checked per package**
   ([`third_party_licenses.rst`](docs/source/third_party_licenses.rst)). `cmake/ThirdPartyNotices.cmake`
   runs `scripts/packaging/third_party_notices.py` as the last install step: Linux after the ELF closure,

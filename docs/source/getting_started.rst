@@ -356,6 +356,10 @@ The library is also exposed to Python through nanobind: the module lives in
   ``free-threaded-wheel.py prove``, which fails when loading the module re-enables the GIL. The
   wheels upload as ``python-wheels-<arch>``. They are ``linux_<arch>`` wheels: GStreamer and
   ONNX Runtime come from the image, not from the wheel.
+- **Type stub:** ``Bindings/python/kataglyphis_inference/_core.pyi`` is a tracked copy of the
+  stub nanobind's stubgen generates, so type checkers resolve ``._core`` without a build. The
+  Linux lane compares it with each wheel's stub (``scripts/linux/check-python-stub.py``) and
+  fails on a difference; after changing the bindings, copy the wheel's stub over it.
 
 Without the GIL the module stays safe through its own locks; which ones, and what a new bound
 class needs: ``AGENTS.md`` § 4.

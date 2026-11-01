@@ -1,0 +1,3 @@
+# stubgen skips module dunders, but __init__.py re-exports __version__.
+kataglyphis_inference\._core\.__prefix__$:
+    __version__: str
