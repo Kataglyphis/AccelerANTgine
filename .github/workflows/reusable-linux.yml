@@ -59,8 +59,7 @@ jobs:
       - name: Run build/test/docs/package inside container
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
         with:
-          # CARGO_HOME must be writable: the image default /usr/local/cargo is root-owned and the container runs as non-root.
-          # GITHUB_RUN_ID names the run in perf-cachegrind.py's record, which a baseline cites.
+          # The non-root container needs a writable Cargo home; the run ID identifies benchmark records.
           extra-args: >-
             --privileged --platform ${{ inputs.platform }}
             -e CARGO_HOME=/tmp/cargo
