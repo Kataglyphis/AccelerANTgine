@@ -30,10 +30,13 @@ COVERAGE_MIN_LINES_GCC=69
 COVERAGE_MIN_BRANCHES_GCC=50
 COVERAGE_MIN_LINES_CLANG=83
 COVERAGE_MIN_BRANCHES_CLANG=68
+# ci-profile-bench.sh wipes the build tree, so the summaries the lane uploads live here.
+COVERAGE_REPORT_DIR="${WORKSPACE_DIR}/logs/coverage"
+mkdir -p "${COVERAGE_REPORT_DIR}"
 
 if [[ "${COMPILER}" == "gcc" ]]; then
   # The paths baked into .gcno are relative to the build directory, hence the cd.
-  COVERAGE_SUMMARY="${WORKSPACE_DIR}/${BUILD_DIR}/coverage-summary.json"
+  COVERAGE_SUMMARY="${COVERAGE_REPORT_DIR}/coverage-summary.json"
   COVERAGE_GCOVR_EXTRA_ARGS=(
     --config "${WORKSPACE_DIR}/gcovr.cfg"
     --filter "${WORKSPACE_DIR}/Src/.*"
@@ -70,7 +73,8 @@ else
       "${MERGED_PROFILE}" \
       "coverage.profdata" \
       "${COVERAGE_JSON}" )
-  python3 "${_SCRIPT_DIR}/check-coverage-floor.py" "${BUILD_DIR}/${COVERAGE_JSON}" \
+  cp "${BUILD_DIR}/${COVERAGE_JSON}" "${COVERAGE_REPORT_DIR}/coverage.json"
+  python3 "${_SCRIPT_DIR}/check-coverage-floor.py" "${COVERAGE_REPORT_DIR}/coverage.json" \
     --min-lines "${COVERAGE_MIN_LINES_CLANG}" --min-branches "${COVERAGE_MIN_BRANCHES_CLANG}" \
     || die "clang coverage is below its floor (see the line above)."
 fi

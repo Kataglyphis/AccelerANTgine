@@ -52,6 +52,14 @@ for report in docs/test_results.xml docs/test_results_tsan.xml logs/python-gil.x
 done
 [[ "$(grep -c . <<< "${gcc_list}")" -eq 1 ]] && grep -qxF docs/test_results.xml <<< "${gcc_list}" \
   || fail "the GCC leg must gate exactly its ctest report, got: ${gcc_list}"
+# Every report the ci-run-all.sh scripts write must be on the clang list, so a new suite cannot go unread.
+while IFS= read -r written; do
+  for label in gil free-threaded; do
+    report="${written//\$\{label\}/${label}}"
+    grep -qxF "${report}" <<< "${clang_list}" || fail "${report} is written but not gated"
+  done
+done < <(grep -ohE '(--junitxml=|--output-junit )"\$\{WORKSPACE_DIR\}/[^"]+"' "${root}"/scripts/linux/ci-build-and-test.sh "${root}"/scripts/linux/ci-python-bindings.sh \
+  | sed -E 's#.*WORKSPACE_DIR\}/([^"]+)"#\1#' | sort -u)
 grep -q 'check-junit-skips.py "${JUNIT_REPORTS\[@\]}"' "${root}/scripts/linux/ci-run-all.sh" \
   || fail 'ci-run-all.sh no longer gates every report of the leg'
 

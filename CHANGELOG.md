@@ -32,7 +32,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 - The chain-only ORT proof moves into `accelerantgine_assert_ort_chain_build` in
   `cmake/OrtPackageVariant.cmake`, unchanged in behaviour.
 - Each Linux leg uploads `test-reports-<arch>-<compiler>`; `quality-report.toml` reads its JUnit,
-  coverage and clang-tidy rows from that artifact.
+  coverage and clang-tidy rows from that artifact. The coverage summaries live in `logs/coverage/`,
+  because `ci-profile-bench.sh` wipes `build/` before the upload, and the skip gate also reads the
+  two text-contract pytest reports.
 - New `mutations.yml` runs the hub's mutation gates over `scripts/linux/tests/lane-mutations.json`.
 
 ### Fixed (2026-11-01, bench-history)

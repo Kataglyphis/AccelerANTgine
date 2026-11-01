@@ -346,8 +346,8 @@ written out rather than linked.
   `[  SKIPPED ]` as passed in its "100% tests passed" line, so `ci-build-and-test.sh` fails the
   lane on any `<skipped>` in its JUnit file and names the tests: the image carries every element,
   so a skip there means one went missing. `ci-run-all.sh` then runs `check-junit-skips.py` over
-  every report of the leg (`ci_junit_reports`: ctest, and on clang also the TSan ctest and both
-  pytest reports); a skipped, not-run or missing report fails. Windows keeps its skips (`webrtcsink`). The Debug
+  every report of the leg (`ci_junit_reports`: ctest, and on clang also the TSan ctest and all four
+  pytest reports, the wheel tests and the text contract per ABI); a skipped, not-run or missing report fails. Windows keeps its skips (`webrtcsink`). The Debug
   presets build UBSan recoverable, so the same script exports `UBSAN_OPTIONS=halt_on_error=1`; a
   report used to print and the test still passed.
 - **On clang-cl the fuzz suite is built without sanitizers.** absl's swisstable layout depends on
@@ -548,7 +548,7 @@ PIE, BIND_NOW, stack-protected CLI and demo and a BIND_NOW, stack-protected libr
 
 **Coverage has a floor per compiler.** `ci-coverage.sh` fails below 83 % lines / 68 % branches with
 clang (llvm-cov over `libAccelerANTgine.so`) and below 69 % / 50 % with GCC (gcovr over `Src/`,
-summary in `build/coverage-summary.json`) through `check-coverage-floor.py`. Raise coverage with
+summary kept in `logs/coverage/`, since `ci-profile-bench.sh` wipes `build/`) through `check-coverage-floor.py`. Raise coverage with
 tests; never lower a floor. Each Linux leg uploads `test-reports-<arch>-<compiler>` (every JUnit
 report, the coverage summary, the clang-tidy log), which `quality-report.toml` reads.
 

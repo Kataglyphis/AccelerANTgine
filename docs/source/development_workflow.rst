@@ -169,11 +169,12 @@ in ``docs/coverage/``. ``check-coverage-floor.py`` then fails the lane below
 demo program, so ``Test/commit`` runs its command-line refusal paths (``Demo.*``).
 
 ``ci-run-all.sh`` runs ``check-junit-skips.py`` over every JUnit report of the leg:
-the ctest report, and on clang also the TSan report and both pytest reports. A skipped
+the ctest report, and on clang also the TSan report and the four pytest reports (wheel
+tests and text contract, GIL and free-threaded). A skipped
 or not-run testcase, a missing report or one without testcases fails the lane.
 
 Each Linux leg uploads ``test-reports-<arch>-<compiler>`` with those reports, the
-coverage summary and ``logs/code-quality/clang-tidy.txt``; ``quality-report.toml``
+coverage summary from ``logs/coverage/`` (``ci-profile-bench.sh`` wipes ``build/``) and ``logs/code-quality/clang-tidy.txt``; ``quality-report.toml``
 reads them as same-commit artifacts.
 
 ``.github/workflows/mutations.yml`` proves these gates can fail. It runs the hub's

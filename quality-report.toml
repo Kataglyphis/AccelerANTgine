@@ -53,10 +53,24 @@ artifact = "test-reports-x64-clang"
 workflow = "linux-x64.yml"
 
 [[artifact]]
+name = "python-contract-gil"
+kind = "junit"
+path = "logs/python-contract-gil.xml"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"
+
+[[artifact]]
+name = "python-contract-free-threaded"
+kind = "junit"
+path = "logs/python-contract-free-threaded.xml"
+artifact = "test-reports-x64-clang"
+workflow = "linux-x64.yml"
+
+[[artifact]]
 name = "clang"
 kind = "coverage"
 format = "json"
-path = "build/coverage.json"
+path = "logs/coverage/coverage.json"
 artifact = "test-reports-x64-clang"
 workflow = "linux-x64.yml"
 
@@ -64,7 +78,7 @@ workflow = "linux-x64.yml"
 name = "gcc"
 kind = "coverage"
 format = "json"
-path = "build/coverage-summary.json"
+path = "logs/coverage/coverage-summary.json"
 artifact = "test-reports-x64-gcc"
 workflow = "linux-x64.yml"
 

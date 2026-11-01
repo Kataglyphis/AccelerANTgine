@@ -58,7 +58,10 @@ expect fail 'GCC below 50 % branches' gcc 690 499
 expect pass 'clang at 83 % lines / 68 % branches' clang 830 680
 expect fail 'clang below 83 % lines' clang 829 680
 expect fail 'clang below 68 % branches' clang 830 679
+lane gcc 700 500
+[[ -s "${work}/leg-gcc-700-500/logs/coverage/coverage-summary.json" ]] || fail 'the GCC summary is not kept under logs/coverage'
 lane clang 850 700
+[[ -s "${work}/leg-clang-850-700/logs/coverage/coverage.json" ]] || fail 'the clang export is not kept under logs/coverage'
 grep -q 'coverage floor: lines 85.00% (minimum 83%), branches 70.00% (minimum 68%)' "${work}/out" \
   || fail "the clang leg does not print its floor: $(grep 'coverage floor' "${work}/out")"
 

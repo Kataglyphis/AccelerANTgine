@@ -214,5 +214,21 @@
   "replace": "    args+=(-pthread)",
   "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
   "why": "A BMI built with -pthread refuses to load into an analysis without it."
+ },
+ {
+  "id": "skip-gate.contract-reports",
+  "target": "scripts/linux/ci-common.sh",
+  "find": "            logs/python-contract-gil.xml logs/python-contract-free-threaded.xml\n",
+  "replace": "\n",
+  "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
+  "why": "The text-generation contract reports must reach the skip gate too."
+ },
+ {
+  "id": "coverage-floor.clang-kept",
+  "target": "scripts/linux/ci-coverage.sh",
+  "find": "  cp \"${BUILD_DIR}/${COVERAGE_JSON}\" \"${COVERAGE_REPORT_DIR}/coverage.json\"\n  python3 \"${_SCRIPT_DIR}/check-coverage-floor.py\" \"${COVERAGE_REPORT_DIR}/coverage.json\" \\",
+  "replace": "  python3 \"${_SCRIPT_DIR}/check-coverage-floor.py\" \"${BUILD_DIR}/${COVERAGE_JSON}\" \\",
+  "test": "bash scripts/linux/tests/test-coverage-floor.sh",
+  "why": "ci-profile-bench.sh wipes build/, so the uploaded clang export must live under logs/coverage."
  }
 ]

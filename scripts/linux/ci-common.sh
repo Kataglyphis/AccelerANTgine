@@ -26,7 +26,8 @@ ci_unknown_argument() { die "Unknown argument: $1"; }
 ci_junit_reports() {
     printf '%s\n' docs/test_results.xml
     if [[ "$1" == "clang" ]]; then
-        printf '%s\n' docs/test_results_tsan.xml logs/python-gil.xml logs/python-free-threaded.xml
+        printf '%s\n' docs/test_results_tsan.xml logs/python-gil.xml logs/python-free-threaded.xml \
+            logs/python-contract-gil.xml logs/python-contract-free-threaded.xml
     fi
 }
 
