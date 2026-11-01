@@ -476,7 +476,8 @@ and `BM_TextGenerateTiny` fail on a doubling. `perf-cachegrind.py` then counts t
 iteration of `BM_PreprocessFrame` and `BM_DetectFrame` at one ORT thread
 (`valgrind --tool=cachegrind --cache-sim=no`, 4 minus 2 iterations) and fails a key over its entry in
 `perf/cachegrind-baseline.json` by more than max(3 %, 3 x the spread recorded there over at least 5
-hosted runs). A key without an entry only records. Re-record after an intended change with
+hosted runs). `x64-clang` and `x64-gcc` have entries, from six hosted runs on five CPU models
+(spread under 1e-5, so the 3 % floor rules) and fail when missing; an arm64 key only records. Re-record after an intended change with
 `perf-cachegrind.py --summarize <cachegrind.json from 5+ CI runs>`; never widen an entry by hand.
 
 The whole Linux CI chain, in order:

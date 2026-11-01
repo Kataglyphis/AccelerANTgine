@@ -1,0 +1,155 @@
+{
+  "baselines": {
+    "x64-clang": {
+      "BM_DetectFrame": {
+        "instructions": 1199544916,
+        "runs": [
+          {
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 1199544913,
+            "run_id": "41262095971"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 1199544953,
+            "run_id": "41262109303"
+          },
+          {
+            "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+            "instructions": 1199544905,
+            "run_id": "41262111394"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 1199544920,
+            "run_id": "41262113304"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+            "instructions": 1199544891,
+            "run_id": "41262115286"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 1199544942,
+            "run_id": "41262117193"
+          }
+        ],
+        "spread": 5.168626797310928e-08
+      },
+      "BM_PreprocessFrame": {
+        "instructions": 11846961,
+        "runs": [
+          {
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 11846904,
+            "run_id": "41262095971"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 11846991,
+            "run_id": "41262109303"
+          },
+          {
+            "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+            "instructions": 11846954,
+            "run_id": "41262111394"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 11846992,
+            "run_id": "41262113304"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+            "instructions": 11846928,
+            "run_id": "41262115286"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 11846969,
+            "run_id": "41262117193"
+          }
+        ],
+        "spread": 7.428064993711678e-06
+      }
+    },
+    "x64-gcc": {
+      "BM_DetectFrame": {
+        "instructions": 1198303238,
+        "runs": [
+          {
+            "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+            "instructions": 1198303218,
+            "run_id": "41262095971"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+            "instructions": 1198303222,
+            "run_id": "41262109303"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 1198303293,
+            "run_id": "41262111394"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 1198303241,
+            "run_id": "41262113304"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) 6973P-C",
+            "instructions": 1198303236,
+            "run_id": "41262115286"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 1198303246,
+            "run_id": "41262117193"
+          }
+        ],
+        "spread": 6.258849812830578e-08
+      },
+      "BM_PreprocessFrame": {
+        "instructions": 10613060,
+        "runs": [
+          {
+            "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+            "instructions": 10613060,
+            "run_id": "41262095971"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+            "instructions": 10613015,
+            "run_id": "41262109303"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 10613101,
+            "run_id": "41262111394"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 10613062,
+            "run_id": "41262113304"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) 6973P-C",
+            "instructions": 10613029,
+            "run_id": "41262115286"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 10613060,
+            "run_id": "41262117193"
+          }
+        ],
+        "spread": 8.103223763928593e-06
+      }
+    }
+  },
+  "measure": "instructions per iteration: total at 4 iterations minus total at 2, halved; one intra-op and one inter-op ORT thread",
+  "schema_version": 1,
+  "tool": "valgrind 3.26.0 --tool=cachegrind --cache-sim=no, the image's apt package"
+}

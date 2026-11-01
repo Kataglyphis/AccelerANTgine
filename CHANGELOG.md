@@ -25,7 +25,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   `bench-history` action (keys `perf-<arch>-<compiler>`); a doubled gated time fails.
 - **An instruction-count check.** `scripts/linux/perf-cachegrind.py` counts `BM_PreprocessFrame` and
   `BM_DetectFrame` under cachegrind and records them per leg; a key with a baseline in
-  `perf/cachegrind-baseline.json` fails over max(3 %, 3 x the recorded spread).
+  `perf/cachegrind-baseline.json` fails over max(3 %, 3 x the recorded spread). `x64-clang` and
+  `x64-gcc` are armed from runs 41262095971, 41262109303, 41262111394, 41262113304, 41262115286 and
+  41262117193 (five CPU models, spread under 1e-5).
 - `YoloConfig` gains `intra_op_num_threads` and `inter_op_num_threads` (default 4, as before).
 
 ### Changed (2026-11-01)
