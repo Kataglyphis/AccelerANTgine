@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Verify packaged CPU and GPU detector results on the pinned ModelANT image.
+# Verify CPU and accelerated (GPU, XNNPACK or DNNL) detector results and profiles on the pinned ModelANT image.
 set -euo pipefail
-if [[ $# -ne 4 ]]; then echo 'usage: check-gpu-detector-parity.sh DEMO MODEL cuda|migraphx NEW_EVIDENCE_DIR' >&2; exit 2; fi
+if [[ $# -ne 4 ]]; then echo 'usage: check-gpu-detector-parity.sh DEMO MODEL cuda|migraphx|xnnpack|dnnl NEW_EVIDENCE_DIR' >&2; exit 2; fi
 demo=$(realpath -e "$1") model=$(realpath -e "$2") device=$3 evidence=$4
-case "$device" in cuda|migraphx) ;; *) echo 'Unsupported GPU device' >&2; exit 2 ;; esac
+case "$device" in cuda|migraphx|xnnpack|dnnl) ;; *) echo 'Unsupported accelerated device' >&2; exit 2 ;; esac
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 fixture="$repo/third_party/ModelANT/contracts/fixtures/two_cats.jpg"
 shared="$repo/third_party/ANTfrastructure/shared/python"

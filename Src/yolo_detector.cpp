@@ -13,14 +13,17 @@ module;
 #include <limits>
 #include <mutex>
 #include <numeric>
+#include <optional>
 #include <shared_mutex>
 #include <span>
+#include <string_view>
 #include <utility>
 
 module kataglyphis.yolo_detector;
 
 import kataglyphis.onnx_inference;
 import kataglyphis.gstreamer_pipeline;
+import kataglyphis.toml_config;
 import kataglyphis.project_config;
 import kataglyphis.log;
 
@@ -151,7 +154,20 @@ namespace {
         float offset_y;
     };
 
-    auto labelled_box(float x, float y, float width, float height, float confidence, int class_id) -> BoundingBox
+    auto class_label(int class_id, const YoloConfig &config) -> std::string
+    {
+        if (config.labels.empty()) { return std::string(YoloDetector::get_coco_class_name(class_id)); }
+        if (class_id >= 0 && std::cmp_less(class_id, config.labels.size())) { return config.labels[class_id]; }
+        return "unknown";
+    }
+
+    auto labelled_box(float x,
+      float y,
+      float width,
+      float height,
+      float confidence,
+      int class_id,
+      const YoloConfig &config) -> BoundingBox
     {
         BoundingBox box;
         box.x = x;
@@ -160,8 +176,41 @@ namespace {
         box.height = height;
         box.confidence = confidence;
         box.class_id = class_id;
-        box.class_name = YoloDetector::get_coco_class_name(class_id);
+        box.class_name = class_label(class_id, config);
         return box;
+    }
+
+    // The best class among scores read through score(c); count may be zero.
+    template<typename Score> auto best_class(std::size_t count, Score &&score) -> std::pair<int, float>
+    {
+        int best = 0;
+        float best_score = 0.0F;
+        for (std::size_t c = 0; c < count; ++c) {
+            if (score(c) > best_score) {
+                best_score = score(c);
+                best = static_cast<int>(c);
+            }
+        }
+        return { best, best_score };
+    }
+
+    auto center_box(std::span<const float, 4> center,
+      float confidence,
+      int class_id,
+      const YoloConfig &config,
+      Scale scale) -> std::optional<BoundingBox>
+    {
+        // NaN fails every comparison, so the thresholds test for acceptance, not rejection.
+        if (!(confidence >= config.confidence_threshold) || !std::isfinite(confidence)) { return std::nullopt; }
+        if (!std::ranges::all_of(center, [](float v) -> bool { return std::isfinite(v); })) { return std::nullopt; }
+        const auto [cx, cy, w, h] = std::array{ center[0], center[1], center[2], center[3] };
+        return labelled_box((cx - (w / 2.0F)) * scale.x - scale.offset_x,
+          (cy - (h / 2.0F)) * scale.y - scale.offset_y,
+          w * scale.x,
+          h * scale.y,
+          confidence,
+          class_id,
+          config);
     }
 
     auto decode_center_rows(std::span<const float> data,
@@ -171,43 +220,35 @@ namespace {
       Scale scale) -> std::vector<BoundingBox>
     {
         std::vector<BoundingBox> boxes;
-        // A row is cx, cy, w, h, objectness, then class scores; anything shorter is not a detection layout.
-        if (values < 5) { return boxes; }
         // Class scores beyond the row would be read from the next detection.
         const std::size_t class_count = std::min(static_cast<std::size_t>(std::max(config.num_classes, 0)), values - 5);
 
-        for (std::size_t i = 0; i < rows && (i + 1) * values <= data.size(); ++i) {
+        for (std::size_t i = 0; i < rows; ++i) {
             const auto row = data.subspan(i * values, values);
-            const float cx = row[0];
-            const float cy = row[1];
-            const float w = row[2];
-            const float h = row[3];
             const float obj_conf = row[4];
-
-            // NaN fails every comparison, so the thresholds test for acceptance, not rejection.
             if (!(obj_conf >= config.confidence_threshold)) { continue; }
-            if (!std::isfinite(cx) || !std::isfinite(cy) || !std::isfinite(w) || !std::isfinite(h)) { continue; }
-
-            int best_class = 0;
-            float final_conf = obj_conf;
-            if (class_count > 0) {
-                float best_class_conf = 0.0F;
-                for (std::size_t c = 0; c < class_count; ++c) {
-                    if (row[5 + c] > best_class_conf) {
-                        best_class_conf = row[5 + c];
-                        best_class = static_cast<int>(c);
-                    }
-                }
-                final_conf = obj_conf * best_class_conf;
+            auto [class_id, class_conf] = best_class(class_count, [&](std::size_t c) -> float { return row[5 + c]; });
+            const float confidence = class_count > 0 ? obj_conf * class_conf : obj_conf;
+            if (auto box = center_box(row.first<4>(), confidence, class_id, config, scale)) {
+                boxes.push_back(std::move(*box));
             }
-            if (!(final_conf >= config.confidence_threshold) || !std::isfinite(final_conf)) { continue; }
+        }
+        return boxes;
+    }
 
-            boxes.push_back(labelled_box((cx - (w / 2.0F)) * scale.x - scale.offset_x,
-              (cy - (h / 2.0F)) * scale.y - scale.offset_y,
-              w * scale.x,
-              h * scale.y,
-              final_conf,
-              best_class));
+    // Column i of a [4 + classes, anchors] tensor is one candidate: its centre, then a score per class.
+    auto decode_anchor_columns(std::span<const float> data, std::size_t anchors, const YoloConfig &config, Scale scale)
+      -> std::vector<BoundingBox>
+    {
+        std::vector<BoundingBox> boxes;
+        const auto classes = static_cast<std::size_t>(config.num_classes);
+        for (std::size_t i = 0; i < anchors; ++i) {
+            const auto at = [&](std::size_t channel) -> float { return data[channel * anchors + i]; };
+            const std::array<float, 4> center{ at(0), at(1), at(2), at(3) };
+            const auto [class_id, confidence] = best_class(classes, [&](std::size_t c) -> float { return at(4 + c); });
+            if (auto box = center_box(center, confidence, class_id, config, scale)) {
+                boxes.push_back(std::move(*box));
+            }
         }
         return boxes;
     }
@@ -228,8 +269,7 @@ namespace {
       Scale scale) -> std::vector<BoundingBox>
     {
         std::vector<BoundingBox> boxes;
-        if (values < 6) { return boxes; }
-        for (std::size_t i = 0; i < rows && (i + 1) * values <= data.size(); ++i) {
+        for (std::size_t i = 0; i < rows; ++i) {
             const auto row = data.subspan(i * values, values);
             if (!corner_row_is_usable(row, config)) { continue; }
             boxes.push_back(labelled_box(row[0] * scale.x - scale.offset_x,
@@ -237,11 +277,113 @@ namespace {
               (row[2] - row[0]) * scale.x,
               (row[3] - row[1]) * scale.y,
               row[4],
-              static_cast<int>(row[5])));
+              static_cast<int>(row[5]),
+              config));
         }
         return boxes;
     }
+
+    // Rows and values per row of a [1, rows, values] or [rows, values] tensor whose data fills it exactly.
+    auto output_matrix(const inference::TensorData &output) -> std::optional<std::pair<std::size_t, std::size_t>>
+    {
+        const auto &dims = output.shape.dimensions;
+        const bool batched = dims.size() == 3 && dims[0] == 1;
+        if (!batched && dims.size() != 2) { return std::nullopt; }
+        const std::size_t rows = dims[dims.size() - 2];
+        const std::size_t values = dims[dims.size() - 1];
+        if (values != 0 && rows > std::numeric_limits<std::size_t>::max() / values) { return std::nullopt; }
+        if (rows * values != output.data.size()) { return std::nullopt; }
+        return std::pair{ rows, values };
+    }
+
+    auto calculate_iou(const BoundingBox &a, const BoundingBox &b) -> float
+    {
+        const float x1 = std::max(a.x, b.x);
+        const float y1 = std::max(a.y, b.y);
+        const float x2 = std::min(a.x + a.width, b.x + b.width);
+        const float y2 = std::min(a.y + a.height, b.y + b.height);
+        if (x2 <= x1 || y2 <= y1) { return 0.0F; }
+        const float intersection = (x2 - x1) * (y2 - y1);
+        return intersection / ((a.width * a.height) + (b.width * b.height) - intersection);
+    }
+
+    auto apply_nms(std::vector<BoundingBox> &boxes, float nms_threshold) -> void
+    {
+        std::ranges::sort(
+          boxes, [](const BoundingBox &a, const BoundingBox &b) -> bool { return a.confidence > b.confidence; });
+        std::vector<bool> suppressed(boxes.size(), false);
+        for (std::size_t i = 0; i < boxes.size(); ++i) {
+            if (suppressed[i]) { continue; }
+            for (std::size_t j = i + 1; j < boxes.size(); ++j) {
+                if (!suppressed[j] && boxes[i].class_id == boxes[j].class_id
+                    && calculate_iou(boxes[i], boxes[j]) > nms_threshold) {
+                    suppressed[j] = true;
+                }
+            }
+        }
+        std::vector<BoundingBox> kept;
+        for (std::size_t i = 0; i < boxes.size(); ++i) {
+            if (!suppressed[i]) { kept.push_back(std::move(boxes[i])); }
+        }
+        boxes = std::move(kept);
+    }
 }// namespace
+
+auto layout_from_metadata(std::string_view value) -> std::optional<YoloOutputLayout>
+{
+    if (value == "xyxy_score_class") { return YoloOutputLayout::CornersScoreClass; }
+    if (value == "cxcywh_objectness_scores") { return YoloOutputLayout::CenterObjectnessScores; }
+    if (value == "cxcywh_scores_by_anchor") { return YoloOutputLayout::CenterScoresByAnchor; }
+    return std::nullopt;
+}
+
+auto yolo_config_from(const config::ModelConfig &model) -> YoloConfig
+{
+    YoloConfig config;
+    config.model_path = model.model_path;
+    config.input_width = model.input_width;
+    config.input_height = model.input_height;
+    config.confidence_threshold = static_cast<float>(model.confidence_threshold);
+    config.nms_threshold = static_cast<float>(model.iou_threshold);
+    config.labels = model.labels;
+    if (!model.labels.empty()) { config.num_classes = static_cast<int>(model.labels.size()); }
+    if (model.intra_op_threads > 0) { config.intra_op_num_threads = static_cast<int>(model.intra_op_threads); }
+    return config;
+}
+
+auto decode_detections(const inference::TensorData &output, const YoloConfig &config, const FrameMapping &mapping)
+  -> std::expected<std::vector<BoundingBox>, OnnxError>
+{
+    const auto matrix = output_matrix(output);
+    if (!matrix) { return std::unexpected(OnnxError::InvalidOutputShape); }
+    const auto [rows, values] = *matrix;
+    const std::span<const float> data(output.data);
+    const Scale scale{
+        1.0F / mapping.scale_x, 1.0F / mapping.scale_y, mapping.pad_x / mapping.scale_x, mapping.pad_y / mapping.scale_y
+    };
+    std::vector<BoundingBox> boxes;
+    switch (config.output_layout) {
+    case YoloOutputLayout::CenterObjectnessScores:
+        if (values < 5) { return std::unexpected(OnnxError::InvalidOutputShape); }
+        boxes = decode_center_rows(data, rows, values, config, scale);
+        break;
+    case YoloOutputLayout::CornersScoreClass:
+        if (values < 6) { return std::unexpected(OnnxError::InvalidOutputShape); }
+        boxes = decode_corner_rows(data, rows, values, config, scale);
+        break;
+    case YoloOutputLayout::CenterScoresByAnchor:
+        // Here the rows are channels: four box values, then exactly one per configured class.
+        if (config.num_classes < 0 || rows != 4 + static_cast<std::size_t>(config.num_classes)) {
+            return std::unexpected(OnnxError::InvalidOutputShape);
+        }
+        boxes = decode_anchor_columns(data, values, config, scale);
+        break;
+    case YoloOutputLayout::Auto:
+        return std::unexpected(OnnxError::InvalidOutputShape);
+    }
+    apply_nms(boxes, config.nms_threshold);
+    return boxes;
+}
 
 auto preprocess_frame(const gstreamer::BufferInfo &buffer,
   std::uint32_t width,
@@ -335,8 +477,27 @@ auto YoloDetector::initialize(const YoloConfig &config, const std::filesystem::p
     auto result = impl_->engine.initialize(session_config);
     if (!result) { return std::unexpected(result.error()); }
 
+    if (config.output_layout == YoloOutputLayout::Auto) {
+        const auto named = impl_->engine.get_custom_metadata("kataglyphis.output");
+        const auto layout = named ? layout_from_metadata(*named) : std::nullopt;
+        if (!layout) { return std::unexpected(OnnxError::InvalidOutputShape); }
+        impl_->config.output_layout = *layout;
+    }
+
     impl_->initialized = true;
     return {};
+}
+
+auto YoloDetector::output_layout() const -> YoloOutputLayout
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->config.output_layout;
+}
+
+auto YoloDetector::applied_intra_op_num_threads() const -> int
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->engine.applied_intra_op_num_threads();
 }
 
 auto YoloDetector::is_initialized() const -> bool
@@ -400,86 +561,17 @@ auto YoloDetector::detect_frame(const gstreamer::BufferInfo &frame) -> std::expe
 auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
   std::uint32_t original_width,
   std::uint32_t original_height,
-  const FrameMapping &mapping) -> DetectionResult
+  const FrameMapping &mapping) -> std::expected<DetectionResult, OnnxError>
 {
-
     DetectionResult result;
     result.original_width = original_width;
     result.original_height = original_height;
     result.inference_time_ms = raw_output.inference_time_ms;
-
     if (raw_output.outputs.empty()) { return result; }
-
-    const auto &output = raw_output.outputs[0];
-    const auto &dims = output.shape.dimensions;
-    if (dims.empty()) { return result; }
-
-    std::size_t num_detections = dims[0];
-    std::size_t values_per_detection = dims.size() > 1 ? dims[1] : dims[0];
-
-    if (dims.size() == 3) {
-        num_detections = dims[1];
-        values_per_detection = dims[2];
-    }
-
-    const std::span<const float> data(output.data.data(), output.data.size());
-    const Scale scale{
-        1.0F / mapping.scale_x, 1.0F / mapping.scale_y, mapping.pad_x / mapping.scale_x, mapping.pad_y / mapping.scale_y
-    };
-    auto all_boxes = impl_->config.output_layout == YoloOutputLayout::CornersScoreClass
-                       ? decode_corner_rows(data, num_detections, values_per_detection, impl_->config, scale)
-                       : decode_center_rows(data, num_detections, values_per_detection, impl_->config, scale);
-
-    apply_nms(all_boxes, impl_->config.nms_threshold);
-
-    result.boxes = std::move(all_boxes);
+    auto boxes = decode_detections(raw_output.outputs[0], impl_->config, mapping);
+    if (!boxes) { return std::unexpected(boxes.error()); }
+    result.boxes = std::move(*boxes);
     return result;
-}
-
-auto YoloDetector::apply_nms(std::vector<BoundingBox> &boxes, float nms_threshold) -> void
-{
-
-    std::ranges::sort(
-      boxes, [](const BoundingBox &a, const BoundingBox &b) -> bool { return a.confidence > b.confidence; });
-
-    std::vector<bool> suppressed(boxes.size(), false);
-
-    for (std::size_t i = 0; i < boxes.size(); ++i) {
-        if (suppressed[i]) { continue; }
-
-        for (std::size_t j = i + 1; j < boxes.size(); ++j) {
-            if (suppressed[j]) { continue; }
-
-            if (boxes[i].class_id == boxes[j].class_id) {
-                float iou = calculate_iou(boxes[i], boxes[j]);
-                if (iou > nms_threshold) { suppressed[j] = true; }
-            }
-        }
-    }
-
-    std::vector<BoundingBox> kept;
-    for (std::size_t i = 0; i < boxes.size(); ++i) {
-        if (!suppressed[i]) { kept.push_back(std::move(boxes[i])); }
-    }
-    boxes = std::move(kept);
-}
-
-auto YoloDetector::calculate_iou(const BoundingBox &a, const BoundingBox &b) -> float
-{
-
-    float x1 = std::max(a.x, b.x);
-    float y1 = std::max(a.y, b.y);
-    float x2 = std::min(a.x + a.width, b.x + b.width);
-    float y2 = std::min(a.y + a.height, b.y + b.height);
-
-    if (x2 <= x1 || y2 <= y1) { return 0.0F; }
-
-    float intersection = (x2 - x1) * (y2 - y1);
-    float area_a = a.width * a.height;
-    float area_b = b.width * b.height;
-    float union_area = area_a + area_b - intersection;
-
-    return intersection / union_area;
 }
 
 auto YoloDetector::get_coco_class_name(int class_id) -> std::string_view

@@ -34,6 +34,9 @@ static auto populate_config(toml::parse_result &result, InferenceConfig &config)
         if (auto *val = model->get("input_height")) { config.model.input_height = val->value_or<std::uint32_t>(640); }
         if (auto *val = model->get("confidence_threshold")) { config.model.confidence_threshold = val->value_or(0.25); }
         if (auto *val = model->get("iou_threshold")) { config.model.iou_threshold = val->value_or(0.45); }
+        if (auto *val = model->get("intra_op_threads")) {
+            config.model.intra_op_threads = val->value_or<std::uint32_t>(0);
+        }
         if (auto *labels = model->get("labels")) {
             if (labels->is_array()) {
                 for (const auto &label : *labels->as_array()) {

@@ -6,6 +6,15 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
 ## Open
 
+- [b] **DNNL cannot run in `:latest`** (S, ★★; blocked on the hub image, CON191). The chain ORT
+  lists `DnnlExecutionProvider` on amd64, but `libonnxruntime_providers_dnnl.so` needs
+  `libdnnl.so.3`, which the image does not ship (its RUNPATH names the build directory), so
+  `ExecutionProvider::Dnnl` is `ProviderUnavailable` there; arm64 does not build it. Second
+  trap: a process that resolves `libonnxruntime.so.1` through `/opt/opencv5/lib` makes ORT look
+  for every provider library in that directory. `Golden.DnnlMatchesCpuOrIsProviderUnavailable`
+  and `OnnxEngine.DnnlRunsOnlyWhenItsLibraryLoads` switch to the CPU-parity branch on their own
+  once `libdnnl.so.3` loads.
+
 - [ ] **A sporadic segfault in the CLI's WebRTC workload** (M, ★★). On 2026-10-15 the Linux
   arm64 gcc job (release, LTO) of a82d9bf, run 38672470256 attempt 1, died in
   `scripts/linux/ci-profile-bench.sh`: `bin/AccelerANTgine` streaming `videotestsrc ! … !

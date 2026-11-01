@@ -105,11 +105,14 @@ inline auto encode_value_info(const ValueSpec &value) -> ProtoWriter
     return info;
 }
 
-// ModelProto (IR 8, default-domain opset 13) with float inputs/outputs and 1-D int64 initializers.
+using MetadataProps = std::vector<std::pair<std::string, std::string>>;
+
+// ModelProto (IR 8, default-domain opset 13) with float inputs/outputs, 1-D int64 initializers and metadata_props.
 inline auto build_onnx_model(const std::vector<ValueSpec> &inputs,
   const std::vector<ValueSpec> &outputs,
   const std::vector<NodeSpec> &nodes,
-  const std::vector<Int64Constant> &constants = {}) -> std::string
+  const std::vector<Int64Constant> &constants = {},
+  const MetadataProps &metadata = {}) -> std::string
 {
     ProtoWriter graph;
     std::size_t index = 0;
@@ -149,6 +152,12 @@ inline auto build_onnx_model(const std::vector<ValueSpec> &inputs,
     model.bytes_field(2, "kataglyphis-test");
     model.message_field(7, graph);
     model.message_field(8, opset);
+    for (const auto &[key, value] : metadata) {
+        ProtoWriter entry;
+        entry.bytes_field(1, key);
+        entry.bytes_field(2, value);
+        model.message_field(14, entry);
+    }
     return model.bytes();
 }
 
@@ -194,12 +203,13 @@ struct YoloReshapeGeometry
     [[nodiscard]] auto elements() const -> std::size_t { return static_cast<std::size_t>(3 * height * width); }
 };
 
-inline auto yolo_reshape_model(const YoloReshapeGeometry &geometry) -> std::string
+inline auto yolo_reshape_model(const YoloReshapeGeometry &geometry, const MetadataProps &metadata = {}) -> std::string
 {
     return build_onnx_model({ { "images", { 1, 3, geometry.height, geometry.width } } },
       { { "output", { 1, geometry.rows, geometry.values_per_row } } },
       { { "Reshape", { "images", "shape" }, { "output" } } },
-      { { "shape", { 1, geometry.rows, geometry.values_per_row } } });
+      { { "shape", { 1, geometry.rows, geometry.values_per_row } } },
+      metadata);
 }
 
 // A uniquely named file that is removed again when the object goes.

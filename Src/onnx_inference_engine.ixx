@@ -27,7 +27,8 @@ enum class OnnxError {
     InvalidOutputType,
     InvalidOutputShape,
     ProfilingNotEnabled,
-    ProfilingFailed
+    ProfilingFailed,
+    ProviderUnavailable
 };
 
 // Exported: a member defined in a module interface is not inline, so importers link against this one.
@@ -56,7 +57,7 @@ struct InferenceResult
 };
 
 enum class ExecutionMode { Sequential, Parallel };
-enum class ExecutionProvider { Cpu, Cuda, MigraphX, DirectML };
+enum class ExecutionProvider { Cpu, Cuda, MigraphX, DirectML, Xnnpack, Dnnl };
 
 struct SessionConfig
 {
@@ -99,11 +100,20 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
     [[nodiscard]] auto get_output_names() const -> std::vector<std::string>;
     [[nodiscard]] auto get_input_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>;
     [[nodiscard]] auto get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>;
+    // The model's custom metadata value for key; empty when absent.
+    [[nodiscard]] auto get_custom_metadata(const std::string &key) const -> std::expected<std::string, OnnxError>;
+    // Why the last initialize returned ProviderUnavailable; empty otherwise.
+    [[nodiscard]] auto provider_error() const -> std::string;
+    // The intra-op thread count the session options were given; 0 before initialize.
+    [[nodiscard]] auto applied_intra_op_num_threads() const -> int;
 
   private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
+
+// Whether the loaded ONNX Runtime was built with provider.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto provider_available(ExecutionProvider provider) -> bool;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path)
   -> SessionConfig;

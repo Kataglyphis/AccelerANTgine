@@ -15,6 +15,7 @@ export module kataglyphis.yolo_detector;
 
 import kataglyphis.onnx_inference;
 import kataglyphis.gstreamer_pipeline;
+import kataglyphis.toml_config;
 
 export namespace kataglyphis::detection {
 
@@ -44,7 +45,12 @@ struct DetectionResult
 enum class YoloOutputLayout {
     CenterObjectnessScores,// YOLOv5: cx, cy, w, h, objectness, one score per class
     CornersScoreClass,// end-to-end exports (DEIM, YOLOv10): x1, y1, x2, y2, score, class index
+    CenterScoresByAnchor,// YOLOv8 and YOLO11: [1, 4 + classes, anchors], each column cx, cy, w, h, class scores
+    Auto,// the model's kataglyphis.output metadata decides; a model without it fails initialize
 };
+
+// The layout a kataglyphis.output metadata value names, or nothing for an unknown value.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto layout_from_metadata(std::string_view value) -> std::optional<YoloOutputLayout>;
 
 enum class FramePreprocessMode { Stretch, Letterbox };
 
@@ -82,7 +88,17 @@ struct YoloConfig
     // One thread each makes an instruction count repeatable (the cachegrind check); the defaults are the engine's.
     int intra_op_num_threads{ 4 };
     int inter_op_num_threads{ 4 };
+    // Names by class index; empty keeps the built-in COCO names.
+    std::vector<std::string> labels;
 };
+
+// A detector config from the [model] table: thresholds, input size, labels and the ORT thread count.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto yolo_config_from(const config::ModelConfig &model) -> YoloConfig;
+
+// Decodes with config's layout, then suppresses overlaps; a shape the layout cannot read is InvalidOutputShape.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto decode_detections(const inference::TensorData &output,
+  const YoloConfig &config,
+  const FrameMapping &mapping) -> std::expected<std::vector<BoundingBox>, OnnxError>;
 
 class KATAGLYPHIS_CPP_API YoloDetector
 {
@@ -104,6 +120,12 @@ class KATAGLYPHIS_CPP_API YoloDetector
 
     [[nodiscard]] auto end_profiling() -> std::expected<std::string, OnnxError>;
 
+    // The layout initialize settled on, Auto resolved from the model.
+    [[nodiscard]] auto output_layout() const -> YoloOutputLayout;
+
+    // The intra-op thread count the ORT session options were given.
+    [[nodiscard]] auto applied_intra_op_num_threads() const -> int;
+
     [[nodiscard]] auto detect(std::span<const float> image_data, std::uint32_t width, std::uint32_t height)
       -> std::expected<DetectionResult, OnnxError>;
 
@@ -121,11 +143,7 @@ class KATAGLYPHIS_CPP_API YoloDetector
     auto post_process(const inference::InferenceResult &raw_output,
       std::uint32_t original_width,
       std::uint32_t original_height,
-      const FrameMapping &mapping) -> DetectionResult;
-
-    auto apply_nms(std::vector<BoundingBox> &boxes, float nms_threshold) -> void;
-
-    static auto calculate_iou(const BoundingBox &a, const BoundingBox &b) -> float;
+      const FrameMapping &mapping) -> std::expected<DetectionResult, OnnxError>;
 };
 
 struct VideoDetectionConfig

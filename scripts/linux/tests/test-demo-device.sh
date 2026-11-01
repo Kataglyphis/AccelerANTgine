@@ -26,7 +26,7 @@ CMAKE
 cat > "$work/main.cpp" <<'CPP'
 #include "demo_device.hpp"
 #include <string_view>
-enum class Provider { Cpu, Cuda, MigraphX, DirectML };
+enum class Provider { Cpu, Cuda, MigraphX, DirectML, Xnnpack, Dnnl };
 int main(int argc, char **argv) {
     using kataglyphis::demo::default_device;
     using kataglyphis::demo::parse_device;
@@ -36,6 +36,8 @@ int main(int argc, char **argv) {
     if (parse_device<Provider>("cuda") != Provider::Cuda) return 4;
     if (parse_device<Provider>("migraphx") != Provider::MigraphX) return 5;
     if (parse_device<Provider>("directml") != Provider::DirectML) return 6;
+    if (parse_device<Provider>("xnnpack") != Provider::Xnnpack) return 8;
+    if (parse_device<Provider>("dnnl") != Provider::Dnnl) return 9;
     if (parse_device<Provider>("unknown")) return 7;
     return 0;
 }

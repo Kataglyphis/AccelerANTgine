@@ -22,6 +22,8 @@ struct ModelConfig
     double confidence_threshold{ 0.25 };
     double iou_threshold{ 0.45 };
     std::vector<std::string> labels{};
+    // ONNX Runtime intra-op threads; 0 keeps the engine's default.
+    std::uint32_t intra_op_threads{ 0 };
 };
 
 struct PipelineConfig

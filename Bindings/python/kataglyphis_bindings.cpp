@@ -92,6 +92,8 @@ auto onnx_error_name(kataglyphis::inference::OnnxError error) -> const char *
         return "ProfilingNotEnabled";
     case OnnxError::ProfilingFailed:
         return "ProfilingFailed";
+    case OnnxError::ProviderUnavailable:
+        return "ProviderUnavailable";
     }
     return "UnknownError";
 }
@@ -178,7 +180,8 @@ void bind_onnx(nb::module_ &m)
       .value("InvalidOutputType", OnnxError::InvalidOutputType)
       .value("InvalidOutputShape", OnnxError::InvalidOutputShape)
       .value("ProfilingNotEnabled", OnnxError::ProfilingNotEnabled)
-      .value("ProfilingFailed", OnnxError::ProfilingFailed);
+      .value("ProfilingFailed", OnnxError::ProfilingFailed)
+      .value("ProviderUnavailable", OnnxError::ProviderUnavailable);
 
     nb::enum_<ExecutionMode>(m, "ExecutionMode")
       .value("Sequential", ExecutionMode::Sequential)
@@ -188,7 +191,9 @@ void bind_onnx(nb::module_ &m)
       .value("Cpu", ExecutionProvider::Cpu)
       .value("Cuda", ExecutionProvider::Cuda)
       .value("MigraphX", ExecutionProvider::MigraphX)
-      .value("DirectML", ExecutionProvider::DirectML);
+      .value("DirectML", ExecutionProvider::DirectML)
+      .value("Xnnpack", ExecutionProvider::Xnnpack)
+      .value("Dnnl", ExecutionProvider::Dnnl);
 
     nb::class_<SessionConfig>(m, "SessionConfig")
       .def(nb::init<>())
@@ -322,7 +327,9 @@ void bind_yolo(nb::module_ &m)
 
     nb::enum_<YoloOutputLayout>(m, "YoloOutputLayout")
       .value("CenterObjectnessScores", YoloOutputLayout::CenterObjectnessScores)
-      .value("CornersScoreClass", YoloOutputLayout::CornersScoreClass);
+      .value("CornersScoreClass", YoloOutputLayout::CornersScoreClass)
+      .value("CenterScoresByAnchor", YoloOutputLayout::CenterScoresByAnchor)
+      .value("Auto", YoloOutputLayout::Auto);
 
     nb::class_<YoloConfig>(m, "YoloConfig")
       .def(nb::init<>())

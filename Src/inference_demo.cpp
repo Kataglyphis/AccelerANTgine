@@ -15,6 +15,7 @@
 
 import kataglyphis.onnx_inference;
 import kataglyphis.gstreamer_pipeline;
+import kataglyphis.toml_config;
 import kataglyphis.yolo_detector;
 import kataglyphis.project_config;
 import kataglyphis.log;
@@ -39,20 +40,19 @@ static void print_detection_results(const detection::DetectionResult &result)
     }
 }
 
-static auto run_onnx_inference_example(const std::filesystem::path &model_path,
-  inference::ExecutionProvider provider,
-  int device_id,
-  const std::filesystem::path &profile_prefix) -> int
+static auto run_onnx_inference_example(const detection::YoloConfig &base, const std::filesystem::path &profile_prefix)
+  -> int
 {
     std::cout << "=== ONNX Runtime Inference Example ===\n\n";
 
     inference::OnnxInferenceEngine engine;
 
+    const auto &model_path = base.model_path;
     auto config = inference::create_default_session_config(model_path);
-    config.intra_op_num_threads = 4;
-    config.inter_op_num_threads = 4;
-    config.execution_provider = provider;
-    config.device_id = device_id;
+    config.intra_op_num_threads = base.intra_op_num_threads;
+    config.inter_op_num_threads = base.inter_op_num_threads;
+    config.execution_provider = base.execution_provider;
+    config.device_id = base.device_id;
     config.profiling_prefix = profile_prefix;
 
     std::cout << "Initializing ONNX Runtime with model: " << model_path << "\n";
@@ -195,27 +195,13 @@ static auto run_gstreamer_pipeline_example() -> int
     return 0;
 }
 
-static auto run_yolo_detection_example(const std::filesystem::path &model_path,
-  inference::ExecutionProvider provider,
-  int device_id) -> int
+static auto run_yolo_detection_example(const detection::YoloConfig &config) -> int
 {
     std::cout << "\n=== YOLO Detection Example ===\n\n";
 
     detection::YoloDetector detector;
 
-    detection::YoloConfig config;
-    config.model_path = model_path;
-    config.execution_provider = provider;
-    config.device_id = device_id;
-    config.input_width = 640;
-    config.input_height = 640;
-    config.confidence_threshold = 0.25F;
-    config.nms_threshold = 0.45F;
-    config.num_classes = 80;
-    // The default model, DEIM-D-FINE-N, is an end-to-end export.
-    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
-
-    std::cout << "Initializing YOLO detector with model: " << model_path << "\n";
+    std::cout << "Initializing YOLO detector with model: " << config.model_path << "\n";
 
     auto init_result = detector.initialize(config);
     if (!init_result) {
@@ -223,7 +209,8 @@ static auto run_yolo_detection_example(const std::filesystem::path &model_path,
         return 1;
     }
 
-    std::cout << "YOLO detector initialized successfully!\n\n";
+    std::cout << "YOLO detector initialized successfully!\n";
+    std::cout << "ORT intra-op threads: " << detector.applied_intra_op_num_threads() << "\n\n";
 
     std::cout << "Performing detection on dummy image data...\n";
 
@@ -241,17 +228,10 @@ static auto run_yolo_detection_example(const std::filesystem::path &model_path,
     return 0;
 }
 
-static auto run_video_detection_example(const std::filesystem::path &model_path,
-  inference::ExecutionProvider provider,
-  int device_id) -> int
+static auto run_video_detection_example(const detection::YoloConfig &config) -> int
 {
     std::cout << "\n=== Video Detection Pipeline Example ===\n\n";
 
-    detection::YoloConfig config;
-    config.model_path = model_path;
-    config.execution_provider = provider;
-    config.device_id = device_id;
-    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
     auto pipeline_result = detection::create_video_detection_pipeline("test.mp4", config, 640, 480);
 
     if (!pipeline_result) {
@@ -282,9 +262,7 @@ static auto run_video_detection_example(const std::filesystem::path &model_path,
 }
 
 // A synthetic frame exercises the live video inference path without a camera.
-static auto run_video_detection_check(const std::filesystem::path &model_path,
-  inference::ExecutionProvider provider,
-  int device_id,
+static auto run_video_detection_check(const detection::YoloConfig &yolo_config,
   const std::filesystem::path &profile_prefix) -> int
 {
     std::mutex mutex;
@@ -293,10 +271,7 @@ static auto run_video_detection_check(const std::filesystem::path &model_path,
     bool failed = false;
 
     detection::VideoDetectionConfig config;
-    config.yolo_config.model_path = model_path;
-    config.yolo_config.execution_provider = provider;
-    config.yolo_config.device_id = device_id;
-    config.yolo_config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    config.yolo_config = yolo_config;
     config.gstreamer_config.pipeline_description =
       "videotestsrc num-buffers=1 pattern=black ! video/x-raw,format=RGB,width=640,height=480,framerate=30/1 "
       "! appsink name=sink sync=false";
@@ -354,26 +329,29 @@ static auto run_video_detection_check(const std::filesystem::path &model_path,
 
 static void print_usage(const char *program_name)
 {
-    std::cout << "Usage: " << program_name << " [options]\n\n"
-              << "Options:\n"
-              << "  --model <path>     ONNX model (default: bundled model, else models/deim_dfine_n_coco.onnx)\n"
-              << "  --onnx-only        Run only ONNX inference example\n"
-              << "  --device <name>    cpu, cuda, migraphx or directml (default: " << kataglyphis::demo::default_device
-              << ")\n"
-              << "  --device-id <id>   Provider device index (default: 0)\n"
-              << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
-              << "  --gstreamer-only   Run only GStreamer pipeline example\n"
-              << "  --yolo-only        Run only YOLO detection example\n"
-              << "  --video-only       Run only video detection example\n"
-              << "  --video-check      Run model inference on one synthetic GStreamer video frame\n"
-              << "  --detector-image <jpg> --detector-output <json> --profile <prefix>\n"
-              << "                     Profile a JPEG detector run (new output file and profile directory)\n"
-              << "  --detector-repeat-output <json>  Repeat detection in the same session\n"
-              << "  --all              Run all examples\n"
-              << "  --help             Show this help message\n\n"
-              << "Examples:\n"
-              << "  " << program_name << " --model models/deim_dfine_n_coco.onnx --all\n"
-              << "  " << program_name << " --onnx-only\n";
+    std::cout
+      << "Usage: " << program_name << " [options]\n\n"
+      << "Options:\n"
+      << "  --model <path>     ONNX model (default: bundled model, else models/deim_dfine_n_coco.onnx)\n"
+      << "  --onnx-only        Run only ONNX inference example\n"
+      << "  --config <toml>    Detector settings from a [model] table (resources/configs/inference_config.toml)\n"
+      << "  --device <name>    cpu, cuda, migraphx, directml, xnnpack or dnnl (default: "
+      << kataglyphis::demo::default_device << ")\n"
+      << "  --device-id <id>   Provider device index (default: 0)\n"
+      << "  --threads <n>      ONNX Runtime intra-op threads (default: the config's, else 4)\n"
+      << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
+      << "  --gstreamer-only   Run only GStreamer pipeline example\n"
+      << "  --yolo-only        Run only YOLO detection example\n"
+      << "  --video-only       Run only video detection example\n"
+      << "  --video-check      Run model inference on one synthetic GStreamer video frame\n"
+      << "  --detector-image <jpg> --detector-output <json> --profile <prefix>\n"
+      << "                     Profile a JPEG detector run (new output file and profile directory)\n"
+      << "  --detector-repeat-output <json>  Repeat detection in the same session\n"
+      << "  --all              Run all examples\n"
+      << "  --help             Show this help message\n\n"
+      << "Examples:\n"
+      << "  " << program_name << " --model models/deim_dfine_n_coco.onnx --all\n"
+      << "  " << program_name << " --onnx-only\n";
 }
 
 auto main(int argc, char *argv[]) -> int
@@ -396,6 +374,9 @@ auto main(int argc, char *argv[]) -> int
         return 2;
     }
     int device_id = 0;
+    int threads = 0;
+    bool model_given = false;
+    std::filesystem::path config_path;
     std::filesystem::path profile_prefix;
     std::filesystem::path detector_image;
     std::filesystem::path detector_output;
@@ -406,6 +387,16 @@ auto main(int argc, char *argv[]) -> int
 
         if (arg == "--model" && i + 1 < argc) {
             model_path = argv[++i];
+            model_given = true;
+        } else if (arg == "--config" && i + 1 < argc) {
+            config_path = argv[++i];
+        } else if (arg == "--threads" && i + 1 < argc) {
+            const std::string value = argv[++i];
+            const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), threads);
+            if (error != std::errc{} || end != value.data() + value.size() || threads < 1) {
+                std::cerr << "Invalid thread count: " << value << "\n";
+                return 2;
+            }
         } else if (arg == "--device" && i + 1 < argc) {
             const std::string device = argv[++i];
             provider = kataglyphis::demo::parse_device<inference::ExecutionProvider>(device);
@@ -452,14 +443,30 @@ auto main(int argc, char *argv[]) -> int
         }
     }
 
+    detection::YoloConfig base;
+    if (!config_path.empty()) {
+        const auto loaded = kataglyphis::config::load_inference_config(config_path);
+        if (!loaded) {
+            std::cerr << "Could not read the config " << config_path << "\n";
+            return 2;
+        }
+        base = detection::yolo_config_from(loaded->model);
+    }
+    if (model_given || base.model_path.empty()) { base.model_path = model_path; }
+    if (threads > 0) { base.intra_op_num_threads = threads; }
+    base.execution_provider = *provider;
+    base.device_id = device_id;
+    // The default model, DEIM-D-FINE-N, is an end-to-end export.
+    base.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    model_path = base.model_path;
+
     if (!detector_image.empty() || !detector_output.empty() || !detector_repeat_output.empty()) {
         if (detector_image.empty() || detector_output.empty() || profile_prefix.empty() || run_onnx || run_gstreamer
             || run_yolo || run_video || run_video_check) {
             std::cerr << "Image detection requires an image, output and profile, without other modes\n";
             return 2;
         }
-        return run_detector_image(
-          model_path, detector_image, detector_output, detector_repeat_output, *provider, device_id, profile_prefix);
+        return run_detector_image(base, detector_image, detector_output, detector_repeat_output, profile_prefix);
     }
     if (!run_onnx && !run_gstreamer && !run_yolo && !run_video && !run_video_check) {
         run_onnx = true;
@@ -473,7 +480,7 @@ auto main(int argc, char *argv[]) -> int
     int result = 0;
 
     if (run_onnx) {
-        result = run_onnx_inference_example(model_path, *provider, device_id, profile_prefix);
+        result = run_onnx_inference_example(base, profile_prefix);
         if (result != 0) {
             std::cerr << "ONNX inference example failed!\n";
             return result;
@@ -489,7 +496,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_yolo) {
-        result = run_yolo_detection_example(model_path, *provider, device_id);
+        result = run_yolo_detection_example(base);
         if (result != 0) {
             std::cerr << "YOLO detection example failed!\n";
             return result;
@@ -497,7 +504,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_video) {
-        result = run_video_detection_example(model_path, *provider, device_id);
+        result = run_video_detection_example(base);
         if (result != 0) {
             std::cerr << "Video detection example failed!\n";
             return result;
@@ -505,7 +512,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     if (run_video_check) {
-        result = run_video_detection_check(model_path, *provider, device_id, profile_prefix);
+        result = run_video_detection_check(base, profile_prefix);
         if (result != 0) { return result; }
     }
 

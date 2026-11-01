@@ -58,6 +58,9 @@ if [[ "${COMPILER}" == "clang" ]]; then
   info "Coverage profiles go to ${LLVM_PROFILE_FILE}"
 fi
 
+# The golden ctest label needs the lock-verified model; a missing one fails it, so fetch before ctest.
+python3 -I "$(antfrastructure_path linux/scripts/lib/fetch-data-lock.py)" --lock "${WORKSPACE_DIR}/models/models.lock"
+
 # The Debug presets build UBSan recoverable, so without this a report prints and the test still passes.
 export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1${UBSAN_OPTIONS:+:${UBSAN_OPTIONS}}"
 

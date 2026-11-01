@@ -17,6 +17,8 @@ template<typename Provider> constexpr auto parse_device(std::string_view name) -
     if (name == "cuda") { return Provider::Cuda; }
     if (name == "migraphx") { return Provider::MigraphX; }
     if (name == "directml") { return Provider::DirectML; }
+    if (name == "xnnpack") { return Provider::Xnnpack; }
+    if (name == "dnnl") { return Provider::Dnnl; }
     return std::nullopt;
 }
 

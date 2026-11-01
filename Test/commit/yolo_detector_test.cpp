@@ -23,6 +23,7 @@
 #include "kShippedInferenceConfig.inc"
 
 import nlohmann.json;
+import kataglyphis.onnx_inference;
 import kataglyphis.gstreamer_pipeline;
 import kataglyphis.toml_config;
 import kataglyphis.yolo_detector;
@@ -598,4 +599,179 @@ TEST(VideoDetectorPipeline, FactoriesForwardTheSelectedDeviceConfiguration)
     const auto camera = detection::create_camera_detection_pipeline("/dev/video0", config, 64, 48, 30);
     ASSERT_FALSE(camera.has_value());
     EXPECT_EQ(camera.error(), detection::OnnxError::SessionCreationFailed);
+}
+
+namespace {
+
+// YOLOv8/YOLO11 columns: row c of the [1, 4 + classes, anchors] tensor holds value c of every anchor.
+auto anchor_tensor(std::size_t classes, const std::vector<std::vector<float>> &anchors)
+  -> kataglyphis::inference::TensorData
+{
+    kataglyphis::inference::TensorData tensor;
+    const std::size_t channels = 4 + classes;
+    tensor.shape.dimensions = { 1, channels, anchors.size() };
+    tensor.data.assign(channels * anchors.size(), 0.0F);
+    for (std::size_t i = 0; i < anchors.size(); ++i) {
+        for (std::size_t c = 0; c < channels; ++c) { tensor.data[c * anchors.size() + i] = anchors[i][c]; }
+    }
+    return tensor;
+}
+
+auto anchor_config(int classes) -> detection::YoloConfig
+{
+    detection::YoloConfig config;
+    config.output_layout = detection::YoloOutputLayout::CenterScoresByAnchor;
+    config.num_classes = classes;
+    config.confidence_threshold = 0.5F;
+    return config;
+}
+
+}// namespace
+
+TEST(YoloDecoder, DecodesYolov8AnchorColumns)
+{
+    const auto tensor = anchor_tensor(3,
+      {
+        { 10, 20, 4, 6, 0.1F, 0.9F, 0.2F },// class 1 at 0.9: kept
+        { 10.5F, 20, 4, 6, 0.1F, 0.8F, 0.2F },// the same box again: suppressed
+        { 50, 50, 2, 2, 0.3F, 0.4F, 0.2F },// best score 0.4: dropped
+        { 30, 5, 2, 4, 0.0F, 0.0F, 0.7F },// class 2 at 0.7: kept
+      });
+    const detection::FrameMapping half{ 0.5F, 0.5F, 0.0F, 0.0F };
+    const auto boxes = detection::decode_detections(tensor, anchor_config(3), half);
+    ASSERT_TRUE(boxes.has_value());
+    ASSERT_EQ(boxes->size(), 2U);
+    EXPECT_EQ((*boxes)[0].class_id, 1);
+    EXPECT_FLOAT_EQ((*boxes)[0].confidence, 0.9F);
+    EXPECT_FLOAT_EQ((*boxes)[0].x, (10.0F - 2.0F) * 2.0F);
+    EXPECT_FLOAT_EQ((*boxes)[0].y, (20.0F - 3.0F) * 2.0F);
+    EXPECT_FLOAT_EQ((*boxes)[0].width, 8.0F);
+    EXPECT_FLOAT_EQ((*boxes)[0].height, 12.0F);
+    EXPECT_EQ((*boxes)[1].class_id, 2);
+    EXPECT_FLOAT_EQ((*boxes)[1].confidence, 0.7F);
+}
+
+TEST(YoloDecoder, AShapeTheLayoutCannotReadIsInvalidOutputShape)
+{
+    const detection::FrameMapping identity{};
+    // Three classes configured, two in the tensor: the class rows would read the next anchor's values.
+    EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(
+                anchor_tensor(2, { { 1, 1, 1, 1, 0.9F, 0.1F } }), anchor_config(3), identity)),
+      detection::OnnxError::InvalidOutputShape);
+    // One class too many in the tensor: its scores would be dropped, so the shape is refused too.
+    EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(
+                anchor_tensor(3, { { 1, 1, 1, 1, 0.9F, 0.1F, 0.1F } }), anchor_config(2), identity)),
+      detection::OnnxError::InvalidOutputShape);
+    auto batched = anchor_tensor(3, { { 1, 1, 1, 1, 0.9F, 0.1F, 0.1F } });
+    batched.shape.dimensions = { 2, 7, 1 };
+    batched.data.resize(14, 0.0F);
+    EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(batched, anchor_config(3), identity)),
+      detection::OnnxError::InvalidOutputShape);
+    auto short_data = anchor_tensor(3, { { 1, 1, 1, 1, 0.9F, 0.1F, 0.1F } });
+    short_data.data.pop_back();
+    EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(short_data, anchor_config(3), identity)),
+      detection::OnnxError::InvalidOutputShape);
+    auto corners = anchor_config(3);
+    corners.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    kataglyphis::inference::TensorData five_wide{ std::vector<float>(10, 0.0F), { { 1, 2, 5 } } };
+    EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(five_wide, corners, identity)),
+      detection::OnnxError::InvalidOutputShape);
+    auto unresolved = anchor_config(3);
+    unresolved.output_layout = detection::YoloOutputLayout::Auto;
+    EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(five_wide, unresolved, identity)),
+      detection::OnnxError::InvalidOutputShape);
+}
+
+TEST(YoloDecoder, ClassNamesComeFromTheConfiguredLabels)
+{
+    auto config = anchor_config(2);
+    config.labels = { "tabby", "tom" };
+    const auto boxes = detection::decode_detections(
+      anchor_tensor(2, { { 5, 5, 2, 2, 0.1F, 0.9F }, { 20, 20, 2, 2, 0.8F, 0.1F } }), config, {});
+    ASSERT_TRUE(boxes.has_value());
+    ASSERT_EQ(boxes->size(), 2U);
+    EXPECT_EQ((*boxes)[0].class_name, "tom");
+    EXPECT_EQ((*boxes)[1].class_name, "tabby");
+    config.labels = { "tabby" };
+    const auto beyond = detection::decode_detections(anchor_tensor(2, { { 5, 5, 2, 2, 0.1F, 0.9F } }), config, {});
+    ASSERT_TRUE(beyond.has_value());
+    ASSERT_EQ(beyond->size(), 1U);
+    EXPECT_EQ((*beyond)[0].class_name, "unknown");
+}
+
+TEST(YoloDetector, TheModelsMetadataPicksTheLayoutWhenAsked)
+{
+    EXPECT_EQ(detection::layout_from_metadata("xyxy_score_class"), detection::YoloOutputLayout::CornersScoreClass);
+    EXPECT_EQ(
+      detection::layout_from_metadata("cxcywh_objectness_scores"), detection::YoloOutputLayout::CenterObjectnessScores);
+    EXPECT_EQ(
+      detection::layout_from_metadata("cxcywh_scores_by_anchor"), detection::YoloOutputLayout::CenterScoresByAnchor);
+    EXPECT_FALSE(detection::layout_from_metadata("").has_value());
+
+    // kTwoClasses' [1, 6, 7] reads as six channels of seven anchors: four box values and two classes.
+    const TempFile model("kataglyphis-yolov8",
+      ".onnx",
+      kataglyphis::test::yolo_reshape_model(kTwoClasses, { { "kataglyphis.output", "cxcywh_scores_by_anchor" } }));
+    auto config = two_class_config(model);
+    config.output_layout = detection::YoloOutputLayout::Auto;
+    detection::YoloDetector detector;
+    ASSERT_TRUE(detector.initialize(config).has_value());
+    EXPECT_EQ(detector.output_layout(), detection::YoloOutputLayout::CenterScoresByAnchor);
+    std::vector<float> columns(kTwoClasses.elements(), 0.0F);
+    for (const auto &[channel, value] : std::initializer_list<std::pair<std::size_t, float>>{
+           { 0, 3.0F }, { 1, 1.0F }, { 2, 2.0F }, { 3, 2.0F }, { 5, 0.9F } }) {
+        columns[channel * 7] = value;
+    }
+    const auto result = detector.detect(columns, 7, 2);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->boxes.size(), 1U);
+    EXPECT_EQ(result->boxes[0].class_name, "bicycle");
+    EXPECT_FLOAT_EQ(result->boxes[0].x, 2.0F);
+}
+
+TEST(YoloDetector, AutoWithoutAKnownLayoutFailsInitialize)
+{
+    for (const auto &metadata : { kataglyphis::test::MetadataProps{},
+           kataglyphis::test::MetadataProps{ { "kataglyphis.output", "rotated_boxes" } } }) {
+        const TempFile model("kataglyphis-auto", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses, metadata));
+        auto config = two_class_config(model);
+        config.output_layout = detection::YoloOutputLayout::Auto;
+        detection::YoloDetector detector;
+        EXPECT_EQ(kataglyphis::test::error_of(detector.initialize(config)), detection::OnnxError::InvalidOutputShape);
+        EXPECT_FALSE(detector.is_initialized());
+    }
+}
+
+TEST(YoloDetector, AnOutputOfTheWrongClassCountIsInvalidOutputShape)
+{
+    const TempFile model("kataglyphis-yolov8", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    auto config = two_class_config(model);
+    config.output_layout = detection::YoloOutputLayout::CenterScoresByAnchor;
+    config.num_classes = 3;
+    detection::YoloDetector detector;
+    ASSERT_TRUE(detector.initialize(config).has_value());
+    const std::vector<float> columns(kTwoClasses.elements(), 0.0F);
+    EXPECT_EQ(kataglyphis::test::error_of(detector.detect(columns, 7, 2)), detection::OnnxError::InvalidOutputShape);
+}
+
+TEST(YoloDetector, TheConfiguredThreadCountReachesTheOrtSession)
+{
+    const auto parsed = kataglyphis::config::parse_inference_config(
+      "[model]\ninput_width = 7\ninput_height = 2\nintra_op_threads = 3\nlabels = [\"a\", \"b\"]\n");
+    ASSERT_TRUE(parsed.has_value());
+    EXPECT_EQ(parsed->model.intra_op_threads, 3U);
+    auto config = detection::yolo_config_from(parsed->model);
+    EXPECT_EQ(config.intra_op_num_threads, 3);
+    EXPECT_EQ(config.num_classes, 2);
+    const TempFile model("kataglyphis-threads", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    config.model_path = model.path();
+    detection::YoloDetector detector;
+    EXPECT_EQ(detector.applied_intra_op_num_threads(), 0);
+    ASSERT_TRUE(detector.initialize(config).has_value());
+    EXPECT_EQ(detector.applied_intra_op_num_threads(), 3);
+
+    const auto unset = kataglyphis::config::parse_inference_config("[model]\n");
+    ASSERT_TRUE(unset.has_value());
+    EXPECT_EQ(
+      detection::yolo_config_from(unset->model).intra_op_num_threads, detection::YoloConfig{}.intra_op_num_threads);
 }

@@ -33,8 +33,8 @@ Test Strategy
 The Suites
 ^^^^^^^^^^
 
-Four C++ suites link ``AccelerANTgine`` and import its modules, so they test the
-library itself; a fifth, ``Test/python``, tests the Python bindings.
+Five C++ suites link ``AccelerANTgine`` and import its modules, so they test the
+library itself; ``Test/python`` tests the Python bindings.
 
 .. list-table::
    :header-rows: 1
@@ -49,7 +49,10 @@ library itself; a fifth, ``Test/python``, tests the Python bindings.
        included; the ONNX engine on models the tests generate (Relu, Add, two
        outputs, and a Reshape that turns the input into raw YOLO output); YOLO
        decoding (thresholds, classes, NMS, scaling, NaN and infinity, rows
-       shorter than the class count); GStreamer frames from ``videotestsrc`` and
+       shorter than the class count, YOLOv8/11 ``[1, 4 + C, N]`` columns, the
+       ``kataglyphis.output`` metadata behind ``Auto``, labels from the config,
+       ``InvalidOutputShape``); the ORT thread count from the TOML config to the
+       session options; XNNPACK and DNNL running or ``ProviderUnavailable``; GStreamer frames from ``videotestsrc`` and
        ``appsrc`` through ``appsink``, callbacks and state; the WebRTC stream
        config, its validation and a start against a refusing signalling server;
        both exports of the Rust crate, through cxx and ``extern "C"``
@@ -63,15 +66,30 @@ library itself; a fifth, ``Test/python``, tests the Python bindings.
      - ``fuzzTestSuite``
      - FuzzTest properties over the untrusted inputs: the settings JSON and the
        inference TOML on arbitrary bytes, unsigned fields that round-trip or are
-       rejected, the stream-name mapping, the COCO table, and the YOLO decoder on
-       arbitrary floats
+       rejected, the stream-name mapping, the COCO table, the YOLO decoder on
+       arbitrary floats, and ``decode_detections`` on arbitrary shapes, where an
+       unreadable shape must be ``InvalidOutputShape``
+   * - ``Test/golden``
+     - ``goldenTestSuite``
+     - The ``golden`` ctest label, native Linux Debug only: the locked model
+       (``models/models.lock``, fetched by ``ci-build-and-test.sh``; missing
+       fails) with ``Auto`` layout on ModelANT's ``two_cats.jpg`` matches the
+       class-15 count and every cat at IoU 0.9 and score 0.05 of
+       ``Test/golden/two_cats_cpu.json``, recorded by
+       ``AccelerANTgine_demo --detector-image``; a black frame gives 0 boxes;
+       XNNPACK's boxes match CPU within 1e-4 (corners as fractions of the frame)
+       and its profile names it through the hub's ``verify_ort_profile.py``;
+       DNNL matches CPU or is ``ProviderUnavailable``; the demo's ``--threads``
+       and ``--config`` reach the session. Re-record the JSON with the demo after
+       a model bump
    * - ``Test/perf``
      - ``perfTestSuite``
      - Google Benchmark over the hot paths: both parsers, ``run_inference`` at
        three sizes, YOLO detection with 0, 64 and 512 candidate boxes (NMS is
        quadratic), and ``pull_sample``
 
-No model or media file is checked in for them:
+No model or media file is checked in for them (the golden suite reads the
+fetched model and ModelANT's fixture):
 ``Test/common/kataglyphis_test_support.h`` writes the ONNX protobuf itself, and
 the GStreamer tests use ``videotestsrc`` and ``appsrc``. A test that needs a
 GStreamer element the install lacks skips and names it; the WebRTC ones need

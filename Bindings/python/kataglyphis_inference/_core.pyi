@@ -329,6 +329,8 @@ class OnnxError(enum.Enum):
 
     ProfilingFailed = 13
 
+    ProviderUnavailable = 14
+
 class ExecutionMode(enum.Enum):
     Sequential = 0
 
@@ -342,6 +344,10 @@ class OnnxExecutionProvider(enum.Enum):
     MigraphX = 2
 
     DirectML = 3
+
+    Xnnpack = 4
+
+    Dnnl = 5
 
 class SessionConfig:
     def __init__(self) -> None: ...
@@ -498,6 +504,10 @@ class YoloOutputLayout(enum.Enum):
     CenterObjectnessScores = 0
 
     CornersScoreClass = 1
+
+    CenterScoresByAnchor = 2
+
+    Auto = 3
 
 class YoloConfig:
     def __init__(self) -> None: ...

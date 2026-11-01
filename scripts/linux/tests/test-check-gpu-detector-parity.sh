@@ -47,6 +47,7 @@ while [[ $# -gt 0 ]]; do
 done
 provider=CUDAExecutionProvider
 [[ "$device" != cpu ]] || provider=CPUExecutionProvider
+[[ "$device" != xnnpack ]] || provider=XnnpackExecutionProvider
 [[ ${BAD_GPU_PROFILE:-0} != 1 || "$device" == cpu ]] || provider=CPUExecutionProvider
 score=0.90
 [[ ${BAD_GPU_OUTPUT:-0} != 1 || "$device" == cpu ]] || score=0.30
@@ -87,6 +88,13 @@ fi
 mv "$work/log-bootstrap.sh" "$work/repo/third_party/ANTfrastructure/linux/scripts/lib/log-bootstrap.sh"
 MIGRAPHX_SKIP_BENCHMARKING=1 ORT_MIGRAPHX_MODEL_CACHE_PATH=/tmp MIGRAPHX_UNKNOWN=poison bash "$check" "$work/demo" "$work/model.onnx" cuda "$work/pass"
 EDGE_PARITY=1 bash "$check" "$work/demo" "$work/model.onnx" cuda "$work/edge"
+bash "$check" "$work/demo" "$work/model.onnx" xnnpack "$work/xnnpack"
+if BAD_GPU_PROFILE=1 bash "$check" "$work/demo" "$work/model.onnx" xnnpack "$work/xnnpack-on-cpu" >/dev/null 2>&1; then
+  echo 'An XNNPACK request profiled on plain CPU was accepted' >&2; exit 1
+fi
+status=0
+bash "$check" "$work/demo" "$work/model.onnx" tensorrt "$work/unknown" >/dev/null 2>&1 || status=$?
+[[ $status -eq 2 && ! -e "$work/unknown" ]] || { echo "An unknown device gave status $status" >&2; exit 1; }
 for fault in BAD_GPU_PROFILE BAD_GPU_OUTPUT BAD_GPU_REPEAT BAD_GPU_SECOND_PROFILE BAD_CPU_REPEAT MISSING_CPU_REPEAT BAD_CPU_SECOND_PROFILE; do
   if env "$fault=1" bash "$check" "$work/demo" "$work/model.onnx" cuda "$work/$fault" >/dev/null 2>&1; then
     echo "$fault was accepted" >&2; exit 1

@@ -39,7 +39,7 @@ and **C++23 named modules** (`.ixx`) shape most of its tooling.
 | --- | --- |
 | `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
-| `Test/` | The four C++ suites `commit`, `compile`, `fuzz` and `perf` (`docs/source/development_workflow.rst` § *The Suites*), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
+| `Test/` | The five C++ suites `commit`, `compile`, `fuzz`, `golden` and `perf` (`docs/source/development_workflow.rst` § *The Suites*), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, run end to end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
 | `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the Pester suite in `tests/` and `generated-artifacts.txt`, the pathspecs the hub's generated-artifacts suite reads. No project-local `modules/`: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
@@ -305,6 +305,16 @@ written out rather than linked.
   Windows arm64 run job, and the `*.onnx` guard in `.gitignore` stays as it is. The shipped
   `resources/configs/inference_config.toml` is compiled into the suites
   (`kataglyphis_embed_text_file`) for the same reason.
+- **The `golden` ctest label needs the real model and never skips** (2026-11-01). `Test/golden`
+  runs on the native Linux Debug lanes: `ci-build-and-test.sh` fetches `models/models.lock` before
+  ctest, and a missing model fails. It matches ModelANT's `two_cats.jpg` against
+  `Test/golden/two_cats_cpu.json`, a file the demo's `--detector-image` wrote; re-record it with the
+  demo after a model or preprocessing change, never by hand. A channel-swapped `preprocess_frame`
+  drops a cat and fails it (`docs/source/development_workflow.rst` § *The Suites*).
+- **An execution provider the runtime lacks is `ProviderUnavailable`, never plain CPU.** Every
+  non-CPU request checks `provider_available()` first, and a listed CPU provider that fails to
+  register (DNNL without `libdnnl.so.3`) is `ProviderUnavailable` too, with ORT's reason in
+  `provider_error()` (`docs/source/getting_started.rst` § *ONNX execution providers*).
 - **The GenAI tests generate their model too.** `kataglyphis_use_tiny_genai_model` in
   `Test/cmake/CommonTestBuild.cmake` runs the hub's `tiny-genai-model.py` at configure time, so a
   hub pin without it fails the configure, and the tests read the generator's `fixture.json` rather

@@ -7,8 +7,21 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 import kataglyphis.onnx_inference;
 
@@ -357,6 +370,9 @@ TEST(OnnxEngine, ACudaRequestWithoutCudaFailsInsteadOfAborting)
         // An ORT with a working CUDA provider: the session must then also run.
         const std::vector<float> input{ 1.0F, -1.0F, 2.0F, -2.0F };
         EXPECT_TRUE(engine.run_inference(input, shape({ 1, 4 }), "X").has_value());
+    } else if (!inference::provider_available(inference::ExecutionProvider::Cuda)) {
+        EXPECT_EQ(result.error(), inference::OnnxError::ProviderUnavailable);
+        EXPECT_FALSE(engine.is_initialized());
     } else {
         EXPECT_TRUE(result.error() == inference::OnnxError::SessionCreationFailed
                     || result.error() == inference::OnnxError::ModelLoadFailed);
@@ -389,7 +405,10 @@ TEST(OnnxEngine, InvalidMigraphXDeviceFailsWithoutInitializing)
     inference::OnnxInferenceEngine engine;
     const auto result = engine.initialize(config);
     ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), inference::OnnxError::SessionCreationFailed);
+    EXPECT_EQ(result.error(),
+      inference::provider_available(inference::ExecutionProvider::MigraphX)
+        ? inference::OnnxError::SessionCreationFailed
+        : inference::OnnxError::ProviderUnavailable);
     EXPECT_FALSE(engine.is_initialized());
 }
 
@@ -426,7 +445,77 @@ TEST(OnnxEngine, DirectMLRequestOnNonWindowsFails)
     auto config = inference::create_default_session_config(model.path());
     config.execution_provider = inference::ExecutionProvider::DirectML;
     inference::OnnxInferenceEngine engine;
-    EXPECT_EQ(engine.initialize(config).error(), inference::OnnxError::SessionCreationFailed);
+    EXPECT_FALSE(inference::provider_available(inference::ExecutionProvider::DirectML));
+    EXPECT_EQ(engine.initialize(config).error(), inference::OnnxError::ProviderUnavailable);
     EXPECT_FALSE(engine.is_initialized());
 }
 #endif
+
+TEST(OnnxEngine, TheCpuProviderIsAlwaysAvailable)
+{ EXPECT_TRUE(inference::provider_available(inference::ExecutionProvider::Cpu)); }
+
+namespace {
+
+// What a session on provider must give back for the Relu model, or the ProviderUnavailable error it must fail with.
+void expect_runs_like_cpu(inference::ExecutionProvider provider, bool must_run, std::string_view missing_library)
+{
+    const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());
+    auto config = inference::create_default_session_config(model.path());
+    config.execution_provider = provider;
+    config.intra_op_num_threads = 2;
+    inference::OnnxInferenceEngine engine;
+    const auto result = engine.initialize(config);
+    if (!must_run) {
+        EXPECT_EQ(kataglyphis::test::error_of(result), inference::OnnxError::ProviderUnavailable);
+        EXPECT_FALSE(engine.is_initialized());
+        EXPECT_EQ(engine.applied_intra_op_num_threads(), 0);
+        EXPECT_NE(engine.provider_error().find(missing_library), std::string::npos) << engine.provider_error();
+        return;
+    }
+    ASSERT_TRUE(result.has_value()) << engine.provider_error();
+    EXPECT_TRUE(engine.provider_error().empty());
+    EXPECT_EQ(engine.applied_intra_op_num_threads(), 2);
+    const std::vector<float> input{ 3.0F, -3.0F, 0.25F, -0.25F };
+    const auto output = engine.run_inference(input, shape({ 1, 4 }), "X");
+    ASSERT_TRUE(output.has_value());
+    EXPECT_EQ(output->outputs[0].data, (std::vector<float>{ 3.0F, 0.0F, 0.25F, 0.0F }));
+}
+
+}// namespace
+
+TEST(OnnxEngine, XnnpackRunsWhereTheRuntimeHasIt)
+{
+    const auto provider = inference::ExecutionProvider::Xnnpack;
+    expect_runs_like_cpu(provider, inference::provider_available(provider), "XnnpackExecutionProvider");
+}
+
+// DNNL needs its provider library and libdnnl: it runs exactly when both load, else ORT names what failed.
+TEST(OnnxEngine, DnnlRunsOnlyWhenItsLibraryLoads)
+{
+    const auto provider = inference::ExecutionProvider::Dnnl;
+    if (!inference::provider_available(provider)) {
+        expect_runs_like_cpu(provider, false, "DnnlExecutionProvider");
+        return;
+    }
+#if defined(_WIN32)
+    HMODULE dnnl = LoadLibraryA("dnnl.dll");
+    if (dnnl != nullptr) { FreeLibrary(dnnl); }
+#else
+    void *dnnl = dlopen("libdnnl.so.3", RTLD_NOW | RTLD_LOCAL);
+    if (dnnl != nullptr) { dlclose(dnnl); }
+#endif
+    expect_runs_like_cpu(provider, dnnl != nullptr, "onnxruntime_providers_");
+}
+
+TEST(OnnxEngine, CustomMetadataIsReadFromTheModel)
+{
+    const TempFile model("kataglyphis-metadata",
+      ".onnx",
+      kataglyphis::test::yolo_reshape_model({ 1, 2, 1, 6 }, { { "kataglyphis.output", "xyxy_score_class" } }));
+    inference::OnnxInferenceEngine engine;
+    EXPECT_EQ(kataglyphis::test::error_of(engine.get_custom_metadata("kataglyphis.output")),
+      inference::OnnxError::SessionNotInitialized);
+    ASSERT_TRUE(engine.initialize(inference::create_default_session_config(model.path())).has_value());
+    EXPECT_EQ(engine.get_custom_metadata("kataglyphis.output"), std::string("xyxy_score_class"));
+    EXPECT_EQ(engine.get_custom_metadata("kataglyphis.absent"), std::string());
+}

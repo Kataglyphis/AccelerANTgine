@@ -60,13 +60,27 @@ ONNX execution providers
 ------------------------
 
 The library API defaults to CPU. Embedders can choose ``ExecutionProvider::Cuda`` for NVIDIA,
-``ExecutionProvider::MigraphX`` for AMD on Linux, or ``ExecutionProvider::DirectML`` for a
-DirectX 12 GPU on Windows in either ``SessionConfig`` or ``YoloConfig``. The Python bindings
+``ExecutionProvider::MigraphX`` for AMD on Linux, ``ExecutionProvider::DirectML`` for a
+DirectX 12 GPU on Windows, or the CPU providers ``ExecutionProvider::Xnnpack`` and
+``ExecutionProvider::Dnnl`` in either ``SessionConfig`` or ``YoloConfig``. The Python bindings
 expose these values as ``OnnxExecutionProvider`` with ``execution_provider`` and ``device_id`` fields.
 For the locked DEIM model, Python callers must also set ``YoloConfig.output_layout`` to
-``YoloOutputLayout.CornersScoreClass``; the default ``CenterObjectnessScores`` is for YOLOv5 rows.
-The existing ``enable_cuda`` field remains supported. A conflicting provider and CUDA request,
-negative device ID, or unavailable provider fails initialization. ONNX Runtime may still run
+``YoloOutputLayout.CornersScoreClass`` or ``Auto``; the default ``CenterObjectnessScores`` is for YOLOv5 rows.
+The existing ``enable_cuda`` field remains supported. A conflicting provider and CUDA request or a
+negative device ID fails initialization with ``SessionCreationFailed``. A provider the loaded ONNX
+Runtime was not built with, or one it lists but cannot load, fails with ``ProviderUnavailable``
+and ``OnnxInferenceEngine::provider_error()`` holds ONNX Runtime's reason; ``provider_available()``
+asks the runtime first. The chain ONNX Runtime in ``:latest`` builds XNNPACK on every architecture,
+so ``xnnpack`` runs on amd64 and arm64. It lists DNNL on amd64 only, and the image ships no
+``libdnnl.so.3``, so ``dnnl`` is ``ProviderUnavailable`` on both (``BACKLOG.md``, hub CON191).
+A process that finds ``libonnxruntime.so.1`` through ``/opt/opencv5/lib`` cannot load any
+provider library either: ONNX Runtime looks for them beside the path it was loaded from.
+
+``SessionConfig::intra_op_num_threads`` (``YoloConfig`` too) sets ONNX Runtime's intra-op thread
+count, and XNNPACK's own pool gets the same number. The ``[model]`` table's ``intra_op_threads``
+key sets it from ``resources/configs/inference_config.toml`` (0 or absent keeps 4), and the demo's
+``--threads <n>`` overrides both. ``applied_intra_op_num_threads()`` reports what the session
+options received. ONNX Runtime may still run
 unsupported model operations on its CPU provider. DirectML sessions use sequential execution,
 disable memory patterns and serialize inference calls as required by ONNX Runtime.
 
@@ -75,7 +89,8 @@ locked model as described in ``models/README.md``, then run, for example::
 
    AccelerANTgine_demo --onnx-only --model models/deim_dfine_n_coco.onnx --device cuda --device-id 0 --profile ort-profile
 
-Use ``directml`` on Windows AMD GPUs or ``migraphx`` on Linux AMD GPUs. The device index is a
+Use ``directml`` on Windows AMD GPUs, ``migraphx`` on Linux AMD GPUs, or ``xnnpack`` and ``dnnl``
+for the CPU providers. ``--config <toml>`` reads the detector settings from a ``[model]`` table. The device index is a
 DXGI adapter index for DirectML and a provider device index for CUDA or MIGraphX. The demo prints
 the generated JSON profile path. With ANTfrastructure checked out, confirm model operators ran
 on the requested provider using ``python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py

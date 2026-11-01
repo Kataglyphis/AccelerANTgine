@@ -18,6 +18,32 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-01, CV features)
+- YOLOv8/YOLO11 output: `YoloOutputLayout::CenterScoresByAnchor` decodes `[1, 4 + C, N]`, and
+  `YoloOutputLayout::Auto` takes the layout from the model's `kataglyphis.output` metadata
+  (`xyxy_score_class`, `cxcywh_objectness_scores`, `cxcywh_scores_by_anchor`); `Auto` without a
+  known value fails `initialize` with `InvalidOutputShape`. `decode_detections` is exported, and a
+  shape the layout cannot read is `InvalidOutputShape`, a property `fuzzTestSuite` checks on
+  arbitrary shapes. `YoloConfig::labels` names the boxes (`yolo_config_from` fills it from the
+  TOML `[model]` table).
+- `ExecutionProvider::Xnnpack` and `ExecutionProvider::Dnnl`, and the error
+  `OnnxError::ProviderUnavailable` (value 14) with `OnnxInferenceEngine::provider_error()`: a
+  provider the runtime was not built with, or cannot load, is refused instead of running on CPU.
+  `provider_available()` asks the runtime. In `:latest` XNNPACK runs on amd64 and arm64; DNNL is
+  `ProviderUnavailable` on both, because the image ships no `libdnnl.so.3` (BACKLOG, hub CON191).
+- The ORT intra-op thread count from the TOML `intra_op_threads` key and the demo's `--threads`;
+  `applied_intra_op_num_threads()` reports what the session options received. The demo also
+  takes `--config <toml>` and `--device xnnpack|dnnl`.
+- `Test/golden` and its `golden` ctest label, run by the Linux lanes with the model required: the
+  two-cats golden against a recorded demo run, a black frame with 0 boxes, XNNPACK and DNNL parity
+  with CPU within 1e-4, XNNPACK's profile through the hub's `verify_ort_profile.py`
+  (`check-gpu-detector-parity.sh` now takes `xnnpack` and `dnnl`), and the thread knobs.
+
+### Changed (2026-11-01, CV features)
+- A CUDA, MIGraphX or DirectML request on a runtime without that provider now fails with
+  `ProviderUnavailable` instead of `SessionCreationFailed`. The Python enums gain the new values.
+  The C ABI is unchanged by these.
+
 ### Changed (2026-11-01, text options: seed, JSON schema, stop)
 - **C ABI change.** `kataglyphis_text_options` gains `struct_size` as its first field, so an
   embedder built against the previous header must be rebuilt; OmniAccelerANT's

@@ -25,5 +25,7 @@ model and its texts in the package's third-party inventory. The packaged demo lo
 model relative to its executable; `--model <path>` still selects a different model.
 
 `YoloDetector` reads that layout when `YoloConfig::output_layout` is
-`YoloOutputLayout::CornersScoreClass`, as `Src/inference_demo.cpp` sets it. The default,
-`CenterObjectnessScores`, is the YOLOv5 rows (cx, cy, w, h, objectness, one score per class).
+`YoloOutputLayout::CornersScoreClass`, as `Src/inference_demo.cpp` sets it, or `Auto`, which
+reads the model's `kataglyphis.output` metadata (`xyxy_score_class` here). The default,
+`CenterObjectnessScores`, is the YOLOv5 rows (cx, cy, w, h, objectness, one score per class);
+`CenterScoresByAnchor` is YOLOv8/YOLO11's `[1, 4 + classes, anchors]`.

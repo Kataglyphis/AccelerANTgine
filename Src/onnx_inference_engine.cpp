@@ -19,6 +19,7 @@ module;
 #include <shared_mutex>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 module kataglyphis.onnx_inference;
@@ -33,10 +34,11 @@ namespace {
     using InferenceClock = std::chrono::high_resolution_clock;
 
     // Under ORT_NO_EXCEPTIONS the C++ wrapper aborts on an error status, so every fallible call goes through the C API.
-    auto ort_succeeded(OrtStatus *status) -> bool
+    auto ort_succeeded(OrtStatus *status, std::string *message = nullptr) -> bool
     {
         if (status == nullptr) { return true; }
         log::error("ONNX Runtime: {}", Ort::GetApi().GetErrorMessage(status));
+        if (message != nullptr) { *message = Ort::GetApi().GetErrorMessage(status); }
         Ort::GetApi().ReleaseStatus(status);
         return false;
     }
@@ -180,6 +182,64 @@ namespace {
         return owned;
     }
 
+    // The registered name GetAvailableProviders reports for a runtime built with the provider.
+    auto provider_name(ExecutionProvider provider) -> std::string_view
+    {
+        switch (provider) {
+        case ExecutionProvider::Cpu:
+            return "CPUExecutionProvider";
+        case ExecutionProvider::Cuda:
+            return "CUDAExecutionProvider";
+        case ExecutionProvider::MigraphX:
+            return "MIGraphXExecutionProvider";
+        case ExecutionProvider::DirectML:
+            return "DmlExecutionProvider";
+        case ExecutionProvider::Xnnpack:
+            return "XnnpackExecutionProvider";
+        case ExecutionProvider::Dnnl:
+            return "DnnlExecutionProvider";
+        }
+        return {};
+    }
+
+    auto available_by_name(std::string_view name) -> bool
+    {
+        const OrtApi &api = Ort::GetApi();
+        char **providers = nullptr;
+        int count = 0;
+        if (!ort_succeeded(api.GetAvailableProviders(&providers, &count))) { return false; }
+        bool found = false;
+        for (int i = 0; i < count; ++i) { found = found || name == providers[i]; }
+        return ort_succeeded(api.ReleaseAvailableProviders(providers, count)) && found;
+    }
+
+    // With default options an append fails only when the provider cannot load, so that is ProviderUnavailable too.
+    auto append_cpu_provider(OrtSessionOptions *options,
+      ExecutionProvider provider,
+      int intra_op_num_threads,
+      std::string &reason) -> std::expected<void, OnnxError>
+    {
+        const OrtApi &api = Ort::GetApi();
+        if (provider == ExecutionProvider::Xnnpack) {
+            const std::string threads = std::to_string(intra_op_num_threads);
+            const char *keys[] = { "intra_op_num_threads" };
+            const char *values[] = { threads.c_str() };
+            if (!ort_succeeded(
+                  api.SessionOptionsAppendExecutionProvider(options, "XNNPACK", keys, values, 1), &reason)) {
+                return std::unexpected(OnnxError::ProviderUnavailable);
+            }
+            return {};
+        }
+        OrtDnnlProviderOptions *dnnl = nullptr;
+        if (!ort_succeeded(api.CreateDnnlProviderOptions(&dnnl), &reason)) {
+            return std::unexpected(OnnxError::ProviderUnavailable);
+        }
+        const bool appended = ort_succeeded(api.SessionOptionsAppendExecutionProvider_Dnnl(options, dnnl), &reason);
+        api.ReleaseDnnlProviderOptions(dnnl);
+        if (!appended) { return std::unexpected(OnnxError::ProviderUnavailable); }
+        return {};
+    }
+
     template<typename TypeInfoGetter>
     auto get_named_shape(const std::vector<std::string> &names, const std::string &name, TypeInfoGetter &&get_type_info)
       -> std::expected<TensorShape, OnnxError>
@@ -206,6 +266,8 @@ struct OnnxInferenceEngine::Impl
     SessionConfig config;
     bool initialized{ false };
     bool profiling_active{ false };
+    int applied_intra_op_num_threads{ 0 };
+    std::string provider_error;
 
     std::vector<std::string> input_names_cache;
     std::vector<std::string> output_names_cache;
@@ -216,6 +278,8 @@ struct OnnxInferenceEngine::Impl
     {
         initialized = false;
         profiling_active = false;
+        applied_intra_op_num_threads = 0;
+        provider_error.clear();
         input_name_ptrs.clear();
         output_name_ptrs.clear();
         input_names_cache.clear();
@@ -271,8 +335,23 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
         impl_->reset();
         return std::unexpected(OnnxError::SessionCreationFailed);
     }
+    impl_->applied_intra_op_num_threads = config.intra_op_num_threads;
 
-    if (provider == ExecutionProvider::Cuda) {
+    // A provider the runtime lacks is its own error, so a request never runs on plain CPU unnoticed.
+    if (provider != ExecutionProvider::Cpu && !provider_available(provider)) {
+        impl_->reset();
+        impl_->provider_error = std::string(provider_name(provider)) + " is not built into the loaded ONNX Runtime";
+        return std::unexpected(OnnxError::ProviderUnavailable);
+    }
+
+    if (provider == ExecutionProvider::Xnnpack || provider == ExecutionProvider::Dnnl) {
+        std::string reason;
+        if (auto appended = append_cpu_provider(options, provider, config.intra_op_num_threads, reason); !appended) {
+            impl_->reset();
+            impl_->provider_error = std::move(reason);
+            return std::unexpected(appended.error());
+        }
+    } else if (provider == ExecutionProvider::Cuda) {
         OrtCUDAProviderOptions cuda_options{};
         cuda_options.device_id = config.device_id;
         if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options))) {
@@ -465,6 +544,43 @@ auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std
         return impl_->session->GetOutputTypeInfo(index);
     });
 }
+
+auto OnnxInferenceEngine::get_custom_metadata(const std::string &key) const -> std::expected<std::string, OnnxError>
+{
+    const std::shared_lock lock(impl_->mutex);
+    if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
+    const OrtApi &api = Ort::GetApi();
+    OrtModelMetadata *metadata = nullptr;
+    if (!ort_succeeded(api.SessionGetModelMetadata(*impl_->session, &metadata))) {
+        return std::unexpected(OnnxError::ModelLoadFailed);
+    }
+    char *value = nullptr;
+    const bool found =
+      ort_succeeded(api.ModelMetadataLookupCustomMetadataMap(metadata, impl_->allocator, key.c_str(), &value));
+    api.ReleaseModelMetadata(metadata);
+    if (!found) { return std::unexpected(OnnxError::ModelLoadFailed); }
+    if (value == nullptr) { return std::string{}; }
+    std::string result(value);
+    if (!ort_succeeded(api.AllocatorFree(impl_->allocator, value))) {
+        return std::unexpected(OnnxError::ModelLoadFailed);
+    }
+    return result;
+}
+
+auto OnnxInferenceEngine::provider_error() const -> std::string
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->provider_error;
+}
+
+auto OnnxInferenceEngine::applied_intra_op_num_threads() const -> int
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->applied_intra_op_num_threads;
+}
+
+KATAGLYPHIS_CPP_API auto provider_available(ExecutionProvider provider) -> bool
+{ return available_by_name(provider_name(provider)); }
 
 KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig
 {

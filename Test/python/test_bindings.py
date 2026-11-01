@@ -62,6 +62,7 @@ def test_onnx_output_errors_are_exposed():
     """Python callers can distinguish unsupported output types from invalid output shapes."""
     assert ki.OnnxError.InvalidOutputType.name == "InvalidOutputType"
     assert ki.OnnxError.InvalidOutputShape.name == "InvalidOutputShape"
+    assert ki.OnnxError.ProviderUnavailable.name == "ProviderUnavailable"
 
 
 @needs_onnx
@@ -87,6 +88,13 @@ def test_session_config_defaults():
     yolo.device_id = 1
     assert yolo.execution_provider == ki.OnnxExecutionProvider.DirectML
     assert yolo.device_id == 1
+    for provider in (ki.OnnxExecutionProvider.Xnnpack, ki.OnnxExecutionProvider.Dnnl):
+        yolo.execution_provider = provider
+        assert yolo.execution_provider == provider
+    yolo.output_layout = ki.YoloOutputLayout.Auto
+    assert yolo.output_layout == ki.YoloOutputLayout.Auto
+    yolo.output_layout = ki.YoloOutputLayout.CenterScoresByAnchor
+    assert yolo.output_layout == ki.YoloOutputLayout.CenterScoresByAnchor
 
 
 @needs_onnx

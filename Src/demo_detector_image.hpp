@@ -26,12 +26,10 @@ static auto write_detector_result(std::ofstream &output, const detection::Detect
     return static_cast<bool>(output);
 }
 
-static auto run_detector_image(const std::filesystem::path &model_path,
+static auto run_detector_image(const detection::YoloConfig &config,
   const std::filesystem::path &image_path,
   const std::filesystem::path &output_path,
   const std::filesystem::path &repeat_output_path,
-  inference::ExecutionProvider provider,
-  int device_id,
   const std::filesystem::path &profile_prefix) -> int
 {
     std::error_code error;
@@ -77,11 +75,6 @@ static auto run_detector_image(const std::filesystem::path &model_path,
         std::cerr << "Could not read the detector image frame\n";
         return 1;
     }
-    detection::YoloConfig config;
-    config.model_path = model_path;
-    config.execution_provider = provider;
-    config.device_id = device_id;
-    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
     detection::YoloDetector detector;
     if (!detector.initialize(config, profile_prefix / "ort")) {
         std::cerr << "Could not initialize the image detector\n";
