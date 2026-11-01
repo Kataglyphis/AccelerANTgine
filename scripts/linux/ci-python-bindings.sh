@@ -54,7 +54,7 @@ build_and_test() {
     die "${label}: expected one *-${TAG}-${abi}-linux_*.whl in ${OUT_DIR}/${label}, found: $(ls "${OUT_DIR}/${label}")"
   wheel="${wheels[0]}"
   info "${label}: built $(basename "${wheel}")"
-  "${python}" -I "${_SCRIPT_DIR}/check-python-stub.py" "${wheel}" ||
+  python3 -I "${_SCRIPT_DIR}/check-python-stub.py" "${wheel}" ||
     die "${label}: the built _core.pyi differs from Bindings/python/kataglyphis_inference/_core.pyi"
 
   venv="${BUILD_ROOT}/venv-${label}"

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# This tests wheel-driver sequencing, not native compilation or the wheel's contents.
+# This tests wheel-driver sequencing and the stub drift verdict, not native compilation or other wheel contents.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf -- "${tmp}"' EXIT
 workspace="${tmp}/project with spaces"
 mkdir -p "${workspace}/scripts/linux" "${workspace}/bin" "${workspace}/hub/linux/scripts/02-toolchain/python"
-cp "${repo}/scripts/linux/ci-python-bindings.sh" "${workspace}/scripts/linux/ci-python-bindings.sh"
+cp "${repo}/scripts/linux/ci-python-bindings.sh" "${repo}/scripts/linux/check-python-stub.py" "${workspace}/scripts/linux/"
+mkdir -p "${workspace}/Bindings/python/kataglyphis_inference"
+printf 'HAS_ONNXRUNTIME: bool = True\n' > "${workspace}/Bindings/python/kataglyphis_inference/_core.pyi"
+cp "${workspace}/Bindings/python/kataglyphis_inference/_core.pyi" "${tmp}/built.pyi"
 touch "${workspace}/hub/linux/scripts/02-toolchain/python/free-threaded-wheel.py"
 cat > "${workspace}/scripts/linux/ci-common.sh" <<'STUB'
 info() { :; }
@@ -38,7 +41,8 @@ case "$1" in
     done
     abi=cp314; [[ "$python" != *t ]] || abi=cp314t
     mkdir -p "$out"
-    touch "$out/kataglyphis_inference-0.0.3-cp314-${abi}-linux_x86_64.whl"
+    python3 -I -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1], "w").write(sys.argv[2], "kataglyphis_inference/_core.pyi")' \
+      "$out/kataglyphis_inference-0.0.3-cp314-${abi}-linux_x86_64.whl" "${UV_TEST_STUB}"
     ;;
   venv)
     venv="${@: -1}"
@@ -60,7 +64,7 @@ esac
 STUB
 chmod +x "${workspace}/bin/uv"
 export PATH="${workspace}/bin:${PATH}" ANTFRASTRUCTURE_DIR="${workspace}/hub" PYTHON_MAJOR_MINOR=3.14
-export UV_TEST_LOG="${tmp}/calls" UV_TEST_FAIL_EXPORT=0
+export UV_TEST_LOG="${tmp}/calls" UV_TEST_FAIL_EXPORT=0 UV_TEST_STUB="${tmp}/built.pyi"
 cd "${workspace}"
 args=(--workspace-dir "${workspace}" --build-root "${tmp}/build root" --out-dir 'dist wheels')
 bash scripts/linux/ci-python-bindings.sh "${args[@]}"
@@ -78,4 +82,11 @@ if bash scripts/linux/ci-python-bindings.sh "${args[@]}"; then
   printf 'failed lock export was accepted\n' >&2; exit 1
 fi
 [[ "$(< "${UV_TEST_LOG}")" != *'python -m pytest '* ]] || { printf 'tests ran after failed lock export\n' >&2; exit 1; }
+: > "${UV_TEST_LOG}"
+export UV_TEST_FAIL_EXPORT=0
+printf 'HAS_ONNXRUNTIME: bool = False\n' > "${tmp}/built.pyi"
+if bash scripts/linux/ci-python-bindings.sh "${args[@]}"; then
+  printf 'a drifted stub was accepted\n' >&2; exit 1
+fi
+[[ "$(< "${UV_TEST_LOG}")" != *'uv venv '* ]] || { printf 'the wheel was installed after stub drift\n' >&2; exit 1; }
 printf 'wheel lock lifecycle passed for GIL and free-threaded ABIs\n'
