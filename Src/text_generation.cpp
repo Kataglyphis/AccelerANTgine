@@ -157,8 +157,8 @@ namespace {
     // GenAI built without llguidance (the Windows chain) refuses a schema with this text when the generator is created.
     auto guidance_error(std::string_view message) -> TextGenError
     {
-        return message.find("Guidance is unavailable") != std::string_view::npos ? TextGenError::JsonSchemaUnsupported
-                                                                                 : TextGenError::InvalidOptions;
+        return message.contains("Guidance is unavailable") ? TextGenError::JsonSchemaUnsupported
+                                                           : TextGenError::InvalidOptions;
     }
 
     // The end of the longest stop-string prefix the text ends with: text that may still become a stop string.
