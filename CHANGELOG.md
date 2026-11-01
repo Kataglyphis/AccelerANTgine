@@ -45,8 +45,8 @@ belongs in the **Changed** list below with that consequence spelled out.
   `scripts/linux/tests/test-check-python-stub.py` in the lint gates; `test-ci-python-lock.sh` proves
   a drifted stub stops the lane before install). `stubgen-patterns.txt` adds
   the `__version__` stubgen skips.
-- The ANTfrastructure pin moves to the hub commit whose `python-static.sh` lets ty resolve
-  `pytest` and the docs theme.
+- The ANTfrastructure pin moves to hub 4c592f36, past the commits that let ty resolve `pytest` and
+  the docs theme in `python-static.sh` and in the quality-report measurement.
 
 ### Added (2026-11-01)
 - **Four benchmarks and a history.** `perfTestSuite` adds `BM_PreprocessFrame`, `BM_DetectFrame`,
