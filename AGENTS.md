@@ -500,8 +500,8 @@ locked DEIM model and runs `perfTestSuite` with `KATAGLYPHIS_REQUIRE_MODEL=1` (a
 GenAI fails instead of skipping) into `logs/perf/results.json`. Each Linux leg uploads it as
 `perf-results-<arch>-<compiler>` and compares it through the hub's `bench-history` action under the
 keys **`perf-x64-gcc`, `perf-x64-clang`, `perf-arm64-gcc` and `perf-arm64-clang`** (artifacts
-`bench-history-perf-<arch>-<compiler>`): `BM_PreprocessFrame`, `BM_DetectFrame`, `BM_SessionCreate`
-and `BM_TextGenerateTiny` fail on a doubling. The Windows lanes report ungated under **`perf-win-x64`**
+`bench-history-perf-<arch>-<compiler>`), which warns and never gates: hosted CPUs differ up to twofold
+in wall time (run 41271221703 doubled `BM_DetectFrame` at an unchanged instruction count). The Windows lanes report under **`perf-win-x64`**
 (the host Profile run's `dist/windows-x64/perf/results.json`) and **`perf-win-arm64`** (the staged
 suite's `results.json` on windows-11-arm, with the model staged beside it). `perf-cachegrind.py` then counts the instructions per
 iteration of `BM_PreprocessFrame` and `BM_DetectFrame` at one ORT thread

@@ -96,7 +96,7 @@ jobs:
             logs/perf/results.json
             logs/perf/cachegrind.json
 
-      # Against the median of the last 20 develop results of this arch and compiler; a doubling of a gated time fails.
+      # Ungated: hosted CPUs differ up to twofold in wall time, so the instruction-count check gates instead.
       - name: Benchmark history
         uses: Kataglyphis/ANTfrastructure/.github/actions/bench-history@develop
         with:
@@ -104,10 +104,10 @@ jobs:
           format: google-benchmark
           result: logs/perf/results.json
           metrics: >-
-            {"BM_PreprocessFrame": {"direction": "lower", "gate": true},
-            "BM_DetectFrame": {"direction": "lower", "gate": true},
-            "BM_SessionCreate": {"direction": "lower", "gate": true},
-            "BM_TextGenerateTiny": {"direction": "lower", "gate": true},
+            {"BM_PreprocessFrame": {"direction": "lower"},
+            "BM_DetectFrame": {"direction": "lower"},
+            "BM_SessionCreate": {"direction": "lower"},
+            "BM_TextGenerateTiny": {"direction": "lower"},
             "*/tokens_per_second": {"direction": "higher"},
             "*/bytes_per_second": {"direction": "higher"}}
 

@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-01, bench-history)
+- The Linux bench-history keys warn instead of gating wall time: run 41271221703 doubled
+  `BM_DetectFrame` (+149 %) on a slower hosted CPU at an unchanged instruction count
+  (1199545389 against 1199544916). The cachegrind instruction-count check stays the gate.
+
 ### Added (2026-11-01, CV features)
 - YOLOv8/YOLO11 output: `YoloOutputLayout::CenterScoresByAnchor` decodes `[1, 4 + C, N]`, and
   `YoloOutputLayout::Auto` takes the layout from the model's `kataglyphis.output` metadata

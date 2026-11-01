@@ -217,8 +217,8 @@ runs:
   ``TCMALLOC_STACKTRACE_METHOD`` yourself overrides the choice.
 - **Benchmark history:** ``perfTestSuite`` writes ``logs/perf/results.json``; CI compares it with
   the median of the last 20 develop results per arch and compiler through the hub's
-  ``bench-history`` action (keys ``perf-<arch>-<compiler>``) and fails when ``BM_PreprocessFrame``,
-  ``BM_DetectFrame``, ``BM_SessionCreate`` or ``BM_TextGenerateTiny`` doubles. The detector
+  ``bench-history`` action (keys ``perf-<arch>-<compiler>``), which warns and never gates on wall
+  time, since hosted CPUs differ up to twofold; the instruction-count check gates instead. The detector
   benchmarks read ``models/deim_dfine_n_coco.onnx`` (``fetch-data-lock.py --lock models/models.lock``)
   or ``KATAGLYPHIS_DETECTOR_MODEL``; ``BM_TextGenerateTiny`` reads the hub's configure-time tiny
   GenAI model. Without the model they skip, unless ``KATAGLYPHIS_REQUIRE_MODEL=1``. On Windows,
