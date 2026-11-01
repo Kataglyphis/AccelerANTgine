@@ -97,8 +97,7 @@ auto initialized(detection::YoloDetector &detector, const detection::YoloConfig 
     return result.has_value();
 }
 
-// Every box down to a tenth on the photo, as class, score and corners in fractions of the frame; empty when refused.
-// Lower scores sit among near ties, where providers may order the model's top-k differently.
+// Stops at a tenth: lower scores sit among near ties, where providers may order the model's top-k differently.
 auto detections(inference::ExecutionProvider provider, detection::YoloDetector &detector) -> std::vector<float>
 {
     auto config = auto_config(provider);
