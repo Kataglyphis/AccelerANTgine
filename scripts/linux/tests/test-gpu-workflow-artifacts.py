@@ -49,6 +49,12 @@ def expand(
 
 
 class ArtifactReruns(unittest.TestCase):
+    def search(self, pattern: str, text: str, msg: str = "") -> re.Match[str]:
+        match = re.search(pattern, text)
+        if match is None:
+            self.fail(f"{pattern!r} has no match {msg}")
+        return match
+
     def test_scope_validation_is_fail_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / "output"
@@ -132,8 +138,7 @@ class ArtifactReruns(unittest.TestCase):
         for job in jobs:
             body = text.split(f"\n  {job}:\n", 1)[1]
             body = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", body, maxsplit=1)[0]
-            group = re.search(r"(?m)^      group: (.+)$", body)
-            self.assertIsNotNone(group, job)
+            group = self.search(r"(?m)^      group: (.+)$", body, job)
             self.assertIn(suffix, group.group(1))
             self.assertIn("${{ matrix.vendor }}", group.group(1))
             self.assertNotIn("${{ inputs.invocation-scope }}", group.group(1))
@@ -220,8 +225,8 @@ class ArtifactReruns(unittest.TestCase):
             (WINDOWS, "$env:CANDIDATE_DIR"),
         ):
             job = workflow.read_text(encoding="utf-8").split("\n  gpu-profile:\n", 1)[1]
-            destination = re.search(r"(?m)^\s+path: (.+)$", job).group(1)
-            used = re.search(r"(?m)^\s+CANDIDATE_DIR: (.+)$", job).group(1)
+            destination = self.search(r"(?m)^\s+path: (.+)$", job).group(1)
+            used = self.search(r"(?m)^\s+CANDIDATE_DIR: (.+)$", job).group(1)
             self.assertEqual(destination, used)
             self.assertIn(reference, job)
             for key in ("github.run_id", "github.run_attempt", "matrix.vendor"):

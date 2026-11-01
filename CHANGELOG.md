@@ -24,6 +24,14 @@ belongs in the **Changed** list below with that consequence spelled out.
   has no unit over the hub's limits; `powershell-quality.yml` now fails on a new one. Build behaviour
   and the fixture's checks are unchanged.
 
+### Fixed (2026-11-01)
+- **Ruff findings 13 -> 0, ty diagnostics 16 -> 6** in the hub's `python-static.sh`: shebang
+  scripts got their executable mode, the package `__init__` re-exports `__doc__` and `__version__`
+  explicitly instead of carrying unused `noqa` codes, the producer proof types its file digests
+  with a `TypedDict`, the artifact test narrows regex matches before use, and the free-threading
+  test checks the interpreter version before `sys._is_gil_enabled()`. The six left are imports the
+  static lane cannot resolve: `pytest`, the compiled `._core` and the docs theme.
+
 ### Added (2026-10-31)
 - **`scripts/linux/quality-report.sh`** runs the hub's `quality-report.sh` on this checkout; the
   tracked `quality-report.toml` declares the docs build list, lane outputs and repo metrics it reads.

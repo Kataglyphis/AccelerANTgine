@@ -10,10 +10,16 @@ import stat
 import sys
 import zipfile
 from pathlib import Path
+from typing import TypedDict
 
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+~-]*\Z")
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 MAX_TOTAL = 40 * 1024**3
+
+
+class FileDigest(TypedDict):
+    size: int
+    sha256: str
 
 
 def identity() -> dict[str, str]:
@@ -45,7 +51,7 @@ def identity() -> dict[str, str]:
     return data
 
 
-def digest_file(path: Path) -> dict[str, object]:
+def digest_file(path: Path) -> FileDigest:
     if path.is_symlink() or not path.is_file():
         raise ValueError(f"package must be a regular file: {path}")
     before = path.stat()
@@ -64,7 +70,7 @@ def digest_file(path: Path) -> dict[str, object]:
     return {"size": after.st_size, "sha256": digest.hexdigest()}
 
 
-def snapshot(directory: Path) -> dict[str, dict[str, object]]:
+def snapshot(directory: Path) -> dict[str, FileDigest]:
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError("package directory must be a real directory")
     selected = []

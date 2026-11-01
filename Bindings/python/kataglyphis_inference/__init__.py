@@ -14,5 +14,8 @@ if hasattr(_os, "add_dll_directory"):
         if _extra and _os.path.isdir(_extra):
             _os.add_dll_directory(_extra)
 
-from ._core import *  # noqa: F401,F403
-from ._core import __doc__, __version__  # noqa: F401
+from . import _core
+from ._core import *
+
+__doc__ = _core.__doc__
+__version__ = _core.__version__
