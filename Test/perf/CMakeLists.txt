@@ -25,6 +25,9 @@ kataglyphis_configure_common_test_target(${PERF_TEST_SUITE} "${_perf_resource_pa
 kataglyphis_configure_library_test_target(${PERF_TEST_SUITE})
 
 target_sources(${PERF_TEST_SUITE} PRIVATE ${PERF_TEST_FILTER})
+kataglyphis_use_tiny_genai_model(${PERF_TEST_SUITE})
+target_compile_definitions(${PERF_TEST_SUITE}
+                           PRIVATE KATAGLYPHIS_DETECTOR_MODEL="${PROJECT_SOURCE_DIR}/models/deim_dfine_n_coco.onnx")
 
 target_link_libraries(
   ${PERF_TEST_SUITE}

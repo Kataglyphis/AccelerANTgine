@@ -466,6 +466,19 @@ and `queue.md`; `--compare <file>` or `--compare previous-develop` grades it (ex
 `docs/code-quality-tooling.md` § quality-report. A regressed verdict on develop is fixed or recorded
 in `BACKLOG.md` before new feature work.
 
+**Benchmarks have a history and an instruction-count gate.** `ci-profile-bench.sh` fetches the
+locked DEIM model and runs `perfTestSuite` with `KATAGLYPHIS_REQUIRE_MODEL=1` (a missing model or
+GenAI fails instead of skipping) into `logs/perf/results.json`. Each Linux leg uploads it as
+`perf-results-<arch>-<compiler>` and compares it through the hub's `bench-history` action under the
+keys **`perf-x64-gcc`, `perf-x64-clang`, `perf-arm64-gcc` and `perf-arm64-clang`** (artifacts
+`bench-history-perf-<arch>-<compiler>`): `BM_PreprocessFrame`, `BM_DetectFrame`, `BM_SessionCreate`
+and `BM_TextGenerateTiny` fail on a doubling. `perf-cachegrind.py` then counts the instructions per
+iteration of `BM_PreprocessFrame` and `BM_DetectFrame` at one ORT thread
+(`valgrind --tool=cachegrind --cache-sim=no`, 4 minus 2 iterations) and fails a key over its entry in
+`perf/cachegrind-baseline.json` by more than max(3 %, 3 x the spread recorded there over at least 5
+hosted runs). A key without an entry only records. Re-record after an intended change with
+`perf-cachegrind.py --summarize <cachegrind.json from 5+ CI runs>`; never widen an entry by hand.
+
 The whole Linux CI chain, in order:
 
 ```bash

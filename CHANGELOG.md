@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-01)
+- **Four benchmarks and a history.** `perfTestSuite` adds `BM_PreprocessFrame`, `BM_DetectFrame`,
+  `BM_SessionCreate` (the locked DEIM model, one ORT thread) and `BM_TextGenerateTiny` (the hub's
+  tiny GenAI model). Every Linux leg uploads `results.json` and compares it through the hub's
+  `bench-history` action (keys `perf-<arch>-<compiler>`); a doubled gated time fails.
+- **An instruction-count check.** `scripts/linux/perf-cachegrind.py` counts `BM_PreprocessFrame` and
+  `BM_DetectFrame` under cachegrind and records them per leg; a key with a baseline in
+  `perf/cachegrind-baseline.json` fails over max(3 %, 3 x the recorded spread).
+- `YoloConfig` gains `intra_op_num_threads` and `inter_op_num_threads` (default 4, as before).
+
 ### Changed (2026-11-01)
 - **PowerShell complexity is strict on push and PR.** `Build-Windows.ps1` runs each build step from a
   named function and the GPU package fixture shares its archive, cabinet and MSI helpers, so `scripts/`

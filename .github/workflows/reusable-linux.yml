@@ -85,6 +85,31 @@ jobs:
             --release-appimage-out-dir ""
             --release-flatpak-out-dir ""'
 
+      # perfTestSuite's results.json and the cachegrind counts, which a later baseline is recorded from.
+      - name: Upload the benchmark results
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-results-${{ inputs.arch }}-${{ inputs.compiler }}
+          if-no-files-found: error
+          path: |
+            logs/perf/results.json
+            logs/perf/cachegrind.json
+
+      # Against the median of the last 20 develop results of this arch and compiler; a doubling of a gated time fails.
+      - name: Benchmark history
+        uses: Kataglyphis/ANTfrastructure/.github/actions/bench-history@develop
+        with:
+          key: perf-${{ inputs.arch }}-${{ inputs.compiler }}
+          format: google-benchmark
+          result: logs/perf/results.json
+          metrics: >-
+            {"BM_PreprocessFrame": {"direction": "lower", "gate": true},
+            "BM_DetectFrame": {"direction": "lower", "gate": true},
+            "BM_SessionCreate": {"direction": "lower", "gate": true},
+            "BM_TextGenerateTiny": {"direction": "lower", "gate": true},
+            "*/tokens_per_second": {"direction": "higher"},
+            "*/bytes_per_second": {"direction": "higher"}}
+
       # ci-profile-bench.sh keeps a crash's status, core and backtrace here (the WebRTC workload's SIGSEGV, BACKLOG).
       - name: Upload the crash evidence (when a profiled workload died on a signal)
         if: ${{ failure() && hashFiles('build/crash-evidence/status.txt') != '' }}

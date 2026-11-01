@@ -197,6 +197,19 @@ runs:
   none of 210 and gave slightly deeper stacks, since clang keeps arm64's frame records at
   ``-O3``. x86_64 keeps the default, where clang drops frame pointers. Setting
   ``TCMALLOC_STACKTRACE_METHOD`` yourself overrides the choice.
+- **Benchmark history:** ``perfTestSuite`` writes ``logs/perf/results.json``; CI compares it with
+  the median of the last 20 develop results per arch and compiler through the hub's
+  ``bench-history`` action (keys ``perf-<arch>-<compiler>``) and fails when ``BM_PreprocessFrame``,
+  ``BM_DetectFrame``, ``BM_SessionCreate`` or ``BM_TextGenerateTiny`` doubles. The detector
+  benchmarks read ``models/deim_dfine_n_coco.onnx`` (``fetch-data-lock.py --lock models/models.lock``)
+  or ``KATAGLYPHIS_DETECTOR_MODEL``; ``BM_TextGenerateTiny`` reads the hub's configure-time tiny
+  GenAI model. Without the model they skip, unless ``KATAGLYPHIS_REQUIRE_MODEL=1``.
+- **Instruction counts:** ``scripts/linux/perf-cachegrind.py --suite build/perfTestSuite --key
+  x64-clang`` counts ``BM_PreprocessFrame`` and ``BM_DetectFrame`` per iteration under
+  ``valgrind --tool=cachegrind --cache-sim=no`` at one ORT thread, and fails over its
+  ``perf/cachegrind-baseline.json`` entry by more than max(3 %, 3 x the recorded spread). It does
+  not see wall time, cache misses or threading. ``--summarize`` builds an entry from at least five
+  recorded CI runs, each with its CPU model.
 - **callgrind:** ``valgrind --tool=callgrind`` is reached through
   ``bash scripts/linux/ci-release.sh --callgrind``.
 - **perf:** ``perf record`` needs a ``perf`` binary (Ubuntu 26.04: the ``linux-perf`` package;

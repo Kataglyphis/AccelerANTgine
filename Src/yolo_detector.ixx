@@ -79,6 +79,9 @@ struct YoloConfig
     FramePreprocessMode preprocess_mode{ FramePreprocessMode::Stretch };
     inference::ExecutionProvider execution_provider{ inference::ExecutionProvider::Cpu };
     int device_id = 0;
+    // One thread each makes an instruction count repeatable (the cachegrind check); the defaults are the engine's.
+    int intra_op_num_threads{ 4 };
+    int inter_op_num_threads{ 4 };
 };
 
 class KATAGLYPHIS_CPP_API YoloDetector

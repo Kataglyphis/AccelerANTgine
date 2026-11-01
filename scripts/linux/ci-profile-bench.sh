@@ -185,4 +185,15 @@ else
   info "no gperftools profile at ${PROFILE_OUTPUT} (libprofiler not linked; ProjectOptions.cmake fell back to -pg)"
 fi
 
-(cd "${BUILD_DIR}" && ./perfTestSuite --benchmark_out=results.json --benchmark_out_format=json)
+# The detector benchmarks read the lock-verified model; KATAGLYPHIS_REQUIRE_MODEL=1 fails a run that cannot load it.
+model_fetcher="$(antfrastructure_path linux/scripts/lib/fetch-data-lock.py)"
+python3 -I "${model_fetcher}" --lock "${WORKSPACE_DIR}/models/models.lock"
+PERF_DIR="${WORKSPACE_DIR}/${LOGS_DIR}/perf"
+mkdir -p "${PERF_DIR}"
+(cd "${BUILD_DIR}" && KATAGLYPHIS_REQUIRE_MODEL=1 ./perfTestSuite --benchmark_out="${PERF_DIR}/results.json" --benchmark_out_format=json)
+
+# Instruction counts at one ORT thread; a key with a recorded baseline gates (AGENTS.md section 5).
+case "$(uname -m)" in x86_64) PERF_ARCH=x64 ;; aarch64) PERF_ARCH=arm64 ;; *) PERF_ARCH="$(uname -m)" ;; esac
+KATAGLYPHIS_REQUIRE_MODEL=1 python3 "${_SCRIPT_DIR}/perf-cachegrind.py" --suite "${BUILD_DIR}/perfTestSuite" \
+  --key "${PERF_ARCH}-${COMPILER}" --baseline "${WORKSPACE_DIR}/perf/cachegrind-baseline.json" \
+  --record "${PERF_DIR}/cachegrind.json"

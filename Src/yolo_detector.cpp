@@ -328,6 +328,8 @@ auto YoloDetector::initialize(const YoloConfig &config, const std::filesystem::p
     auto session_config = inference::create_default_session_config(config.model_path);
     session_config.execution_provider = config.execution_provider;
     session_config.device_id = config.device_id;
+    session_config.intra_op_num_threads = config.intra_op_num_threads;
+    session_config.inter_op_num_threads = config.inter_op_num_threads;
     session_config.profiling_prefix = profiling_prefix;
 
     auto result = impl_->engine.initialize(session_config);
