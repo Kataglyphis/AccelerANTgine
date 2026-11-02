@@ -342,6 +342,7 @@ static void print_usage(const char *program_name)
               << "  --device-id <id>   Provider device index (default: 0)\n"
               << "  --threads <n>      ONNX Runtime intra-op threads (default: the config's, else 4)\n"
               << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
+              << "  --detector-latency-runs <n> With --detector-image: warm p50 and p95 as one JSON line\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
               << "  --yolo-only        Run only YOLO detection example\n"
               << "  --video-only       Run only video detection example\n"
@@ -383,6 +384,7 @@ auto main(int argc, char *argv[]) -> int
     std::filesystem::path detector_image;
     std::filesystem::path detector_output;
     std::filesystem::path detector_repeat_output;
+    int detector_latency_runs = 0;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -421,6 +423,14 @@ auto main(int argc, char *argv[]) -> int
             detector_output = argv[++i];
         } else if (arg == "--detector-repeat-output" && i + 1 < argc) {
             detector_repeat_output = argv[++i];
+        } else if (arg == "--detector-latency-runs" && i + 1 < argc) {
+            const std::string value = argv[++i];
+            const auto *const last = value.data() + value.size();
+            const auto parsed = std::from_chars(value.data(), last, detector_latency_runs);
+            if (parsed.ec != std::errc{} || parsed.ptr != last || detector_latency_runs <= 0) {
+                std::cerr << "Invalid --detector-latency-runs value: " << value << "\n";
+                return 2;
+            }
         } else if (arg == "--onnx-only") {
             run_onnx = true;
         } else if (arg == "--gstreamer-only") {
@@ -468,6 +478,14 @@ auto main(int argc, char *argv[]) -> int
     base.device_id = device_id;
     model_path = base.model_path;
 
+    if (detector_latency_runs > 0) {
+        if (detector_image.empty() || !detector_output.empty() || !detector_repeat_output.empty()
+            || !profile_prefix.empty() || run_onnx || run_gstreamer || run_yolo || run_video || run_video_check) {
+            std::cerr << "Latency runs require an image, without outputs, a profile or other modes\n";
+            return 2;
+        }
+        return run_detector_latency(base, detector_image, detector_latency_runs);
+    }
     if (!detector_image.empty() || !detector_output.empty() || !detector_repeat_output.empty()) {
         if (detector_image.empty() || detector_output.empty() || profile_prefix.empty() || run_onnx || run_gstreamer
             || run_yolo || run_video || run_video_check) {

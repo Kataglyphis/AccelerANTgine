@@ -516,7 +516,10 @@ and `queue.md`; `--compare <file>` or `--compare previous-develop` grades it (ex
 `docs/code-quality-tooling.md` § quality-report. A regressed verdict on develop is fixed or recorded
 in `BACKLOG.md` before new feature work. `bash scripts/linux/quality-report.sh --perf-host` runs the
 latency commands that toml declares inside `:latest` and grades them against `perf/baseline-<cpu>.json`;
-it refuses a dirty tree, a loaded host or a running image chain.
+it refuses a dirty tree, a loaded host or a running image chain. It times two-cats p50/p95 per CPU provider (CPU, XNNPACK; DNNL reports not collected while the image
+lacks `libdnnl.so.3`) through the demo's `--detector-latency-runs`, and SmolLM2-135M time to first token and
+decode rate through the C++ CLI and the Python binding; run it as a
+`systemd-run --user` unit, and `--update-baseline` rewrites the baseline: hub `docs/fleet-health.md` § perf-host.
 
 **Benchmarks have a history and an instruction-count gate.** `ci-profile-bench.sh` fetches the
 locked DEIM model and runs `perfTestSuite` with `KATAGLYPHIS_REQUIRE_MODEL=1` (a missing model or

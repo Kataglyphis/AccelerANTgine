@@ -88,3 +88,32 @@ kind = "clang-tidy"
 path = "logs/code-quality/clang-tidy.txt"
 artifact = "test-reports-x64-clang"
 workflow = "linux-x64.yml"
+
+# quality-report.sh --perf-host, inside :latest; DNNL answers not_collected while the image lacks libdnnl.so.3.
+[perf]
+setup = "bash scripts/linux/perf-host.sh setup"
+
+[[perf.command]]
+name = "detector_cpu"
+run = "build-perf/bin/AccelerANTgine_demo --model models/deim_dfine_n_coco.onnx --detector-image third_party/ModelANT/contracts/fixtures/two_cats.jpg --detector-latency-runs 30 --device cpu"
+metrics = [{ key = "p50_ms", unit = "ms", better = "lower" }, { key = "p95_ms", unit = "ms", better = "lower" }]
+
+[[perf.command]]
+name = "detector_xnnpack"
+run = "build-perf/bin/AccelerANTgine_demo --model models/deim_dfine_n_coco.onnx --detector-image third_party/ModelANT/contracts/fixtures/two_cats.jpg --detector-latency-runs 30 --device xnnpack"
+metrics = [{ key = "p50_ms", unit = "ms", better = "lower" }, { key = "p95_ms", unit = "ms", better = "lower" }]
+
+[[perf.command]]
+name = "detector_dnnl"
+run = "build-perf/bin/AccelerANTgine_demo --model models/deim_dfine_n_coco.onnx --detector-image third_party/ModelANT/contracts/fixtures/two_cats.jpg --detector-latency-runs 30 --device dnnl"
+metrics = [{ key = "p50_ms", unit = "ms", better = "lower" }, { key = "p95_ms", unit = "ms", better = "lower" }]
+
+[[perf.command]]
+name = "text_cpp"
+run = "bash scripts/linux/perf-host.sh text-cpp"
+metrics = [{ key = "ttft_ms", unit = "ms", better = "lower" }, { key = "decode_tok_s", unit = "tok/s", better = "higher" }]
+
+[[perf.command]]
+name = "text_python"
+run = ".venv-perf-host/bin/python scripts/linux/perf_host_text.py --model resources/models/smollm2-perf"
+metrics = [{ key = "ttft_ms", unit = "ms", better = "lower" }, { key = "decode_tok_s", unit = "tok/s", better = "higher" }]
