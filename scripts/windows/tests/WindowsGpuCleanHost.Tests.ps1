@@ -1,6 +1,7 @@
 #requires -Version 7.0
 
 Describe 'Windows GPU clean-host startup' {
+    Import-Module (Join-Path $PSScriptRoot '..\modules\WindowsGpuCandidate.Common.psm1') -Force -ErrorAction Stop
     It 'isolates inherited paths and registry and restores the caller environment' {
         $script = Join-Path $PSScriptRoot '..\Test-WindowsGpuCleanHost.ps1'
         $probe = Join-Path $TestDrive 'environment.txt'
@@ -15,8 +16,7 @@ echo %GST_REGISTRY_1_0%>>"%ACCELERANT_HOST_PROBE%"
 exit /b 0
 '@ | Set-Content -LiteralPath $command -Encoding ascii
         $names = @('PATH', 'GST_PLUGIN_PATH_1_0', 'GST_PLUGIN_SYSTEM_PATH_1_0', 'GST_REGISTRY_1_0', 'ACCELERANT_HOST_PROBE')
-        $saved = @{}
-        foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
+        $saved = Get-ProcessEnvironmentSnapshot -Name $names
         try {
             $env:PATH = 'C:\contaminated-path'
             $env:GST_PLUGIN_PATH_1_0 = 'C:\contaminated-plugin'
@@ -49,13 +49,13 @@ exit /b 0
             $env:PATH | Should Be 'C:\contaminated-path'
             $env:GST_PLUGIN_PATH_1_0 | Should Be 'C:\contaminated-plugin'
         } finally {
-            foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
+            Restore-ProcessEnvironmentSnapshot -Snapshot $saved
         }
     }
 
     It 'fails when the candidate exits unsuccessfully' {
         $script = Join-Path $PSScriptRoot '..\Test-WindowsGpuCleanHost.ps1'
-        $previous = [Environment]::GetEnvironmentVariable('GST_PLUGIN_PATH_1_0', 'Process')
+        $previous = Get-ProcessEnvironmentSnapshot -Name 'GST_PLUGIN_PATH_1_0'
         try {
             $env:GST_PLUGIN_PATH_1_0 = 'C:\contaminated-plugin'
             $message = try {
@@ -64,6 +64,6 @@ exit /b 0
             } catch { $_.Exception.Message }
             $message | Should Match 'Candidate startup failed: 17'
             $env:GST_PLUGIN_PATH_1_0 | Should Be 'C:\contaminated-plugin'
-        } finally { [Environment]::SetEnvironmentVariable('GST_PLUGIN_PATH_1_0', $previous, 'Process') }
+        } finally { Restore-ProcessEnvironmentSnapshot -Snapshot $previous }
     }
 }

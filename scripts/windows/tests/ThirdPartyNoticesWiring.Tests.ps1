@@ -19,28 +19,19 @@ function Get-InstallerNoticeCommands([System.Management.Automation.Language.Ast]
 
 function Assert-WindowsNoticeWiring([string]$Source) {
   $ast = ConvertTo-TestScriptAst -Text $Source
-  $calls = @(Get-StepCommand $ast 'Portable Bundle ($TargetArch)' 'Assert-InstallerNotice')
-  if ($calls.Count -ne 1 -or (Get-TestCommandArguments -Command $calls[0]).Bundle -ne '$portable.Bundle') {
-    throw 'Expected one installer notice check over the bundle'
-  }
+  $bundleFailure = 'Expected one installer notice check over the bundle'
+  Assert-SingleCommandArguments -Commands @(Get-StepCommand $ast 'Portable Bundle ($TargetArch)' 'Assert-InstallerNotice') -Expected @{ Bundle = '$portable.Bundle' } `
+    -CountFailure $bundleFailure -ValueFailure $bundleFailure
   $installer = Get-InstallerNoticeCommands $ast
-  if ($installer.Zip.Count -ne 1) { throw 'Expected one notice check over the ZIP packages' }
-  $zipArgs = Get-TestCommandArguments -Command $installer.Zip[0]
-  if ($zipArgs.Pattern -ne "'*/licenses/THIRD-PARTY-NOTICES.txt'" -or $zipArgs.LicensePath -ne '$notices') {
-    throw 'The ZIP notice check reads the wrong member or reference'
-  }
-  if ($installer.Msi.Count -ne 1 -or (Get-TestCommandArguments -Command $installer.Msi[0]).FileName -ne "'THIRD-PARTY-NOTICES.txt'") {
-    throw 'Expected one notice check over the MSI packages'
-  }
+  Assert-SingleCommandArguments -Commands $installer.Zip -Expected @{ Pattern = "'*/licenses/THIRD-PARTY-NOTICES.txt'"; LicensePath = '$notices' } `
+    -CountFailure 'Expected one notice check over the ZIP packages' -ValueFailure 'The ZIP notice check reads the wrong member or reference'
+  $msiFailure = 'Expected one notice check over the MSI packages'
+  Assert-SingleCommandArguments -Commands $installer.Msi -Expected @{ FileName = "'THIRD-PARTY-NOTICES.txt'" } -CountFailure $msiFailure -ValueFailure $msiFailure
   if (-not $Source.Contains("throw 'CPack produced no ZIP or no MSI for third-party notice verification'")) {
     throw 'A run without a ZIP or an MSI must fail the notice check'
   }
-  $msixChecks = @(Get-StepCommand $ast 'MSIX Packaging' 'Assert-PackageLicense')
-  if ($msixChecks.Count -ne 1) { throw 'Expected one notice check over the MSIX' }
-  $msixArgs = Get-TestCommandArguments -Command $msixChecks[0]
-  if ($msixArgs.Path -ne '$msixFile' -or $msixArgs.Pattern -ne "'licenses/THIRD-PARTY-NOTICES.txt'") {
-    throw 'The MSIX notice check reads the wrong package or member'
-  }
+  Assert-SingleCommandArguments -Commands @(Get-StepCommand $ast 'MSIX Packaging' 'Assert-PackageLicense') -Expected @{ Path = '$msixFile'; Pattern = "'licenses/THIRD-PARTY-NOTICES.txt'" } `
+    -CountFailure 'Expected one notice check over the MSIX' -ValueFailure 'The MSIX notice check reads the wrong package or member'
   $copies = @(Get-StepCommand $ast 'MSIX Packaging' 'Copy-Item' | Where-Object { $_.Extent.Text.Contains('$bundleLicenses') })
   if ($copies.Count -ne 1 -or -not $copies[0].Extent.Text.Contains("'third-party'")) {
     throw 'The MSIX payload must carry the bundle notices and their texts'

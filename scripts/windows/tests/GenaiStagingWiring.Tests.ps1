@@ -2,10 +2,9 @@
 
 # This checks the GenAI staging function and its Stage Tests wiring, not a Windows build or a loaded DLL.
 Describe 'ONNX Runtime GenAI staging for the staged suites' {
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function Get-TestScriptAst, Get-TestAstCommands -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
-    $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
-    . ([scriptblock]::Create((Get-BuildFunctionSource -Ast $ast -Name 'Copy-ChainGenaiBeside')))
+    $ast = Get-BuildScriptAst
+    . (Get-BuildFunctionBlock 'Copy-ChainGenaiBeside')
 
     It 'copies the chain DLL from bin or from lib and returns its staged path' {
         $saved = $env:ONNX_GENAI_ROOT
@@ -36,8 +35,8 @@ Describe 'ONNX Runtime GenAI staging for the staged suites' {
 
     It 'stages GenAI, its own imports and the test model beside the suites in Stage Tests (mutation)' {
         $text = (Get-UniqueBuildAstNode -Ast $ast -StepName 'Stage Tests (').Extent.Text
-        ($text -match 'Copy-ChainGenaiBeside -Destination \$tests') | Should Be $true
-        ($text -match 'Copy-PeImportClosure -Path @\(\$genai\)') | Should Be $true
-        ($text -match "Join-Path \`$fastBuildReleaseDirFull 'test-models'") | Should Be $true
+        foreach ($pattern in 'Copy-ChainGenaiBeside -Destination \$tests', 'Copy-PeImportClosure -Path @\(\$genai\)', "Join-Path \`$fastBuildReleaseDirFull 'test-models'") {
+            $text | Should Match $pattern
+        }
     }
 }

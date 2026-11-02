@@ -32,33 +32,49 @@ function Remove-FixtureComObject([object[]]$ComObject) {
     foreach ($object in $ComObject) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($object) }
 }
 
-function Write-FixtureMsiCabinet([string]$Msi, [string]$Cabinet) {
+# $installer and $db stay visible to Body and to Invoke-FixtureMsiView through dynamic scope.
+function Invoke-FixtureMsiDatabase([string]$Msi, [int]$Mode, [scriptblock]$Body) {
     $installer = New-Object -ComObject WindowsInstaller.Installer
-    $db = $installer.OpenDatabase($Msi, 1)
+    $db = $installer.OpenDatabase($Msi, $Mode)
+    try { & $Body; $null = $db.Commit() }
+    finally { Remove-FixtureComObject @($db, $installer) }
+}
+
+function Invoke-FixtureMsiView([string]$Statement, [int]$Fields = 0, [scriptblock]$Fill) {
+    $view = $db.OpenView($Statement)
+    $objects = @($view)
     try {
-        $view = $db.OpenView('UPDATE `_Streams` SET `Data` = ? WHERE `Name` = ''payload.cab''')
-        $record = $installer.CreateRecord(1)
-        try { $record.SetStream(1, $Cabinet); $null = $view.Execute($record); $null = $view.Close() }
-        finally { Remove-FixtureComObject @($record, $view) }
-        $null = $db.Commit()
-    } finally { Remove-FixtureComObject @($db, $installer) }
+        if ($Fields) {
+            $record = $installer.CreateRecord($Fields)
+            $objects = @($record, $view)
+            & $Fill $record
+            $null = $view.Execute($record)
+        } else {
+            $null = $view.Execute()
+        }
+        $null = $view.Close()
+    } finally { Remove-FixtureComObject $objects }
+}
+
+function Write-FixtureMsiCabinet([string]$Msi, [string]$Cabinet) {
+    Invoke-FixtureMsiDatabase $Msi 1 {
+        Invoke-FixtureMsiView 'UPDATE `_Streams` SET `Data` = ? WHERE `Name` = ''payload.cab''' 1 { param($record) $record.SetStream(1, $Cabinet) }
+    }
+}
+
+# Usage: Cabinet holds Write-FixtureCabinet's Directory and its optional Replace or Omit.
+function Write-FixtureMsiMutant([string]$Msi, [hashtable]$Cabinet) {
+    $null = New-Item -ItemType Directory -Path $Cabinet.Directory -Force
+    Write-FixtureMsiCabinet -Msi $Msi -Cabinet (Write-FixtureCabinet @Cabinet -Items $script:items)
 }
 
 function Invoke-FixtureMsiStatement([string]$Msi, [string]$Statement) {
-    $installer = New-Object -ComObject WindowsInstaller.Installer
-    $db = $installer.OpenDatabase($Msi, 1)
-    try {
-        $view = $db.OpenView($Statement)
-        try { $null = $view.Execute(); $null = $view.Close(); $null = $db.Commit() }
-        finally { Remove-FixtureComObject @($view) }
-    } finally { Remove-FixtureComObject @($db, $installer) }
+    Invoke-FixtureMsiDatabase $Msi 1 { Invoke-FixtureMsiView $Statement }
 }
 
 # Build an embedded cabinet and MSI directory/file tables with the CPack install-root shape.
 function New-FixtureMsi([string]$Msi, [string]$Cabinet, [object[]]$Items) {
-    $installer = New-Object -ComObject WindowsInstaller.Installer
-    $db = $installer.OpenDatabase($Msi, 3)
-    try {
+    Invoke-FixtureMsiDatabase $Msi 3 {
         $sql = @(
             'CREATE TABLE `Directory` (`Directory` CHAR(72) NOT NULL, `Directory_Parent` CHAR(72), `DefaultDir` CHAR(255) NOT NULL PRIMARY KEY `Directory`)',
             'CREATE TABLE `Component` (`Component` CHAR(72) NOT NULL, `Directory_` CHAR(72) NOT NULL PRIMARY KEY `Component`)',
@@ -81,13 +97,9 @@ function New-FixtureMsi([string]$Msi, [string]$Cabinet, [object[]]$Items) {
             $sql += 'INSERT INTO `Component` (`Component`, `Directory_`) VALUES (''c{0}'', ''{1}'')' -f $seq, $item.Dir
             $sql += 'INSERT INTO `File` (`File`, `FileName`, `Component_`, `Sequence`) VALUES (''{0}'', ''{1}'', ''c{2}'', {2})' -f $item.Id, $item.Name, $seq
         }
-        foreach ($statement in $sql) { $view = $db.OpenView($statement); try { $null = $view.Execute(); $null = $view.Close() } finally { Remove-FixtureComObject @($view) } }
-        $view = $db.OpenView('INSERT INTO `_Streams` (`Name`, `Data`) VALUES (?, ?)')
-        $record = $installer.CreateRecord(2)
-        try { $record.StringData(1) = 'payload.cab'; $record.SetStream(2, $Cabinet); $null = $view.Execute($record); $null = $view.Close() }
-        finally { Remove-FixtureComObject @($record, $view) }
-        $null = $db.Commit()
-    } finally { Remove-FixtureComObject @($db, $installer) }
+        foreach ($statement in $sql) { Invoke-FixtureMsiView $statement }
+        Invoke-FixtureMsiView 'INSERT INTO `_Streams` (`Name`, `Data`) VALUES (?, ?)' 2 { param($record) $record.StringData(1) = 'payload.cab'; $record.SetStream(2, $Cabinet) }
+    }
 }
 
 function Get-FixtureMsiItem([object[]]$Group) {
@@ -104,17 +116,21 @@ function Add-FixtureZipMember([Collections.IDictionary]$Member, [string]$Directo
     foreach ($name in $Names) { $Member["$Prefix$name"] = Join-Path $Directory $name }
 }
 
-function Remove-FixtureArchiveEntry([string]$Path, [string]$Member) {
+function Invoke-FixtureArchiveUpdate([string]$Path, [scriptblock]$Body) {
     $archive = [IO.Compression.ZipFile]::Open($Path, [IO.Compression.ZipArchiveMode]::Update)
-    try { $archive.GetEntry($Member).Delete() } finally { $archive.Dispose() }
+    try { & $Body $archive } finally { $archive.Dispose() }
+}
+
+function Remove-FixtureArchiveEntry([string]$Path, [string]$Member) {
+    Invoke-FixtureArchiveUpdate $Path { param($archive) $archive.GetEntry($Member).Delete() }
 }
 
 function Copy-FixtureArchiveEntry([string]$Path, [string]$Member, [string]$Source, [switch]$Replace) {
-    $archive = [IO.Compression.ZipFile]::Open($Path, [IO.Compression.ZipArchiveMode]::Update)
-    try {
+    Invoke-FixtureArchiveUpdate $Path {
+        param($archive)
         if ($Replace) { $archive.GetEntry($Member).Delete() }
         [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $Source, $Member) | Out-Null
-    } finally { $archive.Dispose() }
+    }
 }
 
 function Write-FixtureArchiveEntry([string]$Path, [string]$Member, [string]$Text, [switch]$Replace) {
@@ -168,7 +184,7 @@ function New-FixtureMsix([string]$Root, [string]$Bin, [string]$ModelDir, [string
     return $msixPath
 }
 
-function Assert-FixtureRejected([hashtable]$Arguments, [string]$Pattern, [string]$Failure) {
+function Assert-FixtureRejected([string]$Failure, [string]$Pattern = 'package binary verification failed', [hashtable]$Arguments = $script:msixArgs) {
     $rejected = $false
     try { & $script:proof @Arguments }
     catch { if ($_.Exception.Message -notmatch $Pattern) { throw }; $rejected = $true }
@@ -183,7 +199,7 @@ function Assert-FixtureArchiveCaseRejected([object[]]$Cases, [string]$Pattern, [
     foreach ($case in $Cases) {
         if ($AddEntry) { Write-FixtureArchiveEntry -Path $case.Path -Member $case.Member -Text 'unexpected runtime' }
         else { Remove-FixtureArchiveEntry -Path $case.Path -Member $case.Member }
-        Assert-FixtureRejected -Arguments $script:msixArgs -Pattern $Pattern -Failure $case.Failure
+        Assert-FixtureRejected -Pattern $Pattern -Failure $case.Failure
         Restore-FixtureArchive
     }
 }
@@ -196,7 +212,7 @@ function Assert-FixtureModelMutationRejected([string]$ModelDir) {
             try {
                 if ($mutation -eq 'changed') { [IO.File]::WriteAllText($path, 'tampered') }
                 else { Remove-Item -LiteralPath $path }
-                Assert-FixtureRejected -Arguments $script:msixArgs -Pattern 'do not match models.lock' -Failure "$mutation staged model file was accepted: $name"
+                Assert-FixtureRejected -Pattern 'do not match models.lock' -Failure "$mutation staged model file was accepted: $name"
             } finally { [IO.File]::WriteAllBytes($path, $bytes) }
         }
     }
@@ -205,11 +221,9 @@ function Assert-FixtureModelMutationRejected([string]$ModelDir) {
 function Assert-FixtureMsiDemoMutationRejected([string]$Root, [string]$Msi, [string]$MsiBackup, [string]$BadProvider) {
     foreach ($mutation in 'missing', 'altered') {
         Copy-Item -LiteralPath $MsiBackup -Destination $Msi -Force
-        $demoDir = Join-Path $Root "demo-$mutation"; $null = New-Item -ItemType Directory -Path $demoDir
         $omit = @(if ($mutation -eq 'missing') { 'AccelerANTgine_demo.exe' })
-        $demoCab = Write-FixtureCabinet -Directory $demoDir -Items $script:items -Replace @{ 'AccelerANTgine_demo.exe' = $BadProvider } -Omit $omit
-        Write-FixtureMsiCabinet -Msi $Msi -Cabinet $demoCab
-        Assert-FixtureRejected -Arguments $script:msixArgs -Pattern 'package binary verification failed' -Failure "$mutation MSI inference demo was accepted"
+        Write-FixtureMsiMutant -Msi $Msi -Cabinet @{ Directory = (Join-Path $Root "demo-$mutation"); Replace = @{ 'AccelerANTgine_demo.exe' = $BadProvider }; Omit = $omit }
+        Assert-FixtureRejected -Failure "$mutation MSI inference demo was accepted"
     }
 }
 
@@ -255,38 +269,40 @@ $msixArgs = $packageArgs + @{ MsixPath = $msix }
 Assert-FixtureModelMutationRejected -ModelDir $modelDir
 $backup = Join-Path $root 'original.msix'; Copy-Item -LiteralPath $msix -Destination $backup
 Write-FixtureArchiveEntry -Path $msix -Member 'lib/gstreamer-1.0/gstwebrtc.dll' -Text 'tampered' -Replace
-Assert-FixtureRejected -Arguments $msixArgs -Pattern 'package binary verification failed' -Failure 'Modified MSIX GStreamer plugin was accepted'
+Assert-FixtureRejected -Failure 'Modified MSIX GStreamer plugin was accepted'
 Copy-Item -LiteralPath $backup -Destination $msix -Force
 # Replace the embedded MSI cabinet with one whose GStreamer plugin bytes differ.
 $msiBackup = Join-Path $root 'original.msi'; Copy-Item -LiteralPath $msi -Destination $msiBackup
 $badDir = Join-Path $root 'tampered-cab'; $null = New-Item -ItemType Directory -Path $badDir
 $badProvider = Join-Path $badDir 'tampered.dll'; New-TestPeFile -Path $badProvider -Tag 'tampered'
-Write-FixtureMsiCabinet -Msi $msi -Cabinet (Write-FixtureCabinet -Directory $badDir -Items $items -Replace @{ 'gstwebrtc.dll' = $badProvider })
-Assert-FixtureRejected -Arguments $packageArgs -Pattern 'package binary verification failed' -Failure 'Modified MSI GStreamer plugin was accepted'
+Write-FixtureMsiMutant -Msi $msi -Cabinet @{ Directory = $badDir; Replace = @{ 'gstwebrtc.dll' = $badProvider } }
+Assert-FixtureRejected -Arguments $packageArgs -Failure 'Modified MSI GStreamer plugin was accepted'
 Copy-Item -LiteralPath $msiBackup -Destination $msi -Force
 # Alter the CPack ZIP provider while preserving its other entries.
 Write-FixtureArchiveEntry -Path $zipPath -Member 'candidate/lib/gstreamer-1.0/gstwebrtc.dll' -Text 'tampered' -Replace
-Assert-FixtureRejected -Arguments $packageArgs -Pattern 'package binary verification failed' -Failure 'Modified ZIP GStreamer plugin was accepted'
+Assert-FixtureRejected -Arguments $packageArgs -Failure 'Modified ZIP GStreamer plugin was accepted'
 Write-Host 'PASS: synthetic GPU ZIP, MSI and MSIX byte proof and mutated-plugin rejection'
 
 
 Copy-FixtureArchiveEntry -Path $zipPath -Member 'candidate/lib/gstreamer-1.0/gstwebrtc.dll' -Source (Join-Path $pluginDir 'gstwebrtc.dll') -Replace
 $originalZip = Join-Path $root 'original.zip'; Copy-Item $zipPath $originalZip
+# Each ZIP member under candidate/bin/ has its MSIX twin at the path below it.
+function Get-FixtureZipMsixCases([string]$Failure, [string[]]$MsixMember) {
+    foreach ($member in $MsixMember) {
+        @{ Path = $zipPath; Member = "candidate/bin/$member"; Failure = "$Failure$("candidate/bin/$member")" }
+        @{ Path = $msix; Member = $member; Failure = "$Failure$member" }
+    }
+}
 Assert-FixtureArchiveCaseRejected -Pattern 'package binary verification failed' -Cases @(
-    @{ Path = $zipPath; Member = 'candidate/bin/AccelerANTgine_demo.exe'; Failure = 'Missing package member accepted: candidate/bin/AccelerANTgine_demo.exe' },
-    @{ Path = $msix; Member = 'AccelerANTgine_demo.exe'; Failure = 'Missing package member accepted: AccelerANTgine_demo.exe' },
-    @{ Path = $zipPath; Member = 'candidate/bin/models/deim_dfine_n_coco.onnx'; Failure = 'Missing package member accepted: candidate/bin/models/deim_dfine_n_coco.onnx' },
-    @{ Path = $msix; Member = 'models/deim_dfine_n_coco.onnx'; Failure = 'Missing package member accepted: models/deim_dfine_n_coco.onnx' },
-    @{ Path = $zipPath; Member = 'candidate/bin/models/deim_dfine_n_coco.NOTICE'; Failure = 'Missing package member accepted: candidate/bin/models/deim_dfine_n_coco.NOTICE' },
-    @{ Path = $msix; Member = 'models/deim_dfine_n_coco.NOTICE'; Failure = 'Missing package member accepted: models/deim_dfine_n_coco.NOTICE' }
+    Get-FixtureZipMsixCases 'Missing package member accepted: ' @('AccelerANTgine_demo.exe', 'models/deim_dfine_n_coco.onnx', 'models/deim_dfine_n_coco.NOTICE')
 )
 Assert-FixtureArchiveCaseRejected -Pattern 'package binary verification failed' -Cases @(
     @{ Path = $zipPath; Member = 'candidate/lib/gstreamer-1.0/gstwebrtc.dll'; Failure = "Missing plugin accepted: $zipPath" },
     @{ Path = $msix; Member = 'lib/gstreamer-1.0/gstwebrtc.dll'; Failure = "Missing plugin accepted: $msix" }
 )
-$missingDir = Join-Path $root 'missing-cab'; $null = New-Item -ItemType Directory -Path $missingDir
-Write-FixtureMsiCabinet -Msi $msi -Cabinet (Write-FixtureCabinet -Directory $missingDir -Items $items -Omit 'gstwebrtc.dll')
-Assert-FixtureRejected -Arguments $packageArgs -Pattern 'package binary verification failed' -Failure 'Missing MSI plugin was accepted'
+$missingDir = Join-Path $root 'missing-cab'
+Write-FixtureMsiMutant -Msi $msi -Cabinet @{ Directory = $missingDir; Omit = 'gstwebrtc.dll' }
+Assert-FixtureRejected -Arguments $packageArgs -Failure 'Missing MSI plugin was accepted'
 Write-Host 'PASS: missing GStreamer plugin rejected in ZIP, MSI and MSIX'
 
 Assert-FixtureMsiDemoMutationRejected -Root $root -Msi $msi -MsiBackup $msiBackup -BadProvider $badProvider
@@ -294,19 +310,18 @@ Copy-Item -LiteralPath $msiBackup -Destination $msi -Force
 Write-Host 'PASS: missing or altered MSI inference demo rejected'
 
 Assert-FixtureArchiveCaseRejected -Pattern 'ORT family' -AddEntry -Cases @(
-    @{ Path = $zipPath; Member = 'candidate/bin/models/onnxruntime.dll'; Failure = 'Nested ORT family DLL was accepted: candidate/bin/models/onnxruntime.dll' },
-    @{ Path = $msix; Member = 'models/onnxruntime.dll'; Failure = 'Nested ORT family DLL was accepted: models/onnxruntime.dll' }
+    Get-FixtureZipMsixCases 'Nested ORT family DLL was accepted: ' @('models/onnxruntime.dll')
 )
 Write-Host 'PASS: unexpected nested ORT family DLL rejected in ZIP and MSIX'
 
 $nestedRuntime = Join-Path $modelDir 'onnxruntime.dll'
 [IO.File]::WriteAllText($nestedRuntime, 'unexpected runtime')
 try {
-    Assert-FixtureRejected -Arguments $msixArgs -Pattern 'ORT family' -Failure 'Nested staged ORT family DLL was accepted'
+    Assert-FixtureRejected -Pattern 'ORT family' -Failure 'Nested staged ORT family DLL was accepted'
 } finally { Remove-Item -LiteralPath $nestedRuntime -Force }
 
 Invoke-FixtureMsiStatement -Msi $msi -Statement 'INSERT INTO `File` (`File`, `FileName`, `Component_`, `Sequence`) VALUES (''f_extra'', ''onnxruntime.dll'', ''c10'', 1)'
 try {
-    Assert-FixtureRejected -Arguments $msixArgs -Pattern 'ORT family' -Failure 'Duplicate MSI ORT family DLL was accepted'
+    Assert-FixtureRejected -Pattern 'ORT family' -Failure 'Duplicate MSI ORT family DLL was accepted'
 } finally { Copy-Item $msiBackup $msi -Force }
 Write-Host 'PASS: nested staged and duplicate MSI ORT family DLLs rejected'

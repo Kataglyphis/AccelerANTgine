@@ -15,7 +15,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
-Import-BuildModule @('WindowsMsiLicense.Common', 'WindowsPackageBinary.Common', 'WindowsOrtPayload.Common')
+Import-BuildModule @('WindowsMsiLicense.Common', 'WindowsPackageBinary.Common', 'WindowsOrtPayload.Common', 'WindowsGpuCandidate.Common')
 
 function Assert-LockedDemoModel {
     $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -32,13 +32,7 @@ function Assert-LockedDemoModel {
 # Re-prove the source immediately before comparing the bytes shipped to users.
 Assert-LockedDemoModel
 & (Join-Path $PSScriptRoot 'Test-WindowsGpuImage.ps1') -Variant $Variant -OnnxRoot $OnnxRoot -WheelDir $WheelDir
-$names = @('onnxruntime.dll')
-if ($Variant -eq 'nvidia') {
-    $names += 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll'
-    if (Get-ChainOrtRuntimeFile -OnnxRoot $OnnxRoot -Name 'DirectML.dll' -AllowMissing) { $names += 'DirectML.dll' }
-} else {
-    $names += 'onnxruntime_providers_shared.dll', 'DirectML.dll'
-}
+$names = @(Get-WindowsGpuOrtName -Variant $Variant -OnnxRoot $OnnxRoot)
 $sources = [string[]]@($names | ForEach-Object { Get-ChainOrtRuntimeFile -OnnxRoot $OnnxRoot -Name $_ })
 Assert-PackageOrtFamily -Path $Bundle -Directory 'bin' -Name $names
 for ($i = 0; $i -lt $names.Count; $i++) {

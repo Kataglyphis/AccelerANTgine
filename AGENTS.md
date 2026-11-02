@@ -126,7 +126,8 @@ Two upstream facts repeated here only because they bite before you reach a doc:
 Both are body-mode copies of the hub's templates
 ([`shared/config/README.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/shared/config/README.md#the-template-trees-are-owners-too)):
 change the template upstream, then copy it. Unlike CMake, PowerShell resolves a module from the
-hub first, then from `scripts/windows/modules/`, which this repo does not have. How
+hub first, then from `scripts/windows/modules/`, which holds only `WindowsGpuCandidate.Common` (the
+GPU candidate checks' shared steps; a copied check carries it beside the script). How
 `Build-Windows.ps1` imports its modules is the hub's calling convention,
 [`adopting-in-a-new-project.md` § 8](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/adopting-in-a-new-project.md#8-calling-conventions-what-every-consumer-looks-like)
 and its
@@ -588,7 +589,7 @@ producer and consumer cannot disagree.
 
 `Invoke-ContainerBuild.ps1`, `Invoke-ContainerPythonBindings.ps1` and `Show-BuildHelp.ps1` are
 the other entry points, named for what they do: none of them starts the application. The first
-two run their `Build-*.ps1` in the ANTfrastructure Windows image through the hub's
+two forward their arguments to `Invoke-ContainerLane.ps1`, which runs their `Build-*.ps1` in the ANTfrastructure Windows image through the hub's
 `Invoke-RepoContainerBuild.ps1`, which owns the plumbing (`WindowsContainerBuild.Reuse` +
 `WindowsContainerImage.Common`, the image ref from `versions.env`): tar-pipe transport into a
 reusable per-lane build container at `C:\ws` by default, `-UseBindMount` to opt into a bind

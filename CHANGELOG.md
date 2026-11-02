@@ -18,6 +18,23 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-02, one owner per block)
+- `scripts/linux/lib/detector-evidence.sh` owns the detector checks' input proofs, legs, profile checks and
+  comparisons; `check-gpu-detector-parity.sh`, `diagnose-migraphx-detector.sh` and `profile-gpu-candidate.sh` keep
+  their own usage, comparisons and verdicts. Their suites share `scripts/linux/tests/detector-fixture.sh`, and the
+  Bash suites share `suite-fixture.sh` (root, scratch directory, failure accounting, refused commands;
+  `test-suite-fixture.sh` proves it can fail).
+- `scripts/windows/modules/WindowsGpuCandidate.Common.psm1` owns the Windows GPU checks' ORT file list, scratch directory,
+  environment snapshot and path checks. `tests/WindowsGpuCandidate.Tests.ps1` tests it directly.
+- `Invoke-ContainerBuild.ps1` and `Invoke-ContainerPythonBindings.ps1` forward their arguments to the new
+  `Invoke-ContainerLane.ps1`; the suite runs each through `pwsh -File` against a stub runner. `Build-Windows.ps1` shares
+  Debug and Profile's configure step and the GStreamer plugin lookup, and `BuildAstFixture.psm1` gains the wiring
+  suites' AST helpers. Duplicated blocks fall from 53 to 10.
+- Left in place: `verify-gpu-packages.sh`'s ORT library and notice functions (owned by the hub-side ORT work), and short
+  parameter blocks and wiring assertions that repeat only a parameter or call shape. `ci-profile-bench.sh`'s
+  stop-server function resembles the hub's `t_stop_children`, which lives in its test harness: production code does
+  not source that.
+
 ### Changed (2026-11-02, AGENTS.md matches the tree)
 - **`AGENTS.md` names what the tree holds.** Section 5 names every workflow and both programs and
   `--perf-host`; the `Src/` and `Test/` rows list the modules and directories that were missing; the

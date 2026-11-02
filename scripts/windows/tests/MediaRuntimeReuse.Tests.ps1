@@ -4,26 +4,24 @@
 Describe 'Windows media runtime reuse' {
     . (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1')
     Import-BuildModule 'WindowsMediaRuntime.Common'
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function Get-TestScriptAst, Get-TestAstCommands -ErrorAction Stop
     Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
 
     It 'stages the shared runtime through one helper for all three build roots' {
-        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
+        $ast = Get-BuildScriptAst
         $calls = @(Get-TestAstCommands -Ast $ast -Name 'Copy-MediaRuntimeBundle')
         $calls.Count | Should Be 1
         ($calls[0].Extent.Text -match "-GStreamerRoot 'C:\\runtime\\bin'") | Should Be $true
         $buildCalls = @(Get-TestAstCommands -Ast $ast -Name 'Copy-BuildMediaRuntime')
-        $buildCalls.Count | Should Be 3
-        @($buildCalls | Where-Object { $_.Extent.Text -match '-StageTestPlugins\s+-CopyOrtBeside' }).Count | Should Be 2
+        $buildCalls.Count | Should Be 2
+        @($buildCalls | Where-Object { $_.Extent.Text -match '-StageTestPlugins\s+-CopyOrtBeside' }).Count | Should Be 1
+        @(Get-TestAstCommands -Ast $ast -Name 'Invoke-ConfiguredBuildStep').Count | Should Be 2
         @($buildCalls | Where-Object { $_.Extent.Text -match '\$fastBuildReleaseDirFull' -and $_.Extent.Text -notmatch '-StageTestPlugins|-CopyOrtBeside' }).Count | Should Be 1
         @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Copy-ImageGStreamerRuntime' }, $true)).Count | Should Be 0
         @(Get-TestAstCommands -Ast $ast -Name 'Write-MissingGStreamerBinWarning').Count | Should Be 1
     }
 
     It 'keeps debug-only plugin and ORT staging out of Release while preserving call order' {
-        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
-        $definition = Get-BuildFunctionSource -Ast $ast -Name 'Copy-BuildMediaRuntime'
-        . ([scriptblock]::Create($definition))
+        . (Get-BuildFunctionBlock 'Copy-BuildMediaRuntime')
         $calls = [Collections.Generic.List[string]]::new()
         function Write-MissingGStreamerBinWarning { param($Context) $calls.Add('warning') }
         function Copy-MediaRuntimeBundle { param($Context, $TargetDir, $GStreamerRoot) $calls.Add('bundle'); return 7 }
@@ -43,9 +41,10 @@ Describe 'Windows media runtime reuse' {
     }
 
     It 'stages required and present optional package plugins and rejects an incomplete image' {
-        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
-        . ([scriptblock]::Create((Get-BuildFunctionSource -Ast $ast -Name 'Get-ImageGStreamerPackagePlugins')))
-        . ([scriptblock]::Create((Get-BuildFunctionSource -Ast $ast -Name 'Copy-ImageGStreamerPackagePlugins')))
+        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginDir')
+        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginFile')
+        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPackagePlugins')
+        . (Get-BuildFunctionBlock 'Copy-ImageGStreamerPackagePlugins')
         function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
         $bin = Join-Path $TestDrive 'package-image\bin'
         $plugins = Join-Path $TestDrive 'package-image\lib\gstreamer-1.0'
@@ -70,7 +69,7 @@ Describe 'Windows media runtime reuse' {
     }
 
     It 'seeds the closure with plugins and installs them into each package layout' {
-        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
+        $ast = Get-BuildScriptAst
         @((Get-TestAstCommands -Ast $ast -Name 'Copy-PeImportClosure') | Where-Object { $_.Extent.Text -match '\$engine \+ \$plugins' }).Count | Should Be 1
         $script = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1') -Raw
         $script.Contains('Copy-Item -LiteralPath $bundlePlugins -Destination $stagingLib -Recurse -Force') | Should Be $true
@@ -82,9 +81,7 @@ Describe 'Windows media runtime reuse' {
     }
 
     It 'warns when the selected GStreamer bin is missing' {
-        $ast = Get-TestScriptAst -ScriptPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1')
-        $definition = Get-BuildFunctionSource -Ast $ast -Name 'Write-MissingGStreamerBinWarning'
-        . ([scriptblock]::Create($definition))
+        . (Get-BuildFunctionBlock 'Write-MissingGStreamerBinWarning')
         $warnings = [Collections.Generic.List[string]]::new()
         function Write-BuildLogWarning { param($Context, $Message) $warnings.Add($Message) }
         $missing = Join-Path $TestDrive 'missing-gstreamer'
@@ -105,37 +102,22 @@ Describe 'Windows media runtime reuse' {
         [IO.File]::WriteAllText((Join-Path $override 'gstreamer-fixture-only.dll'), 'override')
         $context = [pscustomobject]@{ LogWriter = $null; SuppressConsoleOutput = $true }
 
-        $fromImage = Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $null } -ScriptBlock {
-            $target = Join-Path $TestDrive 'without-env'
-            $null = Copy-MediaRuntimeBundle -Context $context -TargetDir $target -GStreamerRoot $image -OnnxRoot '' -OnnxGenAiRoot ''
-            Get-Content -LiteralPath (Join-Path $target 'gstreamer-fixture-only.dll') -Raw
+        function Copy-FixtureBundle($GstBin, [string]$TargetName) {
+            $target = Join-Path $TestDrive $TargetName
+            Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $GstBin } -ScriptBlock {
+                $null = Copy-MediaRuntimeBundle -Context $context -TargetDir $target -GStreamerRoot $image -OnnxRoot '' -OnnxGenAiRoot ''
+            }
+            return (Get-Content -LiteralPath (Join-Path $target 'gstreamer-fixture-only.dll') -Raw).Trim()
         }
-        $fromImage.Trim() | Should Be 'image'
+        Copy-FixtureBundle $null 'without-env' | Should Be 'image'
+        Copy-FixtureBundle $override 'with-env' | Should Be 'override'
 
-        $fromOverride = Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $override } -ScriptBlock {
-            $target = Join-Path $TestDrive 'with-env'
-            $null = Copy-MediaRuntimeBundle -Context $context -TargetDir $target -GStreamerRoot $image -OnnxRoot '' -OnnxGenAiRoot ''
-            Get-Content -LiteralPath (Join-Path $target 'gstreamer-fixture-only.dll') -Raw
+        foreach ($case in @(@{ Dll = 'onnxruntime.dll'; Pattern = 'outside the chain install' }, @{ Dll = 'DirectML.dll'; Pattern = 'outside the chain install.*DirectML\.dll' })) {
+            $foreign = Join-Path $image $case.Dll
+            [IO.File]::WriteAllText($foreign, 'foreign')
+            $message = try { $null = Copy-FixtureBundle $null "foreign-$($case.Dll)"; '' } catch { $_.Exception.Message }
+            $message | Should Match $case.Pattern
+            Remove-Item -LiteralPath $foreign
         }
-        $fromOverride.Trim() | Should Be 'override'
-
-        [IO.File]::WriteAllText((Join-Path $image 'onnxruntime.dll'), 'foreign')
-        $message = Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $null } -ScriptBlock {
-            try {
-                $null = Copy-MediaRuntimeBundle -Context $context -TargetDir (Join-Path $TestDrive 'foreign-ort') -GStreamerRoot $image -OnnxRoot '' -OnnxGenAiRoot ''
-                ''
-            } catch { $_.Exception.Message }
-        }
-        ($message -match 'outside the chain install') | Should Be $true
-
-        Remove-Item -LiteralPath (Join-Path $image 'onnxruntime.dll')
-        [IO.File]::WriteAllText((Join-Path $image 'DirectML.dll'), 'foreign')
-        $dmlMessage = Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $null } -ScriptBlock {
-            try {
-                $null = Copy-MediaRuntimeBundle -Context $context -TargetDir (Join-Path $TestDrive 'foreign-dml') -GStreamerRoot $image -OnnxRoot '' -OnnxGenAiRoot ''
-                ''
-            } catch { $_.Exception.Message }
-        }
-        ($dmlMessage -match 'outside the chain install.*DirectML\.dll') | Should Be $true
     }
 }

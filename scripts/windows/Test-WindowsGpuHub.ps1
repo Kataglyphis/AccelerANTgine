@@ -18,14 +18,10 @@ $fetcher = Get-Content -LiteralPath (Join-Path $hub 'linux/scripts/lib/fetch-dat
 if ($fetcher -cnotmatch '(?m)^def read_lock\(' -or $fetcher -cnotmatch '(?m)^def matches\(') {
     throw 'Windows GPU candidates need the locked-model fetcher verification APIs.'
 }
-try { Import-BuildModule @('WindowsOrtLicense.Common', 'WindowsMsiLicense.Common', 'WindowsPackageBinary.Common', 'WindowsOrtPayload.Common') }
+try { Import-BuildModule @('WindowsOrtLicense.Common', 'WindowsMsiLicense.Common', 'WindowsPackageBinary.Common', 'WindowsOrtPayload.Common', 'WindowsGpuCandidate.Common') }
 catch { throw "Windows GPU candidates need ANTfrastructure's finished-package and wheel verification APIs. $($_.Exception.Message)" }
-if (-not (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('ProviderDll')) {
-    throw 'Windows GPU candidates need provider-aware ORT wheel verification.'
-}
-if (-not (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('DirectMlDll')) {
-    throw 'Windows GPU candidates need same-wheel DirectML verification.'
-}
+Assert-OrtWheelVerifierParameter -Name 'ProviderDll' -Message 'Windows GPU candidates need provider-aware ORT wheel verification.'
+Assert-OrtWheelVerifierParameter -Name 'DirectMlDll' -Message 'Windows GPU candidates need same-wheel DirectML verification.'
 foreach ($command in 'Assert-PackageBinary', 'Get-PackageOrtProviderNames', 'Assert-PackageOrtFamily', 'Get-MsiInstalledFileId', 'Assert-PackageLicense', 'Get-ChainOrtRuntimeFile') {
     $null = Get-Command -Name $command -ErrorAction Stop
 }

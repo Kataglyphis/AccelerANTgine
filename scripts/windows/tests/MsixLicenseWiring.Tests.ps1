@@ -17,10 +17,8 @@ function Get-MsixScriptModel([string]$Source) {
 
 function Assert-MsixLicenseWiring([string]$Source) {
   $model = Get-MsixScriptModel $Source
-  $copies = $model.Copies
-  if ($copies.Count -ne 1) { throw 'Expected one MSIX project license staging call' }
-  $copyArgs = Get-TestCommandArguments -Command $copies[0]
-  if ($copyArgs.Path -ne '$licenseSource' -or $copyArgs.Destination -ne '$payloadDir') { throw 'Wrong MSIX license source or destination' }
+  Assert-SingleCommandArguments -Commands $model.Copies -Expected @{ Path = '$licenseSource'; Destination = '$payloadDir' } `
+    -CountFailure 'Expected one MSIX project license staging call' -ValueFailure 'Wrong MSIX license source or destination'
   $checks = $model.Checks
   if ($checks.Count -ne 1 -or -not $checks[0].Extent.Text.Contains('$msixFile')) { throw 'Expected the completed MSIX license check' }
   $ortCopies = $model.OrtCopies

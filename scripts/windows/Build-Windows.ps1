@@ -141,23 +141,31 @@ function Write-MissingGStreamerBinWarning {
 }
 
 # GStreamer looks for plugins in <dir of gstreamer-1.0-0.dll, minus a trailing bin>\lib\gstreamer-1.0; build\bin holds that DLL.
+function Get-ImageGStreamerPluginDir {
+    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
+    return Join-Path (Split-Path -Parent $gstBin) 'lib\gstreamer-1.0'
+}
+
+function Get-ImageGStreamerPluginFile([string]$PluginDir, [string[]]$Name) {
+    foreach ($plugin in $Name) {
+        $file = Join-Path $PluginDir "$plugin.dll"
+        if (Test-Path -LiteralPath $file -PathType Leaf) { $file }
+    }
+}
+
 function Copy-ImageGStreamerTestPlugins {
     param(
         [Parameter(Mandatory)][pscustomobject]$Context,
         [Parameter(Mandatory)][string]$BuildRoot
     )
-    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
-    $pluginDir = Join-Path (Split-Path -Parent $gstBin) 'lib\gstreamer-1.0'
+    $pluginDir = Get-ImageGStreamerPluginDir
     $destination = Join-Path $BuildRoot 'lib\gstreamer-1.0'
     New-Item -ItemType Directory -Force -Path $destination | Out-Null
     # The elements the GStreamer tests and benchmarks build pipelines from; their DLL closure is already in bin\.
     $wanted = @('gstcoreelements', 'gstapp', 'gstvideotestsrc', 'gstvideoconvertscale')
-    $copied = @(foreach ($name in $wanted) {
-            $dll = Join-Path $pluginDir "$name.dll"
-            if (Test-Path -LiteralPath $dll -PathType Leaf) {
-                Copy-Item -LiteralPath $dll -Destination $destination -Force
-                $name
-            }
+    $copied = @(Get-ImageGStreamerPluginFile -PluginDir $pluginDir -Name $wanted | ForEach-Object {
+            Copy-Item -LiteralPath $_ -Destination $destination -Force
+            [IO.Path]::GetFileNameWithoutExtension($_)
         })
     $missing = @($wanted | Where-Object { $_ -notin $copied })
     if ($missing.Count) {
@@ -186,21 +194,17 @@ function Copy-BuildMediaRuntime {
 # Plugins are loaded dynamically and must seed the same PE closure as the engine.
 function Get-ImageGStreamerPackagePlugins {
     param([Parameter(Mandatory)][string]$Arch)
-    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
-    $source = Join-Path (Split-Path -Parent $gstBin) 'lib\gstreamer-1.0'
+    $source = Get-ImageGStreamerPluginDir
     $required = @('coreelements', 'app', 'videotestsrc', 'videoconvertscale', 'playback', 'webrtc', 'nice', 'dtls', 'srtp', 'sctp', 'rtpmanager', 'rtp')
     $optional = @('videorate', 'rawparse', 'videoparsersbad', 'debugutilsbad', 'libav', 'jpeg', 'png', 'multifile', 'isomp4', 'rswebrtc', 'rsrtp', 'vpx', 'openh264', 'mediafoundation', 'winks', 'typefindfunctions')
     foreach ($name in $required) {
-        if (-not (Test-Path -LiteralPath (Join-Path $source "gst$name.dll") -PathType Leaf)) {
+        if (-not (Get-ImageGStreamerPluginFile -PluginDir $source -Name "gst$name")) {
             throw "Required GStreamer plugin gst$name.dll is missing from $source"
         }
     }
-    foreach ($name in ($required + $optional)) {
-        $file = Join-Path $source "gst$name.dll"
-        if (Test-Path -LiteralPath $file -PathType Leaf) {
-            $null = Assert-PeTargetMachine -Path $file -Arch $Arch -Context 'GStreamer package plugin'
-            $file
-        }
+    foreach ($file in (Get-ImageGStreamerPluginFile -PluginDir $source -Name @(($required + $optional) | ForEach-Object { "gst$_" }))) {
+        $null = Assert-PeTargetMachine -Path $file -Arch $Arch -Context 'GStreamer package plugin'
+        $file
     }
 }
 
@@ -346,21 +350,32 @@ function Invoke-MsvcDebugStep {
     }
 }
 
-function Invoke-ClangDebugBuildStep {
-    Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Build" -Critical -Script {
-        # -Configuration Debug is what makes Invoke-CmakeConfigureAndBuild stage the sanitizer runtime DLLs.
+# The -Configuration argument is what makes Invoke-CmakeConfigureAndBuild stage the sanitizer runtime DLLs.
+function Invoke-ConfiguredBuildStep {
+    param(
+        [Parameter(Mandatory)][string]$StepName,
+        [Parameter(Mandatory)][string]$BuildPath,
+        [Parameter(Mandatory)]$Configuration,
+        [string[]]$CrossConfigureArgs = @(),
+        [switch]$Critical
+    )
+    Invoke-BuildStep -Context $Context -StepName $StepName -Critical:$Critical -Script {
         Push-Location $Workspace
         try {
             Invoke-CmakeConfigureAndBuild -Context $Context `
-                -BuildPath $fastBuildClangFull `
-                -Preset $cfgClang.Preset `
-                -Configuration $cfgClang.Configuration -ParallelJobs $ParallelJobs `
-                -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON') +
-                    @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
+                -BuildPath $BuildPath `
+                -Preset $Configuration.Preset `
+                -Configuration $Configuration.Configuration -ParallelJobs $ParallelJobs `
+                -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON') + $CrossConfigureArgs)
         } finally { Pop-Location }
 
-        Copy-BuildMediaRuntime -Context $Context -BuildRoot $fastBuildClangFull -StageTestPlugins -CopyOrtBeside
+        Copy-BuildMediaRuntime -Context $Context -BuildRoot $BuildPath -StageTestPlugins -CopyOrtBeside
     }
+}
+
+function Invoke-ClangDebugBuildStep {
+    Invoke-ConfiguredBuildStep -StepName "ClangCL Debug Build" -Critical -BuildPath $fastBuildClangFull -Configuration $cfgClang `
+        -CrossConfigureArgs @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion)
 
     # A cross build stages the instrumented suite for the arm64 runner instead: the container cannot execute it.
     if (-not $isCross) {
@@ -444,18 +459,7 @@ function Invoke-ClangDebugAnalysisStep {
 }
 
 function Invoke-ProfileStep {
-    Invoke-BuildStep -Context $Context -StepName "Profile Build Configure" -Script {
-        Push-Location $Workspace
-        try {
-            Invoke-CmakeConfigureAndBuild -Context $Context `
-                -BuildPath $fastBuildProfileFull `
-                -Preset $cfgProfile.Preset `
-                -Configuration $cfgProfile.Configuration -ParallelJobs $ParallelJobs `
-                -ConfigureExtraArgs @('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
-        } finally { Pop-Location }
-
-        Copy-BuildMediaRuntime -Context $Context -BuildRoot $fastBuildProfileFull -StageTestPlugins -CopyOrtBeside
-    }
+    Invoke-ConfiguredBuildStep -StepName "Profile Build Configure" -BuildPath $fastBuildProfileFull -Configuration $cfgProfile
 
     Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
         Push-Location $fastBuildProfileFull
