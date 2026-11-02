@@ -18,6 +18,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### 2026-11-02 (hub ORT package checks)
+- **`verify-gpu-packages.sh` calls the hub's `ort-package-proof.sh`** instead of carrying its ORT library and
+  notice checks. Exit statuses are unchanged; diagnostics use the hub's wording.
+
 ### 2026-11-02 (perf-host)
 - **`quality-report.sh --perf-host` latencies** in `quality-report.toml`, with `scripts/linux/perf-host.sh`, `perf_host_text.py`, the demo's `--detector-latency-runs N` and a tracked `perf/baseline-<cpu>.json`.
 

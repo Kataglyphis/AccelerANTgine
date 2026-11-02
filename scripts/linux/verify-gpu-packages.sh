@@ -18,6 +18,8 @@ appimage_verifier="$hub/verify-ort-appimage-payload.sh"
 [[ -f "$appimage_verifier" ]] || { echo 'Pinned ANTfrastructure lacks AppImage GPU payload verification' >&2; exit 1; }
 # shellcheck source=/dev/null
 source "$hub/ort-runtime-bundle.sh"
+# shellcheck source=/dev/null
+source "$hub/ort-package-proof.sh"
 package_dir="$(realpath -e "$1")"
 shopt -s nullglob
 tarballs=("$package_dir"/*.tar.gz)
@@ -44,35 +46,6 @@ verify_demo() {
   case "$resolved" in "$root/"*) ;; *) echo 'Inference demo binary escapes package' >&2; return 1 ;; esac
 }
 
-collect_ort_libraries() {
-  local root="$1" lib="$2/usr/lib/accelerantgine" file resolved name
-  for name in libonnxruntime.so.1 libonnxruntime_providers_shared.so "libonnxruntime_providers_${kind}.so"; do
-    [[ -f "$lib/$name" ]] || { echo "Missing GPU ORT library: $name" >&2; return 1; }
-  done
-  for file in "$lib"/libonnxruntime*.so*; do
-    [[ -f "$file" ]] || { echo "Invalid ORT library: $file" >&2; return 1; }
-    resolved="$(realpath -e "$file")"
-    case "$resolved" in "$root/"*) ;; *) echo 'ORT library escapes package' >&2; return 1 ;; esac
-    name="${file##*/}"
-    case "$name" in
-      libonnxruntime_providers_*) [[ ! -L "$file" ]] || { echo 'ORT provider is a symlink' >&2; return 1; } ;;
-      libonnxruntime.so*) [[ "${resolved##*/}" =~ ^libonnxruntime\.so(\.[0-9]+)*$ ]] || { echo 'ORT core aliases another component' >&2; return 1; } ;;
-    esac
-    libraries+=(--library "$file")
-  done
-}
-
-verify_ort_notices() {
-  local root="$1" prefix="$2" proof="$3" name notice resolved
-  for name in LICENSE ThirdPartyNotices.txt; do
-    notice="$prefix/usr/share/licenses/onnxruntime/$name"
-    [[ -f "$notice" && ! -L "$notice" ]] || { echo "Missing or linked ORT notice: $notice" >&2; return 1; }
-    resolved="$(realpath -e "$notice")"
-    case "$resolved" in "$root/"*) ;; *) echo 'ORT notice escapes package' >&2; return 1 ;; esac
-    cmp "$notice" "$proof/licenses/onnxruntime/$name"
-  done
-}
-
 verify_tree() {
   local root="$1" prefix="$2" proof
   local -a libraries=()
@@ -81,12 +54,13 @@ verify_tree() {
   case "$prefix/" in "$root/"*) ;; *) echo 'Package prefix escapes extraction root' >&2; return 1 ;; esac
   verify_demo "$root" "$prefix"
   ort_assert_no_bundled_host_runtime "$root" "$kind"
-  collect_ort_libraries "$root" "$prefix"
+  ort_package_collect_libraries --reject-invalid "$root" "$prefix/usr/lib/accelerantgine" libraries \
+    libonnxruntime.so.1 libonnxruntime_providers_shared.so "libonnxruntime_providers_${kind}.so"
   proof="$(mktemp -d "$work/proof.XXXXXX")"
   python3 "$hub/stage-ort-wheel-licenses.py" --require-unstripped \
     --wheel-dir "${ORT_CHAIN_WHEEL_DIR:-/opt/onnxruntime-wheels}" --destination "$proof" \
     --strip "${STRIP:-strip}" "${libraries[@]}"
-  verify_ort_notices "$root" "$prefix" "$proof"
+  ort_package_verify_notices "$root" "$prefix/usr/share/licenses/onnxruntime" "$proof/licenses/onnxruntime"
 }
 
 mapfile -d '' -t tops < <(find "$work/tar" -mindepth 1 -maxdepth 1 -print0)

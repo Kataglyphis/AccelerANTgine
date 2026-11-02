@@ -11,7 +11,7 @@ mkdir -p "$hub" "$work/hub/shared/python" "$work/hub/linux/scripts/lib" "$work/h
 cp "$source_hub/shared/python/verify_locked_files.py" "$work/hub/shared/python/verify_locked_files.py"
 cp "$source_hub/linux/scripts/lib/fetch-data-lock.py" "$work/hub/linux/scripts/lib/fetch-data-lock.py"
 cp "$source_hub/linux/scripts/01-core/platform.sh" "$work/hub/linux/scripts/01-core/platform.sh"
-cp "$source_hub/linux/scripts/06-packaging/verify-ort-appimage-payload.sh" "$source_hub/linux/scripts/06-packaging/appimage-verification.sh" "$hub/"
+cp "$source_hub/linux/scripts/06-packaging/verify-ort-appimage-payload.sh" "$source_hub/linux/scripts/06-packaging/appimage-verification.sh" "$source_hub/linux/scripts/06-packaging/ort-package-proof.sh" "$hub/"
 cp "$repo/scripts/linux/verify-gpu-packages.sh" "$work/source/scripts/linux/"
 models="$work/tree/usr/share/accelerantgine/models"
 for name in deim_dfine_n_coco.onnx deim_dfine_n_coco.LICENSE deim_dfine_n_coco.NOTICE; do
