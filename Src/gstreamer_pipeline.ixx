@@ -61,8 +61,6 @@ using BufferCallback = std::function<void(const BufferInfo &)>;
 struct PipelineConfig
 {
     std::string pipeline_description;
-    bool enable_tensor_meta{ false };
-    bool synchronous_mode{ true };
     std::uint32_t timeout_ms{ 5000 };
 };
 
@@ -107,17 +105,31 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     [[nodiscard]] auto push_buffer(void *data, std::size_t size, const FrameMetadata &metadata)
       -> std::expected<void, GStreamerError>;
 
-    [[nodiscard]] auto get_position_ns() const -> std::expected<std::uint64_t, GStreamerError>;
-    [[nodiscard]] auto get_duration_ns() const -> std::expected<std::uint64_t, GStreamerError>;
-    [[nodiscard]] auto seek(std::uint64_t timestamp_ns) -> std::expected<void, GStreamerError>;
-
-    [[nodiscard]] auto get_caps_string() const -> std::string;
     [[nodiscard]] auto get_current_state() const -> int;
 
   private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
+
+// One gst-launch property value, so a path holding " ! " or spaces stays one token.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto quote_pipeline_value(const std::string &value) -> std::string;
+
+[[nodiscard]] KATAGLYPHIS_CPP_API auto inference_pipeline_description(const std::string &input_source,
+  const std::string &model_path,
+  const std::string &output_format = "RAW") -> std::string;
+
+[[nodiscard]] KATAGLYPHIS_CPP_API auto video_inference_pipeline_description(const std::string &video_source,
+  const std::string &model_path,
+  std::uint32_t width,
+  std::uint32_t height,
+  const std::string &output_sink = "appsink") -> std::string;
+
+[[nodiscard]] KATAGLYPHIS_CPP_API auto camera_inference_pipeline_description(const std::string &device,
+  const std::string &model_path,
+  std::uint32_t width,
+  std::uint32_t height,
+  std::uint32_t fps) -> std::string;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_video_inference_pipeline(const std::string &video_source,
   const std::string &model_path,

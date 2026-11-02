@@ -37,6 +37,9 @@ static auto populate_config(toml::parse_result &result, InferenceConfig &config)
         if (auto *val = model->get("intra_op_threads")) {
             config.model.intra_op_threads = val->value_or<std::uint32_t>(0);
         }
+        if (auto *val = model->get("output_layout")) {
+            if (val->is_string()) { config.model.output_layout = val->value_or(std::string{}); }
+        }
         if (auto *labels = model->get("labels")) {
             if (labels->is_array()) {
                 for (const auto &label : *labels->as_array()) {
@@ -70,22 +73,22 @@ static auto populate_config(toml::parse_result &result, InferenceConfig &config)
     }
 }
 
-auto parse_inference_config(const std::string &toml_content) -> std::expected<InferenceConfig, TomlConfigError>
+auto parse_inference_config(const std::string &toml_content) -> std::expected<InferenceConfig, ConfigError>
 {
     auto result = toml::parse(toml_content);
-    if (!result) { return std::unexpected(TomlConfigError::ParseError); }
+    if (!result) { return std::unexpected(ConfigError::ParseError); }
 
     InferenceConfig config;
     populate_config(result, config);
     return config;
 }
 
-auto load_inference_config(const std::filesystem::path &config_path) -> std::expected<InferenceConfig, TomlConfigError>
+auto load_inference_config(const std::filesystem::path &config_path) -> std::expected<InferenceConfig, ConfigError>
 {
-    if (!std::filesystem::exists(config_path)) { return std::unexpected(TomlConfigError::FileNotFound); }
+    if (!std::filesystem::exists(config_path)) { return std::unexpected(ConfigError::FileNotFound); }
 
     auto result = toml::parse_file(config_path.string());
-    if (!result) { return std::unexpected(TomlConfigError::ParseError); }
+    if (!result) { return std::unexpected(ConfigError::ParseError); }
 
     InferenceConfig config;
     populate_config(result, config);

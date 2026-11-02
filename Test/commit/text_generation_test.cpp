@@ -274,6 +274,17 @@ TEST(TextGenerationSetup, AnUninitializedGeneratorRefuses)
       kataglyphis::test::error_of(generator.generate(user("a"), budget(1))), text::TextGenError::NotInitialized);
 }
 
+TEST(TextGenerationSetup, AProviderGenAiHasNoRouteToIsUnavailableBeforeAnyLoad)
+{
+    for (const auto provider :
+      { text::ExecutionProvider::MigraphX, text::ExecutionProvider::Xnnpack, text::ExecutionProvider::Dnnl }) {
+        text::TextGenerator generator;
+        const auto result = generator.initialize(kataglyphis::test::missing_path("tiny-genai"), provider);
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(result.error(), text::TextGenError::ProviderUnavailable);
+    }
+}
+
 TEST(TextGenerationSetup, AMissingModelDirectoryFailsToLoad)
 {
     text::TextGenerator generator;

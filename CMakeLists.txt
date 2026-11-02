@@ -220,15 +220,15 @@ if(TARGET ${PROJECT_NAME}_demo)
         RELATIVE_PATH
         _demo_model_from_private
         "/${CMAKE_INSTALL_LIBDIR}/accelerantgine"
-        "/${DEMO_MODEL_INSTALL_DIR}/deim_dfine_n_coco.onnx")
+        "/${DEMO_MODEL_INSTALL_DIR}")
       file(
         RELATIVE_PATH
         _demo_model_from_bin
         "/${CMAKE_INSTALL_BINDIR}"
-        "/${DEMO_MODEL_INSTALL_DIR}/deim_dfine_n_coco.onnx")
+        "/${DEMO_MODEL_INSTALL_DIR}")
       target_compile_definitions(
-        ${PROJECT_NAME}_demo PRIVATE "KATAGLYPHIS_DEMO_MODEL_FROM_PRIVATE=\"${_demo_model_from_private}\""
-                                     "KATAGLYPHIS_DEMO_MODEL_FROM_BIN=\"${_demo_model_from_bin}\"")
+        ${PROJECT_NAME}_demo PRIVATE "KATAGLYPHIS_DEMO_MODEL_DIR_FROM_PRIVATE=\"${_demo_model_from_private}\""
+                                     "KATAGLYPHIS_DEMO_MODEL_DIR_FROM_BIN=\"${_demo_model_from_bin}\"")
     endif()
     configure_file(cmake/InstallDemoModel.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/InstallDemoModel.cmake" @ONLY)
     install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/InstallDemoModel.cmake")

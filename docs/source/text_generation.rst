@@ -21,7 +21,9 @@ GenAI found this way is the chain build, which the image builds verify instead.
 ``initialize(model_dir, provider)`` reads a GenAI model directory: ``genai_config.json``, the ONNX
 files and the tokenizer. ``ExecutionProvider::Cpu`` clears the providers the config names;
 ``Cuda`` and ``DirectML`` append ``cuda`` or ``dml`` and fail with ``ProviderUnavailable`` where the
-library lacks them.
+library lacks them. The enum is the detector's (``kataglyphis.execution_provider``); ``MigraphX``,
+``Xnnpack`` and ``Dnnl``, which GenAI has no route to, return ``ProviderUnavailable`` before any
+library is loaded.
 
 Generating
 ----------

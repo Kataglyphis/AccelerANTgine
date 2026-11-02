@@ -14,11 +14,13 @@
 #include <iterator>
 #include <limits>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "kCocoClasses.inc"
 #include "kInferenceContract.inc"
 #include "kShippedInferenceConfig.inc"
 
@@ -89,13 +91,66 @@ TEST(YoloDetector, CocoClassNamesCoverTheEightyClasses)
     }
 }
 
-TEST(YoloDetector, TheShippedConfigLabelsMatchTheClassTable)
+TEST(YoloDetector, TheBuiltInClassTableIsTheSyncedList)
 {
-    const auto config = kataglyphis::config::parse_inference_config(std::string(kShippedInferenceConfig));
+    std::istringstream list{ std::string(kCocoClasses) };
+    std::string line;
+    int id = 0;
+    while (std::getline(list, line)) {
+        if (line.ends_with('\r')) { line.pop_back(); }
+        EXPECT_EQ(line, detection::YoloDetector::get_coco_class_name(id)) << id;
+        ++id;
+    }
+    EXPECT_EQ(id, 80);
+}
+
+TEST(YoloDetector, TheShippedConfigNamesTheModelLayoutAndNoLabels)
+{
+    const auto parsed = kataglyphis::config::parse_inference_config(std::string(kShippedInferenceConfig));
+    ASSERT_TRUE(parsed.has_value());
+    const auto config = detection::yolo_config_from(parsed->model);
     ASSERT_TRUE(config.has_value());
-    ASSERT_EQ(config->model.labels.size(), 80U);
-    for (std::size_t i = 0; i < config->model.labels.size(); ++i) {
-        EXPECT_EQ(config->model.labels[i], detection::YoloDetector::get_coco_class_name(static_cast<int>(i))) << i;
+    EXPECT_EQ(config->model_path, std::filesystem::path("models/deim_dfine_n_coco.onnx"));
+    EXPECT_EQ(config->output_layout, detection::YoloOutputLayout::CornersScoreClass);
+    EXPECT_TRUE(config->labels.empty());
+    EXPECT_EQ(config->num_classes, 80);
+}
+
+TEST(YoloDetector, TheConfiguredOutputLayoutIsReadOrRefused)
+{
+    const auto layout_of = [](const std::string &value) {
+        kataglyphis::config::ModelConfig model;
+        model.output_layout = value;
+        return detection::yolo_config_from(model);
+    };
+    EXPECT_EQ(layout_of("auto")->output_layout, detection::YoloOutputLayout::Auto);
+    EXPECT_EQ(layout_of("cxcywh_scores_by_anchor")->output_layout, detection::YoloOutputLayout::CenterScoresByAnchor);
+    EXPECT_EQ(layout_of("")->output_layout, detection::YoloConfig{}.output_layout);
+    const auto refused = layout_of("rows");
+    ASSERT_FALSE(refused.has_value());
+    EXPECT_EQ(refused.error(), kataglyphis::config::ConfigError::InvalidValue);
+}
+
+TEST(YoloDetector, EveryDetectionBuilderKeepsAPathWithASeparatorInOneValue)
+{
+    ASSERT_TRUE(gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+    const std::string clip = "clip ! fakesink name=injected.mp4";
+    const auto camera = detection::camera_detection_pipeline_description("/dev/video0 ! 1", 64, 48, 30);
+    EXPECT_TRUE(camera.contains("device=\"/dev/video0 ! 1\" ! ")) << camera;
+    const auto video = detection::video_detection_pipeline_description(clip, 64, 48);
+    EXPECT_TRUE(video.contains("location=\"" + clip + "\" ! ")) << video;
+    EXPECT_TRUE(detection::video_detection_pipeline_description("file:///a ! b.mp4", 64, 48)
+        .contains("uri=\"file:///a ! b.mp4\" ! "));
+
+    // The whole path through a real parse and a real session, with the model behind the same separator.
+    const TempFile model("kataglyphis ! yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    const auto config = two_class_config(model);
+    if (kataglyphis::test::missing_gstreamer_element({ "filesrc", "decodebin", "videoscale", "videoconvert" })
+          .empty()) {
+        EXPECT_TRUE(detection::create_video_detection_pipeline(clip, config, 64, 48).has_value());
+    }
+    if (kataglyphis::test::missing_gstreamer_element({ "v4l2src" }).empty()) {
+        EXPECT_TRUE(detection::create_camera_detection_pipeline("/dev/video0 ! 1", config, 64, 48, 30).has_value());
     }
 }
 
@@ -760,7 +815,7 @@ TEST(YoloDetector, TheConfiguredThreadCountReachesTheOrtSession)
       "[model]\ninput_width = 7\ninput_height = 2\nintra_op_threads = 3\nlabels = [\"a\", \"b\"]\n");
     ASSERT_TRUE(parsed.has_value());
     EXPECT_EQ(parsed->model.intra_op_threads, 3U);
-    auto config = detection::yolo_config_from(parsed->model);
+    auto config = *detection::yolo_config_from(parsed->model);
     EXPECT_EQ(config.intra_op_num_threads, 3);
     EXPECT_EQ(config.num_classes, 2);
     const TempFile model("kataglyphis-threads", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
@@ -773,5 +828,5 @@ TEST(YoloDetector, TheConfiguredThreadCountReachesTheOrtSession)
     const auto unset = kataglyphis::config::parse_inference_config("[model]\n");
     ASSERT_TRUE(unset.has_value());
     EXPECT_EQ(
-      detection::yolo_config_from(unset->model).intra_op_num_threads, detection::YoloConfig{}.intra_op_num_threads);
+      detection::yolo_config_from(unset->model)->intra_op_num_threads, detection::YoloConfig{}.intra_op_num_threads);
 }

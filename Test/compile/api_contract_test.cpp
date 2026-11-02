@@ -163,10 +163,11 @@ TEST(CppApiContract, ErrorCodesKeepTheirNumbers)
     static_assert(as_int(webrtc::WebRTCError::Timeout) == 9);
     static_assert(as_int(cfg::ConfigError::FileNotFound) == 0);
     static_assert(as_int(cfg::ConfigError::InvalidValue) == 3);
-    static_assert(as_int(cfg::TomlConfigError::ParseError) == 1);
+    static_assert(as_int(cfg::ConfigError::ParseError) == 1);
     static_assert(as_int(webrtc::StreamState::Idle) == 0);
     static_assert(as_int(webrtc::StreamState::Disconnected) == 6);
     static_assert(std::is_same_v<detection::OnnxError, inference::OnnxError>);
+    static_assert(std::is_same_v<kataglyphis::text::ExecutionProvider, inference::ExecutionProvider>);
     SUCCEED();
 }
 
@@ -192,14 +193,10 @@ TEST(CppApiContract, ConfigurationDefaults)
     EXPECT_TRUE(box.class_name.empty());
 
     const detection::VideoDetectionConfig video;
-    EXPECT_FALSE(video.display_results);
-    EXPECT_FALSE(video.save_to_file);
     EXPECT_EQ(video.output_path, std::filesystem::path("output.mp4"));
 
     const gstreamer::PipelineConfig pipeline;
     EXPECT_TRUE(pipeline.pipeline_description.empty());
-    EXPECT_FALSE(pipeline.enable_tensor_meta);
-    EXPECT_TRUE(pipeline.synchronous_mode);
     EXPECT_EQ(pipeline.timeout_ms, 5000U);
 
     const gstreamer::FrameMetadata frame;

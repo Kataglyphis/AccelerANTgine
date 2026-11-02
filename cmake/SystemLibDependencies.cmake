@@ -105,7 +105,6 @@ else()
 endif()
 accelerantgine_assert_ort_chain_build("${_ort_runtime}" "${_ort_chain_marker}" "${_ort_root}")
 
-set(ONNXRUNTIME_FOUND TRUE)
 set(ONNXRUNTIME_LIBRARY "${_ONNXRUNTIME_LIB}")
 set(ONNXRUNTIME_INCLUDE_DIR "${_ONNXRUNTIME_INCLUDE_DIR}")
 message(STATUS "Found chain-built ONNX Runtime at: ${_ort_root}")

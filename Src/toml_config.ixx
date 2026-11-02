@@ -9,9 +9,9 @@ module;
 
 export module kataglyphis.toml_config;
 
-export namespace kataglyphis::config {
+export import kataglyphis.config_error;
 
-enum class TomlConfigError { FileNotFound, ParseError, MissingField, InvalidValue };
+export namespace kataglyphis::config {
 
 struct ModelConfig
 {
@@ -22,6 +22,8 @@ struct ModelConfig
     double confidence_threshold{ 0.25 };
     double iou_threshold{ 0.45 };
     std::vector<std::string> labels{};
+    // "auto" or a kataglyphis.output metadata name; empty keeps the detector's default.
+    std::string output_layout{};
     // ONNX Runtime intra-op threads; 0 keeps the engine's default.
     std::uint32_t intra_op_threads{ 0 };
 };
@@ -44,10 +46,10 @@ struct InferenceConfig
 };
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto load_inference_config(const std::filesystem::path &config_path)
-  -> std::expected<InferenceConfig, TomlConfigError>;
+  -> std::expected<InferenceConfig, ConfigError>;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto parse_inference_config(const std::string &toml_content)
-  -> std::expected<InferenceConfig, TomlConfigError>;
+  -> std::expected<InferenceConfig, ConfigError>;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto get_default_inference_config() -> InferenceConfig;
 

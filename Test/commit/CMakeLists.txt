@@ -8,7 +8,6 @@ set(PROJECT_SRC_DIR ${WORKING_DIRECTORY}Src/)
 set(PROJECT_INCLUDE_DIR ${WORKING_DIRECTORY}Src/)
 set(EXTERNAL_LIB_SRC_DIR ${WORKING_DIRECTORY}third_party/)
 
-include(${PROJECT_SRC_DIR}cmake/filters/SetProjectFilters.cmake)
 include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 
 set(COMMIT_TEST_SUITE commitTestSuite)
@@ -102,6 +101,31 @@ if(TARGET ${PROJECT_NAME}_demo)
                  "Sanitizer|runtime error")
   endfunction()
   kataglyphis_add_demo_test(HelpListsEveryMode "--detector-repeat-output <json>" --help)
+  # Its model path and output layout come from its config: the shipped one, or the one --config names.
+  set(_demo_config "${CMAKE_CURRENT_BINARY_DIR}/demo-config-test.toml")
+  file(WRITE "${_demo_config}" "[model]\nmodel_path = \"config-named.onnx\"\noutput_layout = \"auto\"\n")
+  kataglyphis_add_demo_test(
+    ReadsTheModelAndLayoutFromItsConfig
+    "config-named\\.onnx\"?\nOutput layout: auto\n"
+    --config
+    "${_demo_config}"
+    --yolo-only
+    --device
+    cpu)
+  kataglyphis_add_demo_test(
+    DefaultsToTheShippedConfig
+    "deim_dfine_n_coco\\.onnx\"?\nOutput layout: xyxy_score_class\n"
+    --yolo-only
+    --device
+    cpu)
+  set(_demo_bad_config "${CMAKE_CURRENT_BINARY_DIR}/demo-bad-layout-test.toml")
+  file(WRITE "${_demo_bad_config}" "[model]\nmodel_path = \"m.onnx\"\noutput_layout = \"rows\"\n")
+  kataglyphis_add_demo_test(
+    RefusesAnUnknownLayout
+    "Invalid output_layout: rows"
+    --config
+    "${_demo_bad_config}"
+    --yolo-only)
   kataglyphis_add_demo_test(
     OnnxExampleReportsAMissingModel
     "ONNX inference example failed!"

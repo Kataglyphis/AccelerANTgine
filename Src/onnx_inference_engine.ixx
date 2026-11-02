@@ -11,6 +11,8 @@ module;
 
 export module kataglyphis.onnx_inference;
 
+export import kataglyphis.execution_provider;
+
 export namespace kataglyphis::inference {
 
 enum class OnnxError {
@@ -57,7 +59,6 @@ struct InferenceResult
 };
 
 enum class ExecutionMode { Sequential, Parallel };
-enum class ExecutionProvider { Cpu, Cuda, MigraphX, DirectML, Xnnpack, Dnnl };
 
 struct SessionConfig
 {

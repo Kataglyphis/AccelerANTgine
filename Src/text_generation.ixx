@@ -14,6 +14,8 @@ module;
 
 export module kataglyphis.text_generation;
 
+export import kataglyphis.execution_provider;
+
 export namespace kataglyphis::text {
 
 enum class TextGenError {
@@ -29,7 +31,7 @@ enum class TextGenError {
     JsonSchemaUnsupported,
 };
 
-enum class ExecutionProvider { Cpu, Cuda, DirectML };
+using inference::ExecutionProvider;
 
 enum class FinishReason { Stop, Length, Cancelled };
 

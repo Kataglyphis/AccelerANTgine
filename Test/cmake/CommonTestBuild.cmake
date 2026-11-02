@@ -1,17 +1,6 @@
 # See third_party/ANTfrastructure/cmake/GTestDiscovery.cmake for discovery and its clang-cl fallback.
 include(GTestDiscovery)
-
-function(
-  kataglyphis_collect_project_sources
-  out_sources
-  out_headers
-  project_src_dir)
-  file(GLOB_RECURSE _kataglyphis_sources "${project_src_dir}/*.cpp")
-  list(REMOVE_ITEM _kataglyphis_sources "${project_src_dir}/Main.cpp")
-  set(${out_sources}
-      "${_kataglyphis_sources}"
-      PARENT_SCOPE)
-endfunction()
+include(EmbedTextFile)
 
 function(kataglyphis_add_config_module_to_target target_name project_src_dir)
   get_filename_component(_kataglyphis_project_src_dir "${project_src_dir}" REALPATH)
@@ -69,29 +58,6 @@ function(
   endif()
 endfunction()
 
-# Embeds a text file as `inline constexpr std::string_view <variable>` in <variable>.inc, so staged tests need no data.
-function(
-  kataglyphis_embed_text_file
-  target_name
-  source_file
-  variable)
-  set(_kataglyphis_embed_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
-  file(READ "${source_file}" KATAGLYPHIS_EMBEDDED_CONTENT)
-  set(KATAGLYPHIS_EMBEDDED_VARIABLE "${variable}")
-  file(
-    CONFIGURE
-    OUTPUT
-    "${_kataglyphis_embed_dir}/${variable}.inc"
-    CONTENT
-    "inline constexpr std::string_view @KATAGLYPHIS_EMBEDDED_VARIABLE@ = R\"kgembed(@KATAGLYPHIS_EMBEDDED_CONTENT@)kgembed\";\n"
-    @ONLY)
-  set_property(
-    DIRECTORY
-    APPEND
-    PROPERTY CMAKE_CONFIGURE_DEPENDS "${source_file}")
-  target_include_directories(${target_name} PRIVATE "${_kataglyphis_embed_dir}")
-endfunction()
-
 # A suite that calls the library: it imports its modules, includes the C header and reads the shipped config.
 function(kataglyphis_configure_library_test_target target_name)
   set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
@@ -100,6 +66,7 @@ function(kataglyphis_configure_library_test_target target_name)
     ${target_name} PRIVATE KATAGLYPHIS_TEST_PROJECT_VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
   kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/resources/configs/inference_config.toml"
                               kShippedInferenceConfig)
+  kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/resources/coco-classes.txt" kCocoClasses)
   kataglyphis_embed_text_file(${target_name} "${PROJECT_SOURCE_DIR}/third_party/ModelANT/contracts/inference-v1.json"
                               kInferenceContract)
 endfunction()

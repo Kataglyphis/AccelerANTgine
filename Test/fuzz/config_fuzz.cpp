@@ -77,7 +77,7 @@ FUZZ_TEST(ConfigFuzz, StringSettingsRoundTrip).WithDomains(fuzztest::PrintableAs
 void ParseInferenceConfigNeverCrashes(const std::string &bytes)
 {
     const auto config = cfg::parse_inference_config(bytes);
-    if (!config.has_value()) { EXPECT_EQ(config.error(), cfg::TomlConfigError::ParseError); }
+    if (!config.has_value()) { EXPECT_EQ(config.error(), cfg::ConfigError::ParseError); }
 }
 FUZZ_TEST(ConfigFuzz, ParseInferenceConfigNeverCrashes)
   .WithSeeds({ { std::string(kShippedInferenceConfig) }, { "[model]\ninput_width = 320\n" }, { "" } });

@@ -185,7 +185,6 @@ struct GStreamerPipeline::Impl
     std::mutex callback_mutex;
     std::atomic<bool> is_playing{ false };
     std::atomic<bool> is_paused{ false };
-    std::string caps_string;
 
     GMainLoop *main_loop{ nullptr };
     std::thread main_loop_thread;
@@ -341,29 +340,8 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
 
     impl_->cleanup();
 
-    std::string pipeline_desc;
-
-    if (input_source.contains("://")) {
-        pipeline_desc = "uridecodebin uri=" + input_source + " ! ";
-    } else if (input_source.starts_with("/dev/video")) {
-        pipeline_desc = "v4l2src device=" + input_source + " ! ";
-    } else {
-        pipeline_desc = "filesrc location=" + input_source + " ! decodebin ! ";
-    }
-
-    pipeline_desc +=
-      "videoconvert ! videoscale ! "
-      "video/x-raw,format=RGB,width=640,height=480 ! "
-      "tensor_transform mode=transpose option=1:2:0:3 ! "
-      "tensor_transform mode=typecast option=float32 ! "
-      "onnxruntime model-path="
-      + model_path;
-
-    if (output_format == "TENSOR") { pipeline_desc += " ! tensor_decoder mode=direct"; }
-
-    pipeline_desc += " ! appsink name=sink emit-signals=true";
-
-    auto pipeline = parse_pipeline_description(pipeline_desc, "Inference pipeline creation failed");
+    auto pipeline = parse_pipeline_description(
+      inference_pipeline_description(input_source, model_path, output_format), "Inference pipeline creation failed");
     if (!pipeline) { return std::unexpected(pipeline.error()); }
     impl_->pipeline = *pipeline;
 
@@ -481,47 +459,6 @@ auto GStreamerPipeline::push_buffer(void *data, std::size_t size, const FrameMet
     return {};
 }
 
-auto GStreamerPipeline::get_position_ns() const -> std::expected<std::uint64_t, GStreamerError>
-{
-    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
-
-    gint64 position = 0;
-    if (gst_element_query_position(impl_->pipeline, GST_FORMAT_TIME, &position) == 0) {
-        return std::unexpected(GStreamerError::ResourceNotFound);
-    }
-
-    return static_cast<std::uint64_t>(position);
-}
-
-auto GStreamerPipeline::get_duration_ns() const -> std::expected<std::uint64_t, GStreamerError>
-{
-    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
-
-    gint64 duration = 0;
-    if (gst_element_query_duration(impl_->pipeline, GST_FORMAT_TIME, &duration) == 0) {
-        return std::unexpected(GStreamerError::ResourceNotFound);
-    }
-
-    return static_cast<std::uint64_t>(duration);
-}
-
-auto GStreamerPipeline::seek(std::uint64_t timestamp_ns) -> std::expected<void, GStreamerError>
-{
-    if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
-
-    if (gst_element_seek_simple(impl_->pipeline,
-          GST_FORMAT_TIME,
-          static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
-          static_cast<gint64>(timestamp_ns))
-        == 0) {
-        return std::unexpected(GStreamerError::ResourceNotFound);
-    }
-
-    return {};
-}
-
-auto GStreamerPipeline::get_caps_string() const -> std::string { return impl_->caps_string; }
-
 auto GStreamerPipeline::get_current_state() const -> int
 {
     if (impl_->pipeline == nullptr) { return GST_STATE_NULL; }
@@ -529,6 +466,95 @@ auto GStreamerPipeline::get_current_state() const -> int
     GstState state;
     gst_element_get_state(impl_->pipeline, &state, nullptr, 0);
     return static_cast<int>(state);
+}
+
+auto quote_pipeline_value(const std::string &value) -> std::string
+{
+    std::string escaped;
+    escaped.reserve(value.size() + 2);
+    escaped.push_back('"');
+    for (const char ch : value) {
+        if (ch == '\\' || ch == '"') { escaped.push_back('\\'); }
+        escaped.push_back(ch);
+    }
+    escaped.push_back('"');
+    return escaped;
+}
+
+auto inference_pipeline_description(const std::string &input_source,
+  const std::string &model_path,
+  const std::string &output_format) -> std::string
+{
+    std::string pipeline_desc;
+
+    if (input_source.contains("://")) {
+        pipeline_desc = "uridecodebin uri=" + quote_pipeline_value(input_source) + " ! ";
+    } else if (input_source.starts_with("/dev/video")) {
+        pipeline_desc = "v4l2src device=" + quote_pipeline_value(input_source) + " ! ";
+    } else {
+        pipeline_desc = "filesrc location=" + quote_pipeline_value(input_source) + " ! decodebin ! ";
+    }
+
+    pipeline_desc +=
+      "videoconvert ! videoscale ! "
+      "video/x-raw,format=RGB,width=640,height=480 ! "
+      "tensor_transform mode=transpose option=1:2:0:3 ! "
+      "tensor_transform mode=typecast option=float32 ! "
+      "onnxruntime model-path="
+      + quote_pipeline_value(model_path);
+
+    if (output_format == "TENSOR") { pipeline_desc += " ! tensor_decoder mode=direct"; }
+
+    pipeline_desc += " ! appsink name=sink emit-signals=true";
+    return pipeline_desc;
+}
+
+auto video_inference_pipeline_description(const std::string &video_source,
+  const std::string &model_path,
+  std::uint32_t width,
+  std::uint32_t height,
+  const std::string &output_sink) -> std::string
+{
+    std::string pipeline_desc;
+
+    if (video_source.contains("://")) {
+        pipeline_desc = "uridecodebin uri=" + quote_pipeline_value(video_source) + " ! ";
+    } else {
+        pipeline_desc = "filesrc location=" + quote_pipeline_value(video_source) + " ! decodebin ! ";
+    }
+
+    pipeline_desc += "videoconvert ! videoscale ! "
+                     "video/x-raw,format=RGB,width="
+                     + std::to_string(width) + ",height=" + std::to_string(height)
+                     + " ! "
+                       "tensor_transform mode=transpose option=1:2:0:3 ! "
+                       "tensor_transform mode=typecast option=float32 ! "
+                       "onnxruntime model-path="
+                     + quote_pipeline_value(model_path);
+
+    if (output_sink == "appsink") {
+        pipeline_desc += " ! appsink name=sink emit-signals=true sync=false";
+    } else if (output_sink == "fakesink") {
+        pipeline_desc += " ! fakesink sync=false";
+    }
+    return pipeline_desc;
+}
+
+auto camera_inference_pipeline_description(const std::string &device,
+  const std::string &model_path,
+  std::uint32_t width,
+  std::uint32_t height,
+  std::uint32_t fps) -> std::string
+{
+    return "v4l2src device=" + quote_pipeline_value(device) + " ! "
+           "video/x-raw,width="
+           + std::to_string(width) + ",height=" + std::to_string(height) + ",framerate=" + std::to_string(fps)
+           + "/1 ! "
+             "videoconvert ! "
+             "tensor_transform mode=transpose option=1:2:0:3 ! "
+             "tensor_transform mode=typecast option=float32 ! "
+             "onnxruntime model-path="
+           + quote_pipeline_value(model_path) + " ! appsink name=sink emit-signals=true sync=false";
 }
 
 auto create_video_inference_pipeline(const std::string &video_source,
@@ -543,28 +569,8 @@ auto create_video_inference_pipeline(const std::string &video_source,
 
     GStreamerPipeline pipeline;
 
-    std::string pipeline_desc;
-
-    if (video_source.contains("://")) {
-        pipeline_desc = "uridecodebin uri=" + video_source + " ! ";
-    } else {
-        pipeline_desc = "filesrc location=" + video_source + " ! decodebin ! ";
-    }
-
-    pipeline_desc += "videoconvert ! videoscale ! "
-        "video/x-raw,format=RGB,width=" + std::to_string(width) + 
-        ",height=" + std::to_string(height) + " ! "
-        "tensor_transform mode=transpose option=1:2:0:3 ! "
-        "tensor_transform mode=typecast option=float32 ! "
-        "onnxruntime model-path=" + model_path;
-
-    if (output_sink == "appsink") {
-        pipeline_desc += " ! appsink name=sink emit-signals=true sync=false";
-    } else if (output_sink == "fakesink") {
-        pipeline_desc += " ! fakesink sync=false";
-    }
-
-    auto result = pipeline.create_pipeline_from_string(pipeline_desc);
+    auto result = pipeline.create_pipeline_from_string(
+      video_inference_pipeline_description(video_source, model_path, width, height, output_sink));
     if (!result) { return std::unexpected(result.error()); }
 
     return pipeline;
@@ -582,18 +588,8 @@ auto create_camera_inference_pipeline(const std::string &device,
 
     GStreamerPipeline pipeline;
 
-    std::string pipeline_desc = 
-        "v4l2src device=" + device + " ! "
-        "video/x-raw,width=" + std::to_string(width) + 
-        ",height=" + std::to_string(height) +
-        ",framerate=" + std::to_string(fps) + "/1 ! "
-        "videoconvert ! "
-        "tensor_transform mode=transpose option=1:2:0:3 ! "
-        "tensor_transform mode=typecast option=float32 ! "
-        "onnxruntime model-path=" + model_path + " ! "
-        "appsink name=sink emit-signals=true sync=false";
-
-    auto result = pipeline.create_pipeline_from_string(pipeline_desc);
+    auto result = pipeline.create_pipeline_from_string(
+      camera_inference_pipeline_description(device, model_path, width, height, fps));
     if (!result) { return std::unexpected(result.error()); }
 
     return pipeline;

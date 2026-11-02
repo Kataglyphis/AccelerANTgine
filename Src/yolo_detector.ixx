@@ -92,8 +92,9 @@ struct YoloConfig
     std::vector<std::string> labels;
 };
 
-// A detector config from the [model] table: thresholds, input size, labels and the ORT thread count.
-[[nodiscard]] KATAGLYPHIS_CPP_API auto yolo_config_from(const config::ModelConfig &model) -> YoloConfig;
+// A detector config from the [model] table; an unknown output_layout is InvalidValue, unset keeps the default.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto yolo_config_from(const config::ModelConfig &model)
+  -> std::expected<YoloConfig, config::ConfigError>;
 
 // Decodes with config's layout, then suppresses overlaps; a shape the layout cannot read is InvalidOutputShape.
 [[nodiscard]] KATAGLYPHIS_CPP_API auto decode_detections(const inference::TensorData &output,
@@ -150,8 +151,6 @@ struct VideoDetectionConfig
 {
     YoloConfig yolo_config;
     gstreamer::PipelineConfig gstreamer_config;
-    bool display_results{ false };
-    bool save_to_file{ false };
     std::filesystem::path output_path{ "output.mp4" };
 };
 
@@ -191,6 +190,15 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
+
+[[nodiscard]] KATAGLYPHIS_CPP_API auto camera_detection_pipeline_description(const std::string &device,
+  std::uint32_t width,
+  std::uint32_t height,
+  std::uint32_t fps) -> std::string;
+
+[[nodiscard]] KATAGLYPHIS_CPP_API auto video_detection_pipeline_description(const std::string &video_source,
+  std::uint32_t width,
+  std::uint32_t height) -> std::string;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_camera_detection_pipeline(const std::string &device,
   const std::filesystem::path &model_path,

@@ -205,11 +205,17 @@ def get_default_webrtc_config() -> WebRTCConfig:
     """Get the default WebRTC configuration."""
 
 class ExecutionProvider(enum.Enum):
-    CPU = 0
+    Cpu = 0
 
-    CUDA = 1
+    Cuda = 1
 
-    DIRECTML = 2
+    MigraphX = 2
+
+    DirectML = 3
+
+    Xnnpack = 4
+
+    Dnnl = 5
 
 class FinishReason(enum.Enum):
     STOP = 0
@@ -285,7 +291,7 @@ class GenerationResult:
 class TextGenerator:
     def __init__(self) -> None: ...
 
-    def initialize(self, model_dir: str | os.PathLike, provider: ExecutionProvider = ExecutionProvider.CPU) -> None:
+    def initialize(self, model_dir: str | os.PathLike, provider: ExecutionProvider = ExecutionProvider.Cpu) -> None:
         """Load a GenAI model directory. Releases the GIL while the model loads."""
 
     def is_initialized(self) -> bool: ...
@@ -336,19 +342,6 @@ class ExecutionMode(enum.Enum):
 
     Parallel = 1
 
-class OnnxExecutionProvider(enum.Enum):
-    Cpu = 0
-
-    Cuda = 1
-
-    MigraphX = 2
-
-    DirectML = 3
-
-    Xnnpack = 4
-
-    Dnnl = 5
-
 class SessionConfig:
     def __init__(self) -> None: ...
 
@@ -389,10 +382,10 @@ class SessionConfig:
     def execution_mode(self, arg: ExecutionMode, /) -> None: ...
 
     @property
-    def execution_provider(self) -> OnnxExecutionProvider: ...
+    def execution_provider(self) -> ExecutionProvider: ...
 
     @execution_provider.setter
-    def execution_provider(self, arg: OnnxExecutionProvider, /) -> None: ...
+    def execution_provider(self, arg: ExecutionProvider, /) -> None: ...
 
     @property
     def device_id(self) -> int: ...
@@ -555,10 +548,10 @@ class YoloConfig:
     def output_layout(self, arg: YoloOutputLayout, /) -> None: ...
 
     @property
-    def execution_provider(self) -> OnnxExecutionProvider: ...
+    def execution_provider(self) -> ExecutionProvider: ...
 
     @execution_provider.setter
-    def execution_provider(self, arg: OnnxExecutionProvider, /) -> None: ...
+    def execution_provider(self, arg: ExecutionProvider, /) -> None: ...
 
     @property
     def device_id(self) -> int: ...

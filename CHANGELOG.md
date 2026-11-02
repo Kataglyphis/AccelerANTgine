@@ -18,6 +18,25 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### 2026-11-02: one owner per fact
+
+- **Changed:** `resources/coco-classes.txt` is the hub's synced COCO list (`coco-classes` row);
+  `yolo_detector.cpp` compiles it in and `inference_config.toml` no longer repeats the names.
+- **Changed:** `AccelerANTgine_demo` reads its model path and output layout from config (the
+  shipped TOML compiled in, or `--config`); `[model] output_layout` is new and an unknown name fails.
+  `yolo_config_from` returns `std::expected<YoloConfig, ConfigError>`.
+- **Changed:** one `ExecutionProvider` (`kataglyphis.execution_provider`) and one `ConfigError`
+  (`kataglyphis.config_error`). `TomlConfigError` is gone. The text generator answers
+  `ProviderUnavailable` for `MigraphX`, `Xnnpack` and `Dnnl`. Python: `OnnxExecutionProvider` and
+  the upper-case `ExecutionProvider.CPU`, `CUDA`, `DIRECTML` become `ExecutionProvider.Cpu`, `Cuda`,
+  `DirectML`. The C ABI's provider codes do not change.
+- **Removed:** `GStreamerPipeline::seek`, `get_position_ns`, `get_duration_ns`, `get_caps_string`,
+  no callers; the never-read `display_results`, `save_to_file`, `enable_tensor_meta` and
+  `synchronous_mode`; the unreachable no-ONNX Runtime CMake branch, the `Main.cpp` source group and
+  `kataglyphis_collect_project_sources`.
+- **Fixed:** every pipeline builder quotes its paths through `gstreamer::quote_pipeline_value`, so a
+  path holding `" ! "` cannot split a pipeline.
+
 ### Changed (2026-11-01, tests that can fail)
 - clang-tidy reports without `-fix` in `run-static-analysis-format.sh` and `Build-Windows.ps1`; its
   Linux findings go to `logs/code-quality/clang-tidy.txt`, and the script ends with

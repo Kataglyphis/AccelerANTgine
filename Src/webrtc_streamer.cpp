@@ -24,6 +24,7 @@ module kataglyphis.webrtc_streamer;
 
 import kataglyphis.project_config;
 import kataglyphis.config_loader;
+import kataglyphis.gstreamer_pipeline;
 import kataglyphis.log;
 
 namespace kataglyphis::webrtc {
@@ -62,18 +63,7 @@ namespace {
     auto make_default_producer_id() -> std::string
     { return "stream-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count() % 100000); }
 
-    auto quote_pipeline_value(const std::string &value) -> std::string
-    {
-        std::string escaped;
-        escaped.reserve(value.size() + 2);
-        escaped.push_back('"');
-        for (const char ch : value) {
-            if (ch == '\\' || ch == '"') { escaped.push_back('\\'); }
-            escaped.push_back(ch);
-        }
-        escaped.push_back('"');
-        return escaped;
-    }
+    using gstreamer::quote_pipeline_value;
 
     auto to_file_uri(const std::string &path) -> std::string
     {

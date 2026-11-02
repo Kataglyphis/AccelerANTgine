@@ -9,6 +9,8 @@
 #include <thread>
 #include <vector>
 
+#include "kShippedInferenceConfig.inc"
+
 #include "demo_device.hpp"
 #include "demo_model.hpp"
 #include "standalone_gstreamer_environment.hpp"
@@ -329,29 +331,29 @@ static auto run_video_detection_check(const detection::YoloConfig &yolo_config,
 
 static void print_usage(const char *program_name)
 {
-    std::cout
-      << "Usage: " << program_name << " [options]\n\n"
-      << "Options:\n"
-      << "  --model <path>     ONNX model (default: bundled model, else models/deim_dfine_n_coco.onnx)\n"
-      << "  --onnx-only        Run only ONNX inference example\n"
-      << "  --config <toml>    Detector settings from a [model] table (resources/configs/inference_config.toml)\n"
-      << "  --device <name>    cpu, cuda, migraphx, directml, xnnpack or dnnl (default: "
-      << kataglyphis::demo::default_device << ")\n"
-      << "  --device-id <id>   Provider device index (default: 0)\n"
-      << "  --threads <n>      ONNX Runtime intra-op threads (default: the config's, else 4)\n"
-      << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
-      << "  --gstreamer-only   Run only GStreamer pipeline example\n"
-      << "  --yolo-only        Run only YOLO detection example\n"
-      << "  --video-only       Run only video detection example\n"
-      << "  --video-check      Run model inference on one synthetic GStreamer video frame\n"
-      << "  --detector-image <jpg> --detector-output <json> --profile <prefix>\n"
-      << "                     Profile a JPEG detector run (new output file and profile directory)\n"
-      << "  --detector-repeat-output <json>  Repeat detection in the same session\n"
-      << "  --all              Run all examples\n"
-      << "  --help             Show this help message\n\n"
-      << "Examples:\n"
-      << "  " << program_name << " --model models/deim_dfine_n_coco.onnx --all\n"
-      << "  " << program_name << " --onnx-only\n";
+    std::cout << "Usage: " << program_name << " [options]\n\n"
+              << "Options:\n"
+              << "  --model <path>     ONNX model (default: the config's model_path, bundled if packaged)\n"
+              << "  --onnx-only        Run only ONNX inference example\n"
+              << "  --config <toml>    Model path, output layout and detector settings (default: the shipped "
+                 "inference_config.toml)\n"
+              << "  --device <name>    cpu, cuda, migraphx, directml, xnnpack or dnnl (default: "
+              << kataglyphis::demo::default_device << ")\n"
+              << "  --device-id <id>   Provider device index (default: 0)\n"
+              << "  --threads <n>      ONNX Runtime intra-op threads (default: the config's, else 4)\n"
+              << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
+              << "  --gstreamer-only   Run only GStreamer pipeline example\n"
+              << "  --yolo-only        Run only YOLO detection example\n"
+              << "  --video-only       Run only video detection example\n"
+              << "  --video-check      Run model inference on one synthetic GStreamer video frame\n"
+              << "  --detector-image <jpg> --detector-output <json> --profile <prefix>\n"
+              << "                     Profile a JPEG detector run (new output file and profile directory)\n"
+              << "  --detector-repeat-output <json>  Repeat detection in the same session\n"
+              << "  --all              Run all examples\n"
+              << "  --help             Show this help message\n\n"
+              << "Examples:\n"
+              << "  " << program_name << " --config resources/configs/inference_config.toml --all\n"
+              << "  " << program_name << " --onnx-only\n";
 }
 
 auto main(int argc, char *argv[]) -> int
@@ -362,7 +364,7 @@ auto main(int argc, char *argv[]) -> int
         return 1;
     }
 #endif
-    std::filesystem::path model_path = kataglyphis::demo::default_model();
+    std::filesystem::path model_path;
     bool run_onnx = false;
     bool run_gstreamer = false;
     bool run_yolo = false;
@@ -443,21 +445,27 @@ auto main(int argc, char *argv[]) -> int
         }
     }
 
-    detection::YoloConfig base;
-    if (!config_path.empty()) {
-        const auto loaded = kataglyphis::config::load_inference_config(config_path);
-        if (!loaded) {
-            std::cerr << "Could not read the config " << config_path << "\n";
-            return 2;
-        }
-        base = detection::yolo_config_from(loaded->model);
+    const auto loaded = config_path.empty()
+                          ? kataglyphis::config::parse_inference_config(std::string(kShippedInferenceConfig))
+                          : kataglyphis::config::load_inference_config(config_path);
+    if (!loaded) {
+        std::cerr << "Could not read the config " << config_path << "\n";
+        return 2;
     }
-    if (model_given || base.model_path.empty()) { base.model_path = model_path; }
+    auto configured = detection::yolo_config_from(loaded->model);
+    if (!configured) {
+        std::cerr << "Invalid output_layout: " << loaded->model.output_layout << "\n";
+        return 2;
+    }
+    detection::YoloConfig base = *configured;
+    if (model_given) {
+        base.model_path = model_path;
+    } else if (config_path.empty()) {
+        base.model_path = kataglyphis::demo::default_model(base.model_path);
+    }
     if (threads > 0) { base.intra_op_num_threads = threads; }
     base.execution_provider = *provider;
     base.device_id = device_id;
-    // The default model, DEIM-D-FINE-N, is an end-to-end export.
-    base.output_layout = detection::YoloOutputLayout::CornersScoreClass;
     model_path = base.model_path;
 
     if (!detector_image.empty() || !detector_output.empty() || !detector_repeat_output.empty()) {
@@ -475,7 +483,8 @@ auto main(int argc, char *argv[]) -> int
 
     std::cout << "Kataglyphis ONNX Runtime + GStreamer Inference Demo\n";
     std::cout << "==================================================\n\n";
-    std::cout << "Model: " << model_path << "\n\n";
+    std::cout << "Model: " << model_path << "\n";
+    std::cout << "Output layout: " << loaded->model.output_layout << "\n\n";
 
     int result = 0;
 

@@ -63,7 +63,8 @@ The library API defaults to CPU. Embedders can choose ``ExecutionProvider::Cuda`
 ``ExecutionProvider::MigraphX`` for AMD on Linux, ``ExecutionProvider::DirectML`` for a
 DirectX 12 GPU on Windows, or the CPU providers ``ExecutionProvider::Xnnpack`` and
 ``ExecutionProvider::Dnnl`` in either ``SessionConfig`` or ``YoloConfig``. The Python bindings
-expose these values as ``OnnxExecutionProvider`` with ``execution_provider`` and ``device_id`` fields.
+expose these values as ``ExecutionProvider``, the one enum the detector and the text generator share,
+with ``execution_provider`` and ``device_id`` fields.
 For the locked DEIM model, Python callers must also set ``YoloConfig.output_layout`` to
 ``YoloOutputLayout.CornersScoreClass`` or ``Auto``; the default ``CenterObjectnessScores`` is for YOLOv5 rows.
 The existing ``enable_cuda`` field remains supported. A conflicting provider and CUDA request or a
@@ -90,7 +91,12 @@ locked model as described in ``models/README.md``, then run, for example::
    AccelerANTgine_demo --onnx-only --model models/deim_dfine_n_coco.onnx --device cuda --device-id 0 --profile ort-profile
 
 Use ``directml`` on Windows AMD GPUs, ``migraphx`` on Linux AMD GPUs, or ``xnnpack`` and ``dnnl``
-for the CPU providers. ``--config <toml>`` reads the detector settings from a ``[model]`` table. The device index is a
+for the CPU providers. The demo reads its model path, output layout and detector settings from a ``[model]`` table:
+the shipped ``resources/configs/inference_config.toml``, compiled in, or the file ``--config <toml>`` names.
+``output_layout`` takes ``auto`` or a ``kataglyphis.output`` metadata name (``xyxy_score_class``,
+``cxcywh_objectness_scores``, ``cxcywh_scores_by_anchor``); an unknown name fails. A packaged demo
+looks for the shipped config's model file in its package directory; ``--model`` overrides.
+``labels`` is optional: left out, class names come from ``resources/coco-classes.txt``, compiled in. The device index is a
 DXGI adapter index for DirectML and a provider device index for CUDA or MIGraphX. The demo prints
 the generated JSON profile path. With ANTfrastructure checked out, confirm model operators ran
 on the requested provider using ``python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py

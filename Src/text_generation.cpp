@@ -217,7 +217,8 @@ namespace {
     using Params = std::unique_ptr<OgaGeneratorParams, Release<OgaGeneratorParams, &GenaiApi::DestroyGeneratorParams>>;
     using Generator = std::unique_ptr<OgaGenerator, Release<OgaGenerator, &GenaiApi::DestroyGenerator>>;
 
-    auto provider_name(ExecutionProvider provider) -> const char *
+    // GenAI's provider name, nullptr for CPU; a provider GenAI has no route to is ProviderUnavailable.
+    auto provider_name(ExecutionProvider provider) -> std::expected<const char *, TextGenError>
     {
         switch (provider) {
         case ExecutionProvider::Cuda:
@@ -225,9 +226,13 @@ namespace {
         case ExecutionProvider::DirectML:
             return "dml";
         case ExecutionProvider::Cpu:
+            return nullptr;
+        case ExecutionProvider::MigraphX:
+        case ExecutionProvider::Xnnpack:
+        case ExecutionProvider::Dnnl:
             break;
         }
-        return nullptr;
+        return std::unexpected(TextGenError::ProviderUnavailable);
     }
 
     auto messages_json(const std::vector<ChatMessage> &messages) -> std::string
@@ -423,6 +428,8 @@ auto TextGenerator::operator=(TextGenerator &&) noexcept -> TextGenerator & = de
 auto TextGenerator::initialize(const std::filesystem::path &model_dir, ExecutionProvider provider)
   -> std::expected<void, TextGenError>
 {
+    const auto name = provider_name(provider);
+    if (!name) { return std::unexpected(name.error()); }
     const std::unique_lock lock(impl_->mutex);
     const GenaiApi *api = load_api();
     if (api == nullptr) { return std::unexpected(TextGenError::LibraryUnavailable); }
@@ -431,9 +438,8 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
         return std::unexpected(TextGenError::ModelLoadFailed);
     }
     const Config config{ raw_config, { api } };
-    const char *name = provider_name(provider);
     if (!succeeded(*api, api->ConfigClearProviders(config.get()), "providers")
-        || (name != nullptr && !succeeded(*api, api->ConfigAppendProvider(config.get(), name), name))) {
+        || (*name != nullptr && !succeeded(*api, api->ConfigAppendProvider(config.get(), *name), *name))) {
         return std::unexpected(TextGenError::ProviderUnavailable);
     }
     OgaModel *raw_model = nullptr;

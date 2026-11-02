@@ -9,9 +9,9 @@ module;
 
 export module kataglyphis.config_loader;
 
-export namespace kataglyphis::config {
+export import kataglyphis.config_error;
 
-enum class ConfigError { FileNotFound, ParseError, MissingField, InvalidValue };
+export namespace kataglyphis::config {
 
 /// Video settings from webrtc_settings.json
 struct VideoConfig

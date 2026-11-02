@@ -2,9 +2,6 @@ set(PROJECT_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(PROJECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(EXTERNAL_LIB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/")
 
-include(cmake/filters/SetProjectFilters.cmake)
-include(cmake/SetSourceGroups.cmake)
-
 file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
 # Programs with their own main(): the library must carry none, or every embedder links a dead one.
@@ -13,21 +10,6 @@ list(
   KataglyphisCppProject_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/inference_demo.cpp")
-
-# ONNXRUNTIME_FOUND comes from SystemLibDependencies.cmake, which must run first.
-if(NOT ONNXRUNTIME_FOUND)
-  message(STATUS "Excluding ONNX inference sources (ONNX Runtime not found)")
-  list(
-    REMOVE_ITEM
-    KataglyphisCppProject_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/onnx_inference_engine.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.cpp")
-  list(
-    REMOVE_ITEM
-    KataglyphisCppProject_MODULES
-    "${CMAKE_CURRENT_SOURCE_DIR}/onnx_inference_engine.ixx"
-    "${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.ixx")
-endif()
 
 set(KataglyphisCppProjectConfig_MODULE_IN "${CMAKE_CURRENT_SOURCE_DIR}/KataglyphisCppProjectConfig.ixx.in")
 set(KataglyphisCppProjectConfig_MODULE_OUT "${CMAKE_CURRENT_BINARY_DIR}/KataglyphisCppProjectConfig.ixx")
@@ -48,6 +30,8 @@ corrosion_add_cxxbridge(
 
 # add the executable
 add_library(${PROJECT_NAME} SHARED)
+include(EmbedTextFile)
+kataglyphis_embed_text_file(${PROJECT_NAME} "${PROJECT_SOURCE_DIR}/resources/coco-classes.txt" kCocoClassList)
 set_target_properties(
   ${PROJECT_NAME}
   PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
@@ -63,14 +47,13 @@ if(PROJECT_IS_TOP_LEVEL)
     set_target_properties(${PROJECT_NAME}_cli PROPERTIES OUTPUT_NAME "${PROJECT_NAME}" RUNTIME_OUTPUT_DIRECTORY
                                                                                        "${CMAKE_BINARY_DIR}/bin")
     set_target_properties(${PROJECT_NAME}_cli PROPERTIES CXX_SCAN_FOR_MODULES ON)
-    # The demo models/README.md runs; it needs the ONNX modules the library drops without ONNX Runtime.
-    if(ONNXRUNTIME_FOUND)
-      add_executable(${PROJECT_NAME}_demo inference_demo.cpp)
-      accelerantgine_configure_demo_device(${PROJECT_NAME}_demo "${KATAGLYPHIS_ORT_VARIANT}" "${CMAKE_SYSTEM_NAME}")
-      kataglyphis_add_windows_icon(${PROJECT_NAME}_demo "${PROJECT_SOURCE_DIR}/images/faviconNew.ico")
-      set_target_properties(${PROJECT_NAME}_demo PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-                                                            CXX_SCAN_FOR_MODULES ON)
-    endif()
+    add_executable(${PROJECT_NAME}_demo inference_demo.cpp)
+    kataglyphis_embed_text_file(${PROJECT_NAME}_demo "${PROJECT_SOURCE_DIR}/resources/configs/inference_config.toml"
+                                kShippedInferenceConfig)
+    accelerantgine_configure_demo_device(${PROJECT_NAME}_demo "${KATAGLYPHIS_ORT_VARIANT}" "${CMAKE_SYSTEM_NAME}")
+    kataglyphis_add_windows_icon(${PROJECT_NAME}_demo "${PROJECT_SOURCE_DIR}/images/faviconNew.ico")
+    set_target_properties(${PROJECT_NAME}_demo PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+                                                          CXX_SCAN_FOR_MODULES ON)
   else()
     message(STATUS "Skipping ${PROJECT_NAME}_cli: requires C++ modules")
   endif()

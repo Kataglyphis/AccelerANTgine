@@ -187,14 +187,6 @@ void bind_onnx(nb::module_ &m)
       .value("Sequential", ExecutionMode::Sequential)
       .value("Parallel", ExecutionMode::Parallel);
 
-    nb::enum_<ExecutionProvider>(m, "OnnxExecutionProvider")
-      .value("Cpu", ExecutionProvider::Cpu)
-      .value("Cuda", ExecutionProvider::Cuda)
-      .value("MigraphX", ExecutionProvider::MigraphX)
-      .value("DirectML", ExecutionProvider::DirectML)
-      .value("Xnnpack", ExecutionProvider::Xnnpack)
-      .value("Dnnl", ExecutionProvider::Dnnl);
-
     nb::class_<SessionConfig>(m, "SessionConfig")
       .def(nb::init<>())
       .def_rw("model_path", &SessionConfig::model_path, nb::lock_self())
@@ -492,10 +484,14 @@ void bind_text(nb::module_ &m)
     using text::GenerationResult;
     using text::TextGenerator;
 
+    // Registered here because bind_text runs first; the detector bindings reuse the same Python type.
     nb::enum_<ExecutionProvider>(m, "ExecutionProvider")
-      .value("CPU", ExecutionProvider::Cpu)
-      .value("CUDA", ExecutionProvider::Cuda)
-      .value("DIRECTML", ExecutionProvider::DirectML);
+      .value("Cpu", ExecutionProvider::Cpu)
+      .value("Cuda", ExecutionProvider::Cuda)
+      .value("MigraphX", ExecutionProvider::MigraphX)
+      .value("DirectML", ExecutionProvider::DirectML)
+      .value("Xnnpack", ExecutionProvider::Xnnpack)
+      .value("Dnnl", ExecutionProvider::Dnnl);
     nb::enum_<FinishReason>(m, "FinishReason")
       .value("STOP", FinishReason::Stop)
       .value("LENGTH", FinishReason::Length)

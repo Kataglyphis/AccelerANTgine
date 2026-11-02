@@ -5,8 +5,6 @@ set(PROJECT_SRC_DIR ${WORKING_DIRECTORY}Src/)
 set(PROJECT_INCLUDE_DIR ${WORKING_DIRECTORY}Src/)
 set(EXTERNAL_LIB_SRC_DIR ${WORKING_DIRECTORY}third_party/)
 
-include(${PROJECT_SRC_DIR}cmake/filters/SetProjectFilters.cmake)
-
 include(cmake/SetTestFilters.cmake)
 include(${WORKING_DIRECTORY}Test/cmake/CommonTestBuild.cmake)
 

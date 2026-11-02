@@ -227,8 +227,8 @@ written out rather than linked.
   rewrite of 2026-10-17
   ([`data-repositories.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/data-repositories.md#what-moved-and-why))
   took this pack from 12 to 2 MiB. The AGPL-3.0 `models/yolo26n.onnx` (9.5 MiB) left the tree on
-  2026-10-14 (owner): `Src/inference_demo.cpp` and `resources/configs/inference_config.toml` now
-  name `models/deim_dfine_n_coco.onnx` (Apache-2.0), from
+  2026-10-14 (owner): `resources/configs/inference_config.toml`, which the demo compiles in, now
+  names `models/deim_dfine_n_coco.onnx` (Apache-2.0), from
   [ModelANT](https://github.com/Kataglyphis/ModelANT)'s release. `models/models.lock` pins it and
   its license and notice by SHA-256, and the hub's `fetch-data-lock.py` fetches them
   (`models/README.md`); no other fetcher exists here. No `Test/` suite loads it.
@@ -312,6 +312,14 @@ written out rather than linked.
   Windows arm64 run job, and the `*.onnx` guard in `.gitignore` stays as it is. The shipped
   `resources/configs/inference_config.toml` is compiled into the suites
   (`kataglyphis_embed_text_file`) for the same reason.
+- **Shared facts have one owner.** The 80 COCO names are `resources/coco-classes.txt`, the hub's
+  `coco-classes` asset that lint-gates' shared-config check holds byte-identical; the library
+  compiles it in (`kataglyphis_embed_text_file`), so edit it in the hub. The demo's model path and
+  output layout come from `inference_config.toml`, compiled in, or `--config`. `ExecutionProvider`
+  (`execution_provider.ixx`) and `ConfigError` (`config_error.ixx`) each have one definition.
+- **A pipeline builder quotes every path.** `quote_pipeline_value` (`gstreamer_pipeline.ixx`) wraps
+  each source, device and model value; the description functions beside each `create_*` builder
+  let a test see the text a `" ! "` path produces, on a host without the elements.
 - **The `golden` ctest label needs the real model and never skips** (2026-11-01). `Test/golden`
   runs on the native Linux Debug lanes: `ci-build-and-test.sh` fetches `models/models.lock` before
   ctest, and a missing model fails. It matches ModelANT's `two_cats.jpg` against

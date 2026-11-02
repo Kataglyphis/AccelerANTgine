@@ -3,8 +3,8 @@
 No model is tracked here. The default, `deim_dfine_n_coco.onnx` (DEIM-D-FINE-N, Apache-2.0,
 COCO 80 classes), is built and released by [ModelANT](https://github.com/Kataglyphis/ModelANT).
 `models.lock` pins it, its license and its notice by URL and SHA-256. Fetch them before running
-the `AccelerANTgine_demo` program (`Src/inference_demo.cpp`) or
-`resources/configs/inference_config.toml`'s default:
+the `AccelerANTgine_demo` program (`Src/inference_demo.cpp`), which reads the path and output
+layout from `resources/configs/inference_config.toml`:
 
 ```bash
 python3 -I third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py --lock models/models.lock

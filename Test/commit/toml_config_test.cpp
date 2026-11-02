@@ -110,7 +110,7 @@ TEST(TomlConfig, MalformedDocumentsAreParseErrors)
            "[model]\nlabels = [\"a\"" }) {
         const auto config = cfg::parse_inference_config(std::string(document));
         ASSERT_FALSE(config.has_value()) << document;
-        EXPECT_EQ(config.error(), cfg::TomlConfigError::ParseError) << document;
+        EXPECT_EQ(config.error(), cfg::ConfigError::ParseError) << document;
     }
 }
 
@@ -173,9 +173,9 @@ TEST(TomlConfig, TheShippedConfigParses)
     EXPECT_EQ(config->model.framework, "onnx");
     EXPECT_EQ(config->model.input_width, 640U);
     EXPECT_EQ(config->model.input_height, 640U);
-    ASSERT_EQ(config->model.labels.size(), 80U);
-    EXPECT_EQ(config->model.labels.front(), "person");
-    EXPECT_EQ(config->model.labels.back(), "toothbrush");
+    EXPECT_EQ(config->model.output_layout, "xyxy_score_class");
+    // The detector's built-in names are the synced class list; the config holds no second copy.
+    EXPECT_TRUE(config->model.labels.empty());
     EXPECT_EQ(config->pipeline.capture_width, 1280U);
     EXPECT_EQ(config->pipeline.capture_height, 720U);
     EXPECT_EQ(config->pipeline.capture_fps, 30U);
@@ -199,7 +199,7 @@ TEST(TomlConfig, MissingFileIsFileNotFound)
 {
     const auto config = cfg::load_inference_config(kataglyphis::test::missing_path("inference.toml"));
     ASSERT_FALSE(config.has_value());
-    EXPECT_EQ(config.error(), cfg::TomlConfigError::FileNotFound);
+    EXPECT_EQ(config.error(), cfg::ConfigError::FileNotFound);
 }
 
 TEST(TomlConfig, MalformedFileIsAParseError)
@@ -207,5 +207,5 @@ TEST(TomlConfig, MalformedFileIsAParseError)
     const TempFile file("kataglyphis-inference-broken", ".toml", "[model\n");
     const auto config = cfg::load_inference_config(file.path());
     ASSERT_FALSE(config.has_value());
-    EXPECT_EQ(config.error(), cfg::TomlConfigError::ParseError);
+    EXPECT_EQ(config.error(), cfg::ConfigError::ParseError);
 }

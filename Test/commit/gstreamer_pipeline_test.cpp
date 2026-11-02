@@ -49,17 +49,11 @@ TEST(GStreamerPipeline, AnEmptyPipelineRefusesEveryOperation)
     EXPECT_FALSE(pipeline.is_playing());
     EXPECT_FALSE(pipeline.is_paused());
     EXPECT_EQ(pipeline.get_current_state(), kStateNull);
-    EXPECT_TRUE(pipeline.get_caps_string().empty());
     EXPECT_TRUE(pipeline.stop().has_value());
 
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.start()), gstreamer::GStreamerError::PipelineCreationFailed);
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.pause()), gstreamer::GStreamerError::PipelineCreationFailed);
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.resume()), gstreamer::GStreamerError::PipelineCreationFailed);
-    EXPECT_EQ(
-      kataglyphis::test::error_of(pipeline.get_position_ns()), gstreamer::GStreamerError::PipelineCreationFailed);
-    EXPECT_EQ(
-      kataglyphis::test::error_of(pipeline.get_duration_ns()), gstreamer::GStreamerError::PipelineCreationFailed);
-    EXPECT_EQ(kataglyphis::test::error_of(pipeline.seek(0)), gstreamer::GStreamerError::PipelineCreationFailed);
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.pull_sample(10)), gstreamer::GStreamerError::ElementCreationFailed);
 
     std::array<std::byte, 4> payload{};
@@ -260,7 +254,6 @@ TEST(GStreamerPipeline, ReportsPlayingOnceThePipelineGetsThere)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     EXPECT_EQ(pipeline.get_current_state(), kStatePlaying);
-    EXPECT_TRUE(pipeline.get_position_ns().has_value());
     EXPECT_TRUE(pipeline.stop().has_value());
 }
 
@@ -312,4 +305,32 @@ TEST(GStreamerPipeline, TheInferencePipelineNeedsNnstreamer)
     const auto camera = gstreamer::create_camera_inference_pipeline("/dev/video0", "model.onnx", 64, 48, 30);
     ASSERT_FALSE(camera.has_value());
     EXPECT_EQ(camera.error(), gstreamer::GStreamerError::PipelineCreationFailed);
+}
+
+TEST(GStreamerPipeline, QuotingEscapesTheQuoteAndTheBackslash)
+{ EXPECT_EQ(gstreamer::quote_pipeline_value(R"(a "b" \c)"), R"("a \"b\" \\c")"); }
+
+TEST(GStreamerPipeline, EveryInferenceBuilderKeepsAPathWithASeparatorInOneValue)
+{
+    const std::string model = "model ! fakesink name=injected.onnx";
+    const std::string quoted_model = "model-path=\"" + model + "\" ! ";
+    const std::string clip = "clip ! b.mp4";
+
+    const auto from_file = gstreamer::inference_pipeline_description(clip, model);
+    EXPECT_TRUE(from_file.contains("location=\"" + clip + "\" ! ")) << from_file;
+    EXPECT_TRUE(from_file.contains(quoted_model)) << from_file;
+    const auto from_device = gstreamer::inference_pipeline_description("/dev/video0 ! 1", model);
+    EXPECT_TRUE(from_device.contains("device=\"/dev/video0 ! 1\" ! ")) << from_device;
+    const auto from_uri = gstreamer::inference_pipeline_description("file:///a ! b.mp4", model);
+    EXPECT_TRUE(from_uri.contains("uri=\"file:///a ! b.mp4\" ! ")) << from_uri;
+
+    const auto video = gstreamer::video_inference_pipeline_description(clip, model, 64, 48);
+    EXPECT_TRUE(video.contains("location=\"" + clip + "\" ! ")) << video;
+    EXPECT_TRUE(video.contains(quoted_model)) << video;
+    const auto video_uri = gstreamer::video_inference_pipeline_description("file:///a ! b.mp4", model, 64, 48);
+    EXPECT_TRUE(video_uri.contains("uri=\"file:///a ! b.mp4\" ! ")) << video_uri;
+
+    const auto camera = gstreamer::camera_inference_pipeline_description("/dev/video0 ! 1", model, 64, 48, 30);
+    EXPECT_TRUE(camera.contains("device=\"/dev/video0 ! 1\" ! ")) << camera;
+    EXPECT_TRUE(camera.contains(quoted_model)) << camera;
 }

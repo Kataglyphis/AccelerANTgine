@@ -14,8 +14,10 @@ module;
 #include <mutex>
 #include <numeric>
 #include <optional>
+#include <ranges>
 #include <shared_mutex>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -30,120 +32,22 @@ import kataglyphis.log;
 namespace kataglyphis::detection {
 
 namespace {
-    constexpr std::array<const char *, 80> COCO_CLASSES = { "person",
-        "bicycle",
-        "car",
-        "motorcycle",
-        "airplane",
-        "bus",
-        "train",
-        "truck",
-        "boat",
-        "traffic light",
-        "fire hydrant",
-        "stop sign",
-        "parking meter",
-        "bench",
-        "bird",
-        "cat",
-        "dog",
-        "horse",
-        "sheep",
-        "cow",
-        "elephant",
-        "bear",
-        "zebra",
-        "giraffe",
-        "backpack",
-        "umbrella",
-        "handbag",
-        "tie",
-        "suitcase",
-        "frisbee",
-        "skis",
-        "snowboard",
-        "sports ball",
-        "kite",
-        "baseball bat",
-        "baseball glove",
-        "skateboard",
-        "surfboard",
-        "tennis racket",
-        "bottle",
-        "wine glass",
-        "cup",
-        "fork",
-        "knife",
-        "spoon",
-        "bowl",
-        "banana",
-        "apple",
-        "sandwich",
-        "orange",
-        "broccoli",
-        "carrot",
-        "hot dog",
-        "pizza",
-        "donut",
-        "cake",
-        "chair",
-        "couch",
-        "potted plant",
-        "bed",
-        "dining table",
-        "toilet",
-        "tv",
-        "laptop",
-        "mouse",
-        "remote",
-        "keyboard",
-        "cell phone",
-        "microwave",
-        "oven",
-        "toaster",
-        "sink",
-        "refrigerator",
-        "book",
-        "clock",
-        "vase",
-        "scissors",
-        "teddy bear",
-        "hair drier",
-        "toothbrush" };
+#include "kCocoClassList.inc"
 
-    auto build_camera_detection_pipeline_description(const std::string &device,
-      std::uint32_t width,
-      std::uint32_t height,
-      std::uint32_t fps) -> std::string
-    {
-        return "v4l2src device=" + device + " ! "
-               "video/x-raw,width="
-               + std::to_string(width) + ",height=" + std::to_string(height) + ",framerate="
-               + std::to_string(fps)
-               + "/1 ! "
-                 "videoconvert ! video/x-raw,format=RGB ! "
-                 "appsink name=detector_sink emit-signals=true sync=false";
-    }
-
-    auto build_video_detection_pipeline_description(const std::string &video_source,
-      std::uint32_t width,
-      std::uint32_t height) -> std::string
-    {
-        std::string pipeline_desc;
-
-        if (video_source.contains("://")) {
-            pipeline_desc = "uridecodebin uri=" + video_source + " ! ";
-        } else {
-            pipeline_desc = "filesrc location=" + video_source + " ! decodebin ! ";
+    // The list is resources/coco-classes.txt, one name per line; a Windows checkout may hold CRLF.
+    constexpr std::size_t kCocoClassCount = 80;
+    static_assert(static_cast<std::size_t>(std::ranges::count(kCocoClassList, '\n')) == kCocoClassCount);
+    constexpr auto COCO_CLASSES = [] {
+        std::array<std::string_view, kCocoClassCount> names{};
+        auto rest = kCocoClassList;
+        for (auto &name : names) {
+            const auto end = rest.find('\n');
+            name = rest.substr(0, end);
+            if (name.ends_with('\r')) { name.remove_suffix(1); }
+            rest.remove_prefix(end + 1);
         }
-
-        pipeline_desc +=
-          "videoconvert ! videoscale ! "
-          "video/x-raw,format=RGB,width="
-          + std::to_string(width) + ",height=" + std::to_string(height)
-          + " ! appsink name=detector_sink emit-signals=true sync=false";
-        return pipeline_desc;
-    }
+        return names;
+    }();
 
     // Frame pixels per model-input pixel, by which every decoded box is scaled.
     struct Scale
@@ -337,9 +241,48 @@ auto layout_from_metadata(std::string_view value) -> std::optional<YoloOutputLay
     return std::nullopt;
 }
 
-auto yolo_config_from(const config::ModelConfig &model) -> YoloConfig
+auto camera_detection_pipeline_description(const std::string &device,
+  std::uint32_t width,
+  std::uint32_t height,
+  std::uint32_t fps) -> std::string
+{
+    return "v4l2src device=" + gstreamer::quote_pipeline_value(device) + " ! "
+           "video/x-raw,width="
+           + std::to_string(width) + ",height=" + std::to_string(height) + ",framerate=" + std::to_string(fps)
+           + "/1 ! "
+             "videoconvert ! video/x-raw,format=RGB ! "
+             "appsink name=detector_sink emit-signals=true sync=false";
+}
+
+auto video_detection_pipeline_description(const std::string &video_source, std::uint32_t width, std::uint32_t height)
+  -> std::string
+{
+    std::string pipeline_desc;
+
+    if (video_source.contains("://")) {
+        pipeline_desc = "uridecodebin uri=" + gstreamer::quote_pipeline_value(video_source) + " ! ";
+    } else {
+        pipeline_desc = "filesrc location=" + gstreamer::quote_pipeline_value(video_source) + " ! decodebin ! ";
+    }
+
+    pipeline_desc +=
+      "videoconvert ! videoscale ! "
+      "video/x-raw,format=RGB,width="
+      + std::to_string(width) + ",height=" + std::to_string(height)
+      + " ! appsink name=detector_sink emit-signals=true sync=false";
+    return pipeline_desc;
+}
+
+auto yolo_config_from(const config::ModelConfig &model) -> std::expected<YoloConfig, config::ConfigError>
 {
     YoloConfig config;
+    if (model.output_layout == "auto") {
+        config.output_layout = YoloOutputLayout::Auto;
+    } else if (!model.output_layout.empty()) {
+        const auto layout = layout_from_metadata(model.output_layout);
+        if (!layout) { return std::unexpected(config::ConfigError::InvalidValue); }
+        config.output_layout = *layout;
+    }
     config.model_path = model.model_path;
     config.input_width = model.input_width;
     config.input_height = model.input_height;
@@ -761,10 +704,7 @@ auto create_camera_detection_pipeline(const std::string &device,
 
     config.yolo_config = yolo_config;
 
-    config.gstreamer_config.pipeline_description =
-      build_camera_detection_pipeline_description(device, width, height, fps);
-
-    config.gstreamer_config.enable_tensor_meta = true;
+    config.gstreamer_config.pipeline_description = camera_detection_pipeline_description(device, width, height, fps);
 
     auto result = pipeline.initialize(config);
     if (!result) { return std::unexpected(result.error()); }
@@ -792,9 +732,7 @@ auto create_video_detection_pipeline(const std::string &video_source,
 
     config.yolo_config = yolo_config;
 
-    config.gstreamer_config.pipeline_description =
-      build_video_detection_pipeline_description(video_source, width, height);
-    config.gstreamer_config.enable_tensor_meta = true;
+    config.gstreamer_config.pipeline_description = video_detection_pipeline_description(video_source, width, height);
 
     auto result = pipeline.initialize(config);
     if (!result) { return std::unexpected(result.error()); }
