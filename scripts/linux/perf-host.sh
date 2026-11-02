@@ -31,12 +31,18 @@ setup() {
   uv pip install --python "${VENV}/bin/python" --no-deps "${wheels[0]}"
 }
 
-# The CLI prints its figures to stderr as `<n> tokens, <ms> ms to the first, <rate> tokens/s`.
+# A fresh process's first reply is noisy, so one run is the per-metric median of five; the CLI prints `<n> tokens, <ms> ms to the first, <rate> tokens/s` to stderr.
 text_cpp() {
-  local figures
-  figures="$("${BUILD_DIR}/bin/AccelerANTgine" --chat_model "${LLM_MODEL}" --prompt "$(python3 -I scripts/linux/perf_host_text.py --print-prompt)" \
-    --max_new_tokens "$(python3 -I scripts/linux/perf_host_text.py --print-tokens)" 2>&1 >/dev/null)"
-  printf '%s\n' "${figures}" | sed -nE 's/^[0-9]+ tokens, ([0-9.e+-]+) ms to the first, ([0-9.e+-]+) tokens\/s$/{"ttft_ms": \1, "decode_tok_s": \2}/p' | tail -1
+  local prompt tokens figures ttft rate
+  prompt="$(python3 -I scripts/linux/perf_host_text.py --print-prompt)"
+  tokens="$(python3 -I scripts/linux/perf_host_text.py --print-tokens)"
+  figures="$(for _ in 1 2 3 4 5; do
+    "${BUILD_DIR}/bin/AccelerANTgine" --chat_model "${LLM_MODEL}" --prompt "${prompt}" --max_new_tokens "${tokens}" 2>&1 >/dev/null |
+      sed -nE 's/^[0-9]+ tokens, ([0-9.e+-]+) ms to the first, ([0-9.e+-]+) tokens\/s$/\1 \2/p' | tail -1
+  done)"
+  ttft="$(cut -d' ' -f1 <<< "${figures}" | sort -g | sed -n 3p)"
+  rate="$(cut -d' ' -f2 <<< "${figures}" | sort -g | sed -n 3p)"
+  printf '{"ttft_ms": %s, "decode_tok_s": %s}\n' "${ttft}" "${rate}"
 }
 
 case "${1:-}" in
