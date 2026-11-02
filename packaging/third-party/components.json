@@ -110,6 +110,73 @@
       "texts": [{"root": "repo", "path": "packaging/third-party/texts/orc-COPYING.txt"}]
     },
     {
+      "id": "openssl",
+      "name": "OpenSSL",
+      "version": "the Windows GPU image's OpenSSL runtime",
+      "spdx": "Apache-2.0",
+      "url": "https://www.openssl.org/",
+      "binaries": ["libcrypto-*.dll", "libssl-*.dll"],
+      "texts": [
+        { "root": "repo", "path": "packaging/third-party/texts/openssl-LICENSE.txt" }
+      ]
+    },
+    {
+      "id": "libjpeg-turbo",
+      "name": "libjpeg-turbo",
+      "version": "the GStreamer build's libjpeg-turbo subproject",
+      "spdx": "BSD-3-Clause AND IJG AND Zlib",
+      "url": "https://libjpeg-turbo.org/",
+      "binaries": ["jpeg-*.dll"],
+      "texts": [
+        { "root": "repo", "path": "packaging/third-party/texts/libjpeg-turbo-LICENSE.txt" },
+        { "root": "repo", "path": "packaging/third-party/texts/libjpeg-turbo-README-ijg.txt" }
+      ]
+    },
+    {
+      "id": "libpng",
+      "name": "libpng",
+      "version": "the GStreamer build's libpng subproject",
+      "spdx": "libpng-2.0",
+      "url": "https://www.libpng.org/pub/png/libpng.html",
+      "binaries": ["png16-*.dll"],
+      "texts": [
+        { "root": "repo", "path": "packaging/third-party/texts/libpng-LICENSE.txt" }
+      ]
+    },
+    {
+      "id": "zlib",
+      "name": "zlib",
+      "version": "the GStreamer build's zlib subproject",
+      "spdx": "Zlib",
+      "url": "https://zlib.net/",
+      "binaries": ["z-*.dll"],
+      "texts": [
+        { "root": "repo", "path": "packaging/third-party/texts/zlib-LICENSE.txt" }
+      ]
+    },
+    {
+      "id": "libsrtp",
+      "name": "libSRTP",
+      "version": "the GStreamer build's libsrtp subproject",
+      "spdx": "BSD-3-Clause",
+      "url": "https://github.com/cisco/libsrtp",
+      "binaries": ["srtp2-*.dll"],
+      "texts": [
+        { "root": "repo", "path": "packaging/third-party/texts/libsrtp-LICENSE.txt" }
+      ]
+    },
+    {
+      "id": "openh264",
+      "name": "OpenH264",
+      "version": "the GStreamer build's openh264 subproject",
+      "spdx": "BSD-2-Clause",
+      "url": "https://github.com/cisco/openh264",
+      "binaries": ["openh264-*.dll"],
+      "texts": [
+        { "root": "repo", "path": "packaging/third-party/texts/openh264-LICENSE.txt" }
+      ]
+    },
+    {
       "id": "gstreamer",
       "name": "GStreamer (core, base, good, bad, ugly, libav)",
       "version_var": "GSTREAMER_VERSION",
