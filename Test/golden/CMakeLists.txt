@@ -60,11 +60,15 @@ if(TARGET ${PROJECT_NAME}_demo)
                golden
                PASS_REGULAR_EXPRESSION
                "ORT intra-op threads: 2\n")
-  add_test(NAME Golden.DemoDetectorLatencyPrintsFigures COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> --model
-                                                                "${_golden_model}" --detector-image "${_golden_image}"
-                                                                --detector-latency-runs 2 --device cpu)
-  set_tests_properties(Golden.DemoDetectorLatencyPrintsFigures PROPERTIES LABELS golden PASS_REGULAR_EXPRESSION
-                                                                          "\\{\"p50_ms\":[0-9.e+-]+,\"p95_ms\":[0-9.e+-]+\\}")
+  add_test(NAME Golden.DemoDetectorLatencyPrintsFigures
+           COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> --model "${_golden_model}" --detector-image "${_golden_image}"
+                   --detector-latency-runs 2 --device cpu)
+  set_tests_properties(
+    Golden.DemoDetectorLatencyPrintsFigures
+    PROPERTIES LABELS
+               golden
+               PASS_REGULAR_EXPRESSION
+               "\\{\"p50_ms\":[0-9.e+-]+,\"p95_ms\":[0-9.e+-]+\\}")
   # The hub's verify_ort_profile.py must find XNNPACK operators in both runs of the demo's profiled session.
   set(_golden_evidence "${CMAKE_CURRENT_BINARY_DIR}/xnnpack-evidence")
   add_test(
