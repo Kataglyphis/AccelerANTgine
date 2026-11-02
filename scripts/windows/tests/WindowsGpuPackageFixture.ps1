@@ -160,6 +160,8 @@ function New-FixtureRepo([string]$Root, [string]$ModelDir) {
     foreach ($name in 'Test-WindowsGpuPackages.ps1', 'Test-WindowsGpuImage.ps1', 'Resolve-BuildModule.ps1') {
         Copy-Item -LiteralPath (Join-Path $script:fixture "scripts\windows\$name") -Destination $fixtureScripts
     }
+    $fixtureModules = New-Item -ItemType Directory -Force -Path (Join-Path $fixtureScripts 'modules')
+    Copy-Item -LiteralPath (Join-Path $script:fixture 'scripts\windows\modules\WindowsGpuCandidate.Common.psm1') -Destination $fixtureModules
     foreach ($part in 'windows/scripts', 'linux/scripts', 'shared/python') {
         Copy-Item -LiteralPath (Join-Path $script:fixture "third_party/ANTfrastructure/$part") `
             -Destination (Join-Path $fixtureHub (Split-Path $part -Parent)) -Recurse
