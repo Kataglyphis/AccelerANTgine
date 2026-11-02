@@ -11,10 +11,6 @@ every push to `main` releases `v<that version>` once every lane is green
 `## [<version>]` section as the notes. So before a merge, raise the version and
 turn `## [Unreleased]` into that section.
 
-### Fixed
-
-- Windows GPU packages name OpenSSL, libjpeg-turbo, libpng, zlib, libSRTP and OpenH264 in their third-party notices, with each licence text; the GPU images ship these DLLs and the notices check stopped every GPU package without them.
-
 A change here surfaces in OmniAccelerANT only once its
 `third_party/AccelerANTgine` pin is bumped (and thus in the in-tree
 `packages/kataglyphis_native_inference`), so anything that moves the C ABI
@@ -255,6 +251,7 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ### Fixed
 
+- Windows GPU packages name OpenSSL, libjpeg-turbo, libpng, zlib, libSRTP and OpenH264 in their third-party notices, with each licence text; the GPU images ship these DLLs and the notices check stopped every GPU package without them.
 - `WindowsCiQualityReuse.Tests.ps1` reads the standalone `powershell-quality.yml`, the one caller of the
   hub's PowerShell quality workflow since `windows-x64.yml` stopped calling it.
 - Register MIGraphX with explicit device and memory options, avoiding a quoted empty model-cache
