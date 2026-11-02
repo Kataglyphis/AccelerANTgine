@@ -8,6 +8,7 @@
 #include <string>
 
 namespace fs = std::filesystem;
+namespace demo = kataglyphis::demo;
 
 namespace {
 struct PackageTree
@@ -28,15 +29,14 @@ struct PackageTree
 };
 }// namespace
 
-using kataglyphis::demo::default_model_from_executable;
-
 TEST(DemoModel, TheConfiguredFileIsLookedUpInThePackageDirectory)
 {
     const PackageTree tree;
     const fs::path configured = "models/other_detector.onnx";
     const auto executable = tree.root / "bin/demo";
     std::ofstream(tree.root / "share/models/other_detector.onnx") << "x";
-    const auto found = default_model_from_executable(executable, false, true, configured, "../lib", "../share/models");
+    const auto found =
+      demo::default_model_from_executable(executable, false, true, configured, "../lib", "../share/models");
     EXPECT_EQ(found, tree.root / "bin/../share/models/other_detector.onnx");
 }
 
@@ -44,17 +44,18 @@ TEST(DemoModel, AnUnpackagedDemoUsesTheConfiguredPathAsItIs)
 {
     const PackageTree tree;
     const fs::path configured = "models/other_detector.onnx";
-    EXPECT_EQ(default_model_from_executable(tree.root / "bin/demo", false, false, configured, {}, {}), configured);
-    EXPECT_EQ(default_model_from_executable({}, false, false, configured, {}, {}), configured);
+    EXPECT_EQ(
+      demo::default_model_from_executable(tree.root / "bin/demo", false, false, configured, {}, {}), configured);
+    EXPECT_EQ(demo::default_model_from_executable({}, false, false, configured, {}, {}), configured);
 }
 
 TEST(DemoModel, APackagedDemoNeverFallsBackToTheWorkingDirectory)
 {
     const PackageTree tree;
     const fs::path configured = "models/other_detector.onnx";
-    EXPECT_TRUE(default_model_from_executable({}, false, true, configured, "../lib", "../share/models").empty());
+    EXPECT_TRUE(demo::default_model_from_executable({}, false, true, configured, "../lib", "../share/models").empty());
     const auto missing =
-      default_model_from_executable(tree.root / "bin/demo", false, true, configured, "../lib", "../share/models");
+      demo::default_model_from_executable(tree.root / "bin/demo", false, true, configured, "../lib", "../share/models");
     EXPECT_EQ(missing.filename(), configured.filename());
     EXPECT_TRUE(missing.is_absolute());
 }
