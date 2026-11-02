@@ -311,6 +311,20 @@ jobs:
           overwrite: false
           if-no-files-found: error
 
+      # Only reached when the clean-host checks passed; release.yml collects this name.
+      - name: Download the checked GPU packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: accelerantgine-unverified-gpu-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}${{ needs.scope.outputs.suffix }}
+          path: ${{ runner.temp }}/gpu-release-packages
+      - name: Upload the checked GPU packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: accelerantgine-gpu-${{ matrix.vendor }}-linux-${{ matrix.arch }}${{ needs.scope.outputs.suffix }}
+          overwrite: true
+          if-no-files-found: error
+          path: ${{ runner.temp }}/gpu-release-packages/*
+
   gpu-profile:
     if: ${{ inputs.verify-gpu }}
     needs: [scope, select-tuple, build, clean-host]

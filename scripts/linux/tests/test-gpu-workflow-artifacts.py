@@ -100,11 +100,11 @@ class ArtifactReruns(unittest.TestCase):
                 if workflow == LINUX
                 else ("candidate", "gpu-profile")
             )
-            count = 16 if has_promotion else 3 if workflow == LINUX else 2
+            count = 17 if has_promotion else 3 if workflow == LINUX else 2
             suffix = "${{ " + dependency + " }}"
             prefixes = (
                 {
-                    "accelerantgine-unverified-gpu-": 3,
+                    "accelerantgine-unverified-gpu-": 4,
                     "unverified-accelerantgine-gpu-input-": 2,
                     "unverified-accelerantgine-gpu-meta-": 4,
                     "unverified-accelerantgine-gpu-proof-": 2,
@@ -263,7 +263,7 @@ class ArtifactReruns(unittest.TestCase):
 
     def test_linux_partial_and_full_reruns(self):
         text = LINUX.read_text(encoding="utf-8")
-        name = contract(text, "accelerantgine-unverified-gpu-", 3)
+        name = contract(text, "accelerantgine-unverified-gpu-", 4)
         rows = [("nvidia", "x64"), ("nvidia", "arm64"), ("amd", "x64")]
         first = {expand(name, vendor, arch, 1): "attempt-1" for vendor, arch in rows}
         self.assertEqual(len(first), len(rows))

@@ -74,9 +74,25 @@ jobs:
     uses: ./.github/workflows/windows-arm64-cross.yml
     secrets: inherit
 
+  gpu-lin:
+    needs: version
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/linux-gpu-candidate.yml
+    secrets: inherit
+
+  gpu-win:
+    needs: version
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/windows-gpu-candidates.yml
+    secrets: inherit
+
   # needs: every lane, so one red or cancelled lane means no tag and no release.
   release:
-    needs: [linux-x64, linux-arm64, linux-riscv64, windows-x64, windows-arm64-cross]
+    needs: [linux-x64, linux-arm64, linux-riscv64, windows-x64, windows-arm64-cross, gpu-lin, gpu-win]
     permissions:
       contents: write
     uses: Kataglyphis/ANTfrastructure/.github/workflows/release-publish.yml@develop
