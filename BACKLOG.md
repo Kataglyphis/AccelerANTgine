@@ -53,9 +53,26 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when every lane builds both wheels from the image's interpreters and passes
   `Test/python` on each, Windows arm64 on the `windows-11-arm` device.
 
-## Done
+- [ ] **Move the detector to `deim_dfine_n_coco-v2`** (S, ★★★). On DirectML, v1 finds nothing: an RX 9070 XT ran every profiled operator on `DmlExecutionProvider` and returned no detection, where the CPU
+  finds two cats (hub CON220). v2, sha256 `0bf16e85…`, gives the CPU's detections there.
+  Until the lock moves, the Windows AMD package has no working detector, so no `main` release before it.
+  Change `models/models.lock`, `packaging/third-party/components.json` and
+  `Test/golden/two_cats_cpu.json` with OxidANT and OrchestrANT in one window.
 
-- [x] **llguidance accepts the hub tiny model's tokenizer** (S, ★★). Probe of 2026-11-01 in
+- [ ] **A clear failure or a CPU fallback when CUDA has no kernel for the card** (M, ★★). Seen on an RTX 2080 with OxidANT's package; these packages use the
+  same image and are untested on such a card.
+  `CUDAExecutionProvider` creates its session, then the first node stops with
+  `cudaErrorNoKernelImageForDevice`: no detection, no fallback. The images build `86;87;89;120`, so RTX 20xx
+  cards fail until hub CON217. Any card outside the list should get a message naming it, or the CPU.
+
+- [ ] **The NVIDIA packages have not run on a GPU they support** (S, ★★★). The Linux and Windows packages are built and
+  passed on the CPU, and hosted runners have no GPU. Done on an RTX 30xx or newer when
+  `compare_detector_parity.py` passes against the CPU and the profile shows the provider; the hub's
+  `docs/gpu-artifact-receipts.md` has the commands. DirectML on an NVIDIA card is unproven too.
+
+## Recorded probes
+
+- **llguidance accepts the hub tiny model's tokenizer** (S, ★★). Probe of 2026-11-01 in
   `ghcr.io/kataglyphis/kataglyphis_beschleuniger:latest` (index `7d4d4129`, GenAI 0.17.0 built
   `--use_guidance`): `OgaGeneratorParamsSetGuidance("json_schema", …)` on the model
   `tiny-genai-model.py` writes is accepted, so the schema tests run on that model and SmolLM2-135M
