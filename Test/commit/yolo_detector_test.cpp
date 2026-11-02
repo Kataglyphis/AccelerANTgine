@@ -373,27 +373,21 @@ TEST(YoloDetector, AMovedDetectorStillDetects)
     EXPECT_EQ(result->boxes.size(), 1U);
 }
 
-TEST(YoloDetectorGStreamer, DecodesAFramePushedThroughAppsrc)
+TEST(YoloDetectorGStreamer, DecodesAFramePulledFromAppsink)
 {
-    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("appsrc", "appsink");
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
     const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
     detection::YoloDetector detector;
     ASSERT_TRUE(detector.initialize(two_class_config(model)).has_value());
 
+    // RGB rows align to four bytes; white normalises to one in every NCHW channel.
     gstreamer::GStreamerPipeline pipeline;
     ASSERT_TRUE(pipeline
-        .create_pipeline_from_string("appsrc name=src format=time "
-                                     "caps=video/x-raw,format=RGB,width=14,height=6,framerate=0/1 "
+        .create_pipeline_from_string("videotestsrc num-buffers=1 pattern=white "
+                                     "! video/x-raw,format=RGB,width=14,height=6,framerate=30/1 "
                                      "! appsink name=sink sync=false")
         .has_value());
     ASSERT_TRUE(pipeline.start().has_value());
-
-    // RGB rows align to four bytes; white normalises to one in every NCHW channel.
-    std::vector<std::uint8_t> pixels(44 * 6, 255);
-    gstreamer::FrameMetadata metadata;
-    metadata.timestamp_ns = 0;
-    metadata.duration_ns = 1000;
-    ASSERT_TRUE(pipeline.push_buffer(pixels.data(), pixels.size(), metadata).has_value());
 
     const auto result = detector.detect_from_gstreamer(pipeline, 10000);
     ASSERT_TRUE(result.has_value());
@@ -408,29 +402,25 @@ TEST(YoloDetectorGStreamer, DecodesAFramePushedThroughAppsrc)
 
 TEST(YoloDetectorGStreamer, RejectsFramesWithoutVideoGeometry)
 {
-    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("appsrc", "appsink");
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("fakesrc", "appsink");
     const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
     detection::YoloDetector detector;
     ASSERT_TRUE(detector.initialize(two_class_config(model)).has_value());
 
-    gstreamer::GStreamerPipeline pipeline;
-    ASSERT_TRUE(
-      pipeline.create_pipeline_from_string("appsrc name=src format=time ! appsink name=sink sync=false").has_value());
-    ASSERT_TRUE(pipeline.start().has_value());
-
-    gstreamer::FrameMetadata metadata;
-    std::vector<float> too_short(kTwoClasses.elements() - 1, 0.0F);
-    ASSERT_TRUE(pipeline.push_buffer(too_short.data(), too_short.size() * sizeof(float), metadata).has_value());
-    const auto short_frame = detector.detect_from_gstreamer(pipeline, 10000);
-    ASSERT_FALSE(short_frame.has_value());
-    EXPECT_EQ(short_frame.error(), detection::OnnxError::InvalidInputShape);
-
-    std::vector<std::uint8_t> odd_bytes(7, 1);
-    ASSERT_TRUE(pipeline.push_buffer(odd_bytes.data(), odd_bytes.size(), metadata).has_value());
-    const auto odd_frame = detector.detect_from_gstreamer(pipeline, 10000);
-    ASSERT_FALSE(odd_frame.has_value());
-    EXPECT_EQ(odd_frame.error(), detection::OnnxError::InvalidInputShape);
-    EXPECT_TRUE(pipeline.stop().has_value());
+    // fakesrc sends bytes without caps: a float buffer one element short, then a size no float layout fits.
+    const auto too_short = (kTwoClasses.elements() - 1) * sizeof(float);
+    for (const auto bytes : { too_short, std::size_t{ 7 } }) {
+        gstreamer::GStreamerPipeline pipeline;
+        ASSERT_TRUE(pipeline
+            .create_pipeline_from_string("fakesrc num-buffers=1 filltype=zero sizetype=fixed sizemax="
+                                         + std::to_string(bytes) + " ! appsink name=sink sync=false")
+            .has_value());
+        ASSERT_TRUE(pipeline.start().has_value());
+        const auto frame = detector.detect_from_gstreamer(pipeline, 10000);
+        ASSERT_FALSE(frame.has_value()) << bytes;
+        EXPECT_EQ(frame.error(), detection::OnnxError::InvalidInputShape) << bytes;
+        EXPECT_TRUE(pipeline.stop().has_value());
+    }
 }
 
 TEST(YoloDetectorGStreamer, APipelineWithoutAppsinkGivesNoInput)

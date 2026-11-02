@@ -2,7 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -11,7 +10,6 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -25,8 +23,6 @@ using kataglyphis::test::EventCounter;
 namespace {
 
 // GstState values the API hands out as int.
-constexpr int kStateNull = 1;
-constexpr int kStatePlaying = 4;
 
 // videotestsrc rounds each timestamp down, so the durations at 30 fps alternate between ...33 and ...34.
 constexpr auto frame_start_30fps(std::uint64_t frame) -> std::uint64_t { return frame * 1000000000ULL / 30U; }
@@ -47,18 +43,11 @@ TEST(GStreamerPipeline, AnEmptyPipelineRefusesEveryOperation)
 {
     gstreamer::GStreamerPipeline pipeline;
     EXPECT_FALSE(pipeline.is_playing());
-    EXPECT_FALSE(pipeline.is_paused());
-    EXPECT_EQ(pipeline.get_current_state(), kStateNull);
     EXPECT_TRUE(pipeline.stop().has_value());
 
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.start()), gstreamer::GStreamerError::PipelineCreationFailed);
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.pause()), gstreamer::GStreamerError::PipelineCreationFailed);
-    EXPECT_EQ(kataglyphis::test::error_of(pipeline.resume()), gstreamer::GStreamerError::PipelineCreationFailed);
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.pull_sample(10)), gstreamer::GStreamerError::ElementCreationFailed);
-
-    std::array<std::byte, 4> payload{};
-    EXPECT_EQ(kataglyphis::test::error_of(pipeline.push_buffer(payload.data(), payload.size(), {})),
-      gstreamer::GStreamerError::ElementCreationFailed);
 }
 
 TEST(GStreamerPipeline, AnUnknownElementIsPipelineCreationFailed)
@@ -114,7 +103,13 @@ TEST(GStreamerPipeline, PullsFramesWithTheirMetadata)
       gstreamer::GStreamerError::BufferAllocationFailed);
     EXPECT_TRUE(pipeline.stop().has_value());
     EXPECT_FALSE(pipeline.is_playing());
-    EXPECT_EQ(pipeline.get_current_state(), kStateNull);
+
+    // Back in NULL, the next start replays the stream from its first frame.
+    ASSERT_TRUE(pipeline.start().has_value());
+    const auto first = pipeline.pull_sample(static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count()));
+    ASSERT_TRUE(first.has_value());
+    EXPECT_EQ(first->metadata.timestamp_ns, frame_start_30fps(0));
+    EXPECT_TRUE(pipeline.stop().has_value());
 }
 
 TEST(GStreamerPipeline, PullingWithoutATimeoutWaitsForTheNextFrame)
@@ -175,104 +170,48 @@ TEST(GStreamerPipeline, ACallbackSetBeforeThePipelineStillGetsFrames)
     EXPECT_EQ(frames.count(), 3);
 }
 
-TEST(GStreamerPipeline, PushedBuffersComeOutUnchanged)
-{
-    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("appsrc", "appsink");
-    gstreamer::GStreamerPipeline pipeline;
-    ASSERT_TRUE(pipeline
-        .create_pipeline_from_string("appsrc name=src format=time "
-                                     "caps=video/x-raw,format=GRAY8,width=4,height=2,framerate=0/1 "
-                                     "! appsink name=sink sync=false")
-        .has_value());
-    ASSERT_TRUE(pipeline.start().has_value());
-
-    for (std::uint8_t frame = 0; frame < 2; ++frame) {
-        std::array<std::uint8_t, 8> pixels{};
-        for (std::size_t i = 0; i < pixels.size(); ++i) { pixels[i] = static_cast<std::uint8_t>(frame * 16 + i); }
-        gstreamer::FrameMetadata metadata;
-        metadata.timestamp_ns = 1000U * frame;
-        metadata.duration_ns = 1000;
-        ASSERT_TRUE(pipeline.push_buffer(pixels.data(), pixels.size(), metadata).has_value());
-
-        const auto sample = pipeline.pull_sample(static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count()));
-        ASSERT_TRUE(sample.has_value());
-        ASSERT_EQ(sample->size, pixels.size());
-        for (std::size_t i = 0; i < pixels.size(); ++i) {
-            EXPECT_EQ(sample->data[i], static_cast<std::byte>(pixels[i])) << "byte " << i;
-        }
-        EXPECT_EQ(sample->metadata.timestamp_ns, 1000U * frame);
-        EXPECT_EQ(sample->metadata.duration_ns, 1000U);
-        EXPECT_EQ(sample->metadata.width, 4U);
-        EXPECT_EQ(sample->metadata.height, 2U);
-        EXPECT_EQ(sample->metadata.format, "GRAY8");
-    }
-    EXPECT_TRUE(pipeline.stop().has_value());
-}
-
-TEST(GStreamerPipeline, APipelineWithoutAppElementsHasNothingToPullOrPush)
+TEST(GStreamerPipeline, APipelineWithoutAnAppsinkHasNothingToPull)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("fakesrc", "fakesink");
     gstreamer::GStreamerPipeline pipeline;
     ASSERT_TRUE(pipeline.create_pipeline_from_string("fakesrc num-buffers=1 ! fakesink").has_value());
     EXPECT_EQ(kataglyphis::test::error_of(pipeline.pull_sample(10)), gstreamer::GStreamerError::ElementCreationFailed);
-    std::array<std::byte, 4> payload{};
-    EXPECT_EQ(kataglyphis::test::error_of(pipeline.push_buffer(payload.data(), payload.size(), {})),
-      gstreamer::GStreamerError::ElementCreationFailed);
 }
 
-TEST(GStreamerPipeline, PauseAndResumeTrackTheState)
+TEST(GStreamerPipeline, PauseAndStartTrackTheState)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "fakesink");
     gstreamer::GStreamerPipeline pipeline;
     ASSERT_TRUE(pipeline.create_pipeline_from_string("videotestsrc is-live=true ! fakesink").has_value());
     ASSERT_TRUE(pipeline.start().has_value());
     EXPECT_TRUE(pipeline.is_playing());
-    EXPECT_FALSE(pipeline.is_paused());
 
     ASSERT_TRUE(pipeline.pause().has_value());
-    EXPECT_TRUE(pipeline.is_paused());
     EXPECT_FALSE(pipeline.is_playing());
 
-    ASSERT_TRUE(pipeline.resume().has_value());
+    ASSERT_TRUE(pipeline.start().has_value());
     EXPECT_TRUE(pipeline.is_playing());
-    EXPECT_FALSE(pipeline.is_paused());
 
     ASSERT_TRUE(pipeline.stop().has_value());
     EXPECT_FALSE(pipeline.is_playing());
-    EXPECT_FALSE(pipeline.is_paused());
-}
-
-TEST(GStreamerPipeline, ReportsPlayingOnceThePipelineGetsThere)
-{
-    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "fakesink");
-    gstreamer::GStreamerPipeline pipeline;
-    ASSERT_TRUE(pipeline.create_pipeline_from_string("videotestsrc ! fakesink sync=false").has_value());
-    ASSERT_TRUE(pipeline.start().has_value());
-    // get_current_state() does not wait, so poll until the asynchronous state change lands.
-    const auto deadline = std::chrono::steady_clock::now() + kataglyphis::test::kStreamTimeout;
-    while (pipeline.get_current_state() != kStatePlaying && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    EXPECT_EQ(pipeline.get_current_state(), kStatePlaying);
-    EXPECT_TRUE(pipeline.stop().has_value());
 }
 
 TEST(GStreamerPipeline, ReplacingThePipelineReleasesTheOldOne)
 {
-    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink", "appsrc");
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
     gstreamer::GStreamerPipeline pipeline;
     ASSERT_TRUE(pipeline.create_pipeline_from_string(std::string(kThreeBlackFrames)).has_value());
     ASSERT_TRUE(pipeline.start().has_value());
-    ASSERT_TRUE(
-      pipeline.create_pipeline_from_string("appsrc name=src format=time ! appsink name=sink sync=false").has_value());
-    // The new pipeline is idle; its appsink, not the old one, answers.
+    ASSERT_TRUE(pipeline
+        .create_pipeline_from_string("videotestsrc num-buffers=1 ! video/x-raw,format=GRAY8,width=4,height=1 "
+                                     "! appsink name=sink sync=false")
+        .has_value());
+    // The new pipeline is idle; its appsink, not the old one, answers with the new frame size.
     EXPECT_FALSE(pipeline.is_playing());
     ASSERT_TRUE(pipeline.start().has_value());
-    std::array<std::uint8_t, 3> payload{ 1, 2, 3 };
-    ASSERT_TRUE(pipeline.push_buffer(payload.data(), payload.size(), {}).has_value());
     const auto sample = pipeline.pull_sample(static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count()));
     ASSERT_TRUE(sample.has_value());
-    EXPECT_EQ(sample->size, payload.size());
+    EXPECT_EQ(sample->size, 4U);
     EXPECT_TRUE(pipeline.stop().has_value());
 }
 

@@ -11,7 +11,6 @@ module;
 #include <gst/analytics/gsttensor.h>
 #include <gst/analytics/gsttensormeta.h>
 #include <gst/app/gstappsink.h>
-#include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <mutex>
@@ -179,7 +178,6 @@ struct GStreamerPipeline::Impl
 {
     GstElement *pipeline{ nullptr };
     GstElement *appsink{ nullptr };
-    GstElement *appsrc{ nullptr };
 
     BufferCallback buffer_callback;
     std::mutex callback_mutex;
@@ -214,10 +212,6 @@ struct GStreamerPipeline::Impl
             appsink = nullptr;
         }
         callbacks_installed = false;
-        if (appsrc != nullptr) {
-            gst_object_unref(appsrc);
-            appsrc = nullptr;
-        }
         if (pipeline != nullptr) {
             gst_object_unref(pipeline);
             pipeline = nullptr;
@@ -314,9 +308,8 @@ auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::ex
     if (!pipeline) { return std::unexpected(pipeline.error()); }
     impl_->pipeline = *pipeline;
 
-    // Without these pull_sample, push_buffer and the buffer callback have nothing to talk to.
+    // Without it pull_sample and the buffer callback have nothing to talk to.
     impl_->appsink = find_element_of_type(impl_->pipeline, GST_TYPE_APP_SINK);
-    impl_->appsrc = find_element_of_type(impl_->pipeline, GST_TYPE_APP_SRC);
     impl_->connect_buffer_callback();
 
     return {};
@@ -393,11 +386,7 @@ auto GStreamerPipeline::pause() -> std::expected<void, GStreamerError>
     return {};
 }
 
-auto GStreamerPipeline::resume() -> std::expected<void, GStreamerError> { return start(); }
-
 auto GStreamerPipeline::is_playing() const -> bool { return impl_->is_playing.load() && !impl_->is_paused.load(); }
-
-auto GStreamerPipeline::is_paused() const -> bool { return impl_->is_paused.load(); }
 
 auto GStreamerPipeline::set_buffer_callback(BufferCallback callback) -> void
 {
@@ -428,44 +417,6 @@ auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms) -> std::expected<B
     auto buffer_info = extract_buffer_info(sample);
     gst_sample_unref(sample);
     return buffer_info;
-}
-
-auto GStreamerPipeline::push_buffer(void *data, std::size_t size, const FrameMetadata &metadata)
-  -> std::expected<void, GStreamerError>
-{
-
-    if (impl_->appsrc == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
-
-    GstBuffer *buffer = gst_buffer_new_allocate(nullptr, size, nullptr);
-    if (buffer == nullptr) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
-
-    GstMapInfo map_info;
-    if (gst_buffer_map(buffer, &map_info, GST_MAP_WRITE) == 0) {
-        gst_buffer_unref(buffer);
-        return std::unexpected(GStreamerError::BufferAllocationFailed);
-    }
-
-    std::memcpy(map_info.data, data, size);
-    gst_buffer_unmap(buffer, &map_info);
-
-    GST_BUFFER_PTS(buffer) = metadata.timestamp_ns;
-    GST_BUFFER_DURATION(buffer) = metadata.duration_ns;
-
-    // Takes the buffer's reference, unlike the push-buffer signal.
-    const GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(impl_->appsrc), buffer);
-
-    if (ret != GST_FLOW_OK) { return std::unexpected(GStreamerError::StreamError); }
-
-    return {};
-}
-
-auto GStreamerPipeline::get_current_state() const -> int
-{
-    if (impl_->pipeline == nullptr) { return GST_STATE_NULL; }
-
-    GstState state;
-    gst_element_get_state(impl_->pipeline, &state, nullptr, 0);
-    return static_cast<int>(state);
 }
 
 auto quote_pipeline_value(const std::string &value) -> std::string

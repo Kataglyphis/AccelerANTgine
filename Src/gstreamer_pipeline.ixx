@@ -93,19 +93,13 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     [[nodiscard]] auto start() -> std::expected<void, GStreamerError>;
     [[nodiscard]] auto stop() -> std::expected<void, GStreamerError>;
     [[nodiscard]] auto pause() -> std::expected<void, GStreamerError>;
-    [[nodiscard]] auto resume() -> std::expected<void, GStreamerError>;
 
     [[nodiscard]] auto is_playing() const -> bool;
-    [[nodiscard]] auto is_paused() const -> bool;
 
     auto set_buffer_callback(BufferCallback callback) -> void;
 
     [[nodiscard]] auto pull_sample(std::uint32_t timeout_ms = 5000) -> std::expected<BufferInfo, GStreamerError>;
 
-    [[nodiscard]] auto push_buffer(void *data, std::size_t size, const FrameMetadata &metadata)
-      -> std::expected<void, GStreamerError>;
-
-    [[nodiscard]] auto get_current_state() const -> int;
 
   private:
     struct Impl;

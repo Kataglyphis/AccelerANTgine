@@ -64,7 +64,8 @@ belongs in the **Changed** list below with that consequence spelled out.
   the upper-case `ExecutionProvider.CPU`, `CUDA`, `DIRECTML` become `ExecutionProvider.Cpu`, `Cuda`,
   `DirectML`. The C ABI's provider codes do not change.
 - **Removed:** `GStreamerPipeline::seek`, `get_position_ns`, `get_duration_ns`, `get_caps_string`,
-  no callers; the never-read `display_results`, `save_to_file`, `enable_tensor_meta` and
+  `push_buffer`, `get_current_state`, `is_paused` and `resume`, no callers outside tests (start a paused
+  pipeline with `start`); the never-read `display_results`, `save_to_file`, `enable_tensor_meta` and
   `synchronous_mode`; the unreachable no-ONNX Runtime CMake branch, the `Main.cpp` source group and
   `kataglyphis_collect_project_sources`.
 - **Fixed:** every pipeline builder quotes its paths through `gstreamer::quote_pipeline_value`, so a

@@ -53,7 +53,7 @@ library itself; ``Test/python`` tests the Python bindings.
        ``kataglyphis.output`` metadata behind ``Auto``, labels from the config,
        ``InvalidOutputShape``); the ORT thread count from the TOML config to the
        session options; XNNPACK and DNNL running or ``ProviderUnavailable``; GStreamer frames from ``videotestsrc`` and
-       ``appsrc`` through ``appsink``, callbacks and state; the WebRTC stream
+       ``fakesrc`` through ``appsink``, callbacks and state; the WebRTC stream
        config, its validation and a start against a refusing signalling server;
        both exports of the Rust crate, through cxx and ``extern "C"``
    * - ``Test/compile``
@@ -91,7 +91,7 @@ library itself; ``Test/python`` tests the Python bindings.
 No model or media file is checked in for them (the golden suite reads the
 fetched model and ModelANT's fixture):
 ``Test/common/kataglyphis_test_support.h`` writes the ONNX protobuf itself, and
-the GStreamer tests use ``videotestsrc`` and ``appsrc``. A test that needs a
+the GStreamer tests use ``videotestsrc`` and ``fakesrc``. A test that needs a
 GStreamer element the install lacks skips and names it; the WebRTC ones need
 ``webrtcsink`` (gst-plugins-rs), which the Linux image has and the Windows image
 has not.
