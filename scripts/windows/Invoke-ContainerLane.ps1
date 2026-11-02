@@ -7,6 +7,8 @@ param(
     [string]$Image,
     # Build: comma-separated Build-Windows.ps1 targets (it splits the string itself). PythonBindings: the CMake preset.
     [Alias('BuildTargets', 'Preset')][string]$LaneValue,
+    # Build only: a GPU variant needs its own -Image (the family's -nvidia or -rocm Windows tag).
+    [ValidateSet('cpu', 'nvidia', 'amd')][string]$OrtVariant = 'cpu',
     # Falls back to $env:DOCKER_EXE, the Stevedore install locations, then 'docker' on PATH.
     [string]$DockerExe,
     # Process isolation exposes all host CPUs; Hyper-V isolation defaults to 2.
@@ -49,6 +51,14 @@ if ($isBuild) {
         OutputDirs = @("logs", "dist") + $buildDirs
         OutboundExclude = @("*/CMakeFiles", "*/_deps", "*/_CPack_Packages", "*.obj", "*.lib", "*.ilk")
         VerifyDirs = @($buildDirs | Where-Object { $_ -like "build-clangcl-*" })
+    }
+    if ($OrtVariant -ne 'cpu') {
+        if (-not $Image) { throw "-OrtVariant $OrtVariant needs -Image, the GPU image the variant's ONNX Runtime comes from." }
+        $entryArgs += @('-OrtVariant', $OrtVariant, '-SkipFormat')
+        # A GPU build delivers only its dist tree, and keeps its own container so CPU reuse stays intact.
+        $laneArgs.ContainerName = "accelerantgine-build-$OrtVariant"
+        $laneArgs.OutputDirs = @('logs', 'dist')
+        $laneArgs.VerifyDirs = @("dist\windows-x64-gpu-$OrtVariant")
     }
 } else {
     Write-Host "Preset: $LaneValue"

@@ -117,8 +117,11 @@ auto check_gstreamer(int *argc, char ***argv) -> int
     std::cout << "plugins: " << (bundled.empty() ? std::string("not a package, GStreamer's own search path") : bundled)
               << '\n';
     int failures = 0;
+    bool any_encoder = false;
     for (const auto &location : kataglyphis::webrtc::WebRTCStreamer::locate_elements()) {
-        const bool optional = location.element == "libcamerasrc" || location.element == "openh264enc"
+        const bool encoder = location.element == "vp8enc" || location.element == "openh264enc";
+        any_encoder = any_encoder || (encoder && location.found);
+        const bool optional = location.element == "libcamerasrc" || encoder
 #if defined(_WIN32)
                               || location.element == "v4l2src"
 #endif
@@ -131,6 +134,11 @@ auto check_gstreamer(int *argc, char ***argv) -> int
         const char *verdict = location.found ? (outside ? "OUTSIDE" : "ok") : (optional ? "absent" : "MISSING");
         std::cout << verdict << ' ' << location.element << ' ' << location.plugin_file << '\n';
         if ((!location.found && !optional) || outside) { ++failures; }
+    }
+    // The GPU images build no vpx, so either encoder can carry the WebRTC video path.
+    if (!any_encoder) {
+        std::cout << "MISSING a WebRTC video encoder (vp8enc or openh264enc)\n";
+        ++failures;
     }
     return failures == 0 ? 0 : 1;
 }
