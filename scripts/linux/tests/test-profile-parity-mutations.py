@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 PROFILE = ROOT / "scripts/linux/profile-gpu-candidate.sh"
 FIXTURE = ROOT / "scripts/linux/tests/test-profile-gpu-candidate.sh"
+EVIDENCE_LIB = ROOT / "scripts/linux/lib/detector-evidence.sh"
+SUITE_FIXTURE = ROOT / "scripts/linux/tests/suite-fixture.sh"
 CALL = '    bash "$repo/scripts/linux/check-gpu-detector-parity.sh" "$demo" "$resolved" "$device" "$stage/$kind-detector-parity"'
 
 
@@ -26,6 +28,10 @@ def main():
         fixture = root / "scripts/linux/tests/test-profile-gpu-candidate.sh"
         fixture.parent.mkdir(parents=True)
         fixture.write_bytes(FIXTURE.read_bytes())
+        (fixture.parent / SUITE_FIXTURE.name).write_bytes(SUITE_FIXTURE.read_bytes())
+        evidence_lib = root / "scripts/linux/lib/detector-evidence.sh"
+        evidence_lib.parent.mkdir(parents=True)
+        evidence_lib.write_bytes(EVIDENCE_LIB.read_bytes())
         for name, content in variants.items():
             profile.write_text(content, encoding="utf-8")
             result = subprocess.run(

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Check that the detector diagnostic preserves existing image and profile paths.
 set -euo pipefail
-if [[ $# -ne 3 ]]; then echo 'usage: test-demo-detector-safety.sh DEMO MODEL FIXTURE.jpg' >&2; exit 2; fi
-demo=$(realpath -e "$1") model=$(realpath -e "$2") fixture=$(realpath -e "$3")
+# shellcheck source=../lib/detector-evidence.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/detector-evidence.sh"
+detector_evidence_args 3 'test-demo-detector-safety.sh DEMO MODEL FIXTURE.jpg' "$@"
+demo=$DETECTOR_DEMO model=$DETECTOR_MODEL fixture=$(realpath -e "$3")
 work=$(mktemp -d "${TMPDIR:-/tmp}/accelerant-demo-safety.XXXXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 before=$(sha256sum "$fixture")

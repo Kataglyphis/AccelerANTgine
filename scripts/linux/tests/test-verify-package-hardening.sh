@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+repo=$SUITE_ROOT work=$SUITE_WORK
 gate="${repo}/scripts/linux/verify-package-hardening.sh"
-work="$(mktemp -d)"
-trap 'rm -rf -- "${work}"' EXIT
-failures=0
 
 cat > "${work}/fixture.c" <<'C'
 #include <stdio.h>

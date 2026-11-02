@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-work="$(mktemp -d)"
-trap 'rm -rf -- "${work}"' EXIT
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+repo=$SUITE_ROOT work=$SUITE_WORK
 hub="${work}/hub/linux/scripts"
 mkdir -p "${hub}/01-core" "${hub}/lib"
-cat > "${hub}/01-core/common.sh" <<'STUB'
-info() { :; }
-die() { printf '%s\n' "$*" >&2; exit 1; }
+suite_log_stubs > "${hub}/01-core/common.sh"
+cat >> "${hub}/01-core/common.sh" <<'STUB'
 FLATPAK_RUNTIME_VERSION=1
 STUB
 touch "${hub}/01-core/modules.sh" "${hub}/01-core/tool-checks.sh" \

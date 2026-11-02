@@ -20,6 +20,22 @@ expect_grep() {
   return 0
 }
 
+# Reads one fixed-string pattern per stdin line.
+expect_greps() {
+  local file="$1" pattern
+  while IFS= read -r pattern; do expect_grep "${file}" "${pattern}"; done
+}
+
+# Usage: if expect_accepted LOG MESSAGE COMMAND...; then checks; fi
+expect_accepted() {
+  local log="$1" message="$2"
+  shift 2
+  if "$@" > "${log}" 2>&1; then return 0; fi
+  cat "${log}" >&2
+  fail "${message}"
+  return 1
+}
+
 expect_no_grep() {
   local file="$1" pattern="$2"
   if grep -q -F -e "${pattern}" "${file}"; then fail "${file##*/} unexpectedly has: ${pattern}"; fi
@@ -46,12 +62,26 @@ windows_tree() {
   cp "${repo}/LICENSE" "${root}/share/licenses/AccelerANTgine/LICENSE"
 }
 
-run_windows() {
+# Usage: expect_tree_refused NAME MESSAGE REMOVED_PATH...; the refusal log stays at ${tmp}/NAME.log.
+expect_tree_refused() {
+  local tree="${tmp}/$1" log="${tmp}/$1.log" message="$2" removed
+  shift 2
+  windows_tree "${tree}"
+  for removed in "$@"; do rm -f "${tree}/${removed}"; done
+  if run_windows "${tree}" > "${log}" 2>&1; then fail "${message}"; fi
+}
+
+stage_windows() {
   local root="$1"
   shift
   "${python}" "${stager}" --manifest "${manifest}" --root "${root}" --dest "${root}/licenses" --platform windows \
-    --repo "${repo}" --project-license share/licenses/AccelerANTgine/LICENSE --define ONNXRUNTIME_VERSION=v9.9 \
-    --define GSTREAMER_VERSION=1.99 --text-root "abseil=${tmp}/absl" "$@"
+    --repo "${repo}" --project-license share/licenses/AccelerANTgine/LICENSE --text-root "abseil=${tmp}/absl" "$@"
+}
+
+run_windows() {
+  local root="$1"
+  shift
+  stage_windows "${root}" --define ONNXRUNTIME_VERSION=v9.9 --define GSTREAMER_VERSION=1.99 "$@"
 }
 
 fake_texts
@@ -59,17 +89,19 @@ fake_texts
 # Every Windows closure DLL resolves, installed ORT texts are referenced in place and copies are real texts.
 win="${tmp}/win"
 windows_tree "${win}"
-if run_windows "${win}" > "${tmp}/win.log" 2>&1; then
+if expect_accepted "${tmp}/win.log" "a complete Windows tree was refused" run_windows "${win}"; then
   notices="${win}/licenses/THIRD-PARTY-NOTICES.txt"
-  expect_grep "${notices}" "ONNX Runtime"
-  expect_grep "${notices}" "  Version: v9.9"
-  expect_grep "${notices}" "License text: licenses/onnxruntime/ThirdPartyNotices.txt"
-  expect_grep "${notices}" "File: bin/gstapp-1.0-0.dll"
-  expect_grep "${notices}" "File: bin/ffi-7.dll"
-  expect_grep "${notices}" "Microsoft DirectML"
-  expect_grep "${notices}" "File: bin/concrt140.dll"
-  expect_grep "${notices}" "Abseil C++ (flags)"
-  expect_grep "${notices}" "License: LGPL-2.0-or-later"
+  expect_greps "${notices}" <<'PATTERNS'
+ONNX Runtime
+  Version: v9.9
+License text: licenses/onnxruntime/ThirdPartyNotices.txt
+File: bin/gstapp-1.0-0.dll
+File: bin/ffi-7.dll
+Microsoft DirectML
+File: bin/concrt140.dll
+Abseil C++ (flags)
+License: LGPL-2.0-or-later
+PATTERNS
   expect_no_grep "${notices}" "nanobind"
   cmp -s "${repo}/packaging/third-party/texts/libffi-LICENSE.txt" "${win}/licenses/third-party/libffi/libffi-LICENSE.txt" ||
     fail "libffi text was not copied verbatim"
@@ -85,9 +117,6 @@ expected = {"onnxruntime", "directml", "msvc-runtime", "glib", "libffi", "gettex
 assert expected <= ids, expected - ids
 assert data["scope"] == "native" and data["platform"] == "windows"
 PY
-else
-  cat "${tmp}/win.log" >&2
-  fail "a complete Windows tree was refused"
 fi
 
 # Model data is listed only when shipped, with its accompanying license and notice.
@@ -97,12 +126,9 @@ mkdir -p "${model_tree}/bin/models"
 printf 'model\n' > "${model_tree}/bin/models/deim_dfine_n_coco.onnx"
 printf 'license\n' > "${model_tree}/bin/models/deim_dfine_n_coco.LICENSE"
 printf 'notice\n' > "${model_tree}/bin/models/deim_dfine_n_coco.NOTICE"
-if run_windows "${model_tree}" > "${tmp}/model.log" 2>&1; then
+if expect_accepted "${tmp}/model.log" "the model and its notices were refused" run_windows "${model_tree}"; then
   expect_grep "${model_tree}/licenses/THIRD-PARTY-NOTICES.txt" "DEIM-D-FINE-N COCO demo model"
   expect_grep "${model_tree}/licenses/THIRD-PARTY-NOTICES.txt" "License text: licenses/third-party/deim-dfine-n-coco/deim_dfine_n_coco.NOTICE"
-else
-  cat "${tmp}/model.log" >&2
-  fail "the model and its notices were refused"
 fi
 rm "${model_tree}/bin/models/deim_dfine_n_coco.NOTICE"
 if run_windows "${model_tree}" > "${tmp}/missing-model-notice.log" 2>&1; then fail "a model with no notice passed"; fi
@@ -119,26 +145,15 @@ else
 fi
 
 # A component whose installed text is missing fails instead of listing a dead path.
-no_ort="${tmp}/no-ort"
-windows_tree "${no_ort}"
-rm -f "${no_ort}/licenses/onnxruntime/ThirdPartyNotices.txt"
-if run_windows "${no_ort}" > "${tmp}/no-ort.log" 2>&1; then fail "a missing ORT notice passed"; fi
+expect_tree_refused no-ort "a missing ORT notice passed" licenses/onnxruntime/ThirdPartyNotices.txt
 expect_grep "${tmp}/no-ort.log" "ThirdPartyNotices.txt"
 
 # Without the project license, or without a project binary, there is nothing honest to list.
-no_license="${tmp}/no-license"
-windows_tree "${no_license}"
-rm -f "${no_license}/share/licenses/AccelerANTgine/LICENSE"
-if run_windows "${no_license}" > "${tmp}/no-license.log" 2>&1; then fail "a tree without the project license passed"; fi
-no_project="${tmp}/no-project"
-windows_tree "${no_project}"
-rm -f "${no_project}/bin/AccelerANTgine.exe" "${no_project}/bin/AccelerANTgine.dll"
-if run_windows "${no_project}" > "${tmp}/no-project.log" 2>&1; then fail "a tree without project binaries passed"; fi
+expect_tree_refused no-license "a tree without the project license passed" share/licenses/AccelerANTgine/LICENSE
+expect_tree_refused no-project "a tree without project binaries passed" bin/AccelerANTgine.exe bin/AccelerANTgine.dll
 
 # An unknown version variable fails rather than printing an empty version.
-if "${python}" "${stager}" --manifest "${manifest}" --root "${win}" --dest "${win}/licenses" --platform windows \
-  --repo "${repo}" --project-license share/licenses/AccelerANTgine/LICENSE --text-root "abseil=${tmp}/absl" \
-  > "${tmp}/novar.log" 2>&1; then
+if stage_windows "${win}" > "${tmp}/novar.log" 2>&1; then
   fail "an undefined version variable passed"
 fi
 expect_grep "${tmp}/novar.log" "is not defined"
@@ -183,14 +198,16 @@ run_linux() {
     --search "${tmp}/opt-gst" --search "${tmp}/distro" --dpkg "${tmp}/bin/dpkg" --dpkg-query "${tmp}/bin/dpkg-query" \
     --doc-root "${tmp}/doc" --common-licenses "${tmp}/common"
 }
-if run_linux > "${tmp}/lin.log" 2>&1; then
+if expect_accepted "${tmp}/lin.log" "a complete Linux tree was refused" run_linux; then
   notices="${lin}/share/licenses/AccelerANTgine/THIRD-PARTY-NOTICES.txt"
-  expect_grep "${notices}" "libz1"
-  expect_grep "${notices}" "  Version: 1:1.3.dfsg-1"
-  expect_grep "${notices}" "File: lib/accelerantgine/libz.so.1"
-  expect_grep "${notices}" "License text: share/licenses/AccelerANTgine/third-party/common-licenses/Zlib-Test"
-  expect_grep "${notices}" "License text: share/licenses/onnxruntime/LICENSE"
-  expect_grep "${notices}" "File: lib/accelerantgine/libgstreamer-1.0.so.0"
+  expect_greps "${notices}" <<'PATTERNS'
+libz1
+  Version: 1:1.3.dfsg-1
+File: lib/accelerantgine/libz.so.1
+License text: share/licenses/AccelerANTgine/third-party/common-licenses/Zlib-Test
+License text: share/licenses/onnxruntime/LICENSE
+File: lib/accelerantgine/libgstreamer-1.0.so.0
+PATTERNS
   expect_no_grep "${notices}" "launcher.sh"
   [[ -s "${lin}/share/licenses/AccelerANTgine/third-party/common-licenses/Zlib-Test" ]] || fail "cited common license not copied"
   [[ -s "${lin}/share/licenses/AccelerANTgine/third-party/deb-libz1/copyright" ]] || fail "Debian copyright not copied"
@@ -205,9 +222,6 @@ assert "lib/accelerantgine/gstreamer-1.0/libgstrswebrtc.so" not in components["g
 assert "lib/accelerantgine/gstreamer-1.0/libgstcoreelements.so" in components["gstreamer"]["files"]
 assert components["deb-libz1"]["files"] == ["lib/accelerantgine/libz.so.1"], components["deb-libz1"]["files"]
 PY
-else
-  cat "${tmp}/lin.log" >&2
-  fail "a complete Linux tree was refused"
 fi
 
 # A Debian copyright that is missing fails the package.
@@ -260,13 +274,10 @@ printf '{}' > "${tmp}/policy-ok.json"
 printf '{"--fail": 1}' > "${tmp}/policy-fail.json"
 cargo_args=(--cargo-stager "${tmp}/cargo-stager.py" --cargo-workspace "${tmp}" --cargo-root-package rusty_code
   --cargo-target x86_64-pc-windows-msvc)
-if run_windows "${win}" "${cargo_args[@]}" --cargo-policy "${tmp}/policy-ok.json" > "${tmp}/cargo.log" 2>&1; then
+if expect_accepted "${tmp}/cargo.log" "the Cargo crates were refused" run_windows "${win}" "${cargo_args[@]}" --cargo-policy "${tmp}/policy-ok.json"; then
   expect_grep "${win}/licenses/THIRD-PARTY-NOTICES.txt" "cxx (Rust crate)"
   expect_grep "${win}/licenses/THIRD-PARTY-NOTICES.txt" "License text: licenses/third-party/crate-cxx/LICENSE-MIT"
   expect_no_grep "${win}/licenses/THIRD-PARTY-NOTICES.txt" "rusty_code"
-else
-  cat "${tmp}/cargo.log" >&2
-  fail "the Cargo crates were refused"
 fi
 if run_windows "${win}" "${cargo_args[@]}" --cargo-policy "${tmp}/policy-fail.json" > "${tmp}/cargo-fail.log" 2>&1; then
   fail "a failing Cargo collector passed"
@@ -298,12 +309,9 @@ run_ort() {
 if run_ort "${tmp}/ort/out-none" > "${tmp}/ort-none.log" 2>&1; then fail "ORT texts passed with no source"; fi
 make_wheel "${tmp}/ort/wheels/onnxruntime_dnnl-1.31.0-cp315-cp315-linux_x86_64.whl" a
 make_wheel "${tmp}/ort/wheels/onnxruntime_dnnl-1.30.0-cp315-cp315-linux_x86_64.whl" old
-if run_ort "${tmp}/ort/out-wheel" > "${tmp}/ort-wheel.log" 2>&1; then
+if expect_accepted "${tmp}/ort-wheel.log" "a same-version chain wheel was refused" run_ort "${tmp}/ort/out-wheel"; then
   expect_grep "${tmp}/ort-wheel.log" "WARN: ONNX Runtime 1.31.0 texts from the chain wheel"
   expect_grep "${tmp}/ort/out-wheel/LICENSE" "MIT a"
-else
-  cat "${tmp}/ort-wheel.log" >&2
-  fail "a same-version chain wheel was refused"
 fi
 make_wheel "${tmp}/ort/wheels/onnxruntime_gpu-1.31.0-cp315-cp315-linux_x86_64.whl" b
 if run_ort "${tmp}/ort/out-disagree" > "${tmp}/ort-disagree.log" 2>&1; then fail "disagreeing chain wheels passed"; fi
@@ -311,11 +319,8 @@ rm -f "${tmp}/ort/wheels/onnxruntime_gpu-1.31.0-cp315-cp315-linux_x86_64.whl"
 mkdir -p "${tmp}/ort/onnxruntime-cpu/licenses"
 printf 'MIT chain\n' > "${tmp}/ort/onnxruntime-cpu/licenses/LICENSE"
 printf 'chain notices\n' > "${tmp}/ort/onnxruntime-cpu/licenses/ThirdPartyNotices.txt"
-if run_ort "${tmp}/ort/out-chain" > "${tmp}/ort-chain.log" 2>&1; then
+if expect_accepted "${tmp}/ort-chain.log" "the chain build's own texts were refused" run_ort "${tmp}/ort/out-chain"; then
   expect_grep "${tmp}/ort/out-chain/LICENSE" "MIT chain"
-else
-  cat "${tmp}/ort-chain.log" >&2
-  fail "the chain build's own texts were refused"
 fi
 printf '\177ELF other' > "${tmp}/ort/pkg/libonnxruntime.so.1"
 if run_ort "${tmp}/ort/out-foreign" > "${tmp}/ort-foreign.log" 2>&1; then fail "a foreign ORT library passed"; fi

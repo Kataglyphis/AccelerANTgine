@@ -2,24 +2,13 @@
 # Feeds fixture JUnit reports to the skip gate and checks each leg's report list; it runs no ctest or pytest.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+root=$SUITE_ROOT work=$SUITE_WORK
 gate="${root}/scripts/linux/check-junit-skips.py"
-work="$(mktemp -d)"
-trap 'rm -rf -- "${work}"' EXIT
-failures=0
 
-fail() { echo "FAIL: $*" >&2; failures=$((failures + 1)); }
-expect() {
-  local want="$1" what="$2" rc=0
-  shift 2
-  python3 "${gate}" "$@" >"${work}/out" 2>&1 || rc=$?
-  if [[ "${rc}" -ne "${want}" ]]; then
-    fail "${what}: exit ${rc}, expected ${want}"
-    cat "${work}/out" >&2
-  else
-    echo "ok: ${what}"
-  fi
-}
+run_gate() { python3 "${gate}" "$@" >"${work}/out" 2>&1; }
+expect() { suite_expect "$1" "$2" run_gate "${@:3}"; }
 
 passed='<testsuite name="ctest" tests="2"><testcase name="A.Passes" classname="A" status="run"/><testcase name="A.Also" classname="A" status="run"/></testsuite>'
 printf '%s\n' "${passed}" > "${work}/ctest.xml"
@@ -58,10 +47,10 @@ while IFS= read -r written; do
     report="${written//\$\{label\}/${label}}"
     grep -qxF "${report}" <<< "${clang_list}" || fail "${report} is written but not gated"
   done
-done < <(grep -ohE '(--junitxml=|--output-junit )"\$\{WORKSPACE_DIR\}/[^"]+"' "${root}"/scripts/linux/ci-build-and-test.sh "${root}"/scripts/linux/ci-python-bindings.sh \
+done < <(grep -ohE '(--junitxml=|--output-junit |ctest_with_junit "[^"]+" )"\$\{WORKSPACE_DIR\}/[^"]+"' "${root}"/scripts/linux/ci-build-and-test.sh "${root}"/scripts/linux/ci-python-bindings.sh \
   | sed -E 's#.*WORKSPACE_DIR\}/([^"]+)"#\1#' | sort -u)
 grep -q 'check-junit-skips.py "${JUNIT_REPORTS\[@\]}"' "${root}/scripts/linux/ci-run-all.sh" \
   || fail 'ci-run-all.sh no longer gates every report of the leg'
 
-[[ "${failures}" -eq 0 ]] || { echo "${failures} skip-gate case(s) failed" >&2; exit 1; }
+suite_finish skip-gate
 echo 'JUnit skip gate: all cases passed'

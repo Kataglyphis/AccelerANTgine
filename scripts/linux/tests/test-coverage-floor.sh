@@ -2,12 +2,10 @@
 # Runs ci-coverage.sh over stub gcovr/llvm-cov summaries at and below each floor; real profiles are not read.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+root=$SUITE_ROOT work=$SUITE_WORK
 checker="${root}/scripts/linux/check-coverage-floor.py"
-work="$(mktemp -d)"
-trap 'rm -rf -- "${work}"' EXIT
-failures=0
-fail() { echo "FAIL: $*" >&2; failures=$((failures + 1)); }
 
 # Stubs write the summary for COVERED_LINES/1000 lines and COVERED_BRANCHES/1000 branches.
 mkdir -p "${work}/bin"
@@ -40,17 +38,7 @@ lane() {
     ANTFRASTRUCTURE_DIR="${root}/third_party/ANTfrastructure" \
     bash "${root}/scripts/linux/ci-coverage.sh" --compiler "${compiler}" --build-dir build) >"${work}/out" 2>&1
 }
-expect() {
-  local want="$1" what="$2" rc=0
-  shift 2
-  lane "$@" || rc=$?
-  if { [[ "${want}" == pass ]] && [[ "${rc}" -ne 0 ]]; } || { [[ "${want}" == fail ]] && [[ "${rc}" -eq 0 ]]; }; then
-    fail "${what}: exit ${rc}, expected ${want}"
-    cat "${work}/out" >&2
-  else
-    echo "ok: ${what}"
-  fi
-}
+expect() { suite_expect "$1" "$2" lane "${@:3}"; }
 
 expect pass 'GCC at 69 % lines / 50 % branches' gcc 690 500
 expect fail 'GCC below 69 % lines' gcc 689 500
@@ -76,5 +64,5 @@ expect_unreadable() {
 expect_unreadable 'a report without branches' '{"line_total": 1000, "line_covered": 900, "branch_total": 0, "branch_covered": 0}'
 expect_unreadable 'a malformed report' 'not json'
 
-[[ "${failures}" -eq 0 ]] || { echo "${failures} coverage-floor case(s) failed" >&2; exit 1; }
+suite_finish coverage-floor
 echo 'coverage floors: all cases passed'

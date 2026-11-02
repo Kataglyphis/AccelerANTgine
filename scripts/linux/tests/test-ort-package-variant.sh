@@ -2,12 +2,12 @@
 # Checks matrix, shared API and install-guard wiring; it does not run GPU inference.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+root=$SUITE_ROOT work=$SUITE_WORK
 if LC_ALL=C grep -q $'\r' "${root}/resources/packaging/AccelerANTgine.desktop"; then
   echo 'The AppImage desktop file must use LF line endings' >&2; exit 1
 fi
-work="$(mktemp -d)"
-trap 'rm -rf "${work}"' EXIT
 cat > "${work}/check.cmake" <<'CMAKE'
 include("${MODULE}")
 accelerantgine_validate_ort_package_variant("${VARIANT}" "${SYSTEM}" "${ARCH}" "${TOP}")
@@ -120,18 +120,14 @@ configure_guard() {
 configure_guard "${work}/build" || { cat "${work}/output" >&2; exit 1; }
 # shellcheck disable=SC2016 # Match the literal CMake variable.
 sed '/^[[:space:]]*${PROJECT_NAME}_demo[[:space:]]*$/d' "${root}/cmake/CPackOptions.cmake" > "${work}/without-demo.cmake"
-if cmake -S "${work}/project" -B "${work}/without-demo-build" "-DMODULE=${root}/cmake/OrtPackageVariant.cmake" \
+suite_refuses_logged 'closure without the inference demo unexpectedly accepted' 'demo must be in the closure' "${work}/output" \
+  cmake -S "${work}/project" -B "${work}/without-demo-build" "-DMODULE=${root}/cmake/OrtPackageVariant.cmake" \
     "-DCPACK=${work}/without-demo.cmake" "-DHELPER=${helper}" "-DPROVIDER=${provider}" \
-    "-DKIND=${kind}" "-DEXPECTED=${expected}" >"${work}/output" 2>&1; then
-  echo 'closure without the inference demo unexpectedly accepted' >&2; exit 1
-fi
-grep -Fq 'demo must be in the closure' "${work}/output"
+    "-DKIND=${kind}" "-DEXPECTED=${expected}"
 cmake --install "${work}/build" --prefix "${work}/install" >"${work}/output" 2>&1 || { cat "${work}/output" >&2; exit 1; }
 touch "${work}/install/lib/${vendor}"
-if cmake --install "${work}/build" --prefix "${work}/install" >"${work}/output" 2>&1; then
-  echo 'bundled host GPU runtime unexpectedly accepted' >&2; exit 1
-fi
-grep -Fq 'host GPU runtime library was bundled' "${work}/output"
+suite_refuses_logged 'bundled host GPU runtime unexpectedly accepted' 'host GPU runtime library was bundled' "${work}/output" \
+  cmake --install "${work}/build" --prefix "${work}/install"
 if [ -z "${ORT_TEST_HELPER:-}" ]; then
   if STUB_BAD=1 configure_guard "${work}/bad-build"; then echo 'wildcard host dependency unexpectedly accepted' >&2; exit 1; fi
   grep -Fq 'Invalid host-runtime dependency' "${work}/output"

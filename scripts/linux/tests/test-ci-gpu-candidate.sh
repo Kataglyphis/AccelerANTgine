@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-work="$(mktemp -d)"
-trap 'rm -rf -- "${work}"' EXIT
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+repo=$SUITE_ROOT work=$SUITE_WORK
 mkdir -p "${work}/bin" "${work}/workspace"
 cat > "${work}/bin/uname" <<'STUB'
 #!/bin/bash

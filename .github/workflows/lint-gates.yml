@@ -69,6 +69,7 @@ jobs:
             exit 1
           }
           cat logs/test-results/third-party-notices.txt
+          bash scripts/linux/tests/test-suite-fixture.sh
           python3 scripts/linux/tests/test-model-notices.py
           python3 scripts/linux/tests/test-demo-model-install.py
           python3 scripts/linux/tests/test-perf-cachegrind.py

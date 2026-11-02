@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Compiles the real demo-device selection for each supported package variant.
 set -euo pipefail
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-work="$(mktemp -d)"
-trap 'rm -rf -- "$work"' EXIT
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+root=$SUITE_ROOT work=$SUITE_WORK
 cat > "$work/CMakeLists.txt" <<'CMAKE'
 cmake_minimum_required(VERSION 3.24)
 project(demo_device LANGUAGES CXX)

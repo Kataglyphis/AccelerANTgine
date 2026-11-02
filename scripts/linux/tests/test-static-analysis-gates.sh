@@ -2,12 +2,10 @@
 # Runs run-static-analysis-format.sh against stub tools in a scratch Git tree; it does not run real clang-tidy or scan-build.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+root=$SUITE_ROOT work=$SUITE_WORK
 hub="${root}/third_party/ANTfrastructure"
-work="$(mktemp -d)"
-trap 'rm -rf -- "${work}"' EXIT
-failures=0
-fail() { echo "FAIL: $*" >&2; failures=$((failures + 1)); }
 
 # The hub with its formatter bootstraps replaced, so only this project's gate logic runs.
 mkdir -p "${work}/hub/linux/scripts/lib"
@@ -85,17 +83,7 @@ analyse() {
   (cd "${work}/tree" && env PATH="${work}/bin:${PATH}" ANTFRASTRUCTURE_DIR="${work}/hub" STUB_LOG="${work}/calls" "$@" \
     bash "${root}/scripts/linux/run-static-analysis-format.sh" --build-dir build) >"${work}/out" 2>&1
 }
-expect() {
-  local want="$1" what="$2" rc=0
-  shift 2
-  analyse "$@" || rc=$?
-  if { [[ "${want}" == pass ]] && [[ "${rc}" -ne 0 ]]; } || { [[ "${want}" == fail ]] && [[ "${rc}" -eq 0 ]]; }; then
-    fail "${what}: exit ${rc}, expected ${want}"
-    tail -n 30 "${work}/out" >&2
-  else
-    echo "ok: ${what}"
-  fi
-}
+expect() { SUITE_OUTPUT_LINES=30 suite_expect "$1" "$2" analyse "${@:3}"; }
 
 expect pass 'a clean tree with analysed units passes'
 grep '^clang-tidy ' "${work}/calls" | grep -qw -- '-fix' && fail 'clang-tidy ran with -fix'
@@ -132,5 +120,5 @@ printf '%s\n' '-x c++-module' '-fmodule-file="kataglyphis.log=Src/My Dir/log.pcm
 printf '%s\n' -c log.cpp -x c++-module '-fmodule-file=kataglyphis.log=Src/My Dir/log.pcm' -pthread -Xclang -pthread -o log.o \
   | diff - "${work}/argv" >&2 || fail 'scan-build-cxx.sh did not expand the module map and restore -pthread'
 
-[[ "${failures}" -eq 0 ]] || { echo "${failures} static-analysis case(s) failed" >&2; exit 1; }
+suite_finish static-analysis
 echo 'static-analysis gates: all cases passed'

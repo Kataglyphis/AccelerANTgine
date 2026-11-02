@@ -65,12 +65,15 @@ python3 -I "$(antfrastructure_path linux/scripts/lib/fetch-data-lock.py)" --lock
 export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1${UBSAN_OPTIONS:+:${UBSAN_OPTIONS}}"
 
 # Subshell: ctest_run_execute cds in the caller's shell, and the TSan run must start from the root.
-(
-  ctest_run_main \
-    --build-dir "${BUILD_DIR}" \
-    --build-type "${BUILD_TYPE}" \
-    -- --output-junit "${WORKSPACE_DIR}/docs/test_results.xml" --no-tests=error
-)
+ctest_with_junit() {
+  (
+    ctest_run_main \
+      --build-dir "$1" \
+      --build-type "${BUILD_TYPE}" \
+      -- --output-junit "$2" --no-tests=error
+  )
+}
+ctest_with_junit "${BUILD_DIR}" "${WORKSPACE_DIR}/docs/test_results.xml"
 # The image carries every Linux dependency, so a skip here means one went missing; ctest marks gtest's [  SKIPPED ].
 python3 "${_SCRIPT_DIR}/check-junit-skips.py" "${WORKSPACE_DIR}/docs/test_results.xml" \
   || die "A test skipped on Linux (listed above): a dependency the image should carry is missing."
@@ -96,10 +99,7 @@ if [[ "${COMPILER}" == "clang" ]]; then
   # GLib and GStreamer are uninstrumented and hand buffers between threads through futexes TSan cannot see.
   (
     export TSAN_OPTIONS="ignore_noninstrumented_modules=1${TSAN_OPTIONS:+:${TSAN_OPTIONS}}"
-    ctest_run_main \
-      --build-dir "${TSAN_BUILD_DIR}" \
-      --build-type "${BUILD_TYPE}" \
-      -- --output-junit "${WORKSPACE_DIR}/docs/test_results_tsan.xml" --no-tests=error
+    ctest_with_junit "${TSAN_BUILD_DIR}" "${WORKSPACE_DIR}/docs/test_results_tsan.xml"
   )
 else
   info "Compiled with GCC so no fuzz testing or TSan!"

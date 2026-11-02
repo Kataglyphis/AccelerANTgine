@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+repo=$SUITE_ROOT work=$SUITE_WORK
 hub=${1:-"$repo/third_party/ANTfrastructure"}
-work="$(mktemp -d)"
-trap 'rm -rf -- "$work"' EXIT
 mkdir -p "$work/bundle/usr/bin" "$work/bundle/usr/lib/accelerantgine" "$work/bundle/usr/share/accelerantgine/models" "$work/artifacts" "$work/bin" "$work/repo/scripts/linux"
-mkdir -p "$work/repo/third_party/ANTfrastructure/linux/scripts/lib"
+mkdir -p "$work/repo/third_party/ANTfrastructure/linux/scripts/lib" "$work/repo/scripts/linux/lib"
+cp "$repo/scripts/linux/lib/detector-evidence.sh" "$work/repo/scripts/linux/lib/"
 cp "$hub/linux/scripts/lib/gpu-profile-env.sh" "$hub/linux/scripts/lib/log-bootstrap.sh" "$work/repo/third_party/ANTfrastructure/linux/scripts/lib/"
 profile="$work/repo/scripts/linux/profile-gpu-candidate.sh"
 cp "$repo/scripts/linux/profile-gpu-candidate.sh" "$profile"

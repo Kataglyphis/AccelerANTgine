@@ -2,17 +2,15 @@
 # This tests the docs installation contract, not Sphinx rendering or downloads.
 set -euo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-tmp="$(mktemp -d)"
-trap 'rm -rf -- "${tmp}"' EXIT
-workspace="${tmp}/project with spaces"
-mkdir -p "${workspace}/scripts/linux" "${workspace}/bin"
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+repo=$SUITE_ROOT tmp=$SUITE_WORK
+workspace=$(suite_new_workspace)
 cp "${repo}/scripts/linux/ci-docs.sh" "${workspace}/scripts/linux/ci-docs.sh"
 touch "${workspace}/CMakeLists.txt"
 
-cat > "${workspace}/scripts/linux/ci-common.sh" <<'STUB'
-info() { :; }
-die() { printf '%s\n' "$*" >&2; exit 1; }
+suite_log_stubs > "${workspace}/scripts/linux/ci-common.sh"
+cat >> "${workspace}/scripts/linux/ci-common.sh" <<'STUB'
 antfrastructure_source() {
   if [[ "$1" == linux/scripts/01-core/python_uv.sh ]]; then
     source "${UV_TEST_HUB}/$1"

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Compile the real MIGraphX limit expression with the Windows max macro visible.
 set -euo pipefail
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-work="$(mktemp -d)"
-trap 'rm -rf -- "$work"' EXIT
+# shellcheck source=suite-fixture.sh
+source "$(dirname "${BASH_SOURCE[0]}")/suite-fixture.sh"
+root=$SUITE_ROOT work=$SUITE_WORK
 line="$(awk '/const std::string memory_limit =/ { print; count++ } END { if (count != 1) exit 1 }' "$root/Src/onnx_inference_engine.cpp")"
 [[ "$line" == *SIZE_MAX* ]] || { echo 'MIGraphX limit must survive a max macro and clang-tidy fix' >&2; exit 1; }
 {
