@@ -37,9 +37,9 @@ and **C++23 named modules** (`.ixx`) shape most of its tooling.
 
 | Path | What lives there |
 | --- | --- |
-| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `kataglyphis_c_api` (the embedder-facing ABI) and `rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
+| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `text_generation`, `execution_provider`, `config_error`, `log`, `kataglyphis_c_api` (the embedder-facing ABI) and `Src/rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
-| `Test/` | The five C++ suites `commit`, `compile`, `fuzz`, `golden` and `perf` (`docs/source/development_workflow.rst` § *The Suites*), and `common/`, the helpers that generate their ONNX models; `Test/python` tests the bindings |
+| `Test/` | The five C++ suites `commit`, `compile`, `fuzz`, `golden` and `perf` (`docs/source/development_workflow.rst` § *The Suites*); `common/`, the helpers that generate their ONNX models; `contract/`, the text contract sources the commit suite builds; `cmake/`, the discovery helpers; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, run end to end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
 | `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the Pester suite in `tests/` and `generated-artifacts.txt`, the pathspecs the hub's generated-artifacts suite reads. No project-local `modules/`: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
@@ -216,8 +216,8 @@ written out rather than linked.
 - **The docs theme comes from DocumANTation, via ANTfrastructure** (§ 3). A docs venv whose
   install stops at `error: Distribution not found at: file:///…/sphinx-kataglyphis-theme` means
   the nested submodule was not initialised recursively. `uv sync --locked --only-group docs`
-  resolves the source path relative to the project root. The theme needs
-  Python 3.14. `conf.py` adds only this project's settings to `setup_theme()`: graphviz,
+  resolves the source path relative to the project root. The docs group needs
+  Python 3.14 or newer (`pyproject.toml`). `conf.py` adds only this project's settings to `setup_theme()`: graphviz,
   inheritance diagrams, breathe and exhale when Doxygen's XML exists, the version from
   `CMakeLists.txt`, and an `include-read` hook that points exhale's two tree views at the ids
   docutils gives its labels (lowercase, no dots), where their links used to miss 77 anchors.
@@ -451,10 +451,10 @@ written out rather than linked.
     producer holds) for the window and points the CLI at it. With no consumer attached the
     producer mostly idles: 150 to 230 samples in a 20 s window were measured, not a hot loop.
 
-- **The Python module runs without the GIL on 3.14t, so its locks are load-bearing.**
+- **The Python module runs without the GIL on the image's free-threaded Python, so its locks are load-bearing.**
   `nanobind_add_module(... FREE_THREADED ...)` marks it `Py_MOD_GIL_NOT_USED`; against a GIL
-  Python nanobind ignores the flag. On Linux `ci-python-bindings.sh` ships a `cp314` and a
-  `cp314t` wheel, and the hub's `free-threaded-wheel.py prove` fails the lane when the second
+  Python nanobind ignores the flag. On Linux `ci-python-bindings.sh` ships a `cp3XY` and a
+  `cp3XYt` wheel for the hub's `PYTHON_VERSION` (`versions.env`), and the hub's `free-threaded-wheel.py prove` fails the lane when the second
   re-enables the GIL. The flag is only safe because of three locks:
   - `OnnxInferenceEngine` and `YoloDetector` each hold a `std::shared_mutex`, shared by runs and
     taken alone by `initialize`;
@@ -506,11 +506,16 @@ written out rather than linked.
 
 **Security audit lane.** `.github/workflows/security-audit.yml` calls the hub's reusable `security-audit.yml` on push, pull request, Mondays and dispatch. It scans `uv.lock` and `Src/rusty_code/Cargo.lock` with the hub-pinned osv-scanner, records `cargo_security_checks.sh` for each `Cargo.lock`, fails a push or PR that adds a HIGH or CRITICAL advisory absent from the base commit, lists every finding on the weekly and dispatched runs, and uploads `security-audit.json`. Locally: `bash third_party/ANTfrastructure/linux/scripts/security-audit.sh`. The lint gates enforce the hub's `sha-pin` workflow convention (`workflow-conventions: sha-pin`): every third-party `uses:` names a 40-hex commit SHA.
 
+Programs: the CLI `AccelerANTgine_cli` (`cli_main.cpp`) and the demo `AccelerANTgine_demo`
+(`inference_demo.cpp`), installed by CMake when this is the top-level project.
+
 `bash scripts/linux/quality-report.sh` measures this checkout into `logs/code-quality/measurements.json`
 and `queue.md`; `--compare <file>` or `--compare previous-develop` grades it (exit 0 ok, 1 regressed,
 2 incomplete). `quality-report.toml` declares this repo's lane outputs and metrics: hub
 `docs/code-quality-tooling.md` § quality-report. A regressed verdict on develop is fixed or recorded
-in `BACKLOG.md` before new feature work.
+in `BACKLOG.md` before new feature work. `bash scripts/linux/quality-report.sh --perf-host` runs the
+latency commands that toml declares inside `:latest` and grades them against `perf/baseline-<cpu>.json`;
+it refuses a dirty tree, a loaded host or a running image chain.
 
 **Benchmarks have a history and an instruction-count gate.** `ci-profile-bench.sh` fetches the
 locked DEIM model and runs `perfTestSuite` with `KATAGLYPHIS_REQUIRE_MODEL=1` (a missing model or
@@ -601,7 +606,12 @@ platform + arch, display names `<Platform> <Arch> · <what>`. They are `linux-x6
 `lint-gates.yml`, `submodule-pins.yml` and `powershell-quality.yml`, the one caller of the hub's
 PowerShell lint and complexity workflow, on every push. Its complexity verdict is strict on push and
 PR (15 cyclomatic, 5 nesting, 80 lines per function, `scripts/`): refactor into named functions,
-never raise a limit.
+never raise a limit. The rest: `on-request.yml` starts the lanes a commit message's `[ci <lane>]` asks
+for; `release.yml` is every push to `main`; `mutations.yml` is below; `code-quality-report.yml` runs
+`quality-report.sh`; `security-audit.yml` is the audit lane above; `python-static.yml` is strict Ruff and
+ty; `python-refactor.yml` is an on-demand preview that publishes nothing; `renovate-entrypoint.yml` checks
+the Renovate wrapper and config; and `linux-gpu-candidate.yml` and `windows-gpu-candidates.yml` are
+dispatch-only, unverified GPU package candidates.
 Both Windows container callers request `submodules: 'true'`: their build inputs are direct
 submodules, while a recursive checkout follows ANTfrastructure's documentation cycle.
 

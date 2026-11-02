@@ -6,6 +6,18 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
 ## Open
 
+- [ ] **LAI-A4: a GStreamer audio appsink and Whisper captions** (L, ★★). Captions as `textoverlay`
+  and WebRTC data, from the hub's language-AI milestone 3 (`docs/language-ai.md`).
+
+- [ ] **The demo's `--gstreamer-only` mode hangs** (M, ★). Found while removing a ctest case that
+  could not end: `AccelerANTgine_demo --gstreamer-only` (`Src/inference_demo.cpp`) never returns,
+  so nothing tests that mode. Bound its main loop, then restore the case.
+
+- [ ] **A bundle with `GST_REGISTRY_FORK=no` and no scanner can give webrtcsink an empty codec
+  list** (M, ★★). `Src/bundled_gstreamer.cpp` sets it; on a fresh registry an in-process scan builds
+  the pad templates while webrtcsink reads them (OxidANT `docs/observant.md`). Ship
+  `gst-plugin-scanner` beside the library or prove the fresh-registry path.
+
 - [b] **DNNL cannot run in `:latest`** (S, ★★; blocked on the hub image, CON191). The chain ORT
   lists `DnnlExecutionProvider` on amd64, but `libonnxruntime_providers_dnnl.so` needs
   `libdnnl.so.3`, which the image does not ship (its RUNPATH names the build directory), so

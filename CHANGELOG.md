@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-02, AGENTS.md matches the tree)
+- **`AGENTS.md` names what the tree holds.** Section 5 names every workflow and both programs and
+  `--perf-host`; the `Src/` and `Test/` rows list the modules and directories that were missing; the
+  wheels are `cp3XY`/`cp3XYt` for the hub's `PYTHON_VERSION`, no longer `cp314`. The generated
+  test-result page joins the docs toctree. `BACKLOG.md` lists LAI-A4, the demo's hanging
+  `--gstreamer-only` and the fresh-registry webrtcsink risk.
+
 ### 2026-11-02: one owner per fact
 
 - **Changed:** `resources/coco-classes.txt` is the hub's synced COCO list (`coco-classes` row);

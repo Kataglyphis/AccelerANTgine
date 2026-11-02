@@ -60,6 +60,11 @@ tested on Linux x64, arm64 and riscv64 and on Windows x64 and arm64.
    graphviz_files
    test_results
 
+.. toctree::
+   :hidden:
+
+   test-results/index
+
 Indices and tables
 ==================
 

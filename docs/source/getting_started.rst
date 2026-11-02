@@ -371,8 +371,8 @@ The library is also exposed to Python through nanobind: the module lives in
   ``python_bindings`` ctest, registered only by a ``KATAGLYPHIS_BUILD_PYTHON_BINDINGS=ON``
   configure with ``BUILD_TESTING`` on and pytest importable.
 - **Linux:** the clang leg of both Linux lanes builds two wheels with
-  ``scripts/linux/ci-python-bindings.sh``: ``cp314-cp314`` for the GIL interpreter and
-  ``cp314-cp314t`` for the image's free-threaded 3.14t. Each is installed into its own venv and
+  ``scripts/linux/ci-python-bindings.sh``: ``cp3XY-cp3XY`` for the GIL interpreter and
+  ``cp3XY-cp3XYt`` for the image's free-threaded build of the hub's ``PYTHON_VERSION``. Each is installed into its own venv and
   runs ``Test/python``. The free-threaded one first goes through ANTfrastructure's
   ``free-threaded-wheel.py prove``, which fails when loading the module re-enables the GIL. The
   wheels upload as ``python-wheels-<arch>``. They are ``linux_<arch>`` wheels: GStreamer and
@@ -403,7 +403,7 @@ packages and builds the docs:
 
 A direct docs build, written to ``docs/build/html/index.html``, from the repository root (the
 family theme in ``pyproject.toml`` is a path into the recursive submodule checkout, and it needs
-Python 3.14):
+Python 3.14 or newer):
 
 .. code-block:: bash
 
