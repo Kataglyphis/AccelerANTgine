@@ -11,4 +11,4 @@ export WORKFLOW_CONVENTIONS_GATE="${WORKFLOW_CONVENTIONS_GATE:-sha-pin}"
 source "${_SCRIPT_DIR}/lib/antfrastructure.sh"
 
 # Matches lint-gates.yml's `ratchets: true`; without it the doc-link and ratchet gates never ran here.
-antfrastructure_exec linux/scripts/run-lint-gates.sh "${KATAGLYPHIS_REPO_ROOT}" --ratchets "$@"
+antfrastructure_exec linux/scripts/run-lint-gates.sh "${KATAGLYPHIS_REPO_ROOT}" --ratchets --agents-drift "$@"

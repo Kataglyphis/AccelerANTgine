@@ -411,5 +411,5 @@ Latency on a quiet host
 
 ``bash scripts/linux/quality-report.sh --perf-host`` times the demo's ``--detector-latency-runs`` per
 CPU provider, and SmolLM2-135M through the CLI and the Python binding, in the CI image against
-``perf/baseline-<cpu>.json``: hub ``docs/fleet-health.md`` § perf-host. It is not run in CI, whose
+``perf/baseline-<cpu>.json``: hub ``third_party/ANTfrastructure/docs/fleet-health.md`` § perf-host. It is not run in CI, whose
 hosted wall time varies too much to grade.

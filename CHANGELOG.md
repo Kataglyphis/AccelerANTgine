@@ -39,6 +39,8 @@ belongs in the **Changed** list below with that consequence spelled out.
   not source that.
 
 ### Changed (2026-11-02, AGENTS.md matches the tree)
+- **The lint gates hold it there.** `run-lint-gates.sh` and `lint-gates.yml` run the hub's
+  `verify_agents_drift.py`.
 - **`AGENTS.md` names what the tree holds.** Section 5 names every workflow and both programs and
   `--perf-host`; the `Src/` and `Test/` rows list the modules and directories that were missing; the
   wheels are `cp3XY`/`cp3XYt` for the hub's `PYTHON_VERSION`, no longer `cp314`. The generated

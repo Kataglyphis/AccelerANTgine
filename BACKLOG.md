@@ -67,3 +67,13 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   that leaves the successor chain within 24 tokens and seeds 2 to 4 the chain itself, so four
   seeds give two distinct sequences. The Windows chain builds GenAI with `USE_GUIDANCE=OFF`, so
   there a schema fails with `JsonSchemaUnsupported` (LAI-H2 in the hub).
+
+## Quality queue
+
+The top 5 of `logs/code-quality/queue.md` (`bash scripts/linux/quality-report.sh`); re-sync when it moves.
+
+- [ ] `doc-dupes-hub.allow:4` budget 23 (allow_budget_total)
+- [ ] `shellcheck-warnings.allow:20` budget 7 (allow_budget_total)
+- [ ] `shellcheck-warnings.allow:16` budget 5 (allow_budget_total)
+- [ ] `shellcheck-warnings.allow:15` budget 3 (allow_budget_total)
+- [ ] `shellcheck-warnings.allow:14` budget 2 (allow_budget_total)
