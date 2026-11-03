@@ -103,7 +103,9 @@ on the requested provider using ``python3 -I third_party/ANTfrastructure/shared/
 <profile.json> --device cuda`` (use ``python`` on Windows). The demo in a CPU package defaults
 to CPU; NVIDIA packages default to CUDA, Linux AMD packages to MIGraphX, and Windows AMD packages
 to DirectML. Pass ``--device cpu`` to override a GPU package's default. A requested provider that
-cannot initialize fails instead of silently switching to CPU. Profiling is disabled unless ``--profile`` is
+cannot initialize fails instead of silently switching to CPU. CUDA first runs one kernel on the card:
+on a card the package's ONNX Runtime has no kernel for (an RTX 20xx today) the request fails with
+``ProviderUnavailable``, and the log names the card and its compute capability. Profiling is disabled unless ``--profile`` is
 provided; an embedder can set ``SessionConfig::profiling_prefix`` and call ``end_profiling()``.
 The Linux GPU workflow also runs the locked model on CPU from each finished package using both
 the host and bundled glibc loaders. Its optional self-hosted GPU job profiles the packaged demo

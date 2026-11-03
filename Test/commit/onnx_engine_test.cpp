@@ -1,5 +1,7 @@
 #include "kataglyphis_test_support.h"
 
+#include "cuda_probe.hpp"
+
 #include <gtest/gtest.h>
 
 #include <chrono>
@@ -7,6 +9,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -440,6 +443,54 @@ TEST(HipProbe, AMissingRuntimeOrOneWithoutTheSymbolsCopiesNothing)
     inference::hip_probe::copy_to_device("libc.so.6", 0);
 }
 #endif
+
+TEST(CudaProbe, ACardWithoutAKernelIsNamedWithTheWayOut)
+{
+    const auto reason = inference::cuda_probe::no_kernel_reason(
+      "Status Message: CUDA error cudaErrorNoKernelImageForDevice:no kernel image is available",
+      [] { return std::optional<std::string>("NVIDIA GeForce RTX 2080 (compute capability 7.5)"); });
+    ASSERT_TRUE(reason.has_value());
+    EXPECT_NE(reason->find("NVIDIA GeForce RTX 2080 (compute capability 7.5)"), std::string::npos) << *reason;
+    EXPECT_NE(reason->find("cpu device runs on the CPU"), std::string::npos) << *reason;
+}
+
+TEST(CudaProbe, ACardTheDriverDoesNotNameStillFails)
+{
+    const auto reason = inference::cuda_probe::no_kernel_reason(
+      "cudaErrorNoKernelImageForDevice", [] { return std::optional<std::string>{}; });
+    ASSERT_TRUE(reason.has_value());
+    EXPECT_NE(reason->find("this NVIDIA GPU"), std::string::npos) << *reason;
+}
+
+TEST(CudaProbe, EveryOtherOutcomeIsLeftToTheRealSession)
+{
+    const auto never = []() -> std::optional<std::string> {
+        ADD_FAILURE() << "only a missing kernel asks for the card";
+        return std::nullopt;
+    };
+    EXPECT_FALSE(inference::cuda_probe::no_kernel_reason("", never).has_value());
+    EXPECT_FALSE(inference::cuda_probe::no_kernel_reason("CUDA failure 999: Unknown error", never).has_value());
+}
+
+TEST(CudaProbe, NoDriverOrOneWithoutTheSymbolsNamesNothing)
+{
+    EXPECT_FALSE(inference::cuda_probe::card_on("libnot-a-cuda-driver.so", 0).has_value());
+#if !defined(_WIN32)
+    EXPECT_FALSE(inference::cuda_probe::card_on("libc.so.6", 0).has_value());
+#endif
+}
+
+TEST(CudaProbe, TheModelRunsItsOneKernelOnTheCpu)
+{
+    const auto &bytes = inference::cuda_probe::one_kernel;
+    const TempFile model(
+      "kataglyphis-one-kernel", ".onnx", std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+    auto engine = initialized_engine(model);
+    const std::vector<float> input{ -1.0F };
+    const auto output = engine.run_inference(input, shape({ 1 }), "x");
+    ASSERT_TRUE(output.has_value());
+    EXPECT_EQ(output->outputs[0].data, (std::vector<float>{ 0.0F }));
+}
 
 #if !defined(_WIN32) && defined(KATAGLYPHIS_TEST_MIGRAPHX)
 TEST(OnnxEngine, MigraphXInferenceWorksWithoutACacheOverride)

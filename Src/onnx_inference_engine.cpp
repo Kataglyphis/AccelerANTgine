@@ -8,6 +8,7 @@ module;
 #include <dml_provider_factory.h>
 #endif
 
+#include "cuda_probe.hpp"
 #include "hip_probe.hpp"
 
 #include <algorithm>
@@ -184,6 +185,38 @@ namespace {
         return owned;
     }
 
+    // ONNX Runtime's message when one kernel will not run on the card; empty when it ran.
+    auto run_one_cuda_kernel(OrtEnv *env, int device_id) -> std::string
+    {
+        const OrtApi &api = Ort::GetApi();
+        std::string error;
+        Ort::SessionOptions options;
+        OrtCUDAProviderOptions cuda_options{};
+        cuda_options.device_id = device_id;
+        OrtSession *raw_session = nullptr;
+        // The reason below says it better than ONNX Runtime's red line about a failed node.
+        if (!ort_succeeded(api.SetSessionLogSeverityLevel(options, ORT_LOGGING_LEVEL_FATAL), &error)
+            || !ort_succeeded(api.SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options), &error)
+            || !ort_succeeded(
+              api.CreateSessionFromArray(
+                env, cuda_probe::one_kernel.data(), cuda_probe::one_kernel.size(), options, &raw_session),
+              &error)) {
+            return error;
+        }
+        const Ort::Session session{ raw_session };
+        Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+        std::vector<float> input{ -1.0F };
+        auto tensor = make_float_tensor(memory_info, input, { 1 });
+        if (!tensor) { return "the one-kernel input could not be allocated"; }
+        const char *input_name = "x";
+        const char *output_name = "y";
+        const OrtValue *input_value = *tensor;
+        OrtValue *output = nullptr;
+        ort_succeeded(api.Run(raw_session, nullptr, &input_name, &input_value, 1, &output_name, 1, &output), &error);
+        if (output != nullptr) { api.ReleaseValue(output); }
+        return error;
+    }
+
     // The registered name GetAvailableProviders reports for a runtime built with the provider.
     auto provider_name(ExecutionProvider provider) -> std::string_view
     {
@@ -354,6 +387,15 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
             return std::unexpected(appended.error());
         }
     } else if (provider == ExecutionProvider::Cuda) {
+        const auto reason = cuda_probe::no_kernel_reason(run_one_cuda_kernel(*impl_->env, config.device_id),
+          [device = config.device_id] { return cuda_probe::card_on(cuda_probe::driver, device); });
+        if (reason) {
+            impl_->reset();
+            impl_->provider_error = *reason;
+            // The demos print only the error code, and this one has a way out.
+            kataglyphis::log::error("{}", impl_->provider_error);
+            return std::unexpected(OnnxError::ProviderUnavailable);
+        }
         OrtCUDAProviderOptions cuda_options{};
         cuda_options.device_id = config.device_id;
         if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options))) {

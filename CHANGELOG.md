@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-03, a card without a CUDA kernel)
+- **A card the NVIDIA packages have no kernel for gets a message.** `initialize` runs a one-`Relu` model on CUDA
+  before the real session. On `cudaErrorNoKernelImageForDevice` it returns `ProviderUnavailable` and logs the card and
+  its compute capability, where the session used to start and its first node stopped. Every other probe failure stays
+  for the real session to report. Seen on an RTX 2080 (compute capability 7.5) with the images' `86;87;89;120`.
+
 ### 2026-11-03: stop() ends when a pull races the callback
 
 - **Fixed:** with a buffer callback set, a `pull_sample` that took the frame left the callback blocked in the
