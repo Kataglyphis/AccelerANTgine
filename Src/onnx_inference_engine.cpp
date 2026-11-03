@@ -8,6 +8,8 @@ module;
 #include <dml_provider_factory.h>
 #endif
 
+#include "hip_probe.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -359,6 +361,18 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
             return std::unexpected(OnnxError::SessionCreationFailed);
         }
     } else if (provider == ExecutionProvider::MigraphX) {
+#ifndef _WIN32
+        if (!hip_probe::answers_within(hip_probe::answer_limit,
+              [device = config.device_id] { hip_probe::copy_to_device(hip_probe::runtime, device); })) {
+            impl_->reset();
+            impl_->provider_error =
+              "MIGraphXExecutionProvider cannot run: a copy to the AMD GPU took over 30 seconds. "
+              "The cpu device runs on the CPU";
+            // The demos print only the error code, and this one has a way out.
+            kataglyphis::log::error("{}", impl_->provider_error);
+            return std::unexpected(OnnxError::ProviderUnavailable);
+        }
+#endif
         // Generic options avoid the legacy provider's quoted empty cache path.
         const std::string device_id = std::to_string(config.device_id);
         const std::string memory_limit = std::to_string(SIZE_MAX);

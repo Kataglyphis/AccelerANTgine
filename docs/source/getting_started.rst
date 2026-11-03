@@ -124,6 +124,8 @@ dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=n
 ``amd`` selects the image's GPU ONNX Runtime and stages its matching provider. CPU is the
 default. NVIDIA targets Linux x64 and arm64; AMD targets Linux x64. MIGraphX device registration
 uses explicit options to avoid a malformed empty model-cache path in the legacy runtime API.
+It first copies a few bytes to the selected GPU; after 30 seconds without an answer the request
+fails with ``ProviderUnavailable``.
 For a local investigation on AMD hardware, run:
 
 .. code-block:: sh

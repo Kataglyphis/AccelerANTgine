@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <fstream>
@@ -20,7 +21,10 @@
 #endif
 #include <windows.h>
 #else
+#include "hip_probe.hpp"
+
 #include <dlfcn.h>
+#include <unistd.h>
 #endif
 
 import kataglyphis.onnx_inference;
@@ -411,6 +415,31 @@ TEST(OnnxEngine, InvalidMigraphXDeviceFailsWithoutInitializing)
         : inference::OnnxError::ProviderUnavailable);
     EXPECT_FALSE(engine.is_initialized());
 }
+
+#if !defined(_WIN32)
+TEST(HipProbe, WorkThatFinishesAnswers)
+{
+    EXPECT_TRUE(inference::hip_probe::answers_within(std::chrono::seconds(30), [] {}));
+}
+
+TEST(HipProbe, AChildThatCrashesCountsAsAnAnswer)
+{
+    EXPECT_TRUE(inference::hip_probe::answers_within(std::chrono::seconds(30), [] { std::abort(); }));
+}
+
+TEST(HipProbe, WorkThatNeverReturnsDoesNotAnswer)
+{
+    EXPECT_FALSE(inference::hip_probe::answers_within(std::chrono::milliseconds(100), [] {
+        while (true) { pause(); }
+    }));
+}
+
+TEST(HipProbe, AMissingRuntimeOrOneWithoutTheSymbolsCopiesNothing)
+{
+    inference::hip_probe::copy_to_device("libnot-a-hip-runtime.so", 0);
+    inference::hip_probe::copy_to_device("libc.so.6", 0);
+}
+#endif
 
 #if !defined(_WIN32) && defined(KATAGLYPHIS_TEST_MIGRAPHX)
 TEST(OnnxEngine, MigraphXInferenceWorksWithoutACacheOverride)

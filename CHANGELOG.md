@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-03, MIGraphX hang)
+- **MIGraphX no longer waits without end on an AMD GPU that does not answer.** `Src/hip_probe.hpp` copies four bytes to
+  the selected GPU in a child process first. After 30 seconds `initialize` returns `ProviderUnavailable` and logs the
+  reason, since the demos print only the error code. Seen under WSL on the RX 9070 XT, hub CON202.
+
 ### 2026-11-03 (Windows GPU checks call the hub's helpers)
 - `Test-WindowsGpuHub.ps1` lists missing hub files with `Get-MissingBuildChildPaths`, and `Test-WindowsGpuCleanHost.ps1`
   isolates its environment with `Invoke-WithProcessEnvironment`; the private snapshot pair is gone from
