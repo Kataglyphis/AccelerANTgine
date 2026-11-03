@@ -54,25 +54,33 @@ exec python3 -I -c 'import socket, time, sys; s = socket.socket(); s.setsockopt(
 STUB
 chmod +x "$stubs"/*
 
-run_check() { PATH="$stubs:$PATH" bash "$check" "$packages" > "$work/out" 2>&1; }
-with() { env "$1" bash -c "PATH='$stubs':\"\$PATH\" bash '$check' '$packages' > '$work/out' 2>&1"; }
+# Parallel mutation workers run this suite side by side, so a shared port would fail every case for the wrong reason.
+port="$(python3 -I -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+run_check() { PATH="$stubs:$PATH" bash "$check" "$packages" "$port" > "$work/out" 2>&1; }
+# Usage: refuses_with MESSAGE WHAT [VAR=VALUE]...; any other failure must not satisfy the case.
+refuses_with() {
+  local message=$1 what=$2 rc=0
+  shift 2
+  env "$@" PATH="$stubs:$PATH" bash "$check" "$packages" "$port" > "$work/out" 2>&1 || rc=$?
+  if [[ $rc -ne 0 ]] && grep -Fq -e "$message" "$work/out"; then echo "ok: $what"; return 0; fi
+  fail "$what: exit $rc, expected a failure naming '$message'"
+  cat "$work/out" >&2
+}
 
 suite_expect pass 'finished packages that stream on both loaders pass' run_check
 grep -Fq 'appimage (bundled): a fresh registry' "$work/out" || fail 'the AppImage bundled run did not report'
 grep -Fq 'tarball (host): a fresh registry' "$work/out" || fail 'the tarball host run did not report'
-suite_expect fail 'a failed --gst_check fails' with BAD_CHECK=1
-suite_expect fail 'a registry not written through the scanner fails' with BAD_SCAN=1
-suite_expect fail 'an empty codec list fails even when the process survives' with BAD_LOG=1
-suite_expect fail 'a stream that ended early fails' with BAD_STATUS=1
-suite_expect fail 'only the bundled loader failing still fails' with BAD_BUNDLED=1
-suite_expect fail 'a directory that cannot list the plugin first fails' with BAD_ORDER=1
-export BAD_LOG_TEXT='External plugin loader failed'
-suite_expect fail 'a scanner fallback during the stream fails' with BAD_LOG=1
-unset BAD_LOG_TEXT
+refuses_with '--gst_check failed' 'a failed --gst_check fails' BAD_CHECK=1
+refuses_with 'not written through the packaged scanner' 'a registry not written through the scanner fails' BAD_SCAN=1
+refuses_with 'did not stream' 'an empty codec list fails even when the process survives' BAD_LOG=1
+refuses_with 'did not stream (status 1)' 'a stream that ended early fails' BAD_STATUS=1
+refuses_with '(bundled): a fresh registry did not stream' 'only the bundled loader failing still fails' BAD_BUNDLED=1
+refuses_with 'list libgstrswebrtc.so first' 'a directory that cannot list the plugin first fails' BAD_ORDER=1
+refuses_with 'did not stream' 'a scanner fallback during the stream fails' BAD_LOG=1 BAD_LOG_TEXT='External plugin loader failed'
 mv "$packages/app.AppImage" "$work/held"
-suite_expect fail 'a missing package format fails' run_check
+refuses_with 'Expected one .deb' 'a missing package format fails'
 mv "$work/held" "$packages/app.AppImage"
 printf '#!/usr/bin/env bash\necho 1000\n' > "$stubs/id"
-suite_expect fail 'a non-root run fails' run_check
+refuses_with 'needs root' 'a non-root run fails'
 suite_finish 'fresh-registry'
 echo 'fresh-registry package check verdicts passed'

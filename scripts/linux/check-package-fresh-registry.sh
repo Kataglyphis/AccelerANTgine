@@ -2,13 +2,13 @@
 # Runs as root in the image: each finished package streams from a fresh registry listing webrtcsink's plugin first; other scan orders stay unproved.
 set -euo pipefail
 
-[[ $# -eq 1 ]] || { echo 'usage: check-package-fresh-registry.sh PACKAGE_DIR' >&2; exit 2; }
+[[ $# -ge 1 && $# -le 2 ]] || { echo 'usage: check-package-fresh-registry.sh PACKAGE_DIR [SIGNALLING_PORT]' >&2; exit 2; }
 package_dir="$(realpath -e "$1")"
 [[ $(id -u) -eq 0 ]] || { echo 'Mounting the plugin directory needs root' >&2; exit 1; }
 command -v gst-webrtc-signalling-server > /dev/null || { echo 'gst-webrtc-signalling-server is not on PATH' >&2; exit 1; }
 
 first=libgstrswebrtc.so
-port=18445
+port=${2:-18445}
 work="$(mktemp -d "${TMPDIR:-/tmp}/accelerantgine-registry.XXXXXXXX")"
 signalling=""
 mounted=""
