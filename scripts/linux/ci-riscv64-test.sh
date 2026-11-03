@@ -7,8 +7,10 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_SCRIPT_DIR}/ci-common.sh"
 
 antfrastructure_source linux/scripts/lib/riscv64-cross.sh
-antfrastructure_source linux/scripts/lib/cmake-build.sh
-antfrastructure_source linux/scripts/lib/ctest-run.sh
+# shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/cmake-build.sh
+source "$(antfrastructure_path linux/scripts/lib/cmake-build.sh)"
+# shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/ctest-run.sh
+source "$(antfrastructure_path linux/scripts/lib/ctest-run.sh)"
 
 WORKSPACE_DIR="$(pwd)"
 BUILD_DIR="build-riscv64"

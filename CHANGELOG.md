@@ -24,6 +24,12 @@ belongs in the **Changed** list below with that consequence spelled out.
   its compute capability, where the session used to start and its first node stopped. Every other probe failure stays
   for the real session to report. Seen on an RTX 2080 (compute capability 7.5) with the images' `86;87;89;120`.
 
+### 2026-11-03: shellcheck reads the hub libraries the wrappers configure
+
+- **Changed:** the CI wrappers name each hub library they set knobs for in a `# shellcheck source=` directive, so a knob the
+  library stops reading now fails the warning ratchet. `shellcheck-warnings.allow` goes from 22 findings to 2; the two left
+  are read by name inside the library, where the directive cannot show them.
+
 ### 2026-11-03: stop() ends when a pull races the callback
 
 - **Fixed:** with a buffer callback set, a `pull_sample` that took the frame left the callback blocked in the

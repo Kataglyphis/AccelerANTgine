@@ -6,8 +6,9 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# antfrastructure_source (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override.
-antfrastructure_source linux/scripts/lib/code-quality.sh
+# antfrastructure_path (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override; the directive lets shellcheck see the knobs read there.
+# shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/code-quality.sh
+source "$(antfrastructure_path linux/scripts/lib/code-quality.sh)"
 antfrastructure_source linux/scripts/01-core/gates.sh
 antfrastructure_source linux/scripts/01-core/tool-checks.sh
 
@@ -34,7 +35,7 @@ CODE_QUALITY_CLANG_TIDY_EXTENSIONS=(cpp cc cxx ixx cppm mxx)
 CODE_QUALITY_CLANG_TIDY_FIX=false
 # Which checks a project tolerates is its own decision, so they stay here.
 CODE_QUALITY_CLANG_TIDY_ARGS=(
-  -checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness
+  "-checks=-readability-convert-member-functions-to-static,-readability-redundant-declaration,-misc-const-correctness"
   -header-filter=^Src/
 )
 

@@ -6,9 +6,11 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# antfrastructure_source (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override.
-antfrastructure_source linux/scripts/lib/cmake-build.sh
-antfrastructure_source linux/scripts/lib/ctest-run.sh
+# antfrastructure_path (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override; the directive lets shellcheck see the knobs read there.
+# shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/cmake-build.sh
+source "$(antfrastructure_path linux/scripts/lib/cmake-build.sh)"
+# shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/ctest-run.sh
+source "$(antfrastructure_path linux/scripts/lib/ctest-run.sh)"
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"

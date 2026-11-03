@@ -11,6 +11,7 @@ touch "${workspace}/CMakeLists.txt"
 
 suite_log_stubs > "${workspace}/scripts/linux/ci-common.sh"
 cat >> "${workspace}/scripts/linux/ci-common.sh" <<'STUB'
+antfrastructure_path() { printf '%s' /dev/null; }
 antfrastructure_source() {
   if [[ "$1" == linux/scripts/01-core/python_uv.sh ]]; then
     source "${UV_TEST_HUB}/$1"

@@ -6,8 +6,9 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# antfrastructure_source (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override.
-antfrastructure_source linux/scripts/lib/coverage.sh
+# antfrastructure_path (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override; the directive lets shellcheck see the knobs read there.
+# shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/coverage.sh
+source "$(antfrastructure_path linux/scripts/lib/coverage.sh)"
 
 WORKSPACE_DIR="$(pwd)"
 COMPILER="clang"

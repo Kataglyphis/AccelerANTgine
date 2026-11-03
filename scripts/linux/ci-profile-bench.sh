@@ -6,8 +6,9 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
 
-# antfrastructure_source (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override.
-antfrastructure_source linux/scripts/lib/cmake-build.sh
+# antfrastructure_path (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override; the directive lets shellcheck see the knobs read there.
+# shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/cmake-build.sh
+source "$(antfrastructure_path linux/scripts/lib/cmake-build.sh)"
 
 PERF_TIMEOUT_SECONDS="180"
 # The window the workload still runs for when perf cannot (see perf_probe).
