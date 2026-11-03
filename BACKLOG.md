@@ -39,6 +39,7 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   records the status, core and rerun backtrace; `reusable-linux.yml` uploads the evidence on failure.
   Remaining: analyze a stack from a real workload crash and exercise the successful
   start/stream/stop path under Debug ASan; the existing unit tests cover failure paths.
+  Attempts: 2026-11-03, 120 runs without a crash (x64; 60 Debug ASan, 60 `linux-profile-GNU`; 8 s each, no viewer).
 
 - [ ] **The Python bindings build and test on Linux x64 and arm64 only** (M, ★★). Owner goal
   2026-10-01: every test on every arch, on the pinned CPython once with the GIL and once
