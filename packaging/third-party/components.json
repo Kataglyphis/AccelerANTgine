@@ -15,7 +15,7 @@
     {
       "id": "deim-dfine-n-coco",
       "name": "DEIM-D-FINE-N COCO demo model",
-      "version": "deim_dfine_n_coco-v1",
+      "version": "deim_dfine_n_coco-v2",
       "spdx": "Apache-2.0",
       "url": "https://github.com/Kataglyphis/ModelANT",
       "assets": ["deim_dfine_n_coco.onnx"],

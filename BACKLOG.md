@@ -53,12 +53,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when every lane builds both wheels from the image's interpreters and passes
   `Test/python` on each, Windows arm64 on the `windows-11-arm` device.
 
-- [ ] **Move the detector to `deim_dfine_n_coco-v2`** (S, ★★★). On DirectML, v1 finds nothing: an RX 9070 XT ran every profiled operator on `DmlExecutionProvider` and returned no detection, where the CPU
-  finds two cats (hub CON220). v2, sha256 `0bf16e85…`, gives the CPU's detections there.
-  Until the lock moves, the Windows AMD package has no working detector, so no `main` release before it.
-  Change `models/models.lock`, `packaging/third-party/components.json` and
-  `Test/golden/two_cats_cpu.json` with OxidANT and OrchestrANT in one window.
-
 - [ ] **A clear failure or a CPU fallback when CUDA has no kernel for the card** (M, ★★). Seen on an RTX 2080 with OxidANT's package; these packages use the
   same image and are untested on such a card.
   `CUDAExecutionProvider` creates its session, then the first node stops with
