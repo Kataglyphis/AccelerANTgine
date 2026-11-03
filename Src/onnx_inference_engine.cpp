@@ -199,7 +199,7 @@ namespace {
             || !ort_succeeded(api.SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options), &error)
             || !ort_succeeded(
               api.CreateSessionFromArray(
-                env, cuda_probe::one_kernel.data(), cuda_probe::one_kernel.size(), options, &raw_session),
+                env, cuda_probe::one_kernel().data(), cuda_probe::one_kernel().size(), options, &raw_session),
               &error)) {
             return error;
         }

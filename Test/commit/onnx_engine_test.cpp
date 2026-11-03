@@ -482,7 +482,7 @@ TEST(CudaProbe, NoDriverOrOneWithoutTheSymbolsNamesNothing)
 
 TEST(CudaProbe, TheModelRunsItsOneKernelOnTheCpu)
 {
-    const auto &bytes = inference::cuda_probe::one_kernel;
+    const auto bytes = inference::cuda_probe::one_kernel();
     const TempFile model(
       "kataglyphis-one-kernel", ".onnx", std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
     auto engine = initialized_engine(model);
