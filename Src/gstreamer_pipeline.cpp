@@ -241,7 +241,8 @@ struct GStreamerPipeline::Impl
     static auto on_new_sample(GstAppSink *sink, gpointer user_data) -> GstFlowReturn
     {
         auto *self = static_cast<Impl *>(user_data);
-        GstSample *sample = gst_app_sink_pull_sample(sink);
+        // A concurrent pull_sample may have taken it; a blocking pull here would stall the streaming thread and stop().
+        GstSample *sample = gst_app_sink_try_pull_sample(sink, 0);
 
         if (sample != nullptr) {
             auto buffer_info = extract_buffer_info(sample);

@@ -141,6 +141,53 @@ static auto run_onnx_inference_example(const detection::YoloConfig &base, const 
     return 0;
 }
 
+static auto pull_gstreamer_samples() -> int
+{
+    gstreamer::GStreamerPipeline pipeline;
+
+    gstreamer::PipelineConfig config;
+    config.pipeline_description =
+      "videotestsrc num-buffers=100 ! "
+      "video/x-raw,width=640,height=480,framerate=30/1 ! "
+      "videoconvert ! "
+      "appsink name=test_sink sync=false";
+
+    std::cout << "Creating pipeline...\n";
+    auto create_result = pipeline.create_pipeline(config);
+    if (!create_result) {
+        std::cerr << "Failed to create pipeline: " << static_cast<int>(create_result.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Starting pipeline...\n";
+    auto start_result = pipeline.start();
+    if (!start_result) {
+        std::cerr << "Failed to start pipeline: " << static_cast<int>(start_result.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Pipeline running! Processing 10 buffers...\n";
+
+    int result = 0;
+    for (int i = 0; i < 10 && result == 0; ++i) {
+        auto sample = pipeline.pull_sample(1000);
+        if (sample) {
+            std::cout << "Sample " << i + 1 << ": " << sample->size << " bytes, " << sample->metadata.width << "x"
+                      << sample->metadata.height << "\n";
+        } else {
+            std::cerr << "No sample " << i + 1 << " within a second\n";
+            result = 1;
+        }
+    }
+
+    std::cout << "Stopping pipeline...\n";
+    if (!pipeline.stop()) {
+        std::cerr << "Failed to stop pipeline\n";
+        result = 1;
+    }
+    return result;
+}
+
 static auto run_gstreamer_pipeline_example() -> int
 {
     std::cout << "\n=== GStreamer Pipeline Example ===\n\n";
@@ -153,48 +200,13 @@ static auto run_gstreamer_pipeline_example() -> int
 
     std::cout << "GStreamer initialized successfully!\n";
 
-    gstreamer::GStreamerPipeline pipeline;
-
-    gstreamer::PipelineConfig config;
-    config.pipeline_description =
-      "videotestsrc num-buffers=100 ! "
-      "video/x-raw,width=640,height=480,framerate=30/1 ! "
-      "videoconvert ! "
-      "appsink name=test_sink emit-signals=true sync=false";
-
-    std::cout << "Creating pipeline...\n";
-    auto create_result = pipeline.create_pipeline(config);
-    if (!create_result) {
-        std::cerr << "Failed to create pipeline: " << static_cast<int>(create_result.error()) << "\n";
-        return 1;
-    }
-
-    pipeline.set_buffer_callback([](const gstreamer::BufferInfo &buffer) -> void {
-        std::cout << "Received buffer: " << buffer.size << " bytes, " << buffer.metadata.width << "x"
-                  << buffer.metadata.height << "\n";
-    });
-
-    std::cout << "Starting pipeline...\n";
-    auto start_result = pipeline.start();
-    if (!start_result) {
-        std::cerr << "Failed to start pipeline: " << static_cast<int>(start_result.error()) << "\n";
-        return 1;
-    }
-
-    std::cout << "Pipeline running! Processing 10 buffers...\n";
-
-    for (int i = 0; i < 10; ++i) {
-        auto sample = pipeline.pull_sample(1000);
-        if (sample) { std::cout << "Sample " << i + 1 << ": " << sample->size << " bytes\n"; }
-    }
-
-    std::cout << "Stopping pipeline...\n";
-    (void)pipeline.stop();
+    // The pipeline must release its elements before gst_deinit.
+    const int result = pull_gstreamer_samples();
 
     gstreamer::GStreamerPipeline::deinitialize_gstreamer();
-    std::cout << "GStreamer example completed!\n";
+    if (result == 0) { std::cout << "GStreamer example completed!\n"; }
 
-    return 0;
+    return result;
 }
 
 static auto run_yolo_detection_example(const detection::YoloConfig &config) -> int

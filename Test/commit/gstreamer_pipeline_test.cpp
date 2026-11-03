@@ -6,10 +6,14 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <future>
 #include <initializer_list>
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -155,6 +159,31 @@ TEST(GStreamerPipeline, DeliversEveryFrameToTheCallback)
 
     std::scoped_lock lock(seen_mutex);
     EXPECT_EQ(timestamps, (std::vector<std::uint64_t>{ 0, frame_start_30fps(1), frame_start_30fps(2) }));
+}
+
+// A pull can take the frame a callback was told about; the callback must not wait for another.
+TEST(GStreamerPipeline, StopEndsWhenAPullTakesTheCallbacksFrame)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
+    std::promise<void> finished;
+    auto done = finished.get_future();
+    std::thread worker([&finished] {
+        for (int round = 0; round < 20; ++round) {
+            gstreamer::GStreamerPipeline pipeline;
+            EXPECT_TRUE(pipeline.create_pipeline_from_string(std::string(kThreeBlackFrames)).has_value());
+            pipeline.set_buffer_callback([](const gstreamer::BufferInfo &) {});
+            EXPECT_TRUE(pipeline.start().has_value());
+            // Either consumer may win each frame; only the end of stop() is the contract.
+            std::ignore = pipeline.pull_sample(static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count()));
+            EXPECT_TRUE(pipeline.stop().has_value());
+        }
+        finished.set_value();
+    });
+    if (done.wait_for(std::chrono::seconds(120)) != std::future_status::ready) {
+        ADD_FAILURE() << "stop() did not return";
+        std::abort();
+    }
+    worker.join();
 }
 
 TEST(GStreamerPipeline, ACallbackSetBeforeThePipelineStillGetsFrames)

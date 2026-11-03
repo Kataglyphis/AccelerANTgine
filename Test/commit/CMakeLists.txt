@@ -126,6 +126,8 @@ if(TARGET ${PROJECT_NAME}_demo)
     --config
     "${_demo_bad_config}"
     --yolo-only)
+  kataglyphis_add_demo_test(GStreamerExampleEnds "GStreamer example completed!" --gstreamer-only)
+  set_tests_properties(Demo.GStreamerExampleEnds PROPERTIES TIMEOUT 120)
   kataglyphis_add_demo_test(
     OnnxExampleReportsAMissingModel
     "ONNX inference example failed!"

@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### 2026-11-03: stop() ends when a pull races the callback
+
+- **Fixed:** with a buffer callback set, a `pull_sample` that took the frame left the callback blocked in the
+  streaming thread, so `stop()` never returned. The callback no longer waits. `AccelerANTgine_demo --gstreamer-only`
+  hung on exactly this; it now pulls alone, fails on a missing sample and is the ctest `Demo.GStreamerExampleEnds`.
+
 ### Fixed (2026-11-03, MIGraphX hang)
 - **MIGraphX no longer waits without end on an AMD GPU that does not answer.** `Src/hip_probe.hpp` copies four bytes to
   the selected GPU in a child process first. After 30 seconds `initialize` returns `ProviderUnavailable` and logs the
