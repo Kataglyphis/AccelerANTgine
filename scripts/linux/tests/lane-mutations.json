@@ -5,7 +5,7 @@
   "find": "if case.find(\"skipped\") is not None or status in NOT_RUN_STATUSES:",
   "replace": "if status in NOT_RUN_STATUSES:",
   "test": "bash scripts/linux/tests/test-junit-skip-gate.sh",
-  "why": "A GTEST_SKIP or pytest skip writes <skipped>; ignoring it lets a skipped lane pass."
+  "why": "A gtest skip or pytest skip writes <skipped>; ignoring it lets a skipped lane pass."
  },
  {
   "id": "skip-gate.not-run-status",

@@ -20,7 +20,7 @@ printf '%s\n' '<testsuite name="ctest" tests="0"></testsuite>' > "${work}/empty.
 printf '%s\n' '<testsuite name="ctest"><testcase name="broken"' > "${work}/malformed.xml"
 
 expect 0 'clean ctest and pytest reports pass' "${work}/ctest.xml" "${work}/pytest.xml"
-expect 1 'a GTEST_SKIP in the TSan report fails' "${work}/ctest.xml" "${work}/tsan-skip.xml" "${work}/pytest.xml"
+expect 1 'a gtest skip in the TSan report fails' "${work}/ctest.xml" "${work}/tsan-skip.xml" "${work}/pytest.xml"
 expect 1 'a not-run ctest case fails' "${work}/ctest.xml" "${work}/notrun.xml"
 expect 1 'a pytest skip fails' "${work}/pytest-skip.xml"
 expect 1 'a missing report fails' "${work}/ctest.xml" "${work}/absent.xml"
