@@ -53,7 +53,7 @@ windows_tree() {
   mkdir -p "${root}/bin" "${root}/licenses/onnxruntime" "${root}/share/licenses/AccelerANTgine"
   local name
   for name in AccelerANTgine.exe AccelerANTgine.dll onnxruntime.dll onnxruntime_providers_shared.dll DirectML.dll \
-    glib-2.0-0.dll gobject-2.0-0.dll ffi-7.dll intl-8.dll gstreamer-1.0-0.dll gstapp-1.0-0.dll msvcp140.dll \
+    glib-2.0-0.dll gobject-2.0-0.dll ffi-7.dll intl-8.dll gstreamer-1.0-0.dll gstapp-1.0-0.dll gst-plugin-scanner.exe msvcp140.dll \
     vcruntime140_1.dll concrt140.dll; do
     printf 'MZ' > "${root}/bin/${name}"
   done
@@ -169,6 +169,7 @@ elf "${lin}/lib/accelerantgine/libgstreamer-1.0.so.0"
 elf "${lin}/lib/accelerantgine/libonnxruntime.so.1"
 elf "${lin}/lib/accelerantgine/gstreamer-1.0/libgstrswebrtc.so"
 elf "${lin}/lib/accelerantgine/gstreamer-1.0/libgstcoreelements.so"
+elf "${lin}/lib/accelerantgine/gst-plugin-scanner"
 ln -s libz.so.1 "${lin}/lib/accelerantgine/libz.so"
 printf '#!/bin/sh\n' > "${lin}/lib/accelerantgine/launcher.sh"
 cp "${repo}/LICENSE" "${lin}/share/licenses/AccelerANTgine/LICENSE"
@@ -220,6 +221,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 assert "lib/accelerantgine/gstreamer-1.0/libgstrswebrtc.so" in components["gst-plugins-rs"]["files"]
 assert "lib/accelerantgine/gstreamer-1.0/libgstrswebrtc.so" not in components["gstreamer"]["files"]
 assert "lib/accelerantgine/gstreamer-1.0/libgstcoreelements.so" in components["gstreamer"]["files"]
+assert "lib/accelerantgine/gst-plugin-scanner" in components["gstreamer"]["files"]
 assert components["deb-libz1"]["files"] == ["lib/accelerantgine/libz.so.1"], components["deb-libz1"]["files"]
 PY
 fi

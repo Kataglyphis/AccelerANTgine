@@ -54,6 +54,10 @@ if(WIN32
    AND PROJECT_IS_TOP_LEVEL
    AND KATAGLYPHIS_GST_PLUGIN_DIR)
   install(DIRECTORY "${KATAGLYPHIS_GST_PLUGIN_DIR}/" DESTINATION "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")
+  if(NOT EXISTS "${KATAGLYPHIS_GST_PLUGIN_SCANNER}")
+    message(FATAL_ERROR "KATAGLYPHIS_GST_PLUGIN_SCANNER names no scanner: '${KATAGLYPHIS_GST_PLUGIN_SCANNER}'")
+  endif()
+  install(PROGRAMS "${KATAGLYPHIS_GST_PLUGIN_SCANNER}" DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
 
 # The image's own GStreamer and plugins travel, never the distro's; an embedding project bundles its own (AGENTS.md).
@@ -113,6 +117,17 @@ if(UNIX
         RENAME "${_name}")
     endif()
   endforeach()
+  # bundle-loader.sh below leaves a launcher here, so the scanner runs under the same glibc as the executables.
+  pkg_get_variable(_gst_scanner_dir gstreamer-1.0 pluginscannerdir)
+  set(_gst_scanner_launcher "${CMAKE_INSTALL_LIBDIR}/accelerantgine/libexec/gst-plugin-scanner")
+  if(NOT EXISTS "${_gst_scanner_dir}/gst-plugin-scanner")
+    message(FATAL_ERROR "gst-plugin-scanner is not in '${_gst_scanner_dir}'")
+  endif()
+  file(REAL_PATH "${_gst_scanner_dir}/gst-plugin-scanner" _real)
+  install(
+    PROGRAMS "${_real}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/accelerantgine/libexec"
+    RENAME gst-plugin-scanner)
   # libsrtp2's NSS dlopens its softokn and freebl modules from beside libnss3, which the closure bundles.
   find_library(_nss3 nss3)
   if(_nss3)
@@ -194,6 +209,15 @@ set(_closure_search
     "/opt/libcamera/lib"
     "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
     "/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
+if(_gst_scanner_launcher)
+  set(_scanner_loader_flag "")
+  if(_gpu_provider)
+    set(_scanner_loader_flag "--external-library-path")
+  endif()
+  install(
+    CODE "execute_process(COMMAND bash \"${CMAKE_CURRENT_SOURCE_DIR}/third_party/ANTfrastructure/linux/scripts/06-packaging/bundle-loader.sh\" ${_scanner_loader_flag} \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}\" \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/accelerantgine\" \"${_gst_scanner_launcher}\" COMMAND_ERROR_IS_FATAL ANY)"
+  )
+endif()
 kataglyphis_install_linux_closure(
   LOADER
   PRIVATE_DIR

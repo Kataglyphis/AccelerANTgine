@@ -33,7 +33,8 @@ newer: Debian 13 (tested on a Raspberry Pi 5) and Ubuntu 26.04 have it, Ubuntu
 GStreamer and its plugins too (owner, 2026-10-17), and the ``.deb`` depends on
 glibc and EGL alone (``CHANGELOG.md``, *Unreleased*).
 Packaged Linux launchers clear inherited GStreamer plugin, scanner and registry
-settings so the shipped plugins load; library embedders retain their own settings.
+settings so the shipped plugins load, and the shipped ``gst-plugin-scanner`` writes the registry;
+library embedders retain their own settings.
 The host GPU SDK library path is still available to GPU packages.
 
 .. code-block:: sh
@@ -45,10 +46,10 @@ The host GPU SDK library path is still available to GPU packages.
 Every package carries the project license and the list of its third-party components with their
 license texts: :doc:`third_party_licenses`.
 
-Windows GPU builds stage the image's GStreamer plugins and their runtime dependencies in the
-package. The standalone Windows executables clear inherited plugin, scanner and registry
+Windows GPU builds stage the image's GStreamer plugins, its plugin scanner and their runtime
+dependencies in the package. The standalone Windows executables clear inherited plugin, scanner and registry
 settings when the bundled plugin directory is present; library embedders retain their settings.
-``AccelerANTgine --gst_check`` verifies the required elements and their origin;
+``AccelerANTgine --gst_check`` verifies the required elements, their origin and a working scanner;
 on Windows it treats the Linux-only camera sources as optional. The cached Windows images
 inspected during development lack ``vp8enc``, so the check still fails until the image supplies
 it. The install-time license gate also blocks the new plugin closure until the image supplies

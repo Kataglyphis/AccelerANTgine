@@ -230,5 +230,53 @@
   "replace": "  python3 \"${_SCRIPT_DIR}/check-coverage-floor.py\" \"${BUILD_DIR}/${COVERAGE_JSON}\" \\",
   "test": "bash scripts/linux/tests/test-coverage-floor.sh",
   "why": "ci-profile-bench.sh wipes build/, so the uploaded clang export must live under logs/coverage."
+ },
+ {
+  "id": "fresh-registry.scanner-proof",
+  "target": "scripts/linux/check-package-fresh-registry.sh",
+  "find": "  if ! grep -Fq 'Using scan-helper to load plugin' \"$log\"; then",
+  "replace": "  if false; then",
+  "test": "bash scripts/linux/tests/test-check-package-fresh-registry.sh",
+  "why": "A registry GStreamer scanned in process must not count as the scanner's."
+ },
+ {
+  "id": "fresh-registry.codec-verdict",
+  "target": "scripts/linux/check-package-fresh-registry.sh",
+  "find": "if [[ $status -ne 124 ]] || grep -Eq 'No codec available|External plugin loader failed' \"$log\"; then",
+  "replace": "if [[ $status -ne 124 ]]; then",
+  "test": "bash scripts/linux/tests/test-check-package-fresh-registry.sh",
+  "why": "The empty codec list is the defect; a surviving process does not excuse it."
+ },
+ {
+  "id": "fresh-registry.bundled-loader",
+  "target": "scripts/linux/check-package-fresh-registry.sh",
+  "find": "for mode in host bundled; do check_runtime",
+  "replace": "for mode in host; do check_runtime",
+  "test": "bash scripts/linux/tests/test-check-package-fresh-registry.sh",
+  "why": "The scanner must start under the bundled loader too."
+ },
+ {
+  "id": "fresh-registry.listing-order",
+  "target": "scripts/linux/check-package-fresh-registry.sh",
+  "find": "[[ ${listing%%$'\\n'*} != \"$first\" ]] || return 0",
+  "replace": "return 0",
+  "test": "bash scripts/linux/tests/test-check-package-fresh-registry.sh",
+  "why": "A scan in any other order does not reproduce the race."
+ },
+ {
+  "id": "fresh-registry.appimage",
+  "target": "scripts/linux/check-package-fresh-registry.sh",
+  "find": "check_tree appimage \"$work/appimage/squashfs-root\"",
+  "replace": ":",
+  "test": "bash scripts/linux/tests/test-check-package-fresh-registry.sh",
+  "why": "The AppImage generator patches ELFs, so its scanner needs its own run."
+ },
+ {
+  "id": "notices.plugin-scanner",
+  "target": "packaging/third-party/components.json",
+  "find": ", \"gst-plugin-scanner\", \"gst-plugin-scanner.exe\"",
+  "replace": "",
+  "test": "bash scripts/linux/tests/test-third-party-notices.sh",
+  "why": "The notice gate classifies every shipped ELF and PE, the scanner included."
  }
 ]

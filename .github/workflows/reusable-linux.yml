@@ -153,6 +153,14 @@ jobs:
             build-release/*.AppImage
             build-release/*.flatpak
 
+      # After the upload, so a red check still leaves the packages; root mounts over the plugin directory.
+      - name: Stream from a fresh registry on the finished packages (Clang only)
+        if: ${{ inputs.compiler == 'clang' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: --privileged --platform ${{ inputs.platform }} --user 0:0
+          script: bash scripts/linux/check-package-fresh-registry.sh build-release
+
       # ci-python-bindings.sh dies unless both wheels were built, installed and tested.
       - name: Upload Python wheels, cp314 and cp314t (Clang only)
         if: ${{ inputs.compiler == 'clang' }}

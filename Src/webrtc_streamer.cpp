@@ -32,6 +32,16 @@ namespace kataglyphis::webrtc {
 namespace {
     std::atomic<bool> g_gstreamer_initialized{ false };
     std::mutex g_gstreamer_mutex;
+    std::atomic<bool> g_plugin_scanner_failed{ false };
+
+    // GStreamer falls back to an in-process scan on a broken scanner, and only this warning says so.
+    void note_plugin_scanner_failure(const gchar *domain, GLogLevelFlags level, const gchar *message, gpointer data)
+    {
+        if (message != nullptr && g_str_has_prefix(message, "External plugin loader failed")) {
+            g_plugin_scanner_failed.store(true);
+        }
+        g_log_default_handler(domain, level, message, data);
+    }
 
     auto error_to_string(WebRTCError error) -> const char *
     {
@@ -410,11 +420,15 @@ auto WebRTCStreamer::bundled_plugin_dir() -> std::string
 #endif
 }
 
+auto WebRTCStreamer::plugin_scanner_failed() -> bool { return g_plugin_scanner_failed.load(); }
+
 auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, WebRTCError>
 {
     std::scoped_lock lock(g_gstreamer_mutex);
 
     if (g_gstreamer_initialized.load()) { return {}; }
+
+    const guint scan_log = g_log_set_handler("GStreamer", G_LOG_LEVEL_WARNING, note_plugin_scanner_failure, nullptr);
 
 #if defined(_WIN32)
     bundled_gstreamer::configure();
@@ -425,8 +439,10 @@ auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, 
             log::error("GStreamer init failed: {}", error->message);
             g_error_free(error);
         }
+        g_log_remove_handler("GStreamer", scan_log);
         return std::unexpected(WebRTCError::InitializationFailed);
     }
+    g_log_remove_handler("GStreamer", scan_log);
 
     // Verify webrtcsink is available
     GstElementFactory *factory = gst_element_factory_find("webrtcsink");

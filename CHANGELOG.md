@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-03, an empty codec list on a fresh registry)
+- **Packages with plugins ship `gst-plugin-scanner`.** With the fork off, a fresh registry scanned in process could
+  register webrtcsink before its encoders, and a stream died with `No codec available` on a filesystem listing that plugin
+  first. The Linux tarball, DEB and AppImage run the image's scanner through a `bundle-loader.sh` launcher; the Windows GPU
+  ZIP, MSI and MSIX carry it beside the DLLs. `Src/bundled_gstreamer.cpp` names it in `GST_PLUGIN_SCANNER` and keeps
+  `GST_REGISTRY_FORK=no` only where none travels. `--gst_check` now fails when GStreamer gives up on the scanner, and
+  `check-package-fresh-registry.sh` streams each finished Linux package in that worst order, on both loaders.
+
 ### Fixed (2026-11-03, a card without a CUDA kernel)
 - **A card the NVIDIA packages have no kernel for gets a message.** `initialize` runs a one-`Relu` model on CUDA
   before the real session. On `cudaErrorNoKernelImageForDevice` it returns `ProviderUnavailable` and logs the card and

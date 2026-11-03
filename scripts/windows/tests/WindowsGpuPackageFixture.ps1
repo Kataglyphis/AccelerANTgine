@@ -235,7 +235,7 @@ $bin = Join-Path $bundle 'bin'; $licenses = Join-Path $bundle 'licenses\onnxrunt
 $entryDir = Join-Path $root 'entries'
 $null = New-Item -ItemType Directory -Path $image, $wheelDir, $bin, $licenses, $packages, $entryDir -Force
 $gpuNames = @('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll', 'DirectML.dll')
-$appNames = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll')
+$appNames = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll', 'gst-plugin-scanner.exe')
 $modelNames = @('deim_dfine_n_coco.onnx', 'deim_dfine_n_coco.LICENSE', 'deim_dfine_n_coco.NOTICE')
 $licenseNames = @('LICENSE', 'ThirdPartyNotices.txt')
 $modelDir = Join-Path $bin 'models'; $null = New-Item -ItemType Directory -Force -Path $modelDir
@@ -296,7 +296,7 @@ function Get-FixtureZipMsixCases([string]$Failure, [string[]]$MsixMember) {
     }
 }
 Assert-FixtureArchiveCaseRejected -Pattern 'package binary verification failed' -Cases @(
-    Get-FixtureZipMsixCases 'Missing package member accepted: ' @('AccelerANTgine_demo.exe', 'models/deim_dfine_n_coco.onnx', 'models/deim_dfine_n_coco.NOTICE')
+    Get-FixtureZipMsixCases 'Missing package member accepted: ' @('AccelerANTgine_demo.exe', 'gst-plugin-scanner.exe', 'models/deim_dfine_n_coco.onnx', 'models/deim_dfine_n_coco.NOTICE')
 )
 Assert-FixtureArchiveCaseRejected -Pattern 'package binary verification failed' -Cases @(
     @{ Path = $zipPath; Member = 'candidate/lib/gstreamer-1.0/gstwebrtc.dll'; Failure = "Missing plugin accepted: $zipPath" },

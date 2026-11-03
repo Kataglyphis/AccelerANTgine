@@ -4,6 +4,7 @@
 
 #include <dlfcn.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -59,7 +60,7 @@ auto registry_path(const std::string &plugins) -> std::string
     return (dir / ("registry-" + std::to_string(std::hash<std::string>{}(plugins)) + ".bin")).string();
 }
 
-// Only the bundled plugins load: the distro's are built against another GStreamer, and the bundle ships no scanner.
+// Only the bundled plugins load; an in-process scan can register webrtcsink before its encoders, see AGENTS.md.
 __attribute__((constructor)) void use_bundled_gstreamer()
 {
     const std::string plugins = kataglyphis::bundled_gstreamer::plugin_dir();
@@ -67,7 +68,12 @@ __attribute__((constructor)) void use_bundled_gstreamer()
     set_unless_set("GST_PLUGIN_PATH", plugins);
     set_unless_set("GST_PLUGIN_SYSTEM_PATH", "");
     set_unless_set("GST_PLUGIN_SYSTEM_PATH_1_0", "");
-    set_unless_set("GST_REGISTRY_FORK", "no");
+    const std::string scanner = std::filesystem::path(plugins).parent_path() / "libexec/gst-plugin-scanner";
+    if (::access(scanner.c_str(), X_OK) == 0) {
+        set_unless_set("GST_PLUGIN_SCANNER", scanner);
+    } else {
+        set_unless_set("GST_REGISTRY_FORK", "no");
+    }
     const std::string registry = registry_path(plugins);
     if (!registry.empty()) { set_unless_set("GST_REGISTRY", registry); }
 }
@@ -88,20 +94,26 @@ __attribute__((constructor)) void use_bundled_gstreamer()
 namespace kataglyphis::bundled_gstreamer {
 namespace {
     const char anchor = 0;
-}
+
+    auto module_dir() -> std::filesystem::path
+    {
+        HMODULE module = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+              reinterpret_cast<LPCWSTR>(&anchor),
+              &module)) {
+            return {};
+        }
+        std::vector<wchar_t> name(32768);
+        const DWORD length = GetModuleFileNameW(module, name.data(), static_cast<DWORD>(name.size()));
+        if (length == 0 || length >= name.size()) { return {}; }
+        return std::filesystem::path(std::wstring(name.data(), length)).parent_path();
+    }
+}// namespace
 
 auto plugin_dir() -> std::string
 {
-    HMODULE module = nullptr;
-    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-          reinterpret_cast<LPCWSTR>(&anchor),
-          &module)) {
-        return {};
-    }
-    std::vector<wchar_t> name(32768);
-    const DWORD length = GetModuleFileNameW(module, name.data(), static_cast<DWORD>(name.size()));
-    if (length == 0 || length >= name.size()) { return {}; }
-    const auto base = std::filesystem::path(std::wstring(name.data(), length)).parent_path();
+    const auto base = module_dir();
+    if (base.empty()) { return {}; }
     for (const auto &candidate :
       { base / "gstreamer-1.0", base / "lib/gstreamer-1.0", base / "../lib/gstreamer-1.0" }) {
         std::error_code error;
@@ -121,7 +133,16 @@ void configure()
         if (plugins.empty()) { return; }
         g_setenv("GST_PLUGIN_PATH_1_0", plugins.c_str(), FALSE);
         g_setenv("GST_PLUGIN_SYSTEM_PATH_1_0", "", FALSE);
-        g_setenv("GST_REGISTRY_FORK", "no", FALSE);
+        // Beside the DLLs, whose folder resolves the scanner's imports.
+        const auto scanner = module_dir() / "gst-plugin-scanner.exe";
+        std::error_code error;
+        if (std::filesystem::is_regular_file(scanner, error) && !error) {
+            const auto utf8 = scanner.generic_u8string();
+            const std::string path(reinterpret_cast<const char *>(utf8.data()), utf8.size());
+            g_setenv("GST_PLUGIN_SCANNER_1_0", path.c_str(), FALSE);
+        } else {
+            g_setenv("GST_REGISTRY_FORK", "no", FALSE);
+        }
     });
 }
 }// namespace kataglyphis::bundled_gstreamer

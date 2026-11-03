@@ -68,16 +68,34 @@ Describe 'Windows media runtime reuse' {
         }
     }
 
+    It 'takes the package scanner from the image and rejects an image without one' {
+        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginDir')
+        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPackageScanner')
+        function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
+        $bin = Join-Path $TestDrive 'scanner-image\bin'
+        $scanner = Join-Path $TestDrive 'scanner-image\libexec\gstreamer-1.0\gst-plugin-scanner.exe'
+        $null = New-Item -ItemType Directory -Force -Path $bin, (Split-Path -Parent $scanner)
+        [IO.File]::WriteAllText($scanner, 'scanner')
+        Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $bin } -ScriptBlock {
+            (Get-ImageGStreamerPackageScanner -Arch amd64) | Should Be $scanner
+            Remove-Item -LiteralPath $scanner
+            $message = try { Get-ImageGStreamerPackageScanner -Arch amd64; '' } catch { $_.Exception.Message }
+            ($message -match 'gst-plugin-scanner.exe is missing') | Should Be $true
+        }
+    }
+
     It 'seeds the closure with plugins and installs them into each package layout' {
         $ast = Get-BuildScriptAst
-        @((Get-TestAstCommands -Ast $ast -Name 'Copy-PeImportClosure') | Where-Object { $_.Extent.Text -match '\$engine \+ \$plugins' }).Count | Should Be 1
+        @((Get-TestAstCommands -Ast $ast -Name 'Copy-PeImportClosure') | Where-Object { $_.Extent.Text -match '\$engine \+ \$plugins \+ \$imageScanner' }).Count | Should Be 1
         $script = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1') -Raw
         $script.Contains('Copy-Item -LiteralPath $bundlePlugins -Destination $stagingLib -Recurse -Force') | Should Be $true
         $script.Contains("`$imagePlugins = @(if (`$OrtVariant -ne 'cpu')") | Should Be $true
         $script.Contains('-RuntimeBin $gstBin') | Should Be $true
+        $script.Contains("`$payloadExtra += Join-Path `$payloadDir 'gst-plugin-scanner.exe'") | Should Be $true
         $script.Contains('$search += $ffmpegBin') | Should Be $true
         $cmake = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\..\cmake\CPackOptions.cmake') -Raw
         $cmake.Contains('install(DIRECTORY "${KATAGLYPHIS_GST_PLUGIN_DIR}/" DESTINATION "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")') | Should Be $true
+        $cmake.Contains('install(PROGRAMS "${KATAGLYPHIS_GST_PLUGIN_SCANNER}" DESTINATION "${CMAKE_INSTALL_BINDIR}")') | Should Be $true
     }
 
     It 'warns when the selected GStreamer bin is missing' {

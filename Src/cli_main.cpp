@@ -106,7 +106,7 @@ auto chat(const std::string &model_dir, const std::string &prompt) -> int
     return 0;
 }
 
-// A missing required element, or one a package loads from outside its own plugins, fails the check.
+// A missing required element, one a package loads from outside its own plugins, or a broken scanner fails the check.
 auto check_gstreamer(int *argc, char ***argv) -> int
 {
     if (!kataglyphis::webrtc::WebRTCStreamer::initialize(argc, argv)) {
@@ -138,6 +138,10 @@ auto check_gstreamer(int *argc, char ***argv) -> int
     // The GPU images build no vpx, so either encoder can carry the WebRTC video path.
     if (!any_encoder) {
         std::cout << "MISSING a WebRTC video encoder (vp8enc or openh264enc)\n";
+        ++failures;
+    }
+    if (kataglyphis::webrtc::WebRTCStreamer::plugin_scanner_failed()) {
+        std::cout << "FAILED the plugin scanner: GStreamer scanned in process\n";
         ++failures;
     }
     return failures == 0 ? 0 : 1;

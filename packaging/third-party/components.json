@@ -183,7 +183,7 @@
       "spdx": "LGPL-2.0-or-later",
       "url": "https://gstreamer.freedesktop.org/",
       "source": "https://gitlab.freedesktop.org/gstreamer/gstreamer at the GStreamer tag",
-      "binaries": ["libgst*-1.0.so*", "libgst*.so", "gst*-1.0-*.dll", "gst*.dll"],
+      "binaries": ["libgst*-1.0.so*", "libgst*.so", "gst*-1.0-*.dll", "gst*.dll", "gst-plugin-scanner", "gst-plugin-scanner.exe"],
       "texts": [{"root": "repo", "path": "packaging/third-party/texts/LGPL-2.1.txt"}]
     },
     {

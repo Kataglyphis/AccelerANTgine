@@ -502,6 +502,16 @@ written out rather than linked.
   clean-host jobs run it on a bare Ubuntu. A new element in a pipeline goes into
   `locate_elements()`, its plugin into the list. Embedded in OmniAccelerANT's plugin, none of this
   installs: that bundle carries its own.
+- **A package with plugins scans its registry through its own `gst-plugin-scanner`; never set
+  `GST_REGISTRY_FORK=no` for one.** An in-process scan of a fresh registry can register webrtcsink
+  before its encoders, and the stream dies with `No codec available` on a filesystem that lists that
+  plugin first. Linux installs the image's scanner under `lib/accelerantgine` with a `bundle-loader.sh`
+  launcher in `libexec/`; Windows puts it beside the DLLs in the GPU packages, the only ones with
+  plugins. The library names it in `GST_PLUGIN_SCANNER` and keeps the fork off only where no scanner
+  travels (test trees, an embedding bundle). GStreamer falls back silently on a broken scanner, so
+  `--gst_check` fails on its `External plugin loader failed` warning, and
+  `check-package-fresh-registry.sh` streams each finished Linux package in that worst order, on both
+  loaders.
 
 ## 5. Build, run, test
 

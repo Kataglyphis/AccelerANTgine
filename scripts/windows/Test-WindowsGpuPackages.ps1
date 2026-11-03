@@ -47,7 +47,7 @@ $msis = @(Get-ChildItem -LiteralPath $PackageDir -Filter '*.msi' -File)
 if ($zips.Count -ne 1 -or $msis.Count -ne 1 -or @(Get-ChildItem -LiteralPath $PackageDir -Filter '*.exe' -File).Count) {
     throw 'GPU candidates require exactly one ZIP and MSI and no unverified NSIS installer.'
 }
-$appNames = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll')
+$appNames = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll', 'gst-plugin-scanner.exe')
 $appSources = [string[]]@($appNames | ForEach-Object { Join-Path $Bundle "bin\$_" })
 $packageNames = [string[]]@($names + $appNames)
 $pluginDir = Join-Path $Bundle 'lib\gstreamer-1.0'

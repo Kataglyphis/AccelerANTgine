@@ -108,6 +108,9 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer
     // Every element the pipelines here use; call after initialize().
     [[nodiscard]] static auto locate_elements() -> std::vector<ElementLocation>;
 
+    // True when initialize() saw GStreamer give up on its plugin scanner and scan in process.
+    [[nodiscard]] static auto plugin_scanner_failed() -> bool;
+
     // The plugin directory a Linux package carries; empty anywhere else.
     [[nodiscard]] static auto bundled_plugin_dir() -> std::string;
 

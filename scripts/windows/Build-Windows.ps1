@@ -208,6 +208,16 @@ function Get-ImageGStreamerPackagePlugins {
     }
 }
 
+# Installed beside the DLLs, whose folder resolves its imports; webrtcsink needs a registry it wrote.
+function Get-ImageGStreamerPackageScanner {
+    param([Parameter(Mandatory)][string]$Arch)
+    $root = Split-Path -Parent (Split-Path -Parent (Get-ImageGStreamerPluginDir))
+    $file = Join-Path $root 'libexec\gstreamer-1.0\gst-plugin-scanner.exe'
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "gst-plugin-scanner.exe is missing from the image: $file" }
+    $null = Assert-PeTargetMachine -Path $file -Arch $Arch -Context 'GStreamer plugin scanner'
+    $file
+}
+
 function Copy-ImageGStreamerPackagePlugins {
     param([Parameter(Mandatory)][string]$Destination, [Parameter(Mandatory)][string[]]$Plugins)
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -503,6 +513,7 @@ function Invoke-ReleaseBuildStep {
         # Only this lane cleans, since a package must inherit nothing; CPack installs package-dlls beside the executables.
         $packageDlls = Join-Path $fastBuildReleaseDirFull 'package-dlls'
         $imagePlugins = @(if ($OrtVariant -ne 'cpu') { Get-ImageGStreamerPackagePlugins -Arch $TargetArch })
+        $imageScanner = @(if ($OrtVariant -ne 'cpu') { Get-ImageGStreamerPackageScanner -Arch $TargetArch })
         Push-Location $Workspace
         try {
             Invoke-CmakeConfigureAndBuild -Context $Context `
@@ -514,7 +525,7 @@ function Invoke-ReleaseBuildStep {
                         '-DKATAGLYPHIS_PACKAGE_DEMO_MODEL=ON',
                         "-DKATAGLYPHIS_PACKAGE_DLL_DIR=$($packageDlls -replace '\\', '/')",
                         "-DKATAGLYPHIS_ORT_VARIANT=$OrtVariant") +
-                    @(if ($OrtVariant -ne 'cpu') { "-DKATAGLYPHIS_GST_PLUGIN_DIR=$((Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -replace '\\', '/')" }) +
+                    @(if ($OrtVariant -ne 'cpu') { "-DKATAGLYPHIS_GST_PLUGIN_DIR=$((Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -replace '\\', '/')", "-DKATAGLYPHIS_GST_PLUGIN_SCANNER=$($imageScanner[0] -replace '\\', '/')" }) +
                     @(if ($StageTests) { '-DBUILD_TESTING=ON', '-DKATAGLYPHIS_RELEASE_TESTS=ON' }) +
                     @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
         } finally { Pop-Location }
@@ -536,7 +547,7 @@ function Invoke-ReleaseBuildStep {
             }
             $search += $ffmpegBin
         }
-        $closure = @(Copy-PeImportClosure -Path @($engine + $plugins) -SearchDirectory $search -Destination $packageDlls -Arch $TargetArch)
+        $closure = @(Copy-PeImportClosure -Path @($engine + $plugins + $imageScanner) -SearchDirectory $search -Destination $packageDlls -Arch $TargetArch)
         $null = Copy-OrtWheelLicenses -OrtDll (Join-Path $env:ONNX_ROOT 'bin\onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $packageDlls
         Write-BuildLog -Context $Context -Message "Package DLL closure ($TargetArch): $(@($closure | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
         # The NSIS/WiX/ZIP installers pack the install tree, not bin\: G6 proves that tree first.
@@ -719,6 +730,7 @@ function Invoke-MsixPackagingStep {
             $demo = Join-Path $payloadDir 'AccelerANTgine_demo.exe'
             if (-not (Test-Path -LiteralPath $demo -PathType Leaf)) { throw 'Missing packaged inference demo.' }
             $payloadExtra += $demo
+            if ($OrtVariant -ne 'cpu') { $payloadExtra += Join-Path $payloadDir 'gst-plugin-scanner.exe' }
             $bundleModels = Join-Path $bundleBin 'models'
             if (-not (Test-Path -LiteralPath $bundleModels -PathType Container)) { throw 'Missing packaged demo model directory.' }
             $payloadExtra += $bundleModels
