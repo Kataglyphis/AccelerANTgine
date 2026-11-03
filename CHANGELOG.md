@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### 2026-11-03 (Windows GPU checks call the hub's helpers)
+- `Test-WindowsGpuHub.ps1` lists missing hub files with `Get-MissingBuildChildPaths`, and `Test-WindowsGpuCleanHost.ps1`
+  isolates its environment with `Invoke-WithProcessEnvironment`; the private snapshot pair is gone from
+  `WindowsGpuCandidate.Common`, so the clean-host check now needs the hub submodule.
+- `WindowsGpuHub.Tests.ps1` holds the file refusal; `WindowsGpuCleanHost.Tests.ps1` gains a case that runs on any host.
+
 ### Changed (2026-11-03, detector model)
 - **The detector model is `deim_dfine_n_coco-v2`.** v1 finds nothing on DirectML, where MatMul of a matrix by a
   1-D vector computes wrongly (hub CON220).

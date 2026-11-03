@@ -59,28 +59,4 @@ function Invoke-WithGpuScratchDirectory {
     }
 }
 
-function Get-ProcessEnvironmentSnapshot {
-    <#
-    .SYNOPSIS
-        The current process values of the named variables, null when unset.
-    #>
-    param([Parameter(Mandatory)][string[]]$Name)
-    $saved = @{}
-    foreach ($variable in $Name) { $saved[$variable] = [Environment]::GetEnvironmentVariable($variable, 'Process') }
-    return $saved
-}
-
-function Restore-ProcessEnvironmentSnapshot {
-    <#
-    .SYNOPSIS
-        Puts back what Get-ProcessEnvironmentSnapshot recorded, removing the variables that were unset.
-    #>
-    param([Parameter(Mandatory)][hashtable]$Snapshot)
-    foreach ($variable in $Snapshot.Keys) {
-        if ($null -eq $Snapshot[$variable]) { Remove-Item -LiteralPath "Env:$variable" -ErrorAction SilentlyContinue }
-        else { [Environment]::SetEnvironmentVariable($variable, $Snapshot[$variable], 'Process') }
-    }
-}
-
-Export-ModuleMember -Function Get-WindowsGpuOrtName, Resolve-GpuCandidatePath, Assert-OrtWheelVerifierParameter, Invoke-WithGpuScratchDirectory,
-    Get-ProcessEnvironmentSnapshot, Restore-ProcessEnvironmentSnapshot
+Export-ModuleMember -Function Get-WindowsGpuOrtName, Resolve-GpuCandidatePath, Assert-OrtWheelVerifierParameter, Invoke-WithGpuScratchDirectory

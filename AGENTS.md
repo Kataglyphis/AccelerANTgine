@@ -127,7 +127,7 @@ Both are body-mode copies of the hub's templates
 ([`shared/config/README.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/shared/config/README.md#the-template-trees-are-owners-too)):
 change the template upstream, then copy it. Unlike CMake, PowerShell resolves a module from the
 hub first, then from `scripts/windows/modules/`, which holds only `WindowsGpuCandidate.Common` (the
-GPU candidate checks' shared steps; a copied check carries it beside the script). How
+GPU candidate checks' shared steps; a copied check carries it beside the script and still resolves the hub modules, so `Test-WindowsGpuCleanHost.ps1` needs the submodule its workflow steps already check out). How
 `Build-Windows.ps1` imports its modules is the hub's calling convention,
 [`adopting-in-a-new-project.md` § 8](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/adopting-in-a-new-project.md#8-calling-conventions-what-every-consumer-looks-like)
 and its

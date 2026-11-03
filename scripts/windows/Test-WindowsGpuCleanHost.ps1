@@ -16,32 +16,26 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-# A clean host needs no pinned hub modules for this check.
-Import-Module (Join-Path $PSScriptRoot 'modules\WindowsGpuCandidate.Common.psm1') -Force -ErrorAction Stop
+. (Join-Path $PSScriptRoot 'Resolve-BuildModule.ps1')
+Import-BuildModule @('WindowsGpuCandidate.Common')
 $executablePath = Resolve-GpuCandidatePath -Path $Executable -PathType Leaf -Failure 'Executable is not a file: '
 $variables = @('PATH', 'GST_PLUGIN_PATH', 'GST_PLUGIN_PATH_1_0', 'GST_PLUGIN_SYSTEM_PATH',
     'GST_PLUGIN_SYSTEM_PATH_1_0', 'GST_PLUGIN_SCANNER', 'GST_PLUGIN_SCANNER_1_0', 'GST_REGISTRY',
     'GST_REGISTRY_1_0', 'GST_REGISTRY_FORK')
-$previous = Get-ProcessEnvironmentSnapshot -Name $variables
 Invoke-WithGpuScratchDirectory -Parent ([IO.Path]::GetTempPath()) -Prefix 'accelerantgine-clean-host' -UnsafeMessage 'Unsafe clean-host scratch path: ' -ScriptBlock {
     param($scratch)
-    try {
-        foreach ($name in $variables) { Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue }
-        if ($PreserveGpuRuntimePath) {
-            [Environment]::SetEnvironmentVariable('PATH', $previous['PATH'], 'Process')
-        } else {
-            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
-        }
-        # A real empty directory avoids PowerShell/.NET versions that remove empty environment values.
-        $env:GST_PLUGIN_SYSTEM_PATH_1_0 = $scratch
-        $env:GST_REGISTRY_1_0 = Join-Path $scratch 'registry.bin'
-        if ($PoisonPluginPath) { $env:GST_PLUGIN_PATH_1_0 = $scratch }
+    $isolated = @{}
+    foreach ($name in $variables) { $isolated[$name] = $null }
+    $isolated['PATH'] = if ($PreserveGpuRuntimePath) { $env:PATH } else { "$env:SystemRoot\System32;$env:SystemRoot" }
+    # A real empty directory avoids PowerShell/.NET versions that remove empty environment values.
+    $isolated['GST_PLUGIN_SYSTEM_PATH_1_0'] = $scratch
+    $isolated['GST_REGISTRY_1_0'] = Join-Path $scratch 'registry.bin'
+    if ($PoisonPluginPath) { $isolated['GST_PLUGIN_PATH_1_0'] = $scratch }
+    Invoke-WithProcessEnvironment -Environment $isolated -ScriptBlock {
         Push-Location -LiteralPath $scratch
         try {
             & $executablePath @Arguments
             if ($LASTEXITCODE -ne 0) { throw "Candidate startup failed: $LASTEXITCODE" }
         } finally { Pop-Location }
-    } finally {
-        Restore-ProcessEnvironmentSnapshot -Snapshot $previous
     }
 }
