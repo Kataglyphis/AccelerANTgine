@@ -9,10 +9,14 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 - [ ] **LAI-A4: a GStreamer audio appsink and Whisper captions** (L, ★★). Captions as `textoverlay`
   and WebRTC data, from the hub's language-AI milestone 3 (`docs/language-ai.md`).
 
-- [ ] **A bundle with `GST_REGISTRY_FORK=no` and no scanner can give webrtcsink an empty codec
-  list** (M, ★★). `Src/bundled_gstreamer.cpp` sets it; on a fresh registry an in-process scan builds
-  the pad templates while webrtcsink reads them (OxidANT `docs/observant.md`). Ship
-  `gst-plugin-scanner` beside the library or prove the fresh-registry path.
+- [ ] **A package with `GST_REGISTRY_FORK=no` and no scanner gives webrtcsink an empty codec list on a fresh
+  registry** (M, ★★). `Src/bundled_gstreamer.cpp` sets it. Reproduced 2026-11-03 in `:latest` with the Linux
+  package's plugin list on a tmpfs that lists `libgstrswebrtc.so` first: in process the stream fails with
+  `No codec available`; the image's scanner on the same order streams. So the in-process path cannot be proved; the
+  scanner has to ship. Left: install `gst-plugin-scanner` in the Linux tarball, DEB and AppImage under the bundled loader
+  (OmniAccelerANT's `package-observant.sh` has the wrapper) and in the Windows ZIP, MSI and MSIX; name it in
+  `GST_PLUGIN_SCANNER` and drop the fork there; add it to `packaging/third-party/components.json`, since the notice gate
+  classifies every ELF and PE. Done when the finished packages stream on that forced order.
 
 - [b] **DNNL cannot run in `:latest`** (S, ★★; blocked on the hub image, CON191). The chain ORT
   lists `DnnlExecutionProvider` on amd64, but `libonnxruntime_providers_dnnl.so` needs
