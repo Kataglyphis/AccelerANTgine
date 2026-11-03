@@ -25,7 +25,7 @@ detector_fixture_shared_helpers() {
   cp "$DETECTOR_HUB/shared/python/verify_ort_profile.py" "$DETECTOR_HUB/shared/python/compare_detector_parity.py" "$DETECTOR_SHARED/"
 }
 
-# Usage: detector_fixture_demo; the policy on stdin runs after argument parsing and may set provider, provider2, score and repeat_fault.
+# Usage: detector_fixture_demo; the policy on stdin runs after argument parsing and may set provider, provider2, score and repeat_fault; BAD_GPU_SECOND_PROFILE=1 is the shared fault.
 detector_fixture_demo() {
   {
     cat <<'DEMO'
@@ -45,6 +45,8 @@ score=0.90 second_score=0.8 repeat_fault=
 DEMO
     cat
     cat <<'DEMO'
+provider2=${provider2:-$provider}
+[[ ${BAD_GPU_SECOND_PROFILE:-0} != 1 || "$device" == cpu ]] || provider2=CPUExecutionProvider
 if [[ ${EDGE_PARITY:-0} == 1 ]]; then
   score=0.80
   [[ "$device" == cpu ]] || score=0.76
@@ -57,7 +59,7 @@ case "$repeat_fault" in
   *) cp "$output" "$repeat" ;;
 esac
 mkdir "$profile"
-printf '[{"cat":"Session","name":"model_run","ph":"X","pid":42,"ts":0,"dur":10},{"cat":"Node","ph":"X","pid":42,"ts":1,"dur":1,"args":{"provider":"%s","op_name":"Conv"}},{"cat":"Session","name":"model_run","ph":"X","pid":42,"ts":20,"dur":10},{"cat":"Node","ph":"X","pid":42,"ts":21,"dur":1,"args":{"provider":"%s","op_name":"Conv"}}]\n' "$provider" "${provider2:-$provider}" >"$profile/ort.json"
+printf '[{"cat":"Session","name":"model_run","ph":"X","pid":42,"ts":0,"dur":10},{"cat":"Node","ph":"X","pid":42,"ts":1,"dur":1,"args":{"provider":"%s","op_name":"Conv"}},{"cat":"Session","name":"model_run","ph":"X","pid":42,"ts":20,"dur":10},{"cat":"Node","ph":"X","pid":42,"ts":21,"dur":1,"args":{"provider":"%s","op_name":"Conv"}}]\n' "$provider" "$provider2" >"$profile/ort.json"
 DEMO
   } >"$DETECTOR_WORK/demo"
   chmod +x "$DETECTOR_WORK/demo"

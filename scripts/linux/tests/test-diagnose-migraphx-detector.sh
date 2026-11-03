@@ -20,8 +20,6 @@ else
   esac
 fi
 [[ ${BAD_REPEAT:-0} != 1 || "$device" == cpu ]] || repeat_fault=bad
-provider2=$provider
-[[ ${BAD_SECOND_PROFILE:-0} != 1 || "$device" == cpu ]] || provider2=CPUExecutionProvider
 POLICY
 # Usage: run_mode MODE EVIDENCE; EXPECT_MODE is the setting the synthetic demo requires.
 run_mode() { EXPECT_MODE="$1" bash "$DETECTOR_CHECK" "$SUITE_WORK/demo" "$SUITE_WORK/model.onnx" "$DETECTOR_FIXTURE" "$1" "$2"; }
@@ -37,6 +35,6 @@ EDGE_PARITY=1 run_rocblas "$SUITE_WORK/edge"
 run_mutant() { EXPECT_MODE=skip-rocblas bash "$1" "$SUITE_WORK/demo" "$SUITE_WORK/model.onnx" "$DETECTOR_FIXTURE" skip-rocblas "$SUITE_WORK/mutant"; }
 EDGE_PARITY=1 detector_fixture_pairwise_mutant 's/ --pairwise; then/; then/' run_mutant
 EXPECT_MODE=skip-rocblas detector_fixture_faults bash "$DETECTOR_CHECK" "$SUITE_WORK/demo" "$SUITE_WORK/model.onnx" "$DETECTOR_FIXTURE" skip-rocblas -- \
-  BAD_REPEAT BAD_SECOND_PROFILE
+  BAD_REPEAT BAD_GPU_SECOND_PROFILE
 detector_fixture_changed_model run_exhaustive "$SUITE_WORK/invalid"
 echo 'MIGraphX diagnostic settings and failure checks passed'

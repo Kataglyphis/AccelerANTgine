@@ -22,6 +22,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 - **The detector model is `deim_dfine_n_coco-v2`.** v1 finds nothing on DirectML, where MatMul of a matrix by a
   1-D vector computes wrongly (hub CON220).
 
+### 2026-11-03 (shared package and detector fixture checks)
+- `verify-gpu-packages.sh` checks the demo and its binary through one helper, with the same messages and exit codes.
+- `detector_fixture_demo` owns the second-profile fault for both detector suites, under the name
+  `BAD_GPU_SECOND_PROFILE`. Duplicated blocks fall from 12 to 10.
+
 ### 2026-11-02 (hub ORT package checks)
 - **`verify-gpu-packages.sh` calls the hub's `ort-package-proof.sh`** instead of carrying its ORT library and
   notice checks. Exit statuses are unchanged; diagnostics use the hub's wording.

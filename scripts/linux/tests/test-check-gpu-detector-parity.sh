@@ -25,8 +25,6 @@ provider=CUDAExecutionProvider
 [[ ${BAD_GPU_OUTPUT:-0} != 1 || "$device" == cpu ]] || score=0.30
 if [[ ( ${BAD_GPU_REPEAT:-0} == 1 && "$device" != cpu ) || ( ${BAD_CPU_REPEAT:-0} == 1 && "$device" == cpu ) ]]; then repeat_fault=bad; fi
 [[ ${MISSING_CPU_REPEAT:-0} != 1 || "$device" != cpu ]] || repeat_fault=missing
-provider2=$provider
-[[ ${BAD_GPU_SECOND_PROFILE:-0} != 1 || "$device" == cpu ]] || provider2=CPUExecutionProvider
 [[ ${BAD_CPU_SECOND_PROFILE:-0} != 1 || "$device" != cpu ]] || provider2=CUDAExecutionProvider
 POLICY
 detector_fixture_missing_hub_files run_demo

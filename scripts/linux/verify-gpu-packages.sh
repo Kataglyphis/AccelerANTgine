@@ -34,16 +34,22 @@ mkdir "$work/tar" "$work/deb"
 tar -xzf "${tarballs[0]}" -C "$work/tar"
 dpkg-deb -x "${debs[0]}" "$work/deb"
 
+# Usage: require_inside ROOT PATH MESSAGE; a directory PATH carries a trailing slash, so ROOT itself matches.
+require_inside() {
+  case "$2" in "$1/"*) ;; *) echo "$3" >&2; return 1 ;; esac
+}
+
+# Usage: verify_packaged_program ROOT PATH MISSING_MESSAGE ESCAPE_MESSAGE; a parent directory link can still leave ROOT.
+verify_packaged_program() {
+  local resolved
+  [[ -f "$2" && ! -L "$2" && -x "$2" ]] || { echo "$3" >&2; return 1; }
+  resolved="$(realpath -e "$2")"
+  require_inside "$1" "$resolved" "$4"
+}
+
 verify_demo() {
-  local root="$1" prefix="$2" resolved
-  local demo="$prefix/usr/bin/AccelerANTgine_demo"
-  [[ -f "$demo" && ! -L "$demo" && -x "$demo" ]] || { echo 'Missing packaged inference demo' >&2; return 1; }
-  resolved="$(realpath -e "$demo")"
-  case "$resolved" in "$root/"*) ;; *) echo 'Inference demo escapes package' >&2; return 1 ;; esac
-  local demo_binary="$prefix/usr/lib/accelerantgine/AccelerANTgine_demo"
-  [[ -f "$demo_binary" && ! -L "$demo_binary" && -x "$demo_binary" ]] || { echo 'Missing inference demo binary' >&2; return 1; }
-  resolved="$(realpath -e "$demo_binary")"
-  case "$resolved" in "$root/"*) ;; *) echo 'Inference demo binary escapes package' >&2; return 1 ;; esac
+  verify_packaged_program "$1" "$2/usr/bin/AccelerANTgine_demo" 'Missing packaged inference demo' 'Inference demo escapes package'
+  verify_packaged_program "$1" "$2/usr/lib/accelerantgine/AccelerANTgine_demo" 'Missing inference demo binary' 'Inference demo binary escapes package'
 }
 
 verify_tree() {
@@ -51,7 +57,7 @@ verify_tree() {
   local -a libraries=()
   root="$(realpath -e "$root")"
   prefix="$(realpath -e "$prefix")"
-  case "$prefix/" in "$root/"*) ;; *) echo 'Package prefix escapes extraction root' >&2; return 1 ;; esac
+  require_inside "$root" "$prefix/" 'Package prefix escapes extraction root'
   verify_demo "$root" "$prefix"
   ort_assert_no_bundled_host_runtime "$root" "$kind"
   ort_package_collect_libraries --reject-invalid "$root" "$prefix/usr/lib/accelerantgine" libraries \
