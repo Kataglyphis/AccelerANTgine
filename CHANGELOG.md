@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-04, a too-small runner)
+- **A job the hub's `prepare-linux-ci-host` refused for runner disk re-runs alone** (`retry-disk-refusal.yml`, hub CON216). Any other
+  failure stays failed. `On request`, `release.yml` and GPU candidate lanes are not named, so they never re-run.
+
+### Fixed (2026-11-04, the CLI's stream status)
+- **`--webrtc` exits 1 when the stream fails.** A codec or signalling failure printed its error and exited 0, so a caller
+  could only read the log. A stop signal and a finite source's end stay 0, and `timeout` still reports 124 for an intended
+  window. `Cli.StreamStatusTellsAFailureFromAStop` runs both cases on the real binary.
+
 ### Fixed (2026-11-03, an empty codec list on a fresh registry)
 - **Packages with plugins ship `gst-plugin-scanner`.** With the fork off, a fresh registry scanned in process could
   register webrtcsink before its encoders, and a stream died with `No codec available` on a filesystem listing that plugin

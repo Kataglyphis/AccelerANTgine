@@ -78,7 +78,7 @@ perf_probe() {
   fi
 }
 
-# With no signalling server the CLI exits cleanly about 200 ms in; not 8443, a dev box's own port (AGENTS.md section 4).
+# With no signalling server the CLI fails about 200 ms in; not 8443, a dev box's own port (AGENTS.md section 4).
 SIGNALLING_PID=""
 WORKLOAD_ARGS=("${PROFILE_ARGS_ARR[@]}")
 

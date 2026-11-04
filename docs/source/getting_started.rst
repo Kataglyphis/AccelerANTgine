@@ -236,6 +236,9 @@ reach ``set_error_callback``; logging only adds text.
    AccelerANTgine --webrtc --source test --log_level info
    ACCELERANTGINE_LOG_LEVEL=debug AccelerANTgine --webrtc --source test
 
+``--webrtc`` exits 1 when the stream fails, for example on a missing codec or a refused signalling
+connection. A stop signal and the end of a finite source exit 0.
+
 Clone The Repository
 --------------------
 

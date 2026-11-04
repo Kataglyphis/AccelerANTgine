@@ -87,6 +87,15 @@ if(TARGET ${PROJECT_NAME}_cli)
   endif()
 endif()
 
+# The CLI's stream status needs a shell and a native binary; the source is shared, so the other lanes add no proof.
+if(TARGET ${PROJECT_NAME}_cli
+   AND UNIX
+   AND NOT CMAKE_CROSSCOMPILING)
+  add_test(NAME Cli.StreamStatusTellsAFailureFromAStop
+           COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/cli_stream_status_test.sh" $<TARGET_FILE:${PROJECT_NAME}_cli>)
+  set_tests_properties(Cli.StreamStatusTellsAFailureFromAStop PROPERTIES TIMEOUT 120)
+endif()
+
 # The demo's command line: every mode's refusal path, none of which needs a model.
 if(TARGET ${PROJECT_NAME}_demo)
   set(_demo_missing_model "${CMAKE_BINARY_DIR}/no-such-model.onnx")

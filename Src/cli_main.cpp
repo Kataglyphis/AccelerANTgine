@@ -320,6 +320,9 @@ auto main(int argc, char **argv) -> int
         return 1;
     }
 
+    // Latched: a later state message can overwrite Error before the loop below reads it.
+    std::atomic<bool> stream_failed{ false };
+
     kataglyphis::webrtc::WebRTCStreamer streamer;
 
     streamer.set_state_callback(
@@ -327,9 +330,11 @@ auto main(int argc, char **argv) -> int
           kataglyphis::log::info("State: {} -> {}", state_to_string(old_state), state_to_string(new_state));
       });
 
-    streamer.set_error_callback([](kataglyphis::webrtc::WebRTCError /*error*/, const std::string &message) -> void {
-        std::cerr << "Error: " << message << '\n';
-    });
+    streamer.set_error_callback(
+      [&stream_failed](kataglyphis::webrtc::WebRTCError /*error*/, const std::string &message) -> void {
+          stream_failed.store(true);
+          std::cerr << "Error: " << message << '\n';
+      });
 
     auto configure_result = streamer.configure(config);
     if (!configure_result) {
@@ -356,12 +361,15 @@ auto main(int argc, char **argv) -> int
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         auto state = streamer.get_state();
-        if (state == kataglyphis::webrtc::StreamState::Error
+        if (stream_failed.load() || state == kataglyphis::webrtc::StreamState::Error
             || state == kataglyphis::webrtc::StreamState::Disconnected) {
-            std::cerr << "Stream ended unexpectedly\n";
             break;
         }
     }
+
+    // Read before stop(), whose EOS must not change it; a signal or a finite source's end is success.
+    const bool failed = stream_failed.load() || streamer.get_state() == kataglyphis::webrtc::StreamState::Error;
+    if (failed) { std::cerr << "Stream failed\n"; }
 
     kataglyphis::log::info("Stopping stream");
     (void)streamer.stop();
@@ -369,5 +377,5 @@ auto main(int argc, char **argv) -> int
     kataglyphis::webrtc::WebRTCStreamer::deinitialize();
 
     kataglyphis::log::info("Done");
-    return 0;
+    return failed ? 1 : 0;
 }

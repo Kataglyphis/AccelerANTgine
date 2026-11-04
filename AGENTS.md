@@ -518,7 +518,8 @@ written out rather than linked.
 **Security audit lane.** `.github/workflows/security-audit.yml` calls the hub's reusable `security-audit.yml` on push, pull request, Mondays and dispatch. It scans `uv.lock` and `Src/rusty_code/Cargo.lock` with the hub-pinned osv-scanner, records `cargo_security_checks.sh` for each `Cargo.lock`, fails a push or PR that adds a HIGH or CRITICAL advisory absent from the base commit, lists every finding on the weekly and dispatched runs, and uploads `security-audit.json`. Locally: `bash third_party/ANTfrastructure/linux/scripts/security-audit.sh`. The lint gates enforce the hub's `sha-pin` workflow convention (`workflow-conventions: sha-pin`): every third-party `uses:` names a 40-hex commit SHA.
 
 Programs: the CLI `AccelerANTgine_cli` (`cli_main.cpp`) and the demo `AccelerANTgine_demo`
-(`inference_demo.cpp`), installed by CMake when this is the top-level project.
+(`inference_demo.cpp`), installed by CMake when this is the top-level project. The CLI's `--webrtc` exits 1 when the
+stream fails and 0 on a stop signal or a finite source's end; `timeout` still reports its own 124 for an intended window.
 
 `bash scripts/linux/quality-report.sh` measures this checkout into `logs/code-quality/measurements.json`
 and `queue.md`; `--compare <file>` or `--compare previous-develop` grades it (exit 0 ok, 1 regressed,
@@ -621,7 +622,8 @@ platform + arch, display names `<Platform> <Arch> · <what>`. They are `linux-x6
 PowerShell lint and complexity workflow, on every push. Its complexity verdict is strict on push and
 PR (15 cyclomatic, 5 nesting, 80 lines per function, `scripts/`): refactor into named functions,
 never raise a limit. The rest: `on-request.yml` starts the lanes a commit message's `[ci <lane>]` asks
-for; `release.yml` is every push to `main`; `mutations.yml` is below; `code-quality-report.yml` runs
+for; `release.yml` is every push to `main`; `mutations.yml` is below; `retry-disk-refusal.yml` re-runs one job the hub's `prepare-linux-ci-host` refused for
+runner disk, in the plain Linux and audit lanes only, never `On request`, `release.yml` or a GPU candidate; `code-quality-report.yml` runs
 `quality-report.sh`; `security-audit.yml` is the audit lane above; `python-static.yml` is strict Ruff and
 ty; `python-refactor.yml` is an on-demand preview that publishes nothing; `renovate-entrypoint.yml` checks
 the Renovate wrapper and config; and `linux-gpu-candidate.yml` and `windows-gpu-candidates.yml` are
