@@ -11,10 +11,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
 - [ ] **No finished Windows GPU package has streamed on a fresh registry** (S, ★★). Linux is done: every tarball, DEB and
   AppImage streams with `libgstrswebrtc.so` listed first (`check-package-fresh-registry.sh`). The Windows GPU ZIP, MSI and
-  MSIX now carry `gst-plugin-scanner.exe`, proved on fixtures only: the `[ci windows]` lane packages the CPU variant, which
-  has no plugins and no scanner. Left: the next `windows-gpu-candidates.yml` run must build the real packages, where
-  `Test-WindowsGpuPackages.ps1` checks their scanner bytes and `--gst_check` fails on a broken scanner. Done when one of
-  those packages also streams on that forced order.
+  MSIX carry `gst-plugin-scanner.exe`: `windows-gpu-candidates.yml` run 41738334240 built them and `Test-WindowsGpuPackages.ps1`
+  checked the bytes. Left: one of those packages must stream on that forced order; `scripts/windows` has no such check yet.
 
 - [b] **DNNL cannot run in `:latest`** (S, ★★; blocked on the hub image, CON191). The chain ORT
   lists `DnnlExecutionProvider` on amd64, but `libonnxruntime_providers_dnnl.so` needs
@@ -29,20 +27,19 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   arm64 gcc job (release, LTO) of a82d9bf, run 38672470256 attempt 1, died in
   `scripts/linux/ci-profile-bench.sh`: `bin/AccelerANTgine` streaming `videotestsrc ! … !
   webrtcsink` to the local signalling server ended in SIGSEGV (exit 139); attempt 2 of the
-  same commit passed, and the commit only moved `inference_demo.cpp` out of the library. The
-  WebRTC streamer's success path has no test (`Test/commit/webrtc_streamer_test.cpp` covers its
-  errors), so nothing else would catch a race there.
+  same commit passed, and the commit only moved `inference_demo.cpp` out of the library.
+  `Cli.StreamStatusTellsAFailureFromAStop` now runs a healthy stream against a real signalling server under Debug ASan,
+  on x64 clang for 5 s with no viewer; that is not the job that crashed.
 
   Crash capture is already wired: `scripts/linux/ci-profile-bench.sh`'s `capture_crash`
   records the status, core and rerun backtrace; `reusable-linux.yml` uploads the evidence on failure.
-  Remaining: analyze a stack from a real workload crash and exercise the successful
-  start/stream/stop path under Debug ASan; the existing unit tests cover failure paths.
+  Remaining: analyze a stack from a real workload crash.
   Attempts: 2026-11-03, 120 runs without a crash (x64; 60 Debug ASan, 60 `linux-profile-GNU`; 8 s each, no viewer).
 
 - [ ] **The Python bindings build and test on Linux x64 and arm64 only** (M, ★★). Owner goal
   2026-10-01: every test on every arch, on the pinned CPython once with the GIL and once
   free-threaded. `ci-python-bindings.sh` builds both wheels, installs each and runs
-  `Test/python`, but only `ci-run-all.sh:92-97` calls it, on the clang rows of `linux-x64.yml`
+  `Test/python`, but only `ci-run-all.sh` calls it, on the clang rows of `linux-x64.yml`
   and `linux-arm64.yml`. Missing:
   1. Windows x64 and arm64: no workflow calls `Build-PythonBindings.ps1` (or
      `Invoke-ContainerPythonBindings.ps1`); it builds the GIL package only and runs no test.
@@ -84,6 +81,6 @@ The top 5 of `logs/code-quality/queue.md` (`bash scripts/linux/quality-report.sh
 
 - [ ] `shellcheck-warnings.allow:10` budget 2 (allow_budget_total)
 - [ ] `scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:43` 39 shared shingles with scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:71 (duplicated_blocks)
+- [ ] `Test/commit/cli_stream_status_test.sh:37` 34 shared shingles with scripts/linux/check-package-fresh-registry.sh:40 (duplicated_blocks)
+- [ ] `Test/commit/cli_stream_status_test.sh:37` 30 shared shingles with scripts/linux/ci-profile-bench.sh:96 (duplicated_blocks)
 - [ ] `scripts/windows/Build-Windows.ps1:508` 24 shared shingles with scripts/windows/Build-Windows.ps1:689 (duplicated_blocks)
-- [ ] `scripts/linux/check-package-fresh-registry.sh:40` 20 shared shingles with scripts/linux/ci-profile-bench.sh:96 (duplicated_blocks)
-- [ ] `scripts/windows/Invoke-ContainerLane.ps1:4` 19 shared shingles with scripts/windows/Test-WindowsGpuImage.ps1:8 (duplicated_blocks)
