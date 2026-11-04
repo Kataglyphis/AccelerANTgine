@@ -82,10 +82,10 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
 ## Quality queue
 
-The top 5 of `logs/code-quality/queue.md` (`bash scripts/linux/quality-report.sh`); re-sync when it moves.
+The top 5 of `logs/code-quality/queue.md` (`bash scripts/linux/quality-report.sh`), leaving out `doc-dupes-hub.allow`, which the owner keeps in every AGENTS.md; re-sync when it moves.
 
-- [ ] `doc-dupes-hub.allow:4` budget 23 (allow_budget_total)
 - [ ] `shellcheck-warnings.allow:10` budget 2 (allow_budget_total)
-- [ ] `scripts/windows/Build-Windows.ps1:498` 24 shared shingles with scripts/windows/Build-Windows.ps1:678 (duplicated_blocks)
+- [ ] `scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:43` 39 shared shingles with scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:71 (duplicated_blocks)
+- [ ] `scripts/windows/Build-Windows.ps1:508` 24 shared shingles with scripts/windows/Build-Windows.ps1:689 (duplicated_blocks)
+- [ ] `scripts/linux/check-package-fresh-registry.sh:40` 20 shared shingles with scripts/linux/ci-profile-bench.sh:96 (duplicated_blocks)
 - [ ] `scripts/windows/Invoke-ContainerLane.ps1:4` 19 shared shingles with scripts/windows/Test-WindowsGpuImage.ps1:8 (duplicated_blocks)
-- [ ] `scripts/windows/Test-WindowsGpuImage.ps1:8` 19 shared shingles with scripts/windows/Test-WindowsGpuPackages.ps1:6 (duplicated_blocks)
