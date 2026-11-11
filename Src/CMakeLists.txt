@@ -4,6 +4,13 @@ set(EXTERNAL_LIB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/")
 
 file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
 file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
+# A cargo run inside rusty_code leaves cc-rs probe sources under target/, each with a main() of its own.
+list(
+  FILTER
+  KataglyphisCppProject_SOURCES
+  EXCLUDE
+  REGEX
+  "/rusty_code/target/")
 # Programs with their own main(): the library must carry none, or every embedder links a dead one.
 list(
   REMOVE_ITEM

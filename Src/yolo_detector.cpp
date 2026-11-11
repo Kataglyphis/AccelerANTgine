@@ -246,12 +246,14 @@ auto camera_detection_pipeline_description(const std::string &device,
   std::uint32_t height,
   std::uint32_t fps) -> std::string
 {
+    // The detector runs on the streaming thread; the leaky queue hands it the newest frame, not the oldest queued one.
     return "v4l2src device=" + gstreamer::quote_pipeline_value(device) + " ! "
            "video/x-raw,width="
            + std::to_string(width) + ",height=" + std::to_string(height) + ",framerate=" + std::to_string(fps)
            + "/1 ! "
+             "queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "
              "videoconvert ! video/x-raw,format=RGB ! "
-             "appsink name=detector_sink emit-signals=true sync=false";
+             "appsink name=detector_sink emit-signals=true sync=false max-buffers=1 drop=true";
 }
 
 auto video_detection_pipeline_description(const std::string &video_source, std::uint32_t width, std::uint32_t height)
@@ -328,6 +330,17 @@ auto decode_detections(const inference::TensorData &output, const YoloConfig &co
     return boxes;
 }
 
+namespace {
+    // A byte has 256 normalised values; the table gives the same floats as dividing each pixel by 255.
+    constexpr std::array<float, 256> kNormalisedByte = [] {
+        std::array<float, 256> table{};
+        for (std::size_t value = 0; value < table.size(); ++value) {
+            table[value] = static_cast<float>(value) / 255.0F;
+        }
+        return table;
+    }();
+}// namespace
+
 auto preprocess_frame(const gstreamer::BufferInfo &buffer,
   std::uint32_t width,
   std::uint32_t height,
@@ -366,17 +379,26 @@ auto preprocess_frame(const gstreamer::BufferInfo &buffer,
         static_cast<float>(pad_x),
         static_cast<float>(pad_y) };
     result.data.assign(3 * plane, mode == FramePreprocessMode::Letterbox ? 114.0F / 255.0F : 0.0F);
+    // Every row samples the same columns, so their byte offsets are divided out once per frame.
+    std::vector<std::size_t> column_offsets(content_width);
+    for (std::uint32_t x = 0; x < content_width; ++x) {
+        column_offsets[x] =
+          static_cast<std::size_t>(static_cast<std::uint64_t>(x) * meta.width / content_width) * channels;
+    }
+    const std::span<const std::byte> source(buffer.data);
+    const std::span<float> red(result.data.data(), plane);
+    const std::span<float> green(result.data.data() + plane, plane);
+    const std::span<float> blue(result.data.data() + (2 * plane), plane);
     for (std::uint32_t y = 0; y < content_height; ++y) {
         const auto source_y = static_cast<std::uint64_t>(y) * meta.height / content_height;
+        const auto row =
+          source.subspan(meta.plane_offset_bytes + static_cast<std::size_t>(source_y) * stride, row_bytes);
+        const auto destination = static_cast<std::size_t>(y + pad_y) * width + pad_x;
         for (std::uint32_t x = 0; x < content_width; ++x) {
-            const auto source_x = static_cast<std::uint64_t>(x) * meta.width / content_width;
-            const auto source = meta.plane_offset_bytes + static_cast<std::size_t>(source_y) * stride
-                                + static_cast<std::size_t>(source_x) * channels;
-            const auto destination = static_cast<std::size_t>(y + pad_y) * width + x + pad_x;
-            for (std::size_t channel = 0; channel < 3; ++channel) {
-                result.data[channel * plane + destination] =
-                  std::to_integer<unsigned char>(buffer.data[source + channel]) / 255.0F;
-            }
+            const auto pixel = row.subspan(column_offsets[x], 3);
+            red[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[0])];
+            green[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[1])];
+            blue[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[2])];
         }
     }
     return result;
@@ -496,7 +518,7 @@ auto YoloDetector::detect_frame(const gstreamer::BufferInfo &frame) -> std::expe
       preprocess_frame(frame, impl_->config.input_width, impl_->config.input_height, impl_->config.preprocess_mode);
     if (!input) { return std::unexpected(input.error()); }
     inference::TensorShape shape{ { 1, 3, impl_->config.input_height, impl_->config.input_width } };
-    auto result = impl_->engine.run_inference(input->data, shape, "images");
+    auto result = impl_->engine.run_inference_in_place(input->data, shape, "images");
     if (!result) { return std::unexpected(result.error()); }
     return post_process(*result, frame.metadata.width, frame.metadata.height, input->mapping);
 }

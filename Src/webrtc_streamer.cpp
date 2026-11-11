@@ -545,12 +545,14 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
 auto WebRTCStreamer::start() -> std::expected<void, WebRTCError>
 {
     if (impl_->pipeline == nullptr) { return std::unexpected(WebRTCError::PipelineCreationFailed); }
+    // A second loop thread would be assigned over the joinable first one, which terminates the process.
+    if (impl_->main_loop != nullptr) { return std::unexpected(WebRTCError::StateChangeFailed); }
 
     impl_->set_state(StreamState::Connecting);
 
     // Start main loop in background thread for GLib callbacks
     impl_->main_loop = g_main_loop_new(nullptr, FALSE);
-    impl_->main_loop_thread = std::thread([this]() -> void { g_main_loop_run(impl_->main_loop); });
+    impl_->main_loop_thread = std::thread([loop = impl_->main_loop]() -> void { g_main_loop_run(loop); });
 
     // Start the pipeline
     log::info("Starting pipeline");

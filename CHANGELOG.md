@@ -18,6 +18,22 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-11, the detector's per-frame cost and the camera's backlog)
+- **The camera detection pipeline keeps one frame between capture and the detector.** The detector runs on the streaming
+  thread, so one slower than the camera read the driver's oldest queued frame. A leaky one-buffer queue after the source and
+  `appsink max-buffers=1 drop=true` hand it the newest. File and URI sources stay lossless.
+- **`detect_frame` no longer copies its input.** `OnnxInferenceEngine::run_inference_in_place` runs on the caller's own
+  buffer; `run_inference` keeps its copy for read-only callers and refuses a wrong size before making it. That saves a
+  4.9 MB copy per 640x640 frame.
+- **`preprocess_frame` divides each column offset out once per frame and normalises through a 256-entry table.** The floats
+  are the same; the ModelANT contract cases pass unchanged.
+
+### Fixed (2026-11-11, a second WebRTC start and cargo leftovers)
+- **`WebRTCStreamer::start()` called again, or after a start that failed, returns `StateChangeFailed`.** It assigned a new
+  loop thread over the running one, which ends the process.
+- **A `cargo` run inside `Src/rusty_code` no longer breaks the library's link.** The source glob took cc-rs's probe sources
+  under `rusty_code/target/`, each with a `main()` of its own.
+
 ### Changed (2026-11-04, a too-small runner)
 - **A job the hub's `prepare-linux-ci-host` refused for runner disk re-runs alone** (`retry-disk-refusal.yml`, hub CON216). Any other
   failure stays failed. `On request`, `release.yml` and GPU candidate lanes are not named, so they never re-run.

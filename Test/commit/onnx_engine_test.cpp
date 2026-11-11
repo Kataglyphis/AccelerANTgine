@@ -197,6 +197,28 @@ TEST(OnnxEngine, AnUnknownNameHasNoShape)
     EXPECT_EQ(output_shape.error(), inference::OnnxError::OutputNotFound);
 }
 
+TEST(OnnxEngine, RunsInPlaceOnTheCallersBufferWithoutChangingIt)
+{
+    const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());
+    auto engine = initialized_engine(model);
+
+    std::vector<float> input{ -1.0F, 0.0F, 2.5F, -3.0F };
+    const auto result = engine.run_inference_in_place(input, shape({ 1, 4 }), "X");
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->outputs[0].data, (std::vector<float>{ 0.0F, 0.0F, 2.5F, 0.0F }));
+    EXPECT_EQ(input, (std::vector<float>{ -1.0F, 0.0F, 2.5F, -3.0F }));
+
+    std::vector<float> short_input(3, 1.0F);
+    const auto wrong = engine.run_inference_in_place(short_input, shape({ 1, 4 }), "X");
+    ASSERT_FALSE(wrong.has_value());
+    EXPECT_EQ(wrong.error(), inference::OnnxError::InvalidInputShape);
+
+    inference::OnnxInferenceEngine idle;
+    const auto before = idle.run_inference_in_place(input, shape({ 1, 4 }), "X");
+    ASSERT_FALSE(before.has_value());
+    EXPECT_EQ(before.error(), inference::OnnxError::SessionNotInitialized);
+}
+
 TEST(OnnxEngine, RunsAReluModel)
 {
     const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());

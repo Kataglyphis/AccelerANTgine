@@ -265,6 +265,9 @@ TEST(WebRtcStreamer, AStartWithoutASignallingServerEndsInError)
         if (started.has_value()) { EXPECT_EQ(reported, webrtc::WebRTCError::MediaError); }
     }
 
+    // A retry without stop() is refused: a second loop thread over the first one would end the process.
+    EXPECT_EQ(kataglyphis::test::error_of(streamer.start()), webrtc::WebRTCError::StateChangeFailed);
+
     EXPECT_TRUE(streamer.stop().has_value());
     EXPECT_EQ(streamer.get_state(), webrtc::StreamState::Idle);
 }

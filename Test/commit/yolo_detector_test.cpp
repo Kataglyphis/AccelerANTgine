@@ -154,6 +154,20 @@ TEST(YoloDetector, EveryDetectionBuilderKeepsAPathWithASeparatorInOneValue)
     }
 }
 
+TEST(YoloDetector, TheCameraPipelineKeepsOneFrameBetweenCaptureAndTheDetector)
+{
+    // A detector slower than the camera must see the newest frame, not a backlog of old ones.
+    const auto camera = detection::camera_detection_pipeline_description("/dev/video0", 64, 48, 30);
+    EXPECT_TRUE(camera.contains(" ! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "))
+      << camera;
+    EXPECT_TRUE(camera.ends_with("appsink name=detector_sink emit-signals=true sync=false max-buffers=1 drop=true"))
+      << camera;
+    // A file is read at the detector's pace, so nothing of it may be dropped.
+    const auto video = detection::video_detection_pipeline_description("clip.mp4", 64, 48);
+    EXPECT_FALSE(video.contains("leaky")) << video;
+    EXPECT_FALSE(video.contains("drop=true")) << video;
+}
+
 TEST(YoloDetector, DetectBeforeInitializeFails)
 {
     detection::YoloDetector detector;

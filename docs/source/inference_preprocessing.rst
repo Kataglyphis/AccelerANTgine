@@ -45,6 +45,12 @@ DEIM-D-FINE-N choose stretch and ``YoloOutputLayout::CornersScoreClass``: its ro
 ``CenterObjectnessScores`` layout remains the default for callers using that YOLO export.
 These configuration choices are explicit; the detector does not infer them from a byte count.
 
+The camera factory keeps one frame at most between capture and the detector (a leaky queue and
+``appsink max-buffers=1 drop=true``), so a detector slower than the camera sees the newest
+frame, not a growing backlog. ``detect_frame`` runs the model on its own preprocessed buffer
+through ``OnnxInferenceEngine::run_inference_in_place``, which skips the copy ``run_inference``
+makes of a read-only input.
+
 Shared reference cases
 ----------------------
 

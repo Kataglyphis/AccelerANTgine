@@ -94,6 +94,11 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
       const TensorShape &input_shape,
       const std::string &input_name = "input") -> std::expected<InferenceResult, OnnxError>;
 
+    // The same run on the caller's own buffer, without the copy; nothing may write to it until the call returns.
+    [[nodiscard]] auto run_inference_in_place(std::span<float> input_data,
+      const TensorShape &input_shape,
+      const std::string &input_name = "input") -> std::expected<InferenceResult, OnnxError>;
+
     [[nodiscard]] auto run_inference_multi_input(const std::vector<std::pair<std::string, TensorData>> &inputs)
       -> std::expected<InferenceResult, OnnxError>;
 

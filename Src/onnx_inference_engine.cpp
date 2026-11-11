@@ -141,7 +141,7 @@ namespace {
     }
 
     // ORT only borrows the buffer, so it must outlive the Run that reads it.
-    auto make_float_tensor(const OrtMemoryInfo *memory_info, std::vector<float> &data, const std::vector<int64_t> &dims)
+    auto make_float_tensor(const OrtMemoryInfo *memory_info, std::span<float> data, const std::vector<int64_t> &dims)
       -> std::expected<Ort::Value, OnnxError>
     {
         OrtValue *value = nullptr;
@@ -496,6 +496,19 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
   const TensorShape &input_shape,
   const std::string &input_name) -> std::expected<InferenceResult, OnnxError>
 {
+    // ORT takes a mutable pointer, so a read-only caller pays for one copy; a wrong size is refused before it is made.
+    if (input_data.size() != input_shape.total_elements()) {
+        const std::shared_lock lock(impl_->mutex);
+        return std::unexpected(impl_->initialized ? OnnxError::InvalidInputShape : OnnxError::SessionNotInitialized);
+    }
+    std::vector<float> mutable_input(input_data.begin(), input_data.end());
+    return run_inference_in_place(mutable_input, input_shape, input_name);
+}
+
+auto OnnxInferenceEngine::run_inference_in_place(std::span<float> input_data,
+  const TensorShape &input_shape,
+  const std::string &input_name) -> std::expected<InferenceResult, OnnxError>
+{
     const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
@@ -506,11 +519,10 @@ auto OnnxInferenceEngine::run_inference(std::span<const float> input_data,
     if (input_data.size() != expected_size) { return std::unexpected(OnnxError::InvalidInputShape); }
 
     const auto input_dims = to_ort_dimensions(input_shape);
-    std::vector<float> mutable_input(input_data.begin(), input_data.end());
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
-    auto input_tensor = make_float_tensor(memory_info, mutable_input, input_dims);
+    auto input_tensor = make_float_tensor(memory_info, input_data, input_dims);
     if (!input_tensor) { return std::unexpected(input_tensor.error()); }
 
     std::vector<Ort::Value> inputs;
