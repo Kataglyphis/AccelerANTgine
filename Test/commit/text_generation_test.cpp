@@ -259,6 +259,39 @@ TEST_F(TextGeneration, EmptyMessagesOrNoBudgetAreInvalid)
       text::TextGenError::InvalidOptions);
 }
 
+TEST_F(TextGeneration, TextThatIsNotPlainUtf8IsInvalidInsteadOfAnAbort)
+{
+    // Latin-1, a cut sequence, an overlong form and a NUL: the first three ended the process in the JSON writer.
+    for (const std::string broken : { std::string("gr\xFC\xDF"
+                                                  "e"),
+           std::string("\xE2\x82"),
+           std::string("\xC0\xAF"),
+           std::string("a\0b", 3) }) {
+        EXPECT_EQ(
+          kataglyphis::test::error_of(generator.generate(user(broken), budget(1))), text::TextGenError::InvalidOptions);
+        EXPECT_EQ(kataglyphis::test::error_of(generator.generate({ { broken, "hi" } }, budget(1))),
+          text::TextGenError::InvalidOptions);
+        auto stop = budget(1);
+        stop.stop = { broken };
+        EXPECT_EQ(kataglyphis::test::error_of(generator.generate(user(expected.prompt), stop)),
+          text::TextGenError::InvalidOptions);
+    }
+    // Four-byte and three-byte text still goes through.
+    EXPECT_TRUE(generator.generate(user("\xF0\x9F\x90\x88 \xE2\x82\xAC"), budget(1)).has_value());
+}
+
+TEST_F(TextGeneration, IsInitializedAnswersDuringAGenerationEvenFromItsCallback)
+{
+    // The callback runs inside generate's lock; a query that took the same lock never returned.
+    std::size_t asked = 0;
+    const auto result = generator.generate(user(expected.prompt), budget(2), [&](std::string_view) {
+        EXPECT_TRUE(generator.is_initialized());
+        ++asked;
+    });
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(asked, 2U);
+}
+
 TEST(TextGenerationSetup, TheModelLiesBesideTheSuiteForAStagedOrMovedBuild)
 {
     const auto beside = kataglyphis::test::executable_dir();

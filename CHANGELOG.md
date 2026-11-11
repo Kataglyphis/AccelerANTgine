@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-12, text that is not UTF-8, and a query during a generation)
+- **A message that is not UTF-8 is `InvalidOptions`; it ended the process.** The chat messages go through the JSON writer,
+  which has no error to return in a build without exceptions and called `abort()` on a broken sequence. The C API and the
+  CLI reach it with any bytes: `--prompt "$(cat latin1.txt)"` died with SIGABRT. A NUL is refused the same way, since GenAI
+  reads the templated prompt as a C string and dropped what followed; stop strings are checked too.
+- **`TextGenerator::is_initialized()` no longer waits for a running generation.** It took the lock `generate` holds, so a
+  Python thread asking during a streaming generation held the GIL the callback needed, and both waited for ever; asked
+  from the callback itself it never returned.
+
 ### Changed (2026-11-11, the detector's per-frame cost and the camera's backlog)
 - **The camera detection pipeline keeps one frame between capture and the detector.** The detector runs on the streaming
   thread, so one slower than the camera read the driver's oldest queued frame. A leaky one-buffer queue after the source and

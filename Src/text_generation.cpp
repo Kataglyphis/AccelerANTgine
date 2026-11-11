@@ -194,10 +194,43 @@ namespace {
         emitted = until;
     }
 
+    // UTF-8 without a NUL: GenAI reads every text as a C string, and the JSON writer has no error to return for a broken sequence.
+    auto is_plain_utf8(std::string_view text) -> bool
+    {
+        std::size_t continuation = 0;
+        for (const char raw : text) {
+            const auto byte = static_cast<unsigned char>(raw);
+            if (byte == 0) { return false; }
+            if (continuation > 0) {
+                if ((byte & 0xC0U) != 0x80U) { return false; }
+                --continuation;
+            } else if (byte >= 0x80U) {
+                if (byte >= 0xC2U && byte <= 0xDFU) {
+                    continuation = 1;
+                } else if ((byte & 0xF0U) == 0xE0U) {
+                    continuation = 2;
+                } else if (byte >= 0xF0U && byte <= 0xF4U) {
+                    continuation = 3;
+                } else {
+                    return false;
+                }
+            }
+        }
+        return continuation == 0;
+    }
+
     auto valid_options(const GenerationOptions &options) -> bool
     {
         return options.max_new_tokens > 0 && (!options.seed || *options.seed >= 0)
-               && std::ranges::none_of(options.stop, [](const std::string &stop) { return stop.empty(); });
+               && std::ranges::none_of(
+                 options.stop, [](const std::string &stop) { return stop.empty() || !is_plain_utf8(stop); });
+    }
+
+    auto valid_messages(const std::vector<ChatMessage> &messages) -> bool
+    {
+        return !messages.empty() && std::ranges::all_of(messages, [](const ChatMessage &message) {
+            return is_plain_utf8(message.role) && is_plain_utf8(message.content);
+        });
     }
 
     template<typename T, auto Destroy> struct Release
@@ -241,7 +274,8 @@ namespace {
         for (const auto &message : messages) {
             array.push_back({ { "role", message.role }, { "content", message.content } });
         }
-        return array.dump();
+        // Replace, not strict: built without exceptions a sequence the check above let through would abort the process.
+        return array.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
     }
 
     auto milliseconds(Clock::duration duration) -> double
@@ -257,6 +291,8 @@ struct TextGenerator::Impl
     std::vector<std::int32_t> eos_tokens;
     mutable std::shared_mutex mutex;
     std::atomic<bool> cancel{ false };
+    // Read without the mutex: a caller asking during a generation, from its own callback even, must not wait for it.
+    std::atomic<bool> ready{ false };
 
     auto prompt_tokens(const std::vector<ChatMessage> &messages) const -> std::expected<Sequences, TextGenError>;
     auto make_generator(const OgaSequences &prompt, std::size_t prompt_count, const GenerationOptions &options) const
@@ -462,14 +498,11 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
     impl_->api = api;
     impl_->tokenizer = std::move(tokenizer);
     impl_->model = std::move(model);
+    impl_->ready.store(true);
     return {};
 }
 
-auto TextGenerator::is_initialized() const -> bool
-{
-    const std::shared_lock lock(impl_->mutex);
-    return impl_->model != nullptr;
-}
+auto TextGenerator::is_initialized() const -> bool { return impl_->ready.load(); }
 
 auto TextGenerator::generate(const std::vector<ChatMessage> &messages,
   const GenerationOptions &options,
@@ -477,7 +510,7 @@ auto TextGenerator::generate(const std::vector<ChatMessage> &messages,
 {
     const std::unique_lock lock(impl_->mutex);
     if (impl_->model == nullptr) { return std::unexpected(TextGenError::NotInitialized); }
-    if (messages.empty() || !valid_options(options)) { return std::unexpected(TextGenError::InvalidOptions); }
+    if (!valid_messages(messages) || !valid_options(options)) { return std::unexpected(TextGenError::InvalidOptions); }
     impl_->cancel.store(false);
     // The clock starts before the prompt goes in, so the first token's time includes the prefill.
     const auto start = Clock::now();

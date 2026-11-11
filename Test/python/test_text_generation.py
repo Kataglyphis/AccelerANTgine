@@ -11,7 +11,12 @@ import pytest
 ki = pytest.importorskip("kataglyphis_inference")
 
 GENERATOR = (
-    pathlib.Path(__file__).resolve().parents[2] / "third_party" / "ANTfrastructure" / "linux" / "scripts" / "lib"
+    pathlib.Path(__file__).resolve().parents[2]
+    / "third_party"
+    / "ANTfrastructure"
+    / "linux"
+    / "scripts"
+    / "lib"
     / "tiny-genai-model.py"
 )
 
@@ -19,7 +24,11 @@ GENERATOR = (
 @pytest.fixture(scope="module")
 def tiny_model(tmp_path_factory):
     out = tmp_path_factory.mktemp("tiny-genai") / "model"
-    subprocess.run([sys.executable, "-I", str(GENERATOR), "--out", str(out)], check=True, capture_output=True)
+    subprocess.run(
+        [sys.executable, "-I", str(GENERATOR), "--out", str(out)],
+        check=True,
+        capture_output=True,
+    )
     return out, json.loads((out / "fixture.json").read_text(encoding="utf-8"))
 
 
@@ -38,7 +47,9 @@ def budget(tokens):
 
 def test_greedy_decoding_yields_the_fixture_continuation(generator, tiny_model):
     _, oracle = tiny_model
-    result = generator.generate([("user", oracle["prompt"])], budget(len(oracle["continuation_ids"])))
+    result = generator.generate(
+        [("user", oracle["prompt"])], budget(len(oracle["continuation_ids"]))
+    )
     assert result.text == oracle["continuation"]
     assert result.tokens == oracle["continuation_ids"]
     assert result.prompt_tokens == len(oracle["prompt_ids"])
@@ -49,9 +60,31 @@ def test_greedy_decoding_yields_the_fixture_continuation(generator, tiny_model):
 def test_on_text_receives_every_piece_in_order(generator, tiny_model):
     _, oracle = tiny_model
     pieces = []
-    generator.generate([("user", oracle["prompt"])], budget(len(oracle["continuation_ids"])), pieces.append)
+    generator.generate(
+        [("user", oracle["prompt"])],
+        budget(len(oracle["continuation_ids"])),
+        pieces.append,
+    )
     assert "".join(pieces) == oracle["continuation"]
     assert len(pieces) == len(oracle["continuation_ids"])
+
+
+def test_is_initialized_answers_from_inside_the_callback(generator, tiny_model):
+    """The callback holds the GIL inside generate's lock; a query that waited for that lock never returned."""
+    _, oracle = tiny_model
+    answers = []
+    generator.generate(
+        [("user", oracle["prompt"])],
+        budget(2),
+        lambda _piece: answers.append(generator.is_initialized()),
+    )
+    assert answers == [True, True]
+
+
+def test_a_nul_in_a_message_is_refused(generator):
+    """GenAI reads the templated prompt as a C string, so the text after a NUL was silently dropped."""
+    with pytest.raises(RuntimeError, match="invalid"):
+        generator.generate([("user", "a\0b")], budget(1))
 
 
 def test_a_raising_callback_cancels_and_raises_its_exception(generator, tiny_model):
@@ -65,12 +98,19 @@ def test_a_raising_callback_cancels_and_raises_its_exception(generator, tiny_mod
     with pytest.raises(ValueError, match="stop at the first piece"):
         generator.generate([("user", oracle["prompt"])], budget(4), refuse)
     assert seen == [oracle["continuation"][0]]
-    assert generator.generate([("user", oracle["prompt"])], budget(4)).text == oracle["continuation"]
+    assert (
+        generator.generate([("user", oracle["prompt"])], budget(4)).text
+        == oracle["continuation"]
+    )
 
 
 def test_request_cancel_inside_the_callback_ends_after_one_token(generator, tiny_model):
     _, oracle = tiny_model
-    result = generator.generate([("user", oracle["prompt"])], budget(4), lambda _piece: generator.request_cancel())
+    result = generator.generate(
+        [("user", oracle["prompt"])],
+        budget(4),
+        lambda _piece: generator.request_cancel(),
+    )
     assert result.finish_reason == ki.FinishReason.CANCELLED
     assert result.tokens == oracle["continuation_ids"][:1]
 
@@ -93,7 +133,9 @@ def test_one_generator_serves_many_threads(generator, tiny_model):
         try:
             barrier.wait()
             for _ in range(20):
-                texts.append(generator.generate([("user", oracle["prompt"])], budget(4)).text)
+                texts.append(
+                    generator.generate([("user", oracle["prompt"])], budget(4)).text
+                )
         except BaseException as exc:  # noqa: BLE001 -- every failure is reported on the main thread
             errors.append(exc)
 
@@ -133,7 +175,10 @@ def test_a_repeated_seed_repeats_the_sampled_tokens(generator, tiny_model):
 
 def test_four_seeds_sample_at_least_two_sequences(generator, tiny_model):
     _, oracle = tiny_model
-    sequences = {tuple(generator.generate([("user", oracle["prompt"])], sampled(seed)).tokens) for seed in range(1, 5)}
+    sequences = {
+        tuple(generator.generate([("user", oracle["prompt"])], sampled(seed)).tokens)
+        for seed in range(1, 5)
+    }
     assert all(len(sequence) >= 16 for sequence in sequences)
     assert len(sequences) >= 2
 
