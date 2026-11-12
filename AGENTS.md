@@ -338,8 +338,8 @@ written out rather than linked.
   hub pin without it fails the configure, and the tests read the generator's `fixture.json` rather
   than retyping its tokens. The library loads GenAI at run time and never links it; a lane without
   the chain GenAI fails `initialize` with `LibraryUnavailable`
-  (`docs/source/text_generation.rst`). A JSON-schema test asserts the output on Linux and
-  `JsonSchemaUnsupported` on Windows, whose GenAI has no llguidance; it never skips. The
+  (`docs/source/text_generation.rst`). A JSON-schema test asserts the output on Linux and on
+  Windows, whose chain builds GenAI with llguidance since November 2026; it never skips. The
   real-model contract (`Test/contract/`, `Test/python/contract_text_generation.py`) needs
   `resources/models/llm.lock` fetched; CI sets `KATAGLYPHIS_REQUIRE_MODEL=1` so CMake fails
   without it.

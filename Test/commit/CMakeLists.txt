@@ -79,12 +79,7 @@ if(TARGET ${PROJECT_NAME}_cli)
   add_test(NAME Cli.ChatFollowsAJsonSchema
            COMMAND $<TARGET_FILE:${PROJECT_NAME}_cli> --chat_model "${CMAKE_BINARY_DIR}/test-models/tiny-genai"
                    --prompt abc --max_new_tokens 32 --json_schema "${KATAGLYPHIS_TINY_JSON_SCHEMA}")
-  # The Windows chain's GenAI has no llguidance, so the CLI must name that instead of answering.
-  if(WIN32)
-    set_tests_properties(Cli.ChatFollowsAJsonSchema PROPERTIES PASS_REGULAR_EXPRESSION "no JSON schema support")
-  else()
-    set_tests_properties(Cli.ChatFollowsAJsonSchema PROPERTIES PASS_REGULAR_EXPRESSION "^\\{\"a\":\"#\\$%\"\\}\n")
-  endif()
+  set_tests_properties(Cli.ChatFollowsAJsonSchema PROPERTIES PASS_REGULAR_EXPRESSION "^\\{\"a\":\"#\\$%\"\\}\n")
 endif()
 
 # The CLI's stream status needs a shell and a native binary; the source is shared, so the other lanes add no proof.

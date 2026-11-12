@@ -255,12 +255,8 @@ inline auto missing_path(std::string_view name) -> std::filesystem::path
 { return std::filesystem::temp_directory_path() / "kataglyphis-test-does-not-exist" / std::string(name); }
 
 #ifdef KATAGLYPHIS_TINY_GENAI_MODEL
-// The Windows chain builds GenAI without llguidance, so a JSON schema must fail there with JsonSchemaUnsupported.
-#ifdef _WIN32
-inline constexpr bool kGenaiHasGuidance = false;
-#else
+// Both chains build GenAI with llguidance; a lane that ships without it sets this false and must then see JsonSchemaUnsupported.
 inline constexpr bool kGenaiHasGuidance = true;
-#endif
 
 // llguidance holds the tiny model to one key and three characters, so greedy decoding of abc must close the object.
 inline constexpr const char *kTinyJsonSchema =

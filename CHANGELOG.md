@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-12, JSON schemas on Windows)
+- **The schema tests expect an answer on Windows too.** The Windows chain builds GenAI with llguidance now (hub LAI-H2),
+  so the three tests that asserted `JsonSchemaUnsupported` there failed on the first Windows lane run with the new image:
+  the generator answered `{"a":"#$%"}`. `kGenaiHasGuidance` is true on every lane, the CLI test has one expected output,
+  and the Python test lost its `win32` branch. A build without llguidance still refuses a schema; nothing in `Src/` changed.
+
 ### Fixed (2026-11-12, a model directory outside ASCII on Windows)
 - **`TextGenerator::initialize` passes the model directory as UTF-8.** GenAI reads it so; it was passed in the ANSI code
   page on Windows, where a model below a user folder such as `C:\Users\Jörg` could not be loaded.

@@ -187,10 +187,6 @@ def test_a_json_schema_holds_the_output_or_is_unsupported(generator, tiny_model)
     _, oracle = tiny_model
     options = budget(32)
     options.json_schema = json.dumps(TINY_SCHEMA, separators=(",", ":"))
-    if sys.platform == "win32":
-        with pytest.raises(RuntimeError, match="no JSON schema support"):
-            generator.generate([("user", oracle["prompt"])], options)
-        return
     result = generator.generate([("user", oracle["prompt"])], options)
     parsed = json.loads(result.text)
     assert set(parsed) == {"a"}

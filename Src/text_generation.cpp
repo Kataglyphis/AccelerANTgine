@@ -154,7 +154,7 @@ namespace {
     auto succeeded(const GenaiApi &api, OgaResult *result, std::string_view what) -> bool
     { return !failure(api, result, what); }
 
-    // GenAI built without llguidance (the Windows chain) refuses a schema with this text when the generator is created.
+    // GenAI built without llguidance refuses a schema with this text when the generator is created.
     auto guidance_error(std::string_view message) -> TextGenError
     {
         return message.contains("Guidance is unavailable") ? TextGenError::JsonSchemaUnsupported

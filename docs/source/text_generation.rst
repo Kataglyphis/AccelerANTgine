@@ -45,8 +45,8 @@ Three options shape the reply:
 
 - ``seed`` makes sampling repeatable: the same seed, prompt and options give the same token ids.
   Unset, GenAI draws one; a negative seed is ``InvalidOptions``. Greedy decoding ignores it.
-- ``json_schema`` holds the output to a JSON schema through GenAI's llguidance. A GenAI built
-  without llguidance, as the Windows chain is (``USE_GUIDANCE=OFF``), refuses with
+- ``json_schema`` holds the output to a JSON schema through GenAI's llguidance, which the Linux
+  and the Windows chain both build in. A GenAI built without it refuses with
   ``JsonSchemaUnsupported`` instead of decoding unconstrained text; an invalid schema is
   ``InvalidOptions``. A schema that allows free whitespace can let a small model loop on it until
   the budget ends, so the tests pin ``"x-guidance": {"whitespace_flexible": false}``.
@@ -118,7 +118,7 @@ The commit suite covers the C++ and C calls, the CLI cases cover the chat mode, 
 the C17 header, and ``Test/python/test_text_generation.py`` the binding, including eight threads on
 one generator. The tiny model also proves the options: a repeated seed repeats its token ids, four
 seeds at temperature 1.0 give at least two sequences of at least 16 tokens, the schema output parses
-and holds to its schema (on Windows the schema tests assert ``JsonSchemaUnsupported`` instead), and a
+and holds to its schema, on Windows as on Linux, and a
 stop string ends with ``Stop``. The Linux skip gate fails a skipped test, so all of these run there.
 
 The real-model contract runs the release ModelANT publishes,
