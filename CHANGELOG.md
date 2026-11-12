@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-12, the Windows bundle step at the new hub pin)
+- **`Build-Windows.ps1` takes the last object `New-PortableBundle` returns.** Since the hub at d66d390 that function
+  checks each package's MSVC notice with a Python verifier, and the verifier's output lands in the pipeline before the
+  result: `$portable` became a list, and `$portable.Bundle` ended both Windows lanes with "The property 'Bundle' cannot be
+  found on this object" right after the pin moved. The fault is the hub's and is recorded for it; this repo is the only
+  caller.
+
 ### Changed (2026-11-12, hub pin)
 - **The hub moves from 54857fe to d66d390 (232 commits).** CI already builds in the image and with the actions of the hub's
   `develop`; the pin only decided which copy of the hub's scripts and gates this checkout runs, and it had fallen behind

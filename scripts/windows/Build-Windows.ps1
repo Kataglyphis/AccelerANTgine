@@ -564,9 +564,11 @@ function Invoke-PortableBundleStep {
     # The uploaded install tree plus installers; arm64's setup .exe is NSIS's x86 stub too, which the device job installs.
     Invoke-BuildStep -Context $Context -StepName "Portable Bundle ($TargetArch)" -Critical -Script {
         # -RequireCompleteInstall: the installers pack the install tree, so a DLL the closure has to add is one they would all lack.
+        # Only the last object: the hub's package check runs a verifier inside the function, whose output lands in the pipeline before the result.
         $portable = New-PortableBundle -BuildDir $fastBuildReleaseDirFull -DistDir (Join-Path $Workspace "dist\$distName") `
             -Configuration $cfgRelease.Configuration -Arch $TargetArch -RequireCompleteInstall `
-            -Runner { param($File, [string[]]$Arguments) $null = Invoke-BuildExternal -Context $Context -File $File -Parameters $Arguments }
+            -Runner { param($File, [string[]]$Arguments) $null = Invoke-BuildExternal -Context $Context -File $File -Parameters $Arguments } |
+            Select-Object -Last 1
         $null = Assert-ChainOrtTree -Root $portable.Bundle -OrtDirectory (Join-Path $portable.Bundle 'bin')
         $ortLicenses = Join-Path $fastBuildReleaseDirFull 'package-dlls\licenses\onnxruntime'
         Assert-OrtWheelLicensesInPackage -Path $portable.Bundle -LicenseDirectory $ortLicenses -Format archive
