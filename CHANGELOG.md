@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-12, boxes are cut to the frame)
+- **`YoloDetector` cuts every box to the picture (owner, 2026-11-12).** OxidANT's detector always did; here a box could
+  reach a few pixels past the edge, as the bed's box did on ModelANT's two cats (x2 480.15 in a 480-wide frame). The
+  cut runs in double and treats a sum that is no number as the near edge, so huge finite rows cannot turn into NaN: the
+  decoder fuzz test holds. `Test/golden/two_cats_cpu.json` is re-recorded with the demo, and the threshold test's boxes
+  moved inside its 7x2 input, where the cut leaves them as decoded.
+
 ### Fixed (2026-11-12, the Windows bundle step at the new hub pin)
 - **`Build-Windows.ps1` takes the last object `New-PortableBundle` returns.** Since the hub at d66d390 that function
   checks each package's MSVC notice with a Python verifier, and the verifier's output lands in the pipeline before the

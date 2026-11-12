@@ -210,12 +210,12 @@ TEST(YoloDetector, DecodesThresholdsClassesNmsAndScale)
     ASSERT_TRUE(detector.is_initialized());
 
     const auto rows = flatten({
-      { 10, 10, 4, 4, 0.9F, 0.9F, 0.1F },// person 0.81: kept
-      { 10.5F, 10, 4, 4, 0.8F, 0.9F, 0.1F },// person 0.72 overlapping the first: suppressed
-      { 10, 10, 4, 4, 0.9F, 0.2F, 0.8F },// bicycle 0.72 on the same box: kept, another class
-      { 40, 30, 2, 2, 0.4F, 1.0F, 0.0F },// objectness under the threshold: dropped
-      { 40, 30, 2, 2, 0.9F, 0.3F, 0.2F },// best class too weak, 0.27: dropped
-      { 30, 5, 6, 2, 0.7F, 0.95F, 0.0F },// person 0.665, disjoint: kept
+      { 2, 1, 2, 1, 0.9F, 0.9F, 0.1F },// person 0.81: kept
+      { 2.25F, 1, 2, 1, 0.8F, 0.9F, 0.1F },// person 0.72 overlapping the first: suppressed
+      { 2, 1, 2, 1, 0.9F, 0.2F, 0.8F },// bicycle 0.72 on the same box: kept, another class
+      { 5, 1, 1, 1, 0.4F, 1.0F, 0.0F },// objectness under the threshold: dropped
+      { 5, 1, 1, 1, 0.9F, 0.3F, 0.2F },// best class too weak, 0.27: dropped
+      { 5.5F, 1, 2, 1, 0.7F, 0.95F, 0.0F },// person 0.665, disjoint: kept
     });
 
     // The frame is twice as wide and three times as tall as the model input.
@@ -229,16 +229,17 @@ TEST(YoloDetector, DecodesThresholdsClassesNmsAndScale)
     EXPECT_EQ(first.class_id, 0);
     EXPECT_EQ(first.class_name, "person");
     EXPECT_NEAR(first.confidence, 0.81F, 1e-5F);
-    EXPECT_FLOAT_EQ(first.x, (10.0F - 2.0F) * 2.0F);
-    EXPECT_FLOAT_EQ(first.y, (10.0F - 2.0F) * 3.0F);
-    EXPECT_FLOAT_EQ(first.width, 8.0F);
-    EXPECT_FLOAT_EQ(first.height, 12.0F);
+    // Every box lies inside the 7x2 input, so the cut to the frame leaves them as decoded.
+    EXPECT_FLOAT_EQ(first.x, (2.0F - 1.0F) * 2.0F);
+    EXPECT_FLOAT_EQ(first.y, (1.0F - 0.5F) * 3.0F);
+    EXPECT_FLOAT_EQ(first.width, 4.0F);
+    EXPECT_FLOAT_EQ(first.height, 3.0F);
 
     EXPECT_EQ(result->boxes[1].class_name, "bicycle");
     EXPECT_NEAR(result->boxes[1].confidence, 0.72F, 1e-5F);
     EXPECT_EQ(result->boxes[2].class_name, "person");
     EXPECT_NEAR(result->boxes[2].confidence, 0.665F, 1e-5F);
-    EXPECT_FLOAT_EQ(result->boxes[2].x, (30.0F - 3.0F) * 2.0F);
+    EXPECT_FLOAT_EQ(result->boxes[2].x, (5.5F - 1.0F) * 2.0F);
 }
 
 TEST(YoloDetector, BoxesComeBackSortedByConfidence)
@@ -322,6 +323,42 @@ TEST(YoloDetector, CornerRowsDecodeScoreClassAndScale)
     EXPECT_FLOAT_EQ(result->boxes[1].confidence, 0.7F);
     EXPECT_EQ(result->boxes[2].class_name, "person");
     EXPECT_FLOAT_EQ(result->boxes[2].confidence, 0.6F);
+}
+
+TEST(YoloDetector, BoxesAreCutToTheFrame)
+{
+    constexpr YoloReshapeGeometry kCorners{ 2, 6, 6, 6 };
+    const TempFile model("kataglyphis-corners", ".onnx", kataglyphis::test::yolo_reshape_model(kCorners));
+    detection::YoloDetector detector;
+    detection::YoloConfig config;
+    config.model_path = model.path();
+    config.input_width = 6;
+    config.input_height = 2;
+    config.confidence_threshold = 0.5F;
+    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    ASSERT_TRUE(detector.initialize(config).has_value());
+
+    const auto rows = flatten_corners({
+      { -1, -0.5F, 3, 1, 0.9F, 15 },// starts left of and above the picture
+      { 4, 1, 7, 2.5F, 0.8F, 15 },// ends right of and below it
+      { 1, 0.5F, 2, 1, 0.7F, 15 },// inside: unchanged
+      { 0, 0, 1, 1, 0.1F, 15 },// three rows under the threshold fill the model's six
+      { 0, 0, 1, 1, 0.1F, 15 },
+      { 0, 0, 1, 1, 0.1F, 15 },
+    });
+    // The frame is twice the input's size each way.
+    const auto result = detector.detect(rows, 12, 4);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->boxes.size(), 3U);
+    const auto expect = [](const detection::BoundingBox &box, float x, float y, float width, float height) {
+        EXPECT_FLOAT_EQ(box.x, x);
+        EXPECT_FLOAT_EQ(box.y, y);
+        EXPECT_FLOAT_EQ(box.width, width);
+        EXPECT_FLOAT_EQ(box.height, height);
+    };
+    expect(result->boxes[0], 0.0F, 0.0F, 6.0F, 2.0F);
+    expect(result->boxes[1], 8.0F, 2.0F, 4.0F, 2.0F);
+    expect(result->boxes[2], 2.0F, 1.0F, 2.0F, 1.0F);
 }
 
 TEST(YoloDetector, AModelThatDoesNotFitTheConfigIsRefusedAtTheStart)

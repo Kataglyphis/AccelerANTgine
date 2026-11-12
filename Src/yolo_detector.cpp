@@ -592,6 +592,20 @@ auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
     auto boxes = decode_detections(raw_output.outputs[0], impl_->config, mapping);
     if (!boxes) { return std::unexpected(boxes.error()); }
     result.boxes = std::move(*boxes);
+    // Cut to the picture as Rust and Python do; in double, a sum that is no number being the near edge, never NaN.
+    const auto edge = [](double value, double far) -> float {
+        return static_cast<float>(std::isnan(value) ? 0.0 : std::clamp(value, 0.0, far));
+    };
+    const auto right = static_cast<double>(original_width);
+    const auto bottom = static_cast<double>(original_height);
+    for (auto &box : result.boxes) {
+        const float x1 = edge(box.x, right);
+        const float y1 = edge(box.y, bottom);
+        box.width = edge(static_cast<double>(box.x) + box.width, right) - x1;
+        box.height = edge(static_cast<double>(box.y) + box.height, bottom) - y1;
+        box.x = x1;
+        box.y = y1;
+    }
     return result;
 }
 
