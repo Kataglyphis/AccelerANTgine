@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-12, a failed image run leaves nothing behind, and the local gates see stale mutation recipes)
+- **`--detector-image` decodes the image before it creates any output.** A missing or unreadable image left an empty
+  output file and profile directory, and both must be new, so the corrected run was refused too. It is also why a second
+  `ctest` in one build directory failed `Demo.ImageDetectionReportsAMissingImage`.
+- **`scripts/linux/run-lint-gates.sh` checks the mutation recipes first.** A refactor that moves a line a recipe names made
+  the recipe stale, and only CI's mutation gate said so after the push. The hub's `verify_mutations.py --stale-check` takes
+  a tenth of a second and runs before the gates now.
+- The test that aborts a child on purpose leaves no core file, and `core.<pid>` and `vgcore.*` files are ignored.
+
 ### Changed (2026-11-12, JSON schemas on Windows)
 - **The schema tests expect an answer on Windows too.** The Windows chain builds GenAI with llguidance now (hub LAI-H2),
   so the three tests that asserted `JsonSchemaUnsupported` there failed on the first Windows lane run with the new image:

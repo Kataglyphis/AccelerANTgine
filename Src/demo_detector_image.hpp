@@ -103,6 +103,9 @@ static auto run_detector_image(const detection::YoloConfig &config,
   const std::filesystem::path &repeat_output_path,
   const std::filesystem::path &profile_prefix) -> int
 {
+    // Before any output exists: a missing image left an empty file and directory that refused the corrected run.
+    const auto frame = decode_detector_image(image_path);
+    if (!frame) { return 1; }
     std::error_code error;
     std::ofstream output(output_path, std::ios::out | std::ios::noreplace);
     if (!output) {
@@ -123,8 +126,6 @@ static auto run_detector_image(const detection::YoloConfig &config,
         std::cerr << "Detector profile must be a new directory\n";
         return 1;
     }
-    const auto frame = decode_detector_image(image_path);
-    if (!frame) { return 1; }
     detection::YoloDetector detector;
     if (!detector.initialize(config, profile_prefix / "ort")) {
         std::cerr << "Could not initialize the image detector\n";

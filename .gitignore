@@ -94,3 +94,7 @@ out/*
 # The contract model arrives by resources/models/llm.lock and the hub's fetcher, like models/.
 /resources/models/*
 !/resources/models/llm.lock
+
+# A test that aborts a child on purpose leaves these where it ran; one was committed by accident.
+core.[0-9]*
+vgcore.*

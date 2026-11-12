@@ -27,6 +27,7 @@
 #include "hip_probe.hpp"
 
 #include <dlfcn.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #endif
 
@@ -449,7 +450,12 @@ TEST(HipProbe, WorkThatFinishesAnswers)
 
 TEST(HipProbe, AChildThatCrashesCountsAsAnAnswer)
 {
-    EXPECT_TRUE(inference::hip_probe::answers_within(std::chrono::seconds(30), [] { std::abort(); }));
+    EXPECT_TRUE(inference::hip_probe::answers_within(std::chrono::seconds(30), [] {
+        // No core file: where dumps are on, the abort leaves one in the directory the test ran in.
+        const rlimit none{ 0, 0 };
+        (void)setrlimit(RLIMIT_CORE, &none);
+        std::abort();
+    }));
 }
 
 TEST(HipProbe, WorkThatNeverReturnsDoesNotAnswer)
