@@ -470,7 +470,9 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
     const GenaiApi *api = load_api();
     if (api == nullptr) { return std::unexpected(TextGenError::LibraryUnavailable); }
     OgaConfig *raw_config = nullptr;
-    if (!succeeded(*api, api->CreateConfig(model_dir.string().c_str(), &raw_config), "config")) {
+    // GenAI reads the path as UTF-8; string() is the ANSI code page on Windows, which a user folder like "Jörg" breaks.
+    const auto utf8_dir = model_dir.u8string();
+    if (!succeeded(*api, api->CreateConfig(reinterpret_cast<const char *>(utf8_dir.c_str()), &raw_config), "config")) {
         return std::unexpected(TextGenError::ModelLoadFailed);
     }
     const Config config{ raw_config, { api } };

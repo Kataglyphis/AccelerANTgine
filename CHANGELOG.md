@@ -18,6 +18,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-12, a model directory outside ASCII on Windows)
+- **`TextGenerator::initialize` passes the model directory as UTF-8.** GenAI reads it so; it was passed in the ANSI code
+  page on Windows, where a model below a user folder such as `C:\Users\Jörg` could not be loaded.
+
 ### Fixed (2026-11-12, a stream that ends or breaks is visible)
 - **`GStreamerPipeline` reads its bus.** Nothing did, so a camera that was unplugged, a device that was busy and a
   video that reached its end all looked the same from outside: `pull_sample` returned `BufferAllocationFailed`, as it

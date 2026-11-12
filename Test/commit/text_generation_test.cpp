@@ -11,6 +11,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -257,6 +258,24 @@ TEST_F(TextGeneration, EmptyMessagesOrNoBudgetAreInvalid)
     EXPECT_EQ(kataglyphis::test::error_of(generator.generate({}, budget(1))), text::TextGenError::InvalidOptions);
     EXPECT_EQ(kataglyphis::test::error_of(generator.generate(user(expected.prompt), budget(0))),
       text::TextGenError::InvalidOptions);
+}
+
+TEST_F(TextGeneration, AModelDirectoryWithLettersOutsideAsciiLoads)
+{
+    // The path a Windows user called Jörg has: GenAI takes UTF-8, not the ANSI code page.
+    const auto directory =
+      std::filesystem::temp_directory_path() / std::filesystem::path(u8"kataglyphis-genai-j\u00F6rg-\u6A21\u578B");
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+    std::filesystem::copy(kModelDir, directory, std::filesystem::copy_options::recursive);
+    {
+        text::TextGenerator moved_in;
+        ASSERT_TRUE(moved_in.initialize(directory).has_value());
+        const auto result = moved_in.generate(user(expected.prompt), budget(expected.ids.size()));
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->tokens, expected.ids);
+    }
+    std::filesystem::remove_all(directory, ignored);
 }
 
 TEST_F(TextGeneration, TextThatIsNotPlainUtf8IsInvalidInsteadOfAnAbort)
