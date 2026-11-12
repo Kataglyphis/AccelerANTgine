@@ -54,6 +54,18 @@ target_link_libraries(
           spdlog
           ${PROJECT_NAME})
 
+# A stand-in under the plugin module's name: it is not AMD's, so it proves the engine's calls and nothing about a card.
+if(NOT WIN32)
+  set(_plugin_stub_root "${CMAKE_CURRENT_BINARY_DIR}/plugin-stub")
+  add_library(kataglyphis_plugin_ep_stub MODULE "${WORKING_DIRECTORY}Test/common/plugin_ep_stub.cpp")
+  set_target_properties(kataglyphis_plugin_ep_stub PROPERTIES OUTPUT_NAME migraphx-ep LIBRARY_OUTPUT_DIRECTORY
+                                                                                      "${_plugin_stub_root}/lib")
+  target_include_directories(kataglyphis_plugin_ep_stub
+                             PRIVATE $<TARGET_PROPERTY:onnxruntime::onnxruntime,INTERFACE_INCLUDE_DIRECTORIES>)
+  add_dependencies(${COMMIT_TEST_SUITE} kataglyphis_plugin_ep_stub)
+  target_compile_definitions(${COMMIT_TEST_SUITE} PRIVATE KATAGLYPHIS_PLUGIN_STUB_ROOT="${_plugin_stub_root}")
+endif()
+
 kataglyphis_use_tiny_genai_model(${COMMIT_TEST_SUITE})
 kataglyphis_use_text_contract_model(${COMMIT_TEST_SUITE})
 

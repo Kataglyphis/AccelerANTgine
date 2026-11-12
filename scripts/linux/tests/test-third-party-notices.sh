@@ -197,7 +197,7 @@ run_linux() {
     --platform linux --repo "${repo}" --project-license share/licenses/AccelerANTgine/LICENSE \
     --define ONNXRUNTIME_VERSION=v9.9 --define GSTREAMER_VERSION=1.99 --text-root "abseil=${tmp}/absl" \
     --search "${tmp}/opt-gst" --search "${tmp}/distro" --dpkg "${tmp}/bin/dpkg" --dpkg-query "${tmp}/bin/dpkg-query" \
-    --doc-root "${tmp}/doc" --common-licenses "${tmp}/common"
+    --doc-root "${tmp}/doc" --common-licenses "${tmp}/common" "$@"
 }
 if expect_accepted "${tmp}/lin.log" "a complete Linux tree was refused" run_linux; then
   notices="${lin}/share/licenses/AccelerANTgine/THIRD-PARTY-NOTICES.txt"
@@ -230,6 +230,46 @@ fi
 rm -f "${tmp}/doc/libz1/copyright"
 if run_linux > "${tmp}/lin-nocopy.log" 2>&1; then fail "a missing Debian copyright passed"; fi
 printf 'zlib license\n' > "${tmp}/doc/libz1/copyright"
+
+# AMD's plugin module: the image's licence tree travels whole, and a package without that source fails.
+plugin="${lin}/lib/accelerantgine/libmigraphx-ep.so"
+ep="${tmp}/onnxruntime-ep-amdgpu"
+third="${lin}/share/licenses/AccelerANTgine/third-party/onnxruntime-ep-amdgpu"
+mkdir -p "${ep}/licenses/onnxruntime-ep-amdgpu/LICENSES" "${ep}/licenses/fmt"
+printf 'plugin mit\n' > "${ep}/licenses/onnxruntime-ep-amdgpu/LICENSE"
+printf 'apache\n' > "${ep}/licenses/onnxruntime-ep-amdgpu/LICENSES/Apache-2.0.txt"
+printf 'fmt mit\n' > "${ep}/licenses/fmt/LICENSE"
+printf 'onnxruntime-ep-amdgpu abc123\n' > "${ep}/provenance.txt"
+run_plugin() { run_linux --define ORT_AMDGPU_EP_COMMIT=abc123 --text-root "amdgpu-ep=${ep}"; }
+elf "${plugin}"
+if run_linux --define ORT_AMDGPU_EP_COMMIT=abc123 > "${tmp}/plugin-no-root.log" 2>&1; then
+  fail "a plugin module with no licence source passed"
+fi
+expect_grep "${tmp}/plugin-no-root.log" "onnxruntime-ep-amdgpu: unknown text root 'amdgpu-ep'"
+if expect_accepted "${tmp}/plugin.log" "a plugin module with its licence tree was refused" run_plugin; then
+  diff -r "${ep}/licenses" "${third}/licenses" || fail "the plugin's licence tree was not copied whole"
+  cmp -s "${ep}/provenance.txt" "${third}/provenance.txt" || fail "the plugin's provenance was not copied"
+  expect_greps "${lin}/share/licenses/AccelerANTgine/THIRD-PARTY-NOTICES.txt" <<'PATTERNS'
+ONNX Runtime plugin execution provider for AMD GPUs (MIGraphX)
+  Version: abc123
+File: lib/accelerantgine/libmigraphx-ep.so
+License text: share/licenses/AccelerANTgine/third-party/onnxruntime-ep-amdgpu/licenses/fmt/LICENSE
+License text: share/licenses/AccelerANTgine/third-party/onnxruntime-ep-amdgpu/licenses/onnxruntime-ep-amdgpu/LICENSE
+License text: share/licenses/AccelerANTgine/third-party/onnxruntime-ep-amdgpu/licenses/onnxruntime-ep-amdgpu/LICENSES/Apache-2.0.txt
+License text: share/licenses/AccelerANTgine/third-party/onnxruntime-ep-amdgpu/provenance.txt
+PATTERNS
+fi
+mv "${ep}/provenance.txt" "${tmp}/provenance.keep"
+if run_plugin > "${tmp}/plugin-no-provenance.log" 2>&1; then fail "a plugin module with no provenance passed"; fi
+expect_grep "${tmp}/plugin-no-provenance.log" "provenance.txt"
+mv "${tmp}/provenance.keep" "${ep}/provenance.txt"
+mv "${ep}/licenses" "${tmp}/licenses.keep"
+mkdir "${ep}/licenses"
+if run_plugin > "${tmp}/plugin-empty-tree.log" 2>&1; then fail "a plugin module with an empty licence tree passed"; fi
+expect_grep "${tmp}/plugin-empty-tree.log" "license tree is missing or empty"
+rmdir "${ep}/licenses"
+mv "${tmp}/licenses.keep" "${ep}/licenses"
+rm "${plugin}"
 
 # The wheel lists what its binaries link statically: nanobind yes, the CLI's Abseil no.
 wheel="${tmp}/wheel/kataglyphis_inference"

@@ -55,10 +55,54 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `docs/gpu-artifact-receipts.md` has the commands. DirectML on an NVIDIA card is unproven too.
   The owner runs this on a machine with an NVIDIA GPU. No release until this and the Linux AMD check are done.
 
-- [ ] **The Linux AMD packages have not run on a GPU** (S, ★★★). They are built and passed on the CPU, and hosted runners
-  have no GPU. Under WSL on the RX 9070 XT even a plain HIP copy does not return (hub CON202), so this takes native
-  Linux: the owner runs it under Ubuntu on that machine. Done when `compare_detector_parity.py` passes against the
-  CPU and the profile shows MIGraphX; the hub's `docs/gpu-artifact-receipts.md` has the commands.
+- [ ] **AMD's plugin MIGraphX provider has not run from this library, on a card or in the rocm image** (M, ★★★; hub
+  CON231 step 2). `ExecutionProvider::MigraphX` registers `libmigraphx-ep.so` since 2026-11-12. Proven here, on arm64
+  without a card: the module search, the guard, the option set and the three error paths against the real ONNX Runtime
+  1.31.1, with a missing module, a file that is no ELF and the stand-in `Test/common/plugin_ep_stub.cpp`, also from
+  eight threads at once and after another library registered the name; the script suites with fixtures in the new
+  layout. Not proven: every line that needs AMD's module. The 2026-11-07 parity pass was the in-tree provider's.
+  Under WSL on the RX 9070 XT even a plain HIP copy does not return (hub CON202), so the card run takes native
+  Linux: the owner runs it under Ubuntu on that machine.
+
+  Done when `linux-gpu-candidate.yml` builds the amd-x64 packages in `:latest-rocm`, their clean-host job passes
+  (`--device migraphx` must fail there on the packaged module), and on the card `profile-gpu-candidate.sh <dir>
+  models/deim_dfine_n_coco.onnx migraphx` passes: `compare_detector_parity.py` against the CPU, and the plugin's
+  operators in the profile under the provider name `MIGraphX`. Then run the commit suite once with
+  `-DKATAGLYPHIS_TEST_MIGRAPHX=ON`.
+
+  What is likely to stop the first run, in order:
+  1. The hub's `verify-ort-appimage-payload.sh … amd` proves the packaged `libonnxruntime.so.1` against one chain
+     wheel. In the arm64 `:latest` image the CPU prefix's library matches no wheel in `/opt/onnxruntime-wheels`
+     (`stage-ort-wheel-licenses.py --require-unstripped`: "found 0", 2026-11-12); if `:latest-rocm` is the same, CPack's
+     AppImage check fails there. The tarball and DEB checks here prove the core against the image's CPU build
+     (`stage_ort_texts.py`) and do not need a wheel.
+  2. The hub's bundle census. OxidANT's first AMD candidate build on `:latest-rocm` (its run 43314831939) stopped
+     there: `UNRESOLVED /lib/libmigraphx-ep.so -- no libonnxruntime.so.1 on its ld.so search path`. The image's
+     module has no run path of its own and a package must not patch it. The hub's census gets an option for the
+     launcher's library path (hub CON256); this repo's package step passes it once its pin holds that option.
+     The hub's `verify_ort_profile.py` expects `MIGraphX` since hub 366b8259, and the pin here is past it;
+     `test-diagnose-migraphx-detector.sh` reads the name from the pinned hub's table.
+  3. Never run anywhere: the hub's `stage_ort_runtime … amd` in `CPackOptions.cmake`, the ELF closure with the module
+     protected, the install-time proof against the image's module, and the plugin's licence tree, which nobody here
+     has seen (the inventory takes whatever `licenses/` holds).
+  4. Read, not run: AMD's module takes the registration name as its provider name, takes the card from `device_id`,
+     refuses a second device and any option it does not list, and its registration calls HIP.
+
+  Remove with the hub's fix: `accelerantgine_keep_module_in_appimage` (`cmake/OrtPackageVariant.cmake`) keeps CPack's
+  AppImage step from patching the module, because the hub's `patchelf-keep-glibc.sh --keep-ort` keeps
+  `libonnxruntime*` only; `verify_plugin_texts` (`verify-gpu-packages.sh`) and the inventory's `tree` text stand in
+  for a hub helper that stages the plugin's `licenses/` and `provenance.txt`.
+
+- [b] **CUDA still loads through the in-tree provider** (M, ★★; blocked on the hub's new NVIDIA image, CON233). Owner
+  decision 2026-11-12: only AMD moves now. The hub's contract (`docs/consumer-image-contract.md` § *The CUDA plugin
+  EP*) says the new `:latest-nvidia` builds `libonnxruntime_providers_cuda.so` as a plugin without `GetProvider`, so
+  `SessionOptionsAppendExecutionProvider_CUDA` stops working there: a C++ consumer registers that file once per
+  process as `CUDAExecutionProvider`. Here that is one more row in `Src/ort_plugin.hpp` (the name, a root variable,
+  the module file; the module already sits beside `libonnxruntime.so.1` in the GPU prefix and in a package), and the
+  CUDA branch and `run_one_cuda_kernel` in `Src/onnx_inference_engine.cpp` then go through `append_plugin`.
+  `CPackOptions.cmake` and `verify-gpu-packages.sh` keep the wheel proof, since that module is the GPU wheel's.
+  Done when the NVIDIA packages' card run (two entries up) passes on that image. Until it is published, a build may
+  meet either form of the module.
 
 - [ ] **An error reaches the caller as a bare code, and different causes share one** (M, ★★).
   `YoloDetector::detect_from_gstreamer` turns every failed pull (late frame, end of stream, broken stream) into

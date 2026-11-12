@@ -28,6 +28,7 @@ printf '%s parity\n' "$kind" >>"${TEST_DEMO_LOG:?}"
 STUB
 cat > "$work/bundle/usr/bin/AccelerANTgine_demo" <<'STUB'
 #!/usr/bin/env bash
+set -e
 if [[ "$1" == --onnx-only ]]; then
   [[ $# -eq 3 && "$2" == --profile ]]
   profile="$3"
@@ -40,6 +41,7 @@ fi
 [[ "$LD_LIBRARY_PATH" == "$TEST_SDK_PATH" && -z "${GST_PLUGIN_PATH+x}" && -z "${GST_PLUGIN_PATH_1_0+x}" ]]
 [[ -z "${LD_PRELOAD+x}" && -z "${LD_AUDIT+x}" ]]
 [[ -z "${MIGRAPHX_SKIP_BENCHMARKING+x}" && -z "${ORT_MIGRAPHX_MODEL_CACHE_PATH+x}" && -z "${MIGRAPHX_UNKNOWN+x}" ]]
+[[ -z "${ORT_AMDGPU_EP_ROOT+x}" ]]
 [[ -z "${GST_PLUGIN_SYSTEM_PATH_1_0+x}" && -z "${GST_REGISTRY+x}" && -z "${GST_PLUGIN_SCANNER+x}" ]]
 case "$0" in
   */tar/*) kind=tar ;;
@@ -87,6 +89,7 @@ touch "$TEST_MODEL"
 export LD_LIBRARY_PATH="$work/gpu-sdk" TEST_SDK_PATH="$work/gpu-sdk"
 export LD_PRELOAD='' LD_AUDIT=''
 export MIGRAPHX_SKIP_BENCHMARKING=poison ORT_MIGRAPHX_MODEL_CACHE_PATH=poison MIGRAPHX_UNKNOWN=poison
+export ORT_AMDGPU_EP_ROOT="$work/image-plugin-root"
 export GST_PLUGIN_PATH="$work/host-plugin" GST_PLUGIN_PATH_1_0="$work/host-plugin"
 export GST_PLUGIN_SYSTEM_PATH_1_0="$work/host-system" GST_REGISTRY="$work/host-registry" GST_PLUGIN_SCANNER="$work/host-scanner"
 mv "$work/repo/third_party/ANTfrastructure/linux/scripts/lib/gpu-profile-env.sh" "$work/gpu-profile-env.sh"

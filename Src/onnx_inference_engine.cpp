@@ -10,11 +10,17 @@ module;
 
 #include "cuda_probe.hpp"
 #include "hip_probe.hpp"
+#include "ort_plugin.hpp"
+
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <memory>
@@ -23,6 +29,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 module kataglyphis.onnx_inference;
@@ -217,7 +224,7 @@ namespace {
         return error;
     }
 
-    // The registered name GetAvailableProviders reports for a runtime built with the provider.
+    // The name GetAvailableProviders reports for a runtime built with the provider; a plugin has a table row.
     auto provider_name(ExecutionProvider provider) -> std::string_view
     {
         switch (provider) {
@@ -226,7 +233,7 @@ namespace {
         case ExecutionProvider::Cuda:
             return "CUDAExecutionProvider";
         case ExecutionProvider::MigraphX:
-            return "MIGraphXExecutionProvider";
+            break;
         case ExecutionProvider::DirectML:
             return "DmlExecutionProvider";
         case ExecutionProvider::Xnnpack:
@@ -272,6 +279,139 @@ namespace {
         const bool appended = ort_succeeded(api.SessionOptionsAppendExecutionProvider_Dnnl(options, dnnl), &reason);
         api.ReleaseDnnlProviderOptions(dnnl);
         if (!appended) { return std::unexpected(OnnxError::ProviderUnavailable); }
+        return {};
+    }
+
+    // One lock for register, list and append: ONNX Runtime hands out its own device array, which a registration grows.
+    struct PluginState
+    {
+        std::mutex mutex;
+        ort_plugin::Registered registered;
+    };
+
+    auto plugin_state() -> PluginState &
+    {
+        static PluginState state;
+        return state;
+    }
+
+    // The plugin's module, or what was looked for.
+    auto plugin_module(const ort_plugin::Plugin &plugin) -> std::expected<std::filesystem::path, std::string>
+    {
+#ifdef _WIN32
+        return std::unexpected(std::string(plugin.name) + " is loaded as a plugin on Linux only");
+#else
+        const char *root = std::getenv(plugin.root_variable);
+        const std::string_view root_value = root == nullptr ? std::string_view{} : std::string_view{ root };
+        Dl_info ort{};
+        std::filesystem::path ort_directory;
+        // ONNX Runtime's own API table lies inside its library, wherever the loader took that from.
+        if (::dladdr(&Ort::GetApi(), &ort) != 0 && ort.dli_fname != nullptr) {
+            const auto loaded_from = std::filesystem::path(ort.dli_fname).parent_path();
+            std::error_code unresolved;
+            ort_directory = std::filesystem::canonical(loaded_from, unresolved);
+            if (unresolved) { ort_directory = loaded_from; }
+        }
+        const auto candidates = ort_plugin::module_candidates(plugin, root_value, ort_directory);
+        auto library = ort_plugin::first_file(candidates);
+        if (library.empty()) {
+            return std::unexpected(ort_plugin::missing_module_reason(plugin, root_value, candidates));
+        }
+        return library;
+#endif
+    }
+
+    struct OfferedDevices
+    {
+        const OrtEpDevice *chosen{ nullptr };
+        std::size_t count{ 0 };
+    };
+
+    // The devices listed under a provider name, with the one at index; the caller holds the plugin lock.
+    auto offered_devices(OrtEnv *env, std::string_view name, int index) -> std::expected<OfferedDevices, std::string>
+    {
+        const OrtApi &api = Ort::GetApi();
+        const OrtEpDevice *const *devices = nullptr;
+        std::size_t count = 0;
+        std::string reason;
+        if (!ort_succeeded(api.GetEpDevices(env, &devices, &count), &reason)) { return std::unexpected(reason); }
+        OfferedDevices offered;
+        for (const OrtEpDevice *device : std::span(devices, count)) {
+            const char *ep_name = api.EpDevice_EpName(device);
+            if (ep_name == nullptr || name != ep_name) { continue; }
+            if (std::cmp_equal(offered.count, index)) { offered.chosen = device; }
+            ++offered.count;
+        }
+        return offered;
+    }
+
+    // The registration ends with the process's last environment, so one reference is never released.
+    auto register_plugin(OrtEnv *env,
+      const ort_plugin::Plugin &plugin,
+      const std::filesystem::path &library,
+      std::string &reason) -> bool
+    {
+        const OrtApi &api = Ort::GetApi();
+        return plugin_state().registered.ensure(plugin.name, [&] {
+            OrtEnv *kept = nullptr;
+            if (!ort_succeeded(api.CreateEnv(ORT_LOGGING_LEVEL_WARNING, "KataglyphisOnnxRuntime", &kept), &reason)) {
+                return false;
+            }
+            // Another library of this process may hold the name already, and ONNX Runtime refuses it a second time.
+            const auto held = offered_devices(env, plugin.name, 0);
+            if ((held && held->count > 0)
+                || ort_succeeded(api.RegisterExecutionProviderLibrary(env, plugin.name, library.c_str()), &reason)) {
+                return true;
+            }
+            api.ReleaseEnv(kept);
+            return false;
+        });
+    }
+
+    // Empty when the plugin's device is on options; else what was looked for and why it could not be had.
+    auto append_plugin(OrtEnv *env,
+      OrtSessionOptions *options,
+      [[maybe_unused]] ExecutionProvider provider,
+      const ort_plugin::Plugin &plugin,
+      int device_id) -> std::string
+    {
+        const std::string name = plugin.name;
+        const auto library = plugin_module(plugin);
+        if (!library) { return library.error(); }
+#ifndef _WIN32
+        // AMD's module calls HIP as it registers, so the copy that may never return is tried first.
+        const auto copy = [device_id] { hip_probe::copy_to_device(hip_probe::runtime, device_id); };
+        if (provider == ExecutionProvider::MigraphX && !hip_probe::answers_within(hip_probe::answer_limit, copy)) {
+            return name + " cannot run: a copy to the AMD GPU took over 30 seconds. The cpu device runs on the CPU";
+        }
+#endif
+        const OrtApi &api = Ort::GetApi();
+        const std::scoped_lock lock(plugin_state().mutex);
+        std::string reason;
+        if (!register_plugin(env, plugin, *library, reason)) {
+            return name + " failed to register " + library->string() + ": " + reason;
+        }
+        const auto offered = offered_devices(env, name, device_id);
+        if (!offered) {
+            return name + " registered " + library->string() + ", but its devices cannot be listed: " + offered.error();
+        }
+        if (offered->chosen == nullptr) {
+            return name + " registered " + library->string() + ", which offers " + std::to_string(offered->count)
+                   + " device(s), so device " + std::to_string(device_id) + " does not exist";
+        }
+        const auto settings = ort_plugin::device_options(device_id);
+        std::vector<const char *> keys;
+        std::vector<const char *> values;
+        for (const auto &[key, value] : settings) {
+            keys.push_back(key.c_str());
+            values.push_back(value.c_str());
+        }
+        // AMD's module refuses more than one device and takes the card from the option, so both name the same card.
+        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_V2(
+                             options, env, &offered->chosen, 1, keys.data(), values.data(), keys.size()),
+              &reason)) {
+            return name + " from " + library->string() + " was refused: " + reason;
+        }
         return {};
     }
 
@@ -372,8 +512,9 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     }
     impl_->applied_intra_op_num_threads = config.intra_op_num_threads;
 
+    const ort_plugin::Plugin *plugin = ort_plugin::plugin_for(provider);
     // A provider the runtime lacks is its own error, so a request never runs on plain CPU unnoticed.
-    if (provider != ExecutionProvider::Cpu && !provider_available(provider)) {
+    if (provider != ExecutionProvider::Cpu && plugin == nullptr && !provider_available(provider)) {
         impl_->reset();
         impl_->provider_error = std::string(provider_name(provider)) + " is not built into the loaded ONNX Runtime";
         return std::unexpected(OnnxError::ProviderUnavailable);
@@ -402,27 +543,15 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
             impl_->reset();
             return std::unexpected(OnnxError::SessionCreationFailed);
         }
-    } else if (provider == ExecutionProvider::MigraphX) {
-#ifndef _WIN32
-        if (!hip_probe::answers_within(hip_probe::answer_limit,
-              [device = config.device_id] { hip_probe::copy_to_device(hip_probe::runtime, device); })) {
+    } else if (plugin != nullptr) {
+        // No by-name append comes first: a failed one leaves ep.* entries, and AMD's plugin fails on a foreign one.
+        auto reason = append_plugin(*impl_->env, options, provider, *plugin, config.device_id);
+        if (!reason.empty()) {
             impl_->reset();
-            impl_->provider_error =
-              "MIGraphXExecutionProvider cannot run: a copy to the AMD GPU took over 30 seconds. "
-              "The cpu device runs on the CPU";
+            impl_->provider_error = std::move(reason);
             // The demos print only the error code, and this one has a way out.
             kataglyphis::log::error("{}", impl_->provider_error);
             return std::unexpected(OnnxError::ProviderUnavailable);
-        }
-#endif
-        // Generic options avoid the legacy provider's quoted empty cache path.
-        const std::string device_id = std::to_string(config.device_id);
-        const std::string memory_limit = std::to_string(SIZE_MAX);
-        const char *keys[] = { "device_id", "migraphx_mem_limit" };
-        const char *values[] = { device_id.c_str(), memory_limit.c_str() };
-        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider(options, "MIGraphX", keys, values, 2))) {
-            impl_->reset();
-            return std::unexpected(OnnxError::SessionCreationFailed);
         }
     } else if (provider == ExecutionProvider::DirectML) {
 #ifdef _WIN32
@@ -648,7 +777,11 @@ auto OnnxInferenceEngine::applied_intra_op_num_threads() const -> int
 }
 
 KATAGLYPHIS_CPP_API auto provider_available(ExecutionProvider provider) -> bool
-{ return available_by_name(provider_name(provider)); }
+{
+    // GetAvailableProviders never lists a plugin, so its module on disk is the answer.
+    if (const auto *plugin = ort_plugin::plugin_for(provider)) { return plugin_module(*plugin).has_value(); }
+    return available_by_name(provider_name(provider));
+}
 
 KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig
 {

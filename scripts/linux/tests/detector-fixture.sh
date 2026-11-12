@@ -25,6 +25,12 @@ detector_fixture_shared_helpers() {
   cp "$DETECTOR_HUB/shared/python/verify_ort_profile.py" "$DETECTOR_HUB/shared/python/compare_detector_parity.py" "$DETECTOR_SHARED/"
 }
 
+# Usage: detector_fixture_hub_provider DEVICE; the pinned hub's checker owns the name it accepts, the suites prove the wiring.
+detector_fixture_hub_provider() {
+  python3 -I -c 'import runpy, sys; print(runpy.run_path(sys.argv[1])["PROVIDERS"][sys.argv[2]], end="")' \
+    "$DETECTOR_HUB/shared/python/verify_ort_profile.py" "$1"
+}
+
 # Usage: detector_fixture_demo; the policy on stdin runs after argument parsing and may set provider, provider2, score and repeat_fault; BAD_GPU_SECOND_PROFILE=1 is the shared fault.
 detector_fixture_demo() {
   {

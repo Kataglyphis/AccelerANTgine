@@ -275,7 +275,7 @@ def _contract_stage_and_pins(workflow, stage, profile, checks):
         and "name: Upload the checked packages" in stage
         and stage.index(f"actions/stage-gpu-artifact@{HUB}")
         < stage.index("name: Upload the checked packages")
-        and '          command: env -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND -u KATAGLYPHIS_ORT_DEVICE bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR" "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx" \'${{ matrix.device }}\''
+        and '          command: env -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u ORT_AMDGPU_EP_ROOT -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND -u KATAGLYPHIS_ORT_DEVICE bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR" "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx" \'${{ matrix.device }}\''
         in profile.group(1).splitlines()
         and all(check in workflow for check in checks)
         and all(
@@ -670,7 +670,7 @@ class MetadataTest(unittest.TestCase):
         binary.mkdir(parents=True)
         workspace_script = self.root / "scripts/linux/check-clean-host-inference.sh"
         workspace_script.parent.mkdir(parents=True)
-        stub = "#!/usr/bin/env bash\nset -eu\nfor name in LD_LIBRARY_PATH LD_PRELOAD LD_AUDIT ORT_DYLIB_PATH ORT_LIB_LOCATION KATAGLYPHIS_ONNX_MODEL KATAGLYPHIS_ONNX_BACKEND; do [[ ! -v $name ]] || exit 1; done\n"
+        stub = "#!/usr/bin/env bash\nset -eu\nfor name in LD_LIBRARY_PATH LD_PRELOAD LD_AUDIT ORT_DYLIB_PATH ORT_LIB_LOCATION ORT_AMDGPU_EP_ROOT KATAGLYPHIS_ONNX_MODEL KATAGLYPHIS_ONNX_BACKEND; do [[ ! -v $name ]] || exit 1; done\n"
         for path in (
             binary / "AccelerANTgine",
             workspace_script,
@@ -690,6 +690,7 @@ class MetadataTest(unittest.TestCase):
             "LD_AUDIT",
             "ORT_DYLIB_PATH",
             "ORT_LIB_LOCATION",
+            "ORT_AMDGPU_EP_ROOT",
             "KATAGLYPHIS_ONNX_MODEL",
             "KATAGLYPHIS_ONNX_BACKEND",
         ):
@@ -704,17 +705,19 @@ class MetadataTest(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-        poisoned = commands[0].replace("-u ORT_LIB_LOCATION ", "")
-        self.assertNotEqual(
-            subprocess.run(
-                ["bash", "-c", poisoned],
-                cwd=self.root,
-                env=env,
-                capture_output=True,
-                check=False,
-            ).returncode,
-            0,
-        )
+        for kept in ("ORT_LIB_LOCATION", "ORT_AMDGPU_EP_ROOT"):
+            poisoned = commands[0].replace(f"-u {kept} ", "")
+            self.assertNotEqual(poisoned, commands[0])
+            self.assertNotEqual(
+                subprocess.run(
+                    ["bash", "-c", poisoned],
+                    cwd=self.root,
+                    env=env,
+                    capture_output=True,
+                    check=False,
+                ).returncode,
+                0,
+            )
 
 
 if __name__ == "__main__":

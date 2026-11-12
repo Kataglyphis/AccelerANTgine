@@ -278,5 +278,173 @@
   "replace": "",
   "test": "bash scripts/linux/tests/test-third-party-notices.sh",
   "why": "The notice gate classifies every shipped ELF and PE, the scanner included."
+ },
+ {
+  "id": "amd-plugin.candidate-preflight",
+  "target": "scripts/linux/ci-gpu-candidate.sh",
+  "find": "[[ -f \"${module}\" ]] || {",
+  "replace": "true || {",
+  "test": "bash scripts/linux/tests/test-ci-gpu-candidate.sh",
+  "why": "An AMD candidate built in an image without the plugin module would fail hours later, or ship without it."
+ },
+ {
+  "id": "amd-plugin.package-module",
+  "target": "scripts/linux/verify-gpu-packages.sh",
+  "find": "  ort_assert_plugin_module \"$prefix/usr/lib/accelerantgine/$ORT_AMDGPU_EP_MODULE\"\n",
+  "replace": "",
+  "test": "bash scripts/linux/tests/test-verify-gpu-packages.sh",
+  "why": "A tarball or DEB whose plugin module is not the image's bytes must not pass."
+ },
+ {
+  "id": "amd-plugin.package-texts",
+  "target": "scripts/linux/verify-gpu-packages.sh",
+  "find": "  verify_plugin_texts \"$prefix\"\n",
+  "replace": "",
+  "test": "bash scripts/linux/tests/test-verify-gpu-packages.sh",
+  "why": "A tarball or DEB without the plugin's own licence tree must not pass."
+ },
+ {
+  "id": "amd-plugin.appimage-texts",
+  "target": "scripts/linux/verify-gpu-packages.sh",
+  "find": "[[ \"$kind\" != migraphx ]] || verify_plugin_texts \"$work/appimage/squashfs-root\"",
+  "replace": ":",
+  "test": "bash scripts/linux/tests/test-verify-gpu-packages.sh",
+  "why": "The hub's AppImage check does not read the plugin's texts, so this line is the AppImage's only one."
+ },
+ {
+  "id": "amd-plugin.texts-links",
+  "target": "scripts/linux/verify-gpu-packages.sh",
+  "find": "if [[ -n \"$(find \"$packaged\" -type l -print -quit 2>/dev/null)\" ]] ||",
+  "replace": "if",
+  "test": "bash scripts/linux/tests/test-verify-gpu-packages.sh",
+  "why": "A linked text can point outside the package and still compare equal."
+ },
+ {
+  "id": "amd-plugin.image-provenance",
+  "target": "scripts/linux/verify-gpu-packages.sh",
+  "find": "[[ ! -s \"$image/provenance.txt\" ||",
+  "replace": "[[",
+  "test": "bash scripts/linux/tests/test-verify-gpu-packages.sh",
+  "why": "Two empty provenance files compare equal and prove nothing."
+ },
+ {
+  "id": "amd-plugin.image-tree",
+  "target": "scripts/linux/verify-gpu-packages.sh",
+  "find": " || -z \"$(find \"$image/licenses\" -type f -print -quit 2>/dev/null)\" ]]; then",
+  "replace": " ]]; then",
+  "test": "bash scripts/linux/tests/test-verify-gpu-packages.sh",
+  "why": "Two empty licence trees compare equal and prove nothing."
+ },
+ {
+  "id": "amd-plugin.package-core",
+  "target": "scripts/linux/verify-gpu-packages.sh",
+  "find": "--chain-dir \"${ORT_LIB_LOCATION:-/usr/local/lib/onnxruntime-cpu/lib}\"",
+  "replace": "--chain-dir \"$prefix/usr/lib/accelerantgine\"",
+  "test": "bash scripts/linux/tests/test-verify-gpu-packages.sh",
+  "why": "The core of an AMD package must be the image's CPU build, not whatever the package holds."
+ },
+ {
+  "id": "amd-plugin.clean-host-refusal",
+  "target": "scripts/linux/check-clean-host-inference.sh",
+  "find": "    ! grep -Fq \"MIGraphX failed to register $plugin: \" \"$work/$mode-migraphx.log\"; then",
+  "replace": "    false; then",
+  "test": "bash scripts/linux/tests/test-check-clean-host-inference.sh",
+  "why": "A failure that names another module, or none, does not show that the package's own module was tried."
+ },
+ {
+  "id": "amd-plugin.clean-host-cpu-fallback",
+  "target": "scripts/linux/check-clean-host-inference.sh",
+  "find": "--device migraphx) >\"$work/$mode-migraphx.log\" 2>&1 ||",
+  "replace": "--device migraphx) >\"$work/$mode-migraphx.log\" 2>&1 && false ||",
+  "test": "bash scripts/linux/tests/test-check-clean-host-inference.sh",
+  "why": "A migraphx request that succeeds on a host without the AMD runtime ran on the CPU."
+ },
+ {
+  "id": "amd-plugin.clean-host-package-module",
+  "target": "scripts/linux/check-clean-host-inference.sh",
+  "find": "args=(env -u LD_LIBRARY_PATH -u KATAGLYPHIS_BUNDLED_GLIBC -u ORT_AMDGPU_EP_ROOT)",
+  "replace": "args=(env -u LD_LIBRARY_PATH -u KATAGLYPHIS_BUNDLED_GLIBC)",
+  "test": "bash scripts/linux/tests/test-check-clean-host-inference.sh",
+  "why": "With the plugin root set the engine loads the image's module, and the package's is never tried."
+ },
+ {
+  "id": "amd-plugin.parity-package-module",
+  "target": "scripts/linux/lib/detector-evidence.sh",
+  "find": "-u ORT_LIB_LOCATION -u ORT_AMDGPU_EP_ROOT -u KATAGLYPHIS_ONNX_MODEL",
+  "replace": "-u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL",
+  "test": "bash scripts/linux/tests/test-check-gpu-detector-parity.sh",
+  "why": "A parity run inside the rocm image would load the image's module, not the package's."
+ },
+ {
+  "id": "amd-plugin.profile-package-module",
+  "target": "scripts/linux/profile-gpu-candidate.sh",
+  "find": "env -u LD_PRELOAD -u LD_AUDIT -u ORT_AMDGPU_EP_ROOT",
+  "replace": "env -u LD_PRELOAD -u LD_AUDIT",
+  "test": "bash scripts/linux/tests/test-profile-gpu-candidate.sh",
+  "why": "A profile run inside the rocm image would load the image's module, not the package's."
+ },
+ {
+  "id": "amd-plugin.notices-inventory",
+  "target": "packaging/third-party/components.json",
+  "find": "\"binaries\": [\"libmigraphx-ep.so\"],",
+  "replace": "\"binaries\": [\"libmigraphx-ep.so.absent\"],",
+  "test": "bash scripts/linux/tests/test-third-party-notices.sh",
+  "why": "The plugin module is a shipped binary and needs its inventory entry."
+ },
+ {
+  "id": "amd-plugin.notices-empty-tree",
+  "target": "scripts/packaging/third_party_notices.py",
+  "find": "        if not files:\n",
+  "replace": "        if False:\n",
+  "test": "bash scripts/linux/tests/test-third-party-notices.sh",
+  "why": "A plugin module whose licence tree is empty would ship with a provenance line and no licence."
+ },
+ {
+  "id": "amd-plugin.notices-tree-layout",
+  "target": "scripts/packaging/third_party_notices.py",
+  "find": "f\"{name}/{path.relative_to(source).as_posix()}\"",
+  "replace": "f\"{name}/{path.parent.name}/{path.name}\"",
+  "test": "bash scripts/linux/tests/test-third-party-notices.sh",
+  "why": "The package's tree is compared with the image's, so every text keeps its place."
+ },
+ {
+  "id": "amd-plugin.hub-api",
+  "target": "cmake/OrtPackageVariant.cmake",
+  "find": "message(FATAL_ERROR \"GPU packaging needs ANTfrastructure's plugin MIGraphX module staging and proof\")",
+  "replace": "message(STATUS \"GPU packaging needs ANTfrastructure's plugin MIGraphX module staging and proof\")",
+  "test": "bash scripts/linux/tests/test-ort-package-variant.sh",
+  "why": "A hub pin without the plugin module API would stage the old layout or fail deep inside an install."
+ },
+ {
+  "id": "amd-plugin.image-module",
+  "target": "cmake/OrtPackageVariant.cmake",
+  "find": "     OR NOT EXISTS \"${_module}\"\n",
+  "replace": "",
+  "test": "bash scripts/linux/tests/test-ort-package-variant.sh",
+  "why": "An amd configure in an image without the module must stop at once and name the path."
+ },
+ {
+  "id": "amd-plugin.appimage-patch",
+  "target": "cmake/OrtPackageVariant.cmake",
+  "find": "]] || exit 0; done",
+  "replace": "]] || true; done",
+  "test": "bash scripts/linux/tests/test-ort-package-variant.sh",
+  "why": "CPack's AppImage step would patch the module, which then is not the image's bytes."
+ },
+ {
+  "id": "amd-plugin.install-proof",
+  "target": "cmake/OrtPackageVariant.cmake",
+  "find": "ort_assert_plugin_module \\\"$2\\\"]=]",
+  "replace": "true]=]",
+  "test": "bash scripts/linux/tests/test-ort-package-variant.sh",
+  "why": "A module the closure or another step changed must fail the install, before any package is made."
+ },
+ {
+  "id": "amd-plugin.closure-protect",
+  "target": "cmake/CPackOptions.cmake",
+  "find": "  ${_gpu_protect})",
+  "replace": "  )",
+  "test": "bash scripts/linux/tests/test-ort-package-variant.sh",
+  "why": "Unprotected, the ELF closure patches the module's run path."
  }
 ]

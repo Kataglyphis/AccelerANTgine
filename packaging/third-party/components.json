@@ -42,6 +42,19 @@
       }
     },
     {
+      "id": "onnxruntime-ep-amdgpu",
+      "name": "ONNX Runtime plugin execution provider for AMD GPUs (MIGraphX)",
+      "version_var": "ORT_AMDGPU_EP_COMMIT",
+      "spdx": "MIT",
+      "url": "https://github.com/onnxruntime/onnxruntime-ep-amdgpu",
+      "source": "https://github.com/onnxruntime/onnxruntime-ep-amdgpu at that commit (ANTfrastructure's chain build); the licenses tree is the image's, with the module's own texts and those of every source its build links",
+      "binaries": ["libmigraphx-ep.so"],
+      "texts": [
+        {"root": "amdgpu-ep", "tree": "licenses"},
+        {"root": "amdgpu-ep", "path": "provenance.txt"}
+      ]
+    },
+    {
       "id": "directml",
       "name": "Microsoft DirectML",
       "version": "the redistributable the chain ONNX Runtime ships",

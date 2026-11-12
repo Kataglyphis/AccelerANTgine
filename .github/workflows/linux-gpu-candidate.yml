@@ -289,11 +289,11 @@ jobs:
           artifact: unverified-accelerantgine-gpu-input-${{ matrix.vendor }}-${{ matrix.arch }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}${{ needs.scope.outputs.suffix }}
           scan-elves: 'false'
           deb: '*.deb'
-          deb-command: env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND bash -c 'AccelerANTgine --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo /usr/bin/AccelerANTgine_demo && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo /usr/bin/AccelerANTgine_demo "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx"'
+          deb-command: env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u ORT_AMDGPU_EP_ROOT -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND bash -c 'AccelerANTgine --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo /usr/bin/AccelerANTgine_demo && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo /usr/bin/AccelerANTgine_demo "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx"'
           tarball: '*.tar.gz'
-          tarball-command: env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND bash -c './usr/bin/AccelerANTgine --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo ./usr/bin/AccelerANTgine_demo'
+          tarball-command: env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u ORT_AMDGPU_EP_ROOT -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND bash -c './usr/bin/AccelerANTgine --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --demo ./usr/bin/AccelerANTgine_demo'
           appimage: '*.AppImage'
-          appimage-command: env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND bash -c '"$APPIMAGE" --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --appimage "$APPIMAGE"'
+          appimage-command: env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u ORT_AMDGPU_EP_ROOT -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND bash -c '"$APPIMAGE" --gst_check && bash "$GITHUB_WORKSPACE/scripts/linux/check-clean-host-inference.sh" --appimage "$APPIMAGE"'
           artifact-id: ${{ steps.metadata.outputs.artifact_id }}
           artifact-digest: ${{ steps.metadata.outputs.artifact_digest }}
           artifact-files: ${{ steps.metadata.outputs.files }}
@@ -386,7 +386,7 @@ jobs:
           gpu-receipt: ${{ runner.temp }}/gpu-profile-receipt.json
           max-uncompressed-bytes: '42949672960'
           max-compression-ratio: '1000'
-          command: env -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND -u KATAGLYPHIS_ORT_DEVICE bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR" "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx" '${{ matrix.device }}'
+          command: env -u ORT_DYLIB_PATH -u ORT_LIB_LOCATION -u ORT_AMDGPU_EP_ROOT -u KATAGLYPHIS_ONNX_MODEL -u KATAGLYPHIS_ONNX_BACKEND -u KATAGLYPHIS_ORT_DEVICE bash scripts/linux/profile-gpu-candidate.sh "$GPU_PACKAGE_DIR" "$GITHUB_WORKSPACE/models/deim_dfine_n_coco.onnx" '${{ matrix.device }}'
       - name: Upload the GPU profile receipt
         if: ${{ inputs.promote-verified }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

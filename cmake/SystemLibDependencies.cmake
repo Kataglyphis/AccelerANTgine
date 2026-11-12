@@ -64,13 +64,10 @@ elseif(WIN32)
     )
   endif()
   set(_ort_root "$ENV{ONNX_ROOT}")
-elseif(
-  NOT
-  KATAGLYPHIS_ORT_VARIANT
-  STREQUAL
-  "cpu")
+elseif(KATAGLYPHIS_ORT_VARIANT STREQUAL "nvidia")
   set(_ort_root "/usr/local/lib/onnxruntime-gpu")
 else()
+  # The rocm image builds no GPU ONNX Runtime: AMD's plugin module loads into the CPU build.
   set(_ort_root "/usr/local/lib/onnxruntime-cpu")
 endif()
 file(TO_CMAKE_PATH "${_ort_root}" _ort_root)

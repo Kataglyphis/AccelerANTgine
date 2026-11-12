@@ -71,11 +71,25 @@ ort_assert_no_bundled_host_runtime() {
   [ ! -e "$1/lib/libmigraphx_c.so.3" ] || { echo 'host GPU runtime library was bundled' >&2; return 1; }
 }
 HELPER
+cp "${work}/hub/linux/scripts/06-packaging/ort-runtime-bundle.sh" "${work}/helper-without-plugin-api"
+cat >> "${work}/hub/linux/scripts/06-packaging/ort-runtime-bundle.sh" <<'HELPER'
+ORT_AMDGPU_EP_MODULE=libmigraphx-ep.so
+ort_amdgpu_ep_dir() { printf '%s/lib' "${ORT_AMDGPU_EP_ROOT:-/usr/local/lib/onnxruntime-ep-amdgpu}"; }
+ort_assert_plugin_module() {
+  cmp -s "$1" "$(ort_amdgpu_ep_dir)/${ORT_AMDGPU_EP_MODULE}" || { echo "$1 is not the image's module" >&2; return 1; }
+}
+HELPER
 if check amd Linux x86_64 ON ON; then echo 'incomplete shared CPack API unexpectedly accepted' >&2; exit 1; fi
 printf 'NO_DEFAULT_SYSTEM\n' >> "${work}/hub/cmake/CPackCommon.cmake"
 if check amd Linux x86_64 ON ON; then echo 'AppImage ORT preservation unexpectedly missing' >&2; exit 1; fi
 printf 'PRESERVE_ORT_IN_APPIMAGE\n' >> "${work}/hub/cmake/CPackCommon.cmake"
 check amd Linux x86_64 ON ON || { cat "${work}/output" >&2; exit 1; }
+# Everything else is in place here, so only the missing plugin module API can refuse this hub.
+cp "${work}/hub/linux/scripts/06-packaging/ort-runtime-bundle.sh" "${work}/helper-with-plugin-api"
+cp "${work}/helper-without-plugin-api" "${work}/hub/linux/scripts/06-packaging/ort-runtime-bundle.sh"
+if check amd Linux x86_64 ON ON; then echo 'a hub without the plugin module API unexpectedly accepted' >&2; exit 1; fi
+grep -Fq 'plugin MIGraphX module' "${work}/output"
+cp "${work}/helper-with-plugin-api" "${work}/hub/linux/scripts/06-packaging/ort-runtime-bundle.sh"
 
 mkdir -p "${work}/project" "${work}/install/lib"
 cat > "${work}/project/CMakeLists.txt" <<'CMAKE'
@@ -104,6 +118,20 @@ string(SUBSTRING "${closure_source}" ${targets_begin} ${targets_length} closure_
 string(FIND "${closure_targets}" "\${PROJECT_NAME}_demo" demo)
 if(demo LESS 0)
   message(FATAL_ERROR "The demo must be in the closure before the host-runtime guard")
+endif()
+string(FIND "${closure_source}" "\n  PROTECT\n" protect_begin)
+string(FIND "${closure_source}" ")" closure_end)
+if(protect_begin LESS 0 OR closure_end LESS protect_begin)
+  message(FATAL_ERROR "The closure PROTECT section is missing")
+endif()
+math(EXPR protect_length "${closure_end} - ${protect_begin}")
+string(SUBSTRING "${closure_source}" ${protect_begin} ${protect_length} closure_protect)
+string(FIND "${closure_protect}" "\${_gpu_protect}" protected)
+string(FIND "${closure_source}" "accelerantgine_keep_module_in_appimage(" kept)
+string(FIND "${closure_source}" "accelerantgine_install_plugin_module_proof(" proved)
+string(FIND "${closure_source}" "include(CPack)" cpack)
+if(protected LESS 0 OR kept LESS closure_end OR proved LESS closure_end OR cpack LESS kept)
+  message(FATAL_ERROR "The plugin module must be protected in the closure, kept in the AppImage and proved after both")
 endif()
 accelerantgine_install_gpu_host_runtime_guard("${HELPER}" "${KIND}")
 CMAKE
@@ -138,6 +166,48 @@ if [ -z "${ORT_TEST_HELPER:-}" ]; then
     grep -Fq 'Cannot identify migraphx provider host-runtime dependencies' "${work}/output"
   done
 fi
+
+# The plugin module: found through the hub's own names, kept from CPack's AppImage patching and proved at install.
+mkdir -p "${work}/plugin" "${work}/ep/lib" "${work}/package/lib/accelerantgine"
+cat > "${work}/plugin/CMakeLists.txt" <<'CMAKE'
+cmake_minimum_required(VERSION 3.24)
+project(plugin_module NONE)
+include("${MODULE}")
+accelerantgine_amdgpu_ep_module("${HELPER}" module)
+if(NOT module STREQUAL EXPECTED)
+  message(FATAL_ERROR "Wrong plugin module: ${module}")
+endif()
+set(CPACK_APPIMAGE_PATCHELF_EXECUTABLE "${INNER}")
+accelerantgine_keep_module_in_appimage(libmigraphx-ep.so CPACK_APPIMAGE_PATCHELF_EXECUTABLE)
+file(WRITE "${CMAKE_BINARY_DIR}/wrapper-path" "${CPACK_APPIMAGE_PATCHELF_EXECUTABLE}")
+accelerantgine_install_plugin_module_proof("${HELPER}" "lib/accelerantgine/libmigraphx-ep.so")
+CMAKE
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s"\n' "${work}/patched" > "${work}/inner-patchelf"
+chmod +x "${work}/inner-patchelf"
+# Usage: configure_plugin BUILD_DIR HELPER [INNER]; the image's plugin root is ${work}/ep.
+configure_plugin() {
+  ORT_AMDGPU_EP_ROOT="${work}/ep" cmake -S "${work}/plugin" -B "$1" "-DMODULE=${root}/cmake/OrtPackageVariant.cmake" \
+    "-DHELPER=$2" "-DEXPECTED=${work}/ep/lib/libmigraphx-ep.so" "-DINNER=${3-${work}/inner-patchelf}" >"${work}/output" 2>&1
+}
+real_helper="${root}/third_party/ANTfrastructure/linux/scripts/06-packaging/ort-runtime-bundle.sh"
+suite_refuses_logged 'an image without the plugin module unexpectedly accepted' "requires the image's plugin MIGraphX module" \
+  "${work}/output" configure_plugin "${work}/plugin-missing" "${real_helper}"
+printf 'image module\n' > "${work}/ep/lib/libmigraphx-ep.so"
+configure_plugin "${work}/plugin-build" "${real_helper}" || { cat "${work}/output" >&2; exit 1; }
+suite_refuses_logged 'an AppImage step without a patchelf wrapper unexpectedly accepted' 'must be set before' \
+  "${work}/output" configure_plugin "${work}/plugin-no-wrapper" "${real_helper}" ''
+wrapper="$(cat "${work}/plugin-build/wrapper-path")"
+"${wrapper}" --set-rpath '$ORIGIN' /bundle/usr/lib/accelerantgine/libmigraphx-ep.so
+[[ ! -e "${work}/patched" ]] || { echo "CPack's AppImage step would patch the plugin module" >&2; exit 1; }
+"${wrapper}" --set-rpath '$ORIGIN' /bundle/usr/lib/accelerantgine/libfoo.so
+[[ "$(cat "${work}/patched")" == '--set-rpath $ORIGIN /bundle/usr/lib/accelerantgine/libfoo.so' ]] || {
+  echo 'The AppImage patchelf wrapper did not pass another library on' >&2; exit 1;
+}
+cp "${work}/ep/lib/libmigraphx-ep.so" "${work}/package/lib/accelerantgine/"
+install_plugin() { ORT_AMDGPU_EP_ROOT="${work}/ep" cmake --install "${work}/plugin-build" --prefix "${work}/package"; }
+install_plugin >"${work}/output" 2>&1 || { cat "${work}/output" >&2; exit 1; }
+printf 'patched\n' >> "${work}/package/lib/accelerantgine/libmigraphx-ep.so"
+suite_refuses_logged "a staged module that is not the image's unexpectedly accepted" "is not the image's" "${work}/output" install_plugin
 mkdir -p "${work}/hook/third_party/ANTfrastructure/linux/scripts/06-packaging"
 cat > "${work}/hook/third_party/ANTfrastructure/linux/scripts/06-packaging/verify-ort-appimage-payload.sh" <<'VERIFY'
 #!/usr/bin/env bash

@@ -2,8 +2,8 @@
 
 Windows packaging must select ONNX Runtime license texts from an image wheel whose DLL is
 byte-identical to the chain runtime, install both texts, and check the install tree, ZIP and MSIX.
-MIGraphX uses string provider options with explicit device ID and memory limit; the legacy struct
-registration can turn an empty model-cache path into literal quotes in the image's ONNX Runtime.
+MIGraphX is AMD's plugin module `libmigraphx-ep.so`: register it once per process as `MIGraphX` and append one
+device with the option `device_id` alone; the plugin fails on any other option, and no by-name append comes first.
 
 Guidance for coding agents (and new contributors) working in AccelerANTgine.
 
@@ -333,6 +333,27 @@ written out rather than linked.
   non-CPU request checks `provider_available()` first, and a listed CPU provider that fails to
   register (DNNL without `libdnnl.so.3`) is `ProviderUnavailable` too, with ORT's reason in
   `provider_error()` (`docs/source/getting_started.rst` § *ONNX execution providers*).
+- **MIGraphX is AMD's plugin module, reached by registration alone.** `Src/ort_plugin.hpp` has one row per plugin
+  provider (registration name, root variable, module file); `MigraphX` is the only row, and CUDA keeps its in-tree
+  loading until the hub publishes its new NVIDIA image (`BACKLOG.md`).
+  - The engine looks for `libmigraphx-ep.so` in `$ORT_AMDGPU_EP_ROOT/lib` when that variable is not empty, then
+    beside the loaded `libonnxruntime.so.1`, where a package carries it. Every image but `:latest-rocm` sets the
+    variable to nothing and keeps an empty directory, so test the value and the file, never "is set".
+  - It registers the module once per process as `MIGraphX`. AMD's module takes that name as its own, so devices,
+    sessions and ONNX Runtime profiles say `MIGraphX`, no longer `MIGraphXExecutionProvider`. A registration ends
+    with the process's last `Ort::Env`; the engine keeps one reference for good after the first one and never
+    unregisters. A name another library of the process registered first is used as it is: one loaded ONNX Runtime
+    has one environment for all of them, and it refuses a name a second time.
+  - It appends exactly one device, with `device_id` alone. The plugin fails on an option it does not list
+    (`migraphx_mem_limit` is gone) and on an `ep.*` entry a failed by-name append leaves behind.
+  - `GetAvailableProviders` never lists a plugin: `provider_available()` answers with the module on disk, which
+    says nothing about a card. A missing module, a failed registration and a device that is not offered are each
+    `ProviderUnavailable`, with what was looked for in `provider_error()`.
+  - `Test/common/plugin_ep_stub.cpp` is a stand-in module, not AMD's. It proves the engine's calls against the real
+    ONNX Runtime on every Linux lane and nothing about a card.
+  - Package checks unset `ORT_AMDGPU_EP_ROOT`: inside the rocm image they would otherwise load the image's module
+    and not the package's. On a clean host `check-clean-host-inference.sh` requires `--device migraphx` to fail on
+    the packaged module.
 - **The GenAI tests generate their model too.** `kataglyphis_use_tiny_genai_model` in
   `Test/cmake/CommonTestBuild.cmake` runs the hub's `tiny-genai-model.py` at configure time, so a
   hub pin without it fails the configure, and the tests read the generator's `fixture.json` rather
@@ -491,6 +512,8 @@ written out rather than linked.
   moved too. `Src/rusty_code/LICENSE` is that collector's copy of `LICENSE`; the test fails when they differ.
   Linux ONNX Runtime texts go through `stage_ort_texts.py`: the chain build's `licenses/` once the image
   carries it (hub ca303de0), until then the same-version chain wheel with a `WARN`; never a PyPI wheel.
+  AMD's plugin module brings the image's whole `licenses/` tree and `provenance.txt`: the inventory's `tree` text,
+  read from the plugin root `CPackOptions.cmake` names with `accelerantgine_add_notice_text_root`.
 - **The Linux packages carry the image's own GStreamer, never the distro's** (owner, 2026-10-17;
   the mechanism is the hub's
   [`linux-build-basics.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/linux-build-basics.md#gstreamer-loads-from-the-package-alone)).

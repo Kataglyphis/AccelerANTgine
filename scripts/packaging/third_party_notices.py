@@ -201,17 +201,37 @@ class Stager:
 
     def add_text(self, component: Component, text: dict[str, str]) -> None:
         """Installed texts are referenced in place; every other text is copied beside the list."""
-        root_name, relative = text.get("root"), text.get("path")
+        root_name, relative = text.get("root"), text.get("path") or text.get("tree")
         if root_name not in self.roots or not relative:
             raise NoticeError(
                 f"{component.ident}: unknown text root {root_name!r} or empty path"
             )
         source = self.roots[root_name] / relative
+        if "tree" in text:
+            self.add_tree(component, source, Path(relative).name)
+            return
         data = read_text(source, component.ident)
         if root_name == "install":
             component.texts.append(self.relative(source))
             return
         self.copy_text(component, Path(relative).name, data)
+
+    def add_tree(self, component: Component, source: Path, name: str) -> None:
+        """Copy every text below a directory with its layout, so two files of one name stay apart."""
+        files = (
+            sorted(path for path in source.rglob("*") if not path.is_dir())
+            if source.is_dir()
+            else []
+        )
+        if not files:
+            raise NoticeError(
+                f"{component.ident}: license tree is missing or empty: {source}"
+            )
+        for path in files:
+            data = read_text(path, component.ident)
+            self.copy_text(
+                component, f"{name}/{path.relative_to(source).as_posix()}", data
+            )
 
     def copy_text(self, component: Component, name: str, data: bytes) -> None:
         """Copy a component text to its stable package-relative notice location."""

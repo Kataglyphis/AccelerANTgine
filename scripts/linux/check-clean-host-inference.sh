@@ -34,8 +34,11 @@ if ! env LD_LIBRARY_PATH="$private" ldd "$libav" >"$work/libav.log" 2>&1 || grep
   echo 'GStreamer libav dependencies did not resolve' >&2
   exit 1
 fi
+plugin="$private/libmigraphx-ep.so"
+if [[ -f "$plugin" ]]; then plugin="$(realpath -e "$plugin")"; else plugin=; fi
 for mode in host bundled; do
-  args=(env -u LD_LIBRARY_PATH -u KATAGLYPHIS_BUNDLED_GLIBC)
+  # A set plugin root is looked in first, and this check is of the package's own module.
+  args=(env -u LD_LIBRARY_PATH -u KATAGLYPHIS_BUNDLED_GLIBC -u ORT_AMDGPU_EP_ROOT)
   if [[ "$mode" == bundled ]]; then args+=(KATAGLYPHIS_BUNDLED_GLIBC=1); fi
   if ! (cd "$work" && "${args[@]}" "$demo" --onnx-only "${model_args[@]}" --device cpu) >"$work/$mode.log" 2>&1; then
     cat "$work/$mode.log" >&2
@@ -56,4 +59,13 @@ for mode in host bundled; do
     exit 1
   fi
   echo "$mode runtime: locked-model CPU inference passed"
+  [[ -n "$plugin" ]] || continue
+  # A clean host has no AMD runtime: the named device must fail on the packaged module and never run on the CPU.
+  if (cd "$work" && "${args[@]}" "$demo" --onnx-only "${model_args[@]}" --device migraphx) >"$work/$mode-migraphx.log" 2>&1 ||
+    ! grep -Fq "MIGraphX failed to register $plugin: " "$work/$mode-migraphx.log"; then
+    cat "$work/$mode-migraphx.log" >&2
+    echo "The $mode runtime did not refuse migraphx on its packaged plugin module" >&2
+    exit 1
+  fi
+  echo "$mode runtime: migraphx was refused on the packaged plugin module"
 done

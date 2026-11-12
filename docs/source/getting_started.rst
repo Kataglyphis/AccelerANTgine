@@ -72,7 +72,10 @@ The existing ``enable_cuda`` field remains supported. A conflicting provider and
 negative device ID fails initialization with ``SessionCreationFailed``. A provider the loaded ONNX
 Runtime was not built with, or one it lists but cannot load, fails with ``ProviderUnavailable``
 and ``OnnxInferenceEngine::provider_error()`` holds ONNX Runtime's reason; ``provider_available()``
-asks the runtime first. The chain ONNX Runtime in ``:latest`` builds XNNPACK on every architecture,
+asks the runtime first. MIGraphX is a plugin module that the runtime never lists: for it
+``provider_available()`` says whether ``libmigraphx-ep.so`` is on disk, and a missing module, a failed
+registration or a device the plugin does not offer is ``ProviderUnavailable`` as well (see below).
+The chain ONNX Runtime in ``:latest`` builds XNNPACK on every architecture,
 so ``xnnpack`` runs on amd64 and arm64. It lists DNNL on amd64 only, and the image ships no
 ``libdnnl.so.3``, so ``dnnl`` is ``ProviderUnavailable`` on both (``BACKLOG.md``, hub CON191).
 A process that finds ``libonnxruntime.so.1`` through ``/opt/opencv5/lib`` cannot load any
@@ -101,7 +104,9 @@ looks for the shipped config's model file in its package directory; ``--model`` 
 DXGI adapter index for DirectML and a provider device index for CUDA or MIGraphX. The demo prints
 the generated JSON profile path. With ANTfrastructure checked out, confirm model operators ran
 on the requested provider using ``python3 -I third_party/ANTfrastructure/shared/python/verify_ort_profile.py
-<profile.json> --device cuda`` (use ``python`` on Windows). The demo in a CPU package defaults
+<profile.json> --device cuda`` (use ``python`` on Windows). A MIGraphX profile names its provider
+``MIGraphX``, which the checker expects for ``--device migraphx``; no profile from a card has been
+checked with it (``BACKLOG.md``). The demo in a CPU package defaults
 to CPU; NVIDIA packages default to CUDA, Linux AMD packages to MIGraphX, and Windows AMD packages
 to DirectML. Pass ``--device cpu`` to override a GPU package's default. A requested provider that
 cannot initialize fails instead of silently switching to CPU. CUDA first runs one kernel on the card:
@@ -109,7 +114,9 @@ on a card the package's ONNX Runtime has no kernel for (an RTX 20xx today) the r
 ``ProviderUnavailable``, and the log names the card and its compute capability. Profiling is disabled unless ``--profile`` is
 provided; an embedder can set ``SessionConfig::profiling_prefix`` and call ``end_profiling()``.
 The Linux GPU workflow also runs the locked model on CPU from each finished package using both
-the host and bundled glibc loaders. Its optional self-hosted GPU job profiles the packaged demo
+the host and bundled glibc loaders. From an AMD package it then requires ``--device migraphx`` to fail
+on the packaged plugin module: that host has no AMD runtime, and a CPU session in its place would be a
+silent fallback. Its optional self-hosted GPU job profiles the packaged demo
 from the tarball, extracted AppImage and extracted DEB; the runner needs ``dpkg-deb``. AppImage's
 normal entrypoint launches the main application, not the demo. A package's CPU inference alone does
 not establish GPU use.
@@ -132,13 +139,34 @@ that is not named ``images``, a fixed input size other than ``input_width`` by `
 values (``InvalidOutputShape``). Corner rows (``xyxy_score_class``) come from an end-to-end model,
 one row per object, and are not suppressed; the two raw layouts keep ``nms_threshold``.
 
-These options require an ONNX Runtime built with the requested provider and its runtime
-dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=nvidia`` or
-``amd`` selects the image's GPU ONNX Runtime and stages its matching provider. CPU is the
-default. NVIDIA targets Linux x64 and arm64; AMD targets Linux x64. MIGraphX device registration
-uses explicit options to avoid a malformed empty model-cache path in the legacy runtime API.
-It first copies a few bytes to the selected GPU; after 30 seconds without an answer the request
-fails with ``ProviderUnavailable``.
+These options require an ONNX Runtime with the requested provider and its runtime
+dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=nvidia`` selects the
+image's GPU ONNX Runtime and stages its CUDA provider; ``amd`` keeps the CPU ONNX Runtime and stages
+AMD's plugin module ``libmigraphx-ep.so`` beside it, with the plugin's license texts. CPU is the
+default. NVIDIA targets Linux x64 and arm64; AMD targets Linux x64.
+
+MIGraphX on Linux is AMD's plugin execution provider
+(`onnxruntime-ep-amdgpu <https://github.com/onnxruntime/onnxruntime-ep-amdgpu>`_), not a provider
+built into ONNX Runtime; the ``:latest-rocm`` image carries no other since November 2026.
+
+- **Where the module is looked for:** ``$ORT_AMDGPU_EP_ROOT/lib/libmigraphx-ep.so`` when that variable
+  is not empty (``:latest-rocm`` sets it; every other image sets it to nothing), then beside the loaded
+  ``libonnxruntime.so.1``, where a package carries it.
+- **Registration:** once per process, under the name ``MIGraphX``. AMD's module takes that name as its
+  own, so a session and its profile say ``MIGraphX``, no longer ``MIGraphXExecutionProvider``. The
+  registration stays until the process ends. When another library of the process has registered that
+  name in the same ONNX Runtime, the engine uses its devices and does not register again.
+- **The session:** one device the plugin offers and the option ``device_id``; ``--device-id N`` is the
+  N-th offered device. The plugin has no memory-limit option.
+- **Before it registers,** the engine copies a few bytes to the selected GPU; after 30 seconds without
+  an answer the request fails.
+- **What fails:** a missing module, a registration that fails (the module needs the host's ROCm and
+  MIGraphX runtime and a card) and a device that is not offered are each ``ProviderUnavailable``;
+  ``provider_error()`` and the log name the paths looked at and ONNX Runtime's reason. Such a request
+  does not become a CPU session. Which operators the plugin then takes is what a profile from a card shows.
+
+The plugin has not run from this library on an AMD card yet; the error paths and the calls are tested
+against the real ONNX Runtime with a stand-in module (``BACKLOG.md``).
 For a local investigation on AMD hardware, run:
 
 .. code-block:: sh
@@ -148,7 +176,8 @@ For a local investigation on AMD hardware, run:
 Set ``MODE`` to ``exhaustive``, ``skip-rocblas`` or ``skip-no-mlir``. The evidence directory must be new. The diagnostic
 compares two CPU and two same-session GPU detections and checks each operator profile using the
 selected process-local setting. Exhaustive tuning has a four-minute limit. These experiments do
-not qualify a package for release.
+not qualify a package for release. The checks unset ``ORT_AMDGPU_EP_ROOT``, so ``DEMO`` must have the
+plugin module beside its ONNX Runtime, as a package's demo has.
 Configure with ``-DKATAGLYPHIS_TEST_MIGRAPHX=ON`` to include the commit suite's real GPU
 regression on a MIGraphX host without ``ORT_MIGRAPHX_MODEL_CACHE_PATH``; it checks the Relu
 result and profile. The default build omits this hardware-only test.

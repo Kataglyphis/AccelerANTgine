@@ -134,6 +134,16 @@ function(accelerantgine_require_gpu_packaging_hub hub_dir out_helper)
         "ort_assert_no_bundled_host_runtime")
     message(FATAL_ERROR "GPU packaging needs ANTfrastructure's host-runtime dependency and exclusion checks")
   endif()
+  if(NOT
+     _helper_source
+     MATCHES
+     "ort_amdgpu_ep_dir"
+     OR NOT
+        _helper_source
+        MATCHES
+        "ort_assert_plugin_module")
+    message(FATAL_ERROR "GPU packaging needs ANTfrastructure's plugin MIGraphX module staging and proof")
+  endif()
   file(READ "${_cpack}" _cpack_source)
   file(READ "${_wheel_verifier}" _wheel_source)
   if(NOT
@@ -193,6 +203,62 @@ function(
   set(${out_sonames}
       "${_sonames}"
       PARENT_SCOPE)
+endfunction()
+
+# The image's plugin MIGraphX module, where the hub's staging helper takes it from.
+function(accelerantgine_amdgpu_ep_module helper out_module)
+  execute_process(
+    COMMAND bash -c [=[set -e; source "$1"; printf '%s/%s' "$(ort_amdgpu_ep_dir)" "${ORT_AMDGPU_EP_MODULE:?}"]=] _
+            "${helper}"
+    RESULT_VARIABLE _status
+    OUTPUT_VARIABLE _module)
+  if(NOT
+     _status
+     STREQUAL
+     "0"
+     OR NOT EXISTS "${_module}"
+     OR IS_DIRECTORY "${_module}")
+    message(FATAL_ERROR "amd package requires the image's plugin MIGraphX module, looked for at '${_module}'")
+  endif()
+  set(${out_module}
+      "${_module}"
+      PARENT_SCOPE)
+endfunction()
+
+# CPack's AppImage step patches every ELF and the hub's wrapper keeps glibc and libonnxruntime* only.
+function(accelerantgine_keep_module_in_appimage module_name patchelf_var)
+  set(_inner "${${patchelf_var}}")
+  if(NOT _inner)
+    message(FATAL_ERROR "The AppImage patchelf wrapper must be set before ${module_name} is kept out of it")
+  endif()
+  set(_wrapper "${PROJECT_BINARY_DIR}/tools/patchelf-keep-plugin-module.sh")
+  file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/tools")
+  file(
+    WRITE "${_wrapper}"
+    "#!/usr/bin/env bash\nfor arg in \"$@\"; do [[ \"\${arg##*/}\" != \"${module_name}\" ]] || exit 0; done\nexec \"${_inner}\" \"$@\"\n"
+  )
+  file(
+    CHMOD
+    "${_wrapper}"
+    PERMISSIONS
+    OWNER_READ
+    OWNER_WRITE
+    OWNER_EXECUTE
+    GROUP_READ
+    GROUP_EXECUTE
+    WORLD_READ
+    WORLD_EXECUTE)
+  set(${patchelf_var}
+      "${_wrapper}"
+      PARENT_SCOPE)
+endfunction()
+
+# The staged module must still be the image's bytes after the closure ran over the tree.
+function(accelerantgine_install_plugin_module_proof helper module)
+  install(
+    CODE "set(_pkg \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}\")
+execute_process(COMMAND bash -c [=[set -e; source \"$1\"; ort_assert_plugin_module \"$2\"]=] _ \"${helper}\" \"\${_pkg}/${module}\" COMMAND_ERROR_IS_FATAL ANY)"
+  )
 endfunction()
 
 function(accelerantgine_install_gpu_host_runtime_guard helper kind)

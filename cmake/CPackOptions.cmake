@@ -147,7 +147,8 @@ endif()
 # The compiler's libstdc++, the chain ORT and the image's glibc: GCC 16.2's and glibc 2.43 are newer than Debian 13's.
 get_filename_component(_ort_lib_dir "${_ONNXRUNTIME_LIB}" DIRECTORY)
 set(_gpu_closure_args "")
-set(_gpu_provider "")
+set(_gpu_kind "")
+set(_gpu_protect "")
 if(PROJECT_IS_TOP_LEVEL
    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
    AND NOT
@@ -156,20 +157,26 @@ if(PROJECT_IS_TOP_LEVEL
        "cpu")
   accelerantgine_require_gpu_packaging_hub("${CMAKE_CURRENT_SOURCE_DIR}/third_party/ANTfrastructure" _gpu_helper)
   if(KATAGLYPHIS_ORT_VARIANT STREQUAL "nvidia")
-    set(_gpu_provider libonnxruntime_providers_cuda.so)
     set(_gpu_kind cuda)
+    set(_gpu_module "${_ort_lib_dir}/libonnxruntime_providers_cuda.so")
+    foreach(_required "${_ort_lib_dir}/libonnxruntime_providers_shared.so" "${_gpu_module}")
+      if(NOT EXISTS "${_required}")
+        message(FATAL_ERROR "nvidia package requires ${_required}")
+      endif()
+    endforeach()
   else()
-    set(_gpu_provider libonnxruntime_providers_migraphx.so)
     set(_gpu_kind migraphx)
+    accelerantgine_amdgpu_ep_module("${_gpu_helper}" _gpu_module)
+    get_filename_component(_gpu_module_name "${_gpu_module}" NAME)
+    # The module is proved byte for byte against the image's, so no step may patch it.
+    set(_gpu_protect "lib/accelerantgine/${_gpu_module_name}")
+    get_filename_component(_amdgpu_ep_root "${_gpu_module}" DIRECTORY)
+    get_filename_component(_amdgpu_ep_root "${_amdgpu_ep_root}" DIRECTORY)
+    accelerantgine_add_notice_text_root(amdgpu-ep "${_amdgpu_ep_root}")
   endif()
-  foreach(_required libonnxruntime_providers_shared.so ${_gpu_provider})
-    if(NOT EXISTS "${_ort_lib_dir}/${_required}")
-      message(FATAL_ERROR "${KATAGLYPHIS_ORT_VARIANT} package requires ${_ort_lib_dir}/${_required}")
-    endif()
-  endforeach()
   accelerantgine_gpu_host_dependencies(
     "${_gpu_helper}"
-    "${_ort_lib_dir}/${_gpu_provider}"
+    "${_gpu_module}"
     "${_gpu_kind}"
     _gpu_system)
   install(
@@ -211,7 +218,7 @@ set(_closure_search
     "/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
 if(_gst_scanner_launcher)
   set(_scanner_loader_flag "")
-  if(_gpu_provider)
+  if(_gpu_kind)
     set(_scanner_loader_flag "--external-library-path")
   endif()
   install(
@@ -230,7 +237,13 @@ kataglyphis_install_linux_closure(
   ${_closure_search}
   ${_gpu_closure_args}
   PROTECT
-  "lib/accelerantgine/libonnxruntime*")
+  "lib/accelerantgine/libonnxruntime*"
+  ${_gpu_protect})
+if(PROJECT_IS_TOP_LEVEL AND _gpu_kind STREQUAL "migraphx")
+  accelerantgine_keep_module_in_appimage("${_gpu_module_name}" CPACK_APPIMAGE_PATCHELF_EXECUTABLE)
+  accelerantgine_install_plugin_module_proof("${_gpu_helper}"
+                                             "${CMAKE_INSTALL_LIBDIR}/accelerantgine/${_gpu_module_name}")
+endif()
 if(PROJECT_IS_TOP_LEVEL AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(_gst_launchers "")
   if(TARGET ${PROJECT_NAME}_cli)
@@ -245,11 +258,10 @@ if(PROJECT_IS_TOP_LEVEL AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     )
   endif()
 endif()
-if(PROJECT_IS_TOP_LEVEL AND _gpu_provider)
+if(PROJECT_IS_TOP_LEVEL AND _gpu_kind)
   accelerantgine_install_gpu_host_runtime_guard("${_gpu_helper}" "${_gpu_kind}")
 endif()
-# A provider is dlopened, so verify its notices against the same wheel as the staged core.
-if(PROJECT_IS_TOP_LEVEL AND _gpu_provider)
+if(PROJECT_IS_TOP_LEVEL AND _gpu_kind)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   if(DEFINED ENV{ORT_CHAIN_WHEEL_DIR})
     set(_gpu_wheels "$ENV{ORT_CHAIN_WHEEL_DIR}")
@@ -261,10 +273,13 @@ if(PROJECT_IS_TOP_LEVEL AND _gpu_provider)
   else()
     set(_gpu_strip strip)
   endif()
-  install(
-    CODE "set(_pkg \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}\")
-execute_process(COMMAND \"${Python3_EXECUTABLE}\" \"${CMAKE_CURRENT_SOURCE_DIR}/third_party/ANTfrastructure/linux/scripts/06-packaging/stage-ort-wheel-licenses.py\" --wheel-dir \"${_gpu_wheels}\" --destination \"\${_pkg}/share\" --strip \"${_gpu_strip}\" --library \"\${_pkg}/${CMAKE_INSTALL_LIBDIR}/accelerantgine/libonnxruntime.so.1\" --library \"\${_pkg}/${CMAKE_INSTALL_LIBDIR}/accelerantgine/libonnxruntime_providers_shared.so\" --library \"\${_pkg}/${CMAKE_INSTALL_LIBDIR}/accelerantgine/${_gpu_provider}\" COMMAND_ERROR_IS_FATAL ANY)"
-  )
+  # The CUDA provider is dlopened, so its notices are verified against the same wheel as the staged core.
+  if(_gpu_kind STREQUAL "cuda")
+    install(
+      CODE "set(_pkg \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}\")
+execute_process(COMMAND \"${Python3_EXECUTABLE}\" \"${CMAKE_CURRENT_SOURCE_DIR}/third_party/ANTfrastructure/linux/scripts/06-packaging/stage-ort-wheel-licenses.py\" --wheel-dir \"${_gpu_wheels}\" --destination \"\${_pkg}/share\" --strip \"${_gpu_strip}\" --library \"\${_pkg}/${CMAKE_INSTALL_LIBDIR}/accelerantgine/libonnxruntime.so.1\" --library \"\${_pkg}/${CMAKE_INSTALL_LIBDIR}/accelerantgine/libonnxruntime_providers_shared.so\" --library \"\${_pkg}/${CMAKE_INSTALL_LIBDIR}/accelerantgine/libonnxruntime_providers_cuda.so\" COMMAND_ERROR_IS_FATAL ANY)"
+    )
+  endif()
   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyGpuAppImage.cmake.in"
                  "${PROJECT_BINARY_DIR}/VerifyGpuAppImage.cmake" @ONLY)
   list(APPEND CPACK_POST_BUILD_SCRIPTS "${PROJECT_BINARY_DIR}/VerifyGpuAppImage.cmake")

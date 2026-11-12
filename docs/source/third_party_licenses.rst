@@ -62,6 +62,12 @@ the Flatpak and the Windows install proof get the list of exactly what they pack
   a byte-identical wheel (``stage-ort-wheel-licenses.py``), else, with a ``WARN`` line, the chain
   wheels of the same ONNX Runtime version, which must all carry the same texts. The chain C library
   and the chain wheel are separate builds of one checkout, so today's image needs the last case.
+- **AMD's plugin module:** a Linux AMD package carries ``libmigraphx-ep.so``. Its inventory entry is a
+  ``tree`` text: the image's whole ``licenses/`` directory beside the module (the plugin's own texts
+  and those of every source its build links) and ``provenance.txt`` are copied into
+  ``third-party/onnxruntime-ep-amdgpu/`` with their layout. ``cmake/CPackOptions.cmake`` names the
+  plugin root (``accelerantgine_add_notice_text_root``); a package with the module and no such tree fails.
+  ANTfrastructure has no helper for these texts yet, so the copy and its check are this repository's.
 - **Rust crates:** ANTfrastructure's ``stage-cargo-licenses.py`` collects the original license files
   of ``Src/rusty_code``'s Cargo graph offline; ``packaging/third-party/cargo-license-policy.json``
   reviews the one crate with an ``AND`` expression. The graph includes the build-time ``cxx``
@@ -79,6 +85,8 @@ How The Packages Are Checked
   Runtime's two texts (ANTfrastructure's ``verify_package_license.py`` and
   ``verify-native-appimage-license.sh``), and the project logo as the 256 px PNG and the scalable SVG
   icon, byte for byte against ``images/``.
+- Linux AMD candidates: ``verify-gpu-packages.sh`` compares the plugin module with the image's, byte
+  for byte, and its texts with the image's tree, in the tarball, the DEB and the AppImage.
 - Windows: ``Build-Windows.ps1`` checks the notices in every ZIP and MSI and in the MSIX
   (``Assert-PackageLicense``, ``Assert-MsiPackageLicense``). NSIS packs the same install tree but
   is not opened.

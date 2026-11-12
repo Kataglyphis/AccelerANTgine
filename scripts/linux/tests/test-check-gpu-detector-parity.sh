@@ -17,6 +17,7 @@ detector_fixture_legacy_tool verify_ort_profile.py --min-runs 'A profiler withou
   'Old profiler was checked too late' run_check "$SUITE_WORK/legacy-profile"
 detector_fixture_demo <<'POLICY'
 [[ -z ${MIGRAPHX_SKIP_BENCHMARKING+x} && -z ${ORT_MIGRAPHX_MODEL_CACHE_PATH+x} && -z ${MIGRAPHX_UNKNOWN+x} ]]
+[[ -z ${ORT_AMDGPU_EP_ROOT+x} ]]
 [[ ${NEEDS_LIBRARY_PATH:-0} != 1 || -n ${LD_LIBRARY_PATH+x} ]]
 provider=CUDAExecutionProvider
 [[ "$device" != cpu ]] || provider=CPUExecutionProvider
@@ -28,7 +29,7 @@ if [[ ( ${BAD_GPU_REPEAT:-0} == 1 && "$device" != cpu ) || ( ${BAD_CPU_REPEAT:-0
 [[ ${BAD_CPU_SECOND_PROFILE:-0} != 1 || "$device" != cpu ]] || provider2=CUDAExecutionProvider
 POLICY
 detector_fixture_missing_hub_files run_demo
-MIGRAPHX_SKIP_BENCHMARKING=1 ORT_MIGRAPHX_MODEL_CACHE_PATH=/tmp MIGRAPHX_UNKNOWN=poison run_demo "$SUITE_WORK/pass"
+MIGRAPHX_SKIP_BENCHMARKING=1 ORT_MIGRAPHX_MODEL_CACHE_PATH=/tmp MIGRAPHX_UNKNOWN=poison ORT_AMDGPU_EP_ROOT=/image run_demo "$SUITE_WORK/pass"
 EDGE_PARITY=1 run_demo "$SUITE_WORK/edge"
 NEEDS_LIBRARY_PATH=1 LD_LIBRARY_PATH=/opt/gcc/lib64 run_demo "$SUITE_WORK/xnnpack" xnnpack
 NEEDS_LIBRARY_PATH=1 LD_LIBRARY_PATH=/opt/gcc/lib64 suite_refuses "A GPU check's CPU leg kept the caller's LD_LIBRARY_PATH" run_demo "$SUITE_WORK/gpu-cpu-leg"

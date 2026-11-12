@@ -118,7 +118,7 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
     std::unique_ptr<Impl> impl_;
 };
 
-// Whether the loaded ONNX Runtime was built with provider.
+// Whether the loaded ONNX Runtime was built with provider; for a plugin provider, whether its module is on disk.
 [[nodiscard]] KATAGLYPHIS_CPP_API auto provider_available(ExecutionProvider provider) -> bool;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path)

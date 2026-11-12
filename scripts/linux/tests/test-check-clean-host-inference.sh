@@ -13,9 +13,23 @@ cat >"$work/usr/bin/AccelerANTgine_demo" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
 [[ ( $# -eq 3 || $# -eq 5 ) && ( $1 == --onnx-only || $1 == --video-check ) ]]
-if [[ $# -eq 5 ]]; then [[ $2 == --model && $4 == --device && $5 == cpu ]];
-else [[ $2 == --device && $3 == cpu ]]; fi
-[[ -z ${LD_LIBRARY_PATH+x} ]]
+device=${!#}
+if [[ $# -eq 5 ]]; then [[ $2 == --model && $4 == --device ]]; else [[ $2 == --device ]]; fi
+[[ -z ${LD_LIBRARY_PATH+x} && -z ${ORT_AMDGPU_EP_ROOT+x} ]]
+if [[ $device == migraphx ]]; then
+  module="$(realpath -e "$(dirname "$0")/../lib/accelerantgine/libmigraphx-ep.so")"
+  [[ $1 == --onnx-only ]]
+  printf '%s migraphx\n' "${KATAGLYPHIS_BUNDLED_GLIBC:-host}" >>"$PROOF_DIR/modes"
+  case "${BAD_PLUGIN:-}" in
+    cpu) echo 'Output 0 shape: [1, 300, 6] (1800 elements)'; exit 0 ;;
+    fallback) echo "[accelerantgine:error] MIGraphX failed to register $module: no card" >&2; exit 0 ;;
+    image) echo '[accelerantgine:error] MIGraphX failed to register /image/lib/libmigraphx-ep.so: no card' >&2 ;;
+    silent) ;;
+    *) echo "[accelerantgine:error] MIGraphX failed to register $module: libmigraphx_c.so.3: cannot open shared object file" >&2 ;;
+  esac
+  exit 1
+fi
+[[ $device == cpu ]]
 printf '%s %s\n' "${KATAGLYPHIS_BUNDLED_GLIBC:-host}" "$1" >>"$PROOF_DIR/modes"
 if [[ $1 == --onnx-only ]]; then
   if [[ ${BAD_OUTPUT:-0} == 1 ]]; then echo 'bad shape'; else echo 'Output 0 shape: [1, 300, 6] (1800 elements)'; fi
@@ -67,4 +81,17 @@ if bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/missing.onnx"
   echo 'A missing model unexpectedly passed' >&2
   exit 1
 fi
+# An AMD package: without the AMD runtime the named device must fail on the package's own module, on both loaders.
+touch "$work/usr/lib/accelerantgine/libmigraphx-ep.so"
+export ORT_AMDGPU_EP_ROOT=/image
+rm "$work/modes"
+bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx"
+bash "$check" --appimage "$work/fake.AppImage"
+[[ "$(cat "$work/modes")" == $'host --onnx-only\nhost --video-check\nhost migraphx\n1 --onnx-only\n1 --video-check\n1 migraphx\nhost --onnx-only\nhost --video-check\nhost migraphx\n1 --onnx-only\n1 --video-check\n1 migraphx' ]]
+for fault in cpu fallback image silent; do
+  if BAD_PLUGIN=$fault bash "$check" --demo "$work/usr/bin/AccelerANTgine_demo" "$work/model.onnx" >/dev/null 2>&1; then
+    echo "A migraphx request answered as '$fault' unexpectedly passed" >&2
+    exit 1
+  fi
+done
 echo 'Clean-host inference checks passed.'

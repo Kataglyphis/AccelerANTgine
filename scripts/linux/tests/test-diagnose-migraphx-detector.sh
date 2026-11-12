@@ -5,13 +5,15 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/detector-fixture.sh"
 detector_fixture_tree diagnose-migraphx-detector.sh "$@"
 detector_fixture_shared_helpers
+FIXTURE_GPU_PROVIDER=$(detector_fixture_hub_provider migraphx)
+export FIXTURE_GPU_PROVIDER
 detector_fixture_demo <<'POLICY'
 [[ -z ${MIGRAPHX_UNKNOWN+x} ]]
 provider=CPUExecutionProvider
 if [[ "$device" == cpu ]]; then
   [[ -z ${MIGRAPHX_SKIP_BENCHMARKING+x} && -z ${ORT_MIGRAPHX_EXHAUSTIVE_TUNE+x} ]]
 else
-  provider=MIGraphXExecutionProvider
+  provider=$FIXTURE_GPU_PROVIDER
   case "$EXPECT_MODE" in
     exhaustive) [[ ${ORT_MIGRAPHX_EXHAUSTIVE_TUNE:-} == 1 && -z ${MIGRAPHX_SKIP_BENCHMARKING+x} ]] ;;
     skip-rocblas) [[ ${MIGRAPHX_SKIP_BENCHMARKING:-} == 1 && ${MIGRAPHX_SET_GEMM_PROVIDER:-} == rocblas ]] ;;

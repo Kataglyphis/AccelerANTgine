@@ -18,6 +18,44 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-12, MIGraphX is AMD's plugin module)
+- **`ExecutionProvider::MigraphX` goes through AMD's plugin execution provider (owner, 2026-11-12); it has not run with
+  AMD's module yet (last but one point).** Hub ffdbcf1c took `libonnxruntime_providers_migraphx.so` out of
+  `:latest-rocm`; since then every `migraphx` request here ended in `ProviderUnavailable`. The engine now looks for
+  `libmigraphx-ep.so` in `$ORT_AMDGPU_EP_ROOT/lib` when that variable is not empty, then beside the loaded
+  `libonnxruntime.so.1`; registers it once per process as `MIGraphX`; and appends one of its devices with the option
+  `device_id`. The by-name append, `migraphx_mem_limit` and the lookup in `GetAvailableProviders` are gone, with
+  `test-migraphx-limit-portability.sh`. `Src/ort_plugin.hpp` holds one row per plugin provider; CUDA keeps its present
+  loading (`BACKLOG.md`).
+- **The provider's name is `MIGraphX`.** AMD's module takes the registration name as its own, so a session and an ONNX
+  Runtime profile say `MIGraphX`, no longer `MIGraphXExecutionProvider` (read in AMD's source, not seen on a card). The
+  device name stays `migraphx`. The hub pin moves from d66d390 to da9b23a, whose `verify_ort_profile.py` expects
+  the new name; no profile from a card has been checked with it.
+- **A `migraphx` request that cannot load still fails; it does not become a CPU session.** A missing module, a failed
+  registration and a device the plugin does not offer are each `ProviderUnavailable`, and `provider_error()` names the
+  paths looked at and ONNX Runtime's reason. `provider_available(MigraphX)` now says whether the module is on disk; it
+  cannot say that a card answers. An invalid device index is `ProviderUnavailable` too, where it was
+  `SessionCreationFailed` with the in-tree provider. On Windows the request stays `ProviderUnavailable`.
+- **A registration lasts for the process.** ONNX Runtime drops a plugin with the process's last environment, and each
+  engine owns its own, so the engine keeps one environment reference for good after the first successful registration.
+  One lock covers registering, listing the devices and appending one. A name that another library of the process
+  registered first is used and not registered again, since ONNX Runtime refuses a name a second time.
+- **AMD packages carry the CPU ONNX Runtime, the plugin module and its license tree.** `-DKATAGLYPHIS_ORT_VARIANT=amd`
+  takes `/usr/local/lib/onnxruntime-cpu` (the rocm image has no GPU prefix any more), stages the module through the
+  hub's `stage_ort_runtime`, protects it in the ELF closure and from CPack's AppImage patching, and fails the install
+  when the staged file is not the image's. `packaging/third-party/components.json` lists it; its texts are the image's
+  whole `licenses/` tree and `provenance.txt`, a new `tree` text of `third_party_notices.py`.
+- **The candidate checks know the new layout.** `ci-gpu-candidate.sh` requires the image's module for `amd` and keeps
+  the wheel proof for `nvidia`. `verify-gpu-packages.sh` requires the core and the module in an AMD package, compares
+  the module and its texts with the image's in the tarball, DEB and AppImage, and proves every `libonnxruntime*` file
+  against the image's CPU build, so an in-tree provider file fails it. `check-clean-host-inference.sh` requires
+  `--device migraphx` to fail on the packaged module on a clean host. The package checks unset `ORT_AMDGPU_EP_ROOT`.
+- **Not proven:** nothing here ran with AMD's module, on a card or in the x64 rocm image. The commit suite proves the
+  search, the guard, the options and the error paths against the real ONNX Runtime with a stand-in module
+  (`Test/common/plugin_ep_stub.cpp`). The card run and what may stop it are in `BACKLOG.md`.
+- **For OmniAccelerANT:** the C ABI does not move. Its bundle must put `libmigraphx-ep.so` beside the
+  `libonnxruntime.so.1` it loads, and whatever reads a provider name there must accept `MIGraphX`.
+
 ### Changed (2026-11-12, boxes are cut to the frame)
 - **`YoloDetector` cuts every box to the picture (owner, 2026-11-12).** OxidANT's detector always did; here a box could
   reach a few pixels past the edge, as the bed's box did on ModelANT's two cats (x2 480.15 in a 480-wide frame). The

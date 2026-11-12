@@ -81,9 +81,7 @@ jobs:
         run: bash scripts/linux/tests/test-verify-package-hardening.sh
       - name: Test the ONNX Runtime package matrix
         shell: bash
-        run: |
-          bash scripts/linux/tests/test-ort-package-variant.sh
-          bash scripts/linux/tests/test-migraphx-limit-portability.sh
+        run: bash scripts/linux/tests/test-ort-package-variant.sh
       - name: Test packaged GStreamer isolation
         shell: bash
         run: |

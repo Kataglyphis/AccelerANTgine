@@ -52,7 +52,8 @@ library itself; ``Test/python`` tests the Python bindings.
        shorter than the class count, YOLOv8/11 ``[1, 4 + C, N]`` columns, the
        ``kataglyphis.output`` metadata behind ``Auto``, labels from the config,
        ``InvalidOutputShape``); the ORT thread count from the TOML config to the
-       session options; XNNPACK and DNNL running or ``ProviderUnavailable``; GStreamer frames from ``videotestsrc`` and
+       session options; XNNPACK and DNNL running or ``ProviderUnavailable``; the MIGraphX plugin's module search,
+       registration guard and error paths, with a stand-in module in place of AMD's; GStreamer frames from ``videotestsrc`` and
        ``fakesrc`` through ``appsink``, callbacks and state; the WebRTC stream
        config, its validation and a start against a refusing signalling server;
        both exports of the Rust crate, through cxx and ``extern "C"``

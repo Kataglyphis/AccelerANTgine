@@ -29,7 +29,7 @@ chmod u+x "$stage/candidate.AppImage"
 run_demo() {
   local demo=$1 registry=$2
   shift 2
-  (cd "$stage" && gpu_without_migraphx_overrides env -u LD_PRELOAD -u LD_AUDIT "${DETECTOR_EVIDENCE_GST_UNSET[@]}" \
+  (cd "$stage" && gpu_without_migraphx_overrides env -u LD_PRELOAD -u LD_AUDIT -u ORT_AMDGPU_EP_ROOT "${DETECTOR_EVIDENCE_GST_UNSET[@]}" \
     GST_REGISTRY_1_0="$registry" "$demo" "$@")
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify finished GPU packages against the original wheel and locked model.
+# Verify finished GPU packages against the image's ONNX Runtime sources and the locked model.
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then echo 'usage: verify-gpu-packages.sh PACKAGE_DIR nvidia|amd' >&2; exit 2; fi
@@ -52,20 +52,51 @@ verify_demo() {
   verify_packaged_program "$1" "$2/usr/lib/accelerantgine/AccelerANTgine_demo" 'Missing inference demo binary' 'Inference demo binary escapes package'
 }
 
+# Usage: verify_plugin_texts PREFIX; the hub has no helper for the plugin's texts, so the image's tree is read here.
+verify_plugin_texts() {
+  local packaged="$1/usr/share/licenses/AccelerANTgine/third-party/onnxruntime-ep-amdgpu" image
+  image="$(dirname "$(ort_amdgpu_ep_dir)")"
+  if [[ ! -s "$image/provenance.txt" || -z "$(find "$image/licenses" -type f -print -quit 2>/dev/null)" ]]; then
+    echo "The image has no MIGraphX plugin texts or provenance under $image" >&2; return 1
+  fi
+  if [[ -n "$(find "$packaged" -type l -print -quit 2>/dev/null)" ]] ||
+    ! diff -r "$image/licenses" "$packaged/licenses" >&2 || ! cmp "$image/provenance.txt" "$packaged/provenance.txt" >&2; then
+    echo "The package's MIGraphX plugin texts are not the image's: $packaged" >&2; return 1
+  fi
+}
+
+# Usage: verify_plugin_package PREFIX PROOF_DIR --library FILE...; every libonnxruntime* file must be the image's CPU build.
+verify_plugin_package() {
+  local prefix="$1" proof="$2" library
+  shift 2
+  ort_assert_plugin_module "$prefix/usr/lib/accelerantgine/$ORT_AMDGPU_EP_MODULE"
+  verify_plugin_texts "$prefix"
+  for library in "$@"; do
+    [[ "$library" != --library ]] || continue
+    python3 "$repo/scripts/packaging/stage_ort_texts.py" --library "$library" \
+      --chain-dir "${ORT_LIB_LOCATION:-/usr/local/lib/onnxruntime-cpu/lib}" --wheel-stager "$hub/stage-ort-wheel-licenses.py" \
+      --wheel-dir "${ORT_CHAIN_WHEEL_DIR:-/opt/onnxruntime-wheels}" --strip "${STRIP:-strip}" --destination "$proof/licenses/onnxruntime"
+  done
+}
+
 verify_tree() {
   local root="$1" prefix="$2" proof
-  local -a libraries=()
+  local -a libraries=() required=(libonnxruntime.so.1 libonnxruntime_providers_shared.so libonnxruntime_providers_cuda.so)
   root="$(realpath -e "$root")"
   prefix="$(realpath -e "$prefix")"
   require_inside "$root" "$prefix/" 'Package prefix escapes extraction root'
   verify_demo "$root" "$prefix"
   ort_assert_no_bundled_host_runtime "$root" "$kind"
-  ort_package_collect_libraries --reject-invalid "$root" "$prefix/usr/lib/accelerantgine" libraries \
-    libonnxruntime.so.1 libonnxruntime_providers_shared.so "libonnxruntime_providers_${kind}.so"
+  [[ "$kind" != migraphx ]] || required=(libonnxruntime.so.1 "$ORT_AMDGPU_EP_MODULE")
+  ort_package_collect_libraries --reject-invalid "$root" "$prefix/usr/lib/accelerantgine" libraries "${required[@]}"
   proof="$(mktemp -d "$work/proof.XXXXXX")"
-  python3 "$hub/stage-ort-wheel-licenses.py" --require-unstripped \
-    --wheel-dir "${ORT_CHAIN_WHEEL_DIR:-/opt/onnxruntime-wheels}" --destination "$proof" \
-    --strip "${STRIP:-strip}" "${libraries[@]}"
+  if [[ "$kind" == migraphx ]]; then
+    verify_plugin_package "$prefix" "$proof" "${libraries[@]}"
+  else
+    python3 "$hub/stage-ort-wheel-licenses.py" --require-unstripped \
+      --wheel-dir "${ORT_CHAIN_WHEEL_DIR:-/opt/onnxruntime-wheels}" --destination "$proof" \
+      --strip "${STRIP:-strip}" "${libraries[@]}"
+  fi
   ort_package_verify_notices "$root" "$prefix/usr/share/licenses/onnxruntime" "$proof/licenses/onnxruntime"
 }
 
@@ -89,6 +120,7 @@ env -u LD_PRELOAD -u LD_AUDIT bash "$appimage_verifier" "$work/candidate.AppImag
 (cd "$work/appimage" && env -u LD_PRELOAD -u LD_AUDIT "$work/candidate.AppImage" --appimage-extract >/dev/null)
 verify_model "$work/appimage/squashfs-root" "$work/appimage/squashfs-root"
 verify_demo "$work/appimage/squashfs-root" "$work/appimage/squashfs-root"
+[[ "$kind" != migraphx ]] || verify_plugin_texts "$work/appimage/squashfs-root"
 for relative in usr/bin/AccelerANTgine_demo usr/lib/accelerantgine/AccelerANTgine_demo; do
   cmp "$tar_prefix/$relative" "$work/deb/$relative" || { echo "GPU packages disagree on $relative" >&2; exit 1; }
   cmp "$tar_prefix/$relative" "$work/appimage/squashfs-root/$relative" || { echo "AppImage disagrees on $relative" >&2; exit 1; }

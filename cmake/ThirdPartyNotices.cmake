@@ -105,6 +105,11 @@ function(accelerantgine_install_windows_notices)
   install(CODE "${_code}")
 endfunction()
 
+# A text source that only one image has, such as the plugin module's licence tree; the inventory names it by NAME.
+function(accelerantgine_add_notice_text_root name dir)
+  set_property(GLOBAL APPEND PROPERTY ACCELERANTGINE_NOTICE_TEXT_ROOTS "${name}=${dir}")
+endfunction()
+
 # Runs after the ELF closure, so it lists what each Linux generator is about to pack.
 function(accelerantgine_install_linux_notices)
   if(NOT
@@ -141,6 +146,14 @@ function(accelerantgine_install_linux_notices)
       _search_args
       --search
       "${_dir}")
+  endforeach()
+  get_property(_text_roots GLOBAL PROPERTY ACCELERANTGINE_NOTICE_TEXT_ROOTS)
+  foreach(_root IN LISTS _text_roots)
+    list(
+      APPEND
+      _search_args
+      --text-root
+      "${_root}")
   endforeach()
   if(DEFINED ENV{ORT_CHAIN_WHEEL_DIR})
     set(_ort_wheels "$ENV{ORT_CHAIN_WHEEL_DIR}")
