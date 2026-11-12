@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-12, hub pin)
+- **The hub moves from 54857fe to d66d390 (232 commits).** CI already builds in the image and with the actions of the hub's
+  `develop`; the pin only decided which copy of the hub's scripts and gates this checkout runs, and it had fallen behind
+  the image (owner, 2026-11-12: move all pins). No shared file this repo takes from the hub changed, and the
+  consumer-pin, shared-config and ratchet gates pass at the new pin.
+
 ### Changed (2026-11-12, one box per object, and a model that does not fit is refused at the start)
 - **Corner rows are no longer suppressed (owner, 2026-11-12).** `xyxy_score_class` is the output of an end-to-end model,
   one row per object; the overlap suppression that the raw YOLO layouts need merged two same-class objects that lie
