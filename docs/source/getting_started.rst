@@ -126,6 +126,11 @@ error or the end of the stream, and ``stream_error()``, which names the failing 
 message (a camera that was unplugged, a device that is busy). ``GStreamerPipeline::pull_sample``
 returns ``StreamError`` for a failed stream and ``BufferAllocationFailed`` for a frame that did
 not come in time or a stream at its end.
+The detector checks the model against the config when it starts and logs what differs: an input
+that is not named ``images``, a fixed input size other than ``input_width`` by ``input_height``
+(``InvalidInputShape``), a layout other than the one the model names, or corner rows without six
+values (``InvalidOutputShape``). Corner rows (``xyxy_score_class``) come from an end-to-end model,
+one row per object, and are not suppressed; the two raw layouts keep ``nms_threshold``.
 
 These options require an ONNX Runtime built with the requested provider and its runtime
 dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=nvidia`` or

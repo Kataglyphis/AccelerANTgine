@@ -43,7 +43,9 @@ gtest_discover_tests(
 
 if(TARGET ${PROJECT_NAME}_demo)
   set(_golden_config "${CMAKE_CURRENT_BINARY_DIR}/golden_threads.toml")
-  file(WRITE "${_golden_config}" "[model]\nmodel_path = \"${_golden_model}\"\nintra_op_threads = 2\n")
+  # The model names its layout; a config that leaves it at the YOLO default is refused at the start.
+  file(WRITE "${_golden_config}"
+       "[model]\nmodel_path = \"${_golden_model}\"\noutput_layout = \"auto\"\nintra_op_threads = 2\n")
   add_test(NAME Golden.DemoThreadsFlagReachesTheSession COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> --model
                                                                 "${_golden_model}" --yolo-only --threads 3)
   add_test(NAME Golden.DemoConfigThreadsReachTheSession COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> --config

@@ -18,6 +18,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-12, one box per object, and a model that does not fit is refused at the start)
+- **Corner rows are no longer suppressed (owner, 2026-11-12).** `xyxy_score_class` is the output of an end-to-end model,
+  one row per object; the overlap suppression that the raw YOLO layouts need merged two same-class objects that lie
+  together. On ModelANT's two cats the detector now reports five rows where it reported four, as OxidANT and OrchestrANT
+  count them; `Test/golden/two_cats_cpu.json` is re-recorded with the demo. The raw layouts keep `nms_threshold`.
+- **`YoloDetector::initialize` compares the model with the config.** A model without an `images` input or with another
+  fixed input size is `InvalidInputShape`; a config whose layout is not the one the model names, or corner rows without
+  six values, is `InvalidOutputShape`; each with a log line that says what differs. Before, the wrong size failed every
+  frame, and a DEIM model under the default YOLO layout decoded corners as centres into boxes that looked real: a
+  `--config` without `output_layout` did exactly that. Set `output_layout = "auto"` for a model that names its layout.
+
 ### Fixed (2026-11-12, a failed image run leaves nothing behind, and the local gates see stale mutation recipes)
 - **`--detector-image` decodes the image before it creates any output.** A missing or unreadable image left an empty
   output file and profile directory, and both must be new, so the corrected run was refused too. It is also why a second

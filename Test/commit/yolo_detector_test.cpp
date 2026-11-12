@@ -302,14 +302,14 @@ TEST(YoloDetector, CornerRowsDecodeScoreClassAndScale)
       { 1, 0.5F, 3, 1.5F, 0.9F, 15 },// cat: kept
       { 1, 0.5F, 3, 1.5F, 0.3F, 15 },// under the threshold: dropped
       { 4, 0, 5, 1, 0.7F, 0 },// person: kept
-      { 4, 0, 5, 1, 0.6F, 0 },// the same person again: suppressed
+      { 4, 0, 5, 1, 0.6F, 0 },// a second person in the same place: kept, an end-to-end row is one object
       { 0, 0, 1, 1, 0.8F, 80 },// no such class: dropped
       { 2, 0, 1, 1, 0.8F, 2 },// x2 before x1: dropped
     });
     // The frame is twice the input's size each way.
     const auto result = detector.detect(rows, 12, 4);
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(result->boxes.size(), 2U);
+    ASSERT_EQ(result->boxes.size(), 3U);
     const auto &cat = result->boxes[0];
     EXPECT_EQ(cat.class_id, 15);
     EXPECT_EQ(cat.class_name, "cat");
@@ -320,6 +320,48 @@ TEST(YoloDetector, CornerRowsDecodeScoreClassAndScale)
     EXPECT_FLOAT_EQ(cat.height, 2.0F);
     EXPECT_EQ(result->boxes[1].class_name, "person");
     EXPECT_FLOAT_EQ(result->boxes[1].confidence, 0.7F);
+    EXPECT_EQ(result->boxes[2].class_name, "person");
+    EXPECT_FLOAT_EQ(result->boxes[2].confidence, 0.6F);
+}
+
+TEST(YoloDetector, AModelThatDoesNotFitTheConfigIsRefusedAtTheStart)
+{
+    constexpr YoloReshapeGeometry kCorners{ 2, 6, 6, 6 };
+    const TempFile corners("kataglyphis-corners", ".onnx", kataglyphis::test::yolo_reshape_model(kCorners));
+    detection::YoloConfig config;
+    config.model_path = corners.path();
+    config.input_width = 6;
+    config.input_height = 2;
+    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    detection::YoloDetector detector;
+    ASSERT_TRUE(detector.initialize(config).has_value());
+
+    // The model fixes 6x2 frames: another size failed every frame, and only there.
+    config.input_width = 8;
+    EXPECT_EQ(kataglyphis::test::error_of(detector.initialize(config)), detection::OnnxError::InvalidInputShape);
+    EXPECT_FALSE(detector.is_initialized());
+
+    // Seven values a row cannot be corner rows.
+    const TempFile seven("kataglyphis-seven", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    config.model_path = seven.path();
+    config.input_width = static_cast<std::uint32_t>(kTwoClasses.width);
+    EXPECT_EQ(kataglyphis::test::error_of(detector.initialize(config)), detection::OnnxError::InvalidOutputShape);
+
+    // The model names its own layout, the config another: decoding corners as centres gave boxes that looked real.
+    const TempFile named("kataglyphis-named",
+      ".onnx",
+      kataglyphis::test::yolo_reshape_model(kCorners, { { "kataglyphis.output", "xyxy_score_class" } }));
+    config.model_path = named.path();
+    config.input_width = 6;
+    config.output_layout = detection::YoloOutputLayout::CenterObjectnessScores;
+    EXPECT_EQ(kataglyphis::test::error_of(detector.initialize(config)), detection::OnnxError::InvalidOutputShape);
+    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    EXPECT_TRUE(detector.initialize(config).has_value());
+
+    // A model without an input named images.
+    const TempFile relu("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());
+    config.model_path = relu.path();
+    EXPECT_EQ(kataglyphis::test::error_of(detector.initialize(config)), detection::OnnxError::InvalidInputShape);
 }
 
 TEST(YoloDetector, ShortRowsNeverReadTheNextRowsValues)

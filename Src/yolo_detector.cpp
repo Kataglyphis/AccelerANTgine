@@ -233,6 +233,56 @@ namespace {
     }
 }// namespace
 
+namespace {
+    // A dimension the model fixes; dynamic ones come back as 0 or as a wrapped -1.
+    auto fixed(const std::vector<std::size_t> &dimensions, std::size_t index) -> std::optional<std::size_t>
+    {
+        if (index >= dimensions.size()) { return std::nullopt; }
+        const std::size_t value = dimensions[index];
+        if (value == 0 || value > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) {
+            return std::nullopt;
+        }
+        return value;
+    }
+
+    // The input tensor, its size and the output layout, as far as the model file fixes them, against the config.
+    auto model_fits(const inference::OnnxInferenceEngine &engine, const YoloConfig &config, std::string_view declared)
+      -> std::expected<void, OnnxError>
+    {
+        const auto input = engine.get_input_shape("images");
+        if (!input) {
+            log::error("The detector model has no input named images");
+            return std::unexpected(OnnxError::InvalidInputShape);
+        }
+        const auto height = fixed(input->dimensions, 2);
+        const auto width = fixed(input->dimensions, 3);
+        if ((height && *height != config.input_height) || (width && *width != config.input_width)) {
+            log::error("The detector model takes {}x{} frames, the config says {}x{}",
+              width.value_or(0),
+              height.value_or(0),
+              config.input_width,
+              config.input_height);
+            return std::unexpected(OnnxError::InvalidInputShape);
+        }
+        if (const auto layout = layout_from_metadata(declared); layout && *layout != config.output_layout) {
+            log::error(
+              "The detector model names its output layout {}, the config another: set output_layout to auto", declared);
+            return std::unexpected(OnnxError::InvalidOutputShape);
+        }
+        std::optional<std::size_t> values;
+        if (const auto outputs = engine.get_output_names(); !outputs.empty()) {
+            if (const auto output = engine.get_output_shape(outputs.front()); output && !output->dimensions.empty()) {
+                values = fixed(output->dimensions, output->dimensions.size() - 1);
+            }
+        }
+        if (config.output_layout == YoloOutputLayout::CornersScoreClass && values && *values != 6) {
+            log::error("Corner rows have 6 values, the detector model's output has {}", *values);
+            return std::unexpected(OnnxError::InvalidOutputShape);
+        }
+        return {};
+    }
+}// namespace
+
 auto layout_from_metadata(std::string_view value) -> std::optional<YoloOutputLayout>
 {
     if (value == "xyxy_score_class") { return YoloOutputLayout::CornersScoreClass; }
@@ -326,7 +376,8 @@ auto decode_detections(const inference::TensorData &output, const YoloConfig &co
     case YoloOutputLayout::Auto:
         return std::unexpected(OnnxError::InvalidOutputShape);
     }
-    apply_nms(boxes, config.nms_threshold);
+    // Corner rows come from an end-to-end model, one per object: suppressing them merged two cats lying together.
+    if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }
     return boxes;
 }
 
@@ -442,11 +493,16 @@ auto YoloDetector::initialize(const YoloConfig &config, const std::filesystem::p
     auto result = impl_->engine.initialize(session_config);
     if (!result) { return std::unexpected(result.error()); }
 
+    const auto named = impl_->engine.get_custom_metadata("kataglyphis.output");
+    const auto declared = named ? layout_from_metadata(*named) : std::nullopt;
     if (config.output_layout == YoloOutputLayout::Auto) {
-        const auto named = impl_->engine.get_custom_metadata("kataglyphis.output");
-        const auto layout = named ? layout_from_metadata(*named) : std::nullopt;
-        if (!layout) { return std::unexpected(OnnxError::InvalidOutputShape); }
-        impl_->config.output_layout = *layout;
+        if (!declared) { return std::unexpected(OnnxError::InvalidOutputShape); }
+        impl_->config.output_layout = *declared;
+    }
+    // At the start, with the reason: a model that does not fit the config otherwise fails every frame, or decodes nonsense.
+    if (auto fits = model_fits(impl_->engine, impl_->config, named ? std::string_view(*named) : std::string_view{});
+      !fits) {
+        return std::unexpected(fits.error());
     }
 
     impl_->initialized = true;

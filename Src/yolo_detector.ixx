@@ -96,7 +96,7 @@ struct YoloConfig
 [[nodiscard]] KATAGLYPHIS_CPP_API auto yolo_config_from(const config::ModelConfig &model)
   -> std::expected<YoloConfig, config::ConfigError>;
 
-// Decodes with config's layout, then suppresses overlaps; a shape the layout cannot read is InvalidOutputShape.
+// Decodes with config's layout; the two raw layouts then suppress overlaps, corner rows are one per object already.
 [[nodiscard]] KATAGLYPHIS_CPP_API auto decode_detections(const inference::TensorData &output,
   const YoloConfig &config,
   const FrameMapping &mapping) -> std::expected<std::vector<BoundingBox>, OnnxError>;
