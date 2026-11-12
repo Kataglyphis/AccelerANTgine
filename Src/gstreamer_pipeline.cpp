@@ -14,6 +14,7 @@ module;
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -183,6 +184,10 @@ struct GStreamerPipeline::Impl
     std::mutex callback_mutex;
     std::atomic<bool> is_playing{ false };
     std::atomic<bool> is_paused{ false };
+    std::atomic<bool> ended{ false };
+    std::atomic<bool> failed{ false };
+    std::mutex error_mutex;
+    std::string stream_error;
 
     GMainLoop *main_loop{ nullptr };
     std::thread main_loop_thread;
@@ -201,7 +206,9 @@ struct GStreamerPipeline::Impl
         if (pipeline != nullptr) {
             gst_element_set_state(pipeline, GST_STATE_NULL);
             wait_for_callbacks();
+            set_bus_handler(nullptr);
         }
+        forget_stream_end();
         // Both hold their own reference, so the pipeline below is only freed once they let go.
         if (appsink != nullptr) {
             if (callbacks_installed) {
@@ -222,6 +229,46 @@ struct GStreamerPipeline::Impl
 
     // No callback runs after the NULL state change; the lock makes that ordering visible to TSan as well.
     void wait_for_callbacks() { std::scoped_lock lock(callback_mutex); }
+
+    // Nothing else reads the bus: without a handler an error upstream is invisible, and every message stays queued.
+    void set_bus_handler(GstBusSyncHandler handler)
+    {
+        GstBus *bus = gst_element_get_bus(pipeline);
+        gst_bus_set_sync_handler(bus, handler, handler != nullptr ? this : nullptr, nullptr);
+        gst_object_unref(bus);
+    }
+
+    void forget_stream_end()
+    {
+        std::scoped_lock lock(error_mutex);
+        stream_error.clear();
+        failed.store(false);
+        ended.store(false);
+    }
+
+    static auto on_bus_message([[maybe_unused]] GstBus *bus, GstMessage *message, gpointer user_data) -> GstBusSyncReply
+    {
+        auto *self = static_cast<Impl *>(user_data);
+        if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_EOS) {
+            self->ended.store(true);
+        } else if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
+            GError *error = nullptr;
+            gst_message_parse_error(message, &error, nullptr);
+            {
+                std::scoped_lock lock(self->error_mutex);
+                // The first error names the cause; the elements around it only report that the stream broke.
+                if (!self->failed.load()) {
+                    const GstObject *source = GST_MESSAGE_SRC(message);
+                    self->stream_error = source != nullptr ? std::string(GST_OBJECT_NAME(source)) + ": " : "";
+                    self->stream_error += error != nullptr ? error->message : "unknown error";
+                }
+                self->failed.store(true);
+            }
+            g_clear_error(&error);
+        }
+        gst_message_unref(message);
+        return GST_BUS_DROP;
+    }
 
     // The C API, not the appsink signals, which delivered nothing on Windows (run 36902874261).
     void connect_buffer_callback()
@@ -308,6 +355,7 @@ auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::ex
     auto pipeline = parse_pipeline_description(config.pipeline_description, "Pipeline creation failed");
     if (!pipeline) { return std::unexpected(pipeline.error()); }
     impl_->pipeline = *pipeline;
+    impl_->set_bus_handler(&Impl::on_bus_message);
 
     // Without it pull_sample and the buffer callback have nothing to talk to.
     impl_->appsink = find_element_of_type(impl_->pipeline, GST_TYPE_APP_SINK);
@@ -338,6 +386,7 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
       inference_pipeline_description(input_source, model_path, output_format), "Inference pipeline creation failed");
     if (!pipeline) { return std::unexpected(pipeline.error()); }
     impl_->pipeline = *pipeline;
+    impl_->set_bus_handler(&Impl::on_bus_message);
 
     impl_->appsink = gst_bin_get_by_name(GST_BIN(impl_->pipeline), "sink");
     if (impl_->appsink == nullptr) { return std::unexpected(GStreamerError::ElementCreationFailed); }
@@ -351,6 +400,9 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
 auto GStreamerPipeline::start() -> std::expected<void, GStreamerError>
 {
     if (impl_->pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
+
+    // A resume keeps what the running stream reported; a new run starts without the last one's end.
+    if (!impl_->is_playing.load()) { impl_->forget_stream_end(); }
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_PLAYING);
 
@@ -389,6 +441,15 @@ auto GStreamerPipeline::pause() -> std::expected<void, GStreamerError>
 
 auto GStreamerPipeline::is_playing() const -> bool { return impl_->is_playing.load() && !impl_->is_paused.load(); }
 
+auto GStreamerPipeline::has_ended() const -> bool { return impl_->ended.load() || impl_->failed.load(); }
+
+auto GStreamerPipeline::stream_error() const -> std::optional<std::string>
+{
+    std::scoped_lock lock(impl_->error_mutex);
+    if (!impl_->failed.load()) { return std::nullopt; }
+    return impl_->stream_error;
+}
+
 auto GStreamerPipeline::set_buffer_callback(BufferCallback callback) -> void
 {
     {
@@ -413,7 +474,11 @@ auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms) -> std::expected<B
         sample = gst_app_sink_try_pull_sample(GST_APP_SINK(impl_->appsink), timeout);
     }
 
-    if (sample == nullptr) { return std::unexpected(GStreamerError::BufferAllocationFailed); }
+    // A failed stream is not a frame that is late: the caller of a camera has to tell the two apart.
+    if (sample == nullptr) {
+        return std::unexpected(
+          impl_->failed.load() ? GStreamerError::StreamError : GStreamerError::BufferAllocationFailed);
+    }
 
     auto buffer_info = extract_buffer_info(sample);
     gst_sample_unref(sample);

@@ -116,6 +116,74 @@ TEST(GStreamerPipeline, PullsFramesWithTheirMetadata)
     EXPECT_TRUE(pipeline.stop().has_value());
 }
 
+TEST(GStreamerPipeline, AStreamThatEndsSaysSoAndARestartForgetsIt)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
+    gstreamer::GStreamerPipeline pipeline;
+    ASSERT_TRUE(pipeline.create_pipeline_from_string(std::string(kThreeBlackFrames)).has_value());
+    EXPECT_FALSE(pipeline.has_ended());
+    ASSERT_TRUE(pipeline.start().has_value());
+    const auto timeout = static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count());
+    for (int frame = 0; frame < 3; ++frame) { ASSERT_TRUE(pipeline.pull_sample(timeout).has_value()); }
+    // The end is no error: the caller of a file sees it as the stream's end, not as a failure.
+    EXPECT_EQ(
+      kataglyphis::test::error_of(pipeline.pull_sample(timeout)), gstreamer::GStreamerError::BufferAllocationFailed);
+    const auto deadline = std::chrono::steady_clock::now() + kataglyphis::test::kStreamTimeout;
+    while (!pipeline.has_ended() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    EXPECT_TRUE(pipeline.has_ended());
+    EXPECT_FALSE(pipeline.stream_error().has_value());
+    EXPECT_TRUE(pipeline.stop().has_value());
+
+    // An endless stream, so the restart cannot have ended again by the time it is asked.
+    ASSERT_TRUE(pipeline
+        .create_pipeline_from_string("videotestsrc is-live=true pattern=black "
+                                     "! video/x-raw,format=RGBA,width=8,height=4,framerate=30/1 "
+                                     "! appsink name=sink sync=false max-buffers=1 drop=true")
+        .has_value());
+    ASSERT_TRUE(pipeline.start().has_value());
+    ASSERT_TRUE(pipeline.pull_sample(timeout).has_value());
+    EXPECT_FALSE(pipeline.has_ended());
+    EXPECT_TRUE(pipeline.stop().has_value());
+}
+
+TEST(GStreamerPipeline, AnErrorUpstreamIsAStreamErrorThatNamesItsElement)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "identity", "appsink");
+    gstreamer::GStreamerPipeline pipeline;
+    // identity fails at its second buffer, as a camera does when it is unplugged.
+    ASSERT_TRUE(pipeline
+        .create_pipeline_from_string("videotestsrc pattern=black "
+                                     "! video/x-raw,format=RGBA,width=8,height=4,framerate=30/1 "
+                                     "! identity name=unplugged error-after=2 ! appsink name=sink sync=false")
+        .has_value());
+    ASSERT_TRUE(pipeline.start().has_value());
+    const auto timeout = static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count());
+    ASSERT_TRUE(pipeline.pull_sample(timeout).has_value());
+    EXPECT_EQ(kataglyphis::test::error_of(pipeline.pull_sample(timeout)), gstreamer::GStreamerError::StreamError);
+    EXPECT_TRUE(pipeline.has_ended());
+    const auto reason = pipeline.stream_error();
+    ASSERT_TRUE(reason.has_value());
+    EXPECT_TRUE(reason->starts_with("unplugged: ")) << *reason;
+    EXPECT_GT(reason->size(), std::string_view("unplugged: ").size());
+    EXPECT_TRUE(pipeline.stop().has_value());
+}
+
+TEST(GStreamerPipeline, AStartThatFailsSaysWhy)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("filesrc", "appsink");
+    gstreamer::GStreamerPipeline pipeline;
+    ASSERT_TRUE(
+      pipeline.create_pipeline_from_string("filesrc name=absent location=/kataglyphis/no/such/file ! appsink name=sink")
+        .has_value());
+    EXPECT_EQ(kataglyphis::test::error_of(pipeline.start()), gstreamer::GStreamerError::StateChangeFailed);
+    const auto reason = pipeline.stream_error();
+    ASSERT_TRUE(reason.has_value());
+    EXPECT_TRUE(reason->starts_with("absent: ")) << *reason;
+    EXPECT_FALSE(pipeline.is_playing());
+}
+
 TEST(GStreamerPipeline, PullingWithoutATimeoutWaitsForTheNextFrame)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");

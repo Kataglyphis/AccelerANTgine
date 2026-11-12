@@ -695,6 +695,11 @@ auto VideoDetectorPipeline::last_error() const -> std::optional<OnnxError>
 
 auto VideoDetectorPipeline::is_running() const -> bool { return impl_->running.load(); }
 
+auto VideoDetectorPipeline::has_ended() const -> bool { return impl_->pipeline.has_ended(); }
+
+auto VideoDetectorPipeline::stream_error() const -> std::optional<std::string>
+{ return impl_->pipeline.stream_error(); }
+
 auto VideoDetectorPipeline::end_profiling() -> std::expected<std::string, OnnxError>
 {
     const std::scoped_lock lifecycle_lock(impl_->lifecycle_mutex);

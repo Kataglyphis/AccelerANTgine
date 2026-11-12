@@ -184,6 +184,10 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
 
     [[nodiscard]] auto is_running() const -> bool;
 
+    // The callbacks only fire for frames, so a stream that ended on its own is asked for here.
+    [[nodiscard]] auto has_ended() const -> bool;
+    [[nodiscard]] auto stream_error() const -> std::optional<std::string>;
+
     [[nodiscard]] auto end_profiling() -> std::expected<std::string, OnnxError>;
 
   private:

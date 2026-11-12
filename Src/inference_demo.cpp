@@ -312,13 +312,14 @@ static auto run_video_detection_check(const detection::YoloConfig &yolo_config,
         ready.notify_one();
     });
     if (!pipeline.start()) {
-        std::cerr << "Video pipeline failed to start\n";
+        std::cerr << "Video pipeline failed to start: " << pipeline.stream_error().value_or("no reason given") << "\n";
         return 1;
     }
     {
         std::unique_lock lock(mutex);
         (void)ready.wait_for(lock, std::chrono::seconds(60), [&] { return detected || failed; });
     }
+    if (const auto broken = pipeline.stream_error()) { std::cerr << "Video stream failed: " << *broken << "\n"; }
     const bool stopped = pipeline.stop().has_value();
     bool success;
     {

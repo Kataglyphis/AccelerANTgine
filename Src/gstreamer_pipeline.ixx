@@ -7,6 +7,7 @@ module;
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -95,6 +96,12 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     [[nodiscard]] auto pause() -> std::expected<void, GStreamerError>;
 
     [[nodiscard]] auto is_playing() const -> bool;
+
+    // True once the stream reached its end or an element reported an error, since the last start.
+    [[nodiscard]] auto has_ended() const -> bool;
+
+    // What the first failing element reported, such as a camera that was unplugged or a device that is busy.
+    [[nodiscard]] auto stream_error() const -> std::optional<std::string>;
 
     auto set_buffer_callback(BufferCallback callback) -> void;
 

@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-12, a stream that ends or breaks is visible)
+- **`GStreamerPipeline` reads its bus.** Nothing did, so a camera that was unplugged, a device that was busy and a
+  video that reached its end all looked the same from outside: `pull_sample` returned `BufferAllocationFailed`, as it
+  does for a frame that is merely late, and `VideoDetectorPipeline`, whose callbacks fire only for frames, looked alive
+  for ever. `pull_sample` returns `StreamError` once an element reported an error, `has_ended()` is true after an
+  error or the end of the stream, and `stream_error()` gives the failing element and its message, also for a `start()`
+  that failed. `VideoDetectorPipeline` passes both on. The bus messages are dropped once read; they stayed queued for
+  the pipeline's whole life.
+
 ### Fixed (2026-11-12, text that is not UTF-8, and a query during a generation)
 - **A message that is not UTF-8 is `InvalidOptions`; it ended the process.** The chat messages go through the JSON writer,
   which has no error to return in a build without exceptions and called `abort()` on a broken sequence. The C API and the

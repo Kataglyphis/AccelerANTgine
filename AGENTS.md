@@ -187,6 +187,8 @@ written out rather than linked.
   `last_error()` and calls `set_error_callback`'s callback for failed frames. `start()` resets
   the stored error; a successful frame does not erase it. Without a callback the pipeline logs
   a changed error to stderr. Preserve these semantics when changing the streaming path.
+  A stream that ends or breaks fires no callback; `has_ended()` and `stream_error()` report it,
+  from the bus sync handler that is the bus's only reader.
 
 - **Static analysis reports; it never rewrites.** clang-tidy runs without `-fix` on Linux and in
   `Build-Windows.ps1`, writes `logs/code-quality/clang-tidy.txt` (the quality-report clang-tidy

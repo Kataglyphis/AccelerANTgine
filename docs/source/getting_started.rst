@@ -121,6 +121,11 @@ workflow checks both the direct ONNX and video profiles; the video check does no
 optional GStreamer tensor inference plugins.
 The camera and video detection factories also accept a ``YoloConfig`` overload, so callers can
 select its execution provider and device instead of the path-only factories' CPU default.
+A stream that stops on its own fires no callback: ask ``has_ended()``, which is true after an
+error or the end of the stream, and ``stream_error()``, which names the failing element and its
+message (a camera that was unplugged, a device that is busy). ``GStreamerPipeline::pull_sample``
+returns ``StreamError`` for a failed stream and ``BufferAllocationFailed`` for a frame that did
+not come in time or a stream at its end.
 
 These options require an ONNX Runtime built with the requested provider and its runtime
 dependencies. For a top-level Linux package build, ``-DKATAGLYPHIS_ORT_VARIANT=nvidia`` or

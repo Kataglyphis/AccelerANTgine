@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -505,6 +506,34 @@ TEST(VideoDetectorPipeline, RunsTheDetectorOnEveryFrame)
     EXPECT_EQ(detections.count(), 3);
     std::scoped_lock lock(sizes_mutex);
     EXPECT_EQ(widths, (std::vector<std::uint32_t>{ 640, 640, 640 }));
+}
+
+TEST(VideoDetectorPipeline, AStreamThatBreaksIsSeenWithoutAFrame)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "identity", "appsink");
+    const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+
+    detection::VideoDetectionConfig config;
+    config.yolo_config = two_class_config(model);
+    // identity fails at its second buffer, as a camera does when it is unplugged.
+    config.gstreamer_config.pipeline_description =
+      "videotestsrc pattern=black ! video/x-raw,format=RGB,width=640,height=480,framerate=30/1 "
+      "! identity name=unplugged error-after=2 ! appsink name=sink sync=false";
+
+    detection::VideoDetectorPipeline pipeline;
+    ASSERT_TRUE(pipeline.initialize(config).has_value());
+    EXPECT_FALSE(pipeline.has_ended());
+    ASSERT_TRUE(pipeline.start().has_value());
+    const auto deadline = std::chrono::steady_clock::now() + kataglyphis::test::kStreamTimeout;
+    while (!pipeline.has_ended() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    // No callback fires for a frame that never comes; before, the pipeline looked alive for ever.
+    EXPECT_TRUE(pipeline.has_ended());
+    const auto reason = pipeline.stream_error();
+    ASSERT_TRUE(reason.has_value());
+    EXPECT_TRUE(reason->starts_with("unplugged: ")) << *reason;
+    EXPECT_TRUE(pipeline.stop().has_value());
 }
 
 TEST(VideoDetectorPipeline, ReportsUnsupportedFramesThroughTheErrorCallback)
