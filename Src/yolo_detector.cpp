@@ -299,6 +299,18 @@ namespace {
         }
         return {};
     }
+
+    // The model's own word on how a frame is fitted: the other fitting gives wrong boxes on every frame, without an error.
+    auto preprocess_fits(const inference::OnnxInferenceEngine &engine, const YoloConfig &config)
+      -> std::expected<void, OnnxError>
+    {
+        const auto named = engine.get_custom_metadata("kataglyphis.preprocess");
+        const std::string_view wanted =
+          config.preprocess_mode == FramePreprocessMode::Letterbox ? "letterbox" : "stretch";
+        if (!named || named->empty() || *named == wanted) { return {}; }
+        log::error("The detector model names its preprocessing {}, the config says {}", *named, wanted);
+        return std::unexpected(OnnxError::InvalidInputShape);
+    }
 }// namespace
 
 auto layout_from_metadata(std::string_view value) -> std::optional<YoloOutputLayout>
@@ -527,6 +539,7 @@ auto YoloDetector::initialize(const YoloConfig &config, const std::filesystem::p
       !fits) {
         return std::unexpected(fits.error());
     }
+    if (auto fits = preprocess_fits(impl_->engine, impl_->config); !fits) { return std::unexpected(fits.error()); }
 
     impl_->initialized = true;
     return {};

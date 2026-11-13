@@ -217,20 +217,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when `TheShapeOfASequenceOutputIsInvalidOutputType` (the existing `sequence_output_model()`) and
   `ADynamicDimensionIsReportedAsDynamic` pass under ASan and UBSan, with one pytest for the bound getters.
 
-- [ ] **The model names its preprocessing, and C++ never reads it** (S, ★★). The DEIM model carries
-  `kataglyphis.preprocess=stretch` beside `kataglyphis.output`
-  (`third_party/ModelANT/models/deim_dfine_n_coco/model.json:17-21`). `YoloDetector::initialize` reads the output
-  key, and nothing reads the preprocess key, so a model that wants letterbox would be stretched and give wrong boxes
-  without an error. Latent: ModelANT ships one model family. The two builders that take only a model path
-  (`create_camera_detection_pipeline`, `create_video_detection_pipeline`) use the `YoloConfig` defaults, the YOLOv5
-  layout, so since a3bc65d they refuse a model that names another layout, the shipped one too; only the test
-  `VideoDetectorPipeline.FactoriesFailOnAMissingModel` calls them.
-
-  First: in `initialize`, where the output key is read, fail with a clear error when the model's
-  `kataglyphis.preprocess` contradicts `preprocess_mode`; no default changes, the policy stays with `YoloConfig`.
-  Ask the owner whether the two path-only builders move to `Auto` or go (an API break for `CHANGELOG.md`).
-  Done when a commit test builds a model with the key (`Test/common/kataglyphis_test_support.h` writes
-  `metadata_props`), asks for the other mode and sees `initialize` fail.
+- [b] **The two path-only pipeline builders refuse the shipped model** (S, ★; waits for an owner decision).
+  `create_camera_detection_pipeline` and `create_video_detection_pipeline` take only a model path and use the
+  `YoloConfig` defaults, the YOLOv5 layout, so since a3bc65d they refuse a model that names another layout, the
+  shipped one too; only the test `VideoDetectorPipeline.FactoriesFailOnAMissingModel` calls them. Decide whether
+  they move to `Auto` or go (an API break for `CHANGELOG.md`).
 
 - [ ] **"Newest frame, no backlog" is tested as text only, and the pipeline counts nothing** (M, ★★; not
   double-checked). `YoloDetector.TheCameraPipelineKeepsOneFrameBetweenCaptureAndTheDetector` checks substrings of
@@ -330,13 +321,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   frame's sides swapped in `preprocess_frame`, and `detect` naming the input as the frame, fail the
   `FramePreprocessing` and `YoloDetector` tests. The contract without `decode`, or with no decode case, fails the
   replay.
-
-- [ ] **An old `uv` is not told that it is too old** (S, ★★). `uv.lock` is revision 5 and `pyproject.toml` sets no
-  `required-version` under `[tool.uv]`. On the Pi uv 0.11.3 met a hub pin of 0.13, and the failure looked like a
-  broken lock (reported; not run again for this entry).
-  First: `required-version` as a lower bound, not the hub's exact pin, or every newer local uv breaks.
-  Done when an older uv stops with the version it needs. Hub side: the consumer-pins gate holds the bound at or
-  below `UV_VERSION`.
 
 - [b] **The same schema failure is `InvalidOptions` here and `GenerationFailed` in Rust** (S, ★★; waits for an
   owner decision). With a schema set, a generator error other than "Guidance is unavailable" becomes

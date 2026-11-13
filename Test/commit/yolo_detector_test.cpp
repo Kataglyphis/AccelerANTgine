@@ -1030,6 +1030,23 @@ TEST(YoloDetector, AutoWithoutAKnownLayoutFailsInitialize)
     }
 }
 
+TEST(YoloDetector, AModelThatNamesAnotherPreprocessingFailsInitialize)
+{
+    const TempFile model("kataglyphis-preprocess",
+      ".onnx",
+      kataglyphis::test::yolo_reshape_model(kTwoClasses, { { "kataglyphis.preprocess", "letterbox" } }));
+    auto config = two_class_config(model);
+    config.preprocess_mode = detection::FramePreprocessMode::Stretch;
+    detection::YoloDetector detector;
+    EXPECT_EQ(kataglyphis::test::error_of(detector.initialize(config)), detection::OnnxError::InvalidInputShape);
+    EXPECT_FALSE(detector.is_initialized());
+    // The fitting the model names passes, and so does a model that names none.
+    config.preprocess_mode = detection::FramePreprocessMode::Letterbox;
+    EXPECT_TRUE(detector.initialize(config).has_value());
+    const TempFile silent("kataglyphis-preprocess", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    EXPECT_TRUE(detector.initialize(two_class_config(silent)).has_value());
+}
+
 TEST(YoloDetector, AnOutputOfTheWrongClassCountIsInvalidOutputShape)
 {
     const TempFile model("kataglyphis-yolov8", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));

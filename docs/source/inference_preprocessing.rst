@@ -44,6 +44,9 @@ DEIM-D-FINE-N choose stretch and ``YoloOutputLayout::CornersScoreClass``: its ro
 ``x1, y1, x2, y2, score, class`` in model-input pixels. The legacy
 ``CenterObjectnessScores`` layout remains the default for callers using that YOLO export.
 These configuration choices are explicit; the detector does not infer them from a byte count.
+``initialize`` holds them to the model: a model whose ``kataglyphis.preprocess`` names the other
+fitting, or whose ``kataglyphis.output`` names another layout, fails at the start with both names
+in the log.
 
 The camera factory keeps one frame at most between capture and the detector (a leaky queue and
 ``appsink max-buffers=1 drop=true``), so a detector slower than the camera sees the newest

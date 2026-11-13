@@ -18,6 +18,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-13, two small backlog entries)
+- **A model that names another preprocessing than the config fails at the start.** The DEIM model carries
+  `kataglyphis.preprocess=stretch` beside `kataglyphis.output`, and `YoloDetector::initialize` read only the output
+  key: a model that wants letterbox would have been stretched and given wrong boxes on every frame without an
+  error. `initialize` now returns `InvalidInputShape` and logs both names when the model's key contradicts
+  `YoloConfig::preprocess_mode`; a model without the key passes as before, and no default changes.
+- **An old `uv` is told that it is too old.** `pyproject.toml` sets `required-version = ">=0.11.3"` under
+  `[tool.uv]`, a lower bound and not the hub's pin, so a newer local uv keeps working. A uv below the bound stops
+  with `Required uv version ... does not match the running version` (seen with 0.11.3 against a bound of 0.13.7).
+  0.11.3 is the oldest release seen reading the revision-5 lock (`uv export --locked` on the Pi), not a proven first
+  one. The "broken lock" the Pi once showed was a nested docs submodule off its pinned commit, not the age of uv.
+
 ### Changed (2026-11-13, the hub's hook pair)
 - **A push runs the lint gates and the script suites.** The hub pin moves from da9b23a to ed3d170, which holds the
   consumer hook pair: `git config core.hooksPath third_party/ANTfrastructure/shared/linux/templates/git-hooks` once
