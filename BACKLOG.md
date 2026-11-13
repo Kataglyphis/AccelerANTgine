@@ -70,12 +70,13 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   operators in the profile under the provider name `MIGraphX`. Then run the commit suite once with
   `-DKATAGLYPHIS_TEST_MIGRAPHX=ON`.
 
-  What is likely to stop the first run, in order:
-  1. The wheel proof and the bundle census, as OxidANT's first builds on `:latest-rocm` met them: hub BACKLOG CON256
-     (i). Here that is `verify-ort-appimage-payload.sh … amd` in CPack's AppImage check, which may ask for the
-     wheel's exact bytes where the image strips the CPU core; the tarball and DEB checks prove the core against the
-     image's CPU build (`stage_ort_texts.py`) and need no wheel. This repo calls no census on its Linux packages;
-     if it adds one, the hub's `--library-path` (pin ed3d170 holds it) names the launcher's directory.
+  The first run (43409259960, a2345f4, hub pin ed3d170) built the amd-x64 tarball and DEB in `:latest-rocm` with
+  their licence proofs, and stopped where item 1 expected. What stops it, in order:
+  1. Seen: `verify-ort-appimage-payload.sh … amd` in CPack's AppImage check fails with `expected one wheel matching
+     every native library; found 0`. It asks for the wheel's exact bytes where the image strips the CPU core: hub
+     BACKLOG CON256 (i), whose fix needs an x86-64 host. Until then the amd leg is red on every `[ci gpu-lin]` and
+     `[ci all]` run, and its clean-host job with it. This repo calls no census on its Linux packages; if it adds
+     one, the hub's `--library-path` (pin ed3d170 holds it) names the launcher's directory.
   2. The profile's provider name: the hub's `verify_ort_profile.py` expects `MIGraphX`, and
      `test-diagnose-migraphx-detector.sh` reads the name from the pinned hub's table, so only a card shows a mismatch.
   3. Never run anywhere: the hub's `stage_ort_runtime … amd` in `CPackOptions.cmake`, the ELF closure with the module
