@@ -241,6 +241,27 @@ TEST_F(TextGeneration, AStopStringThatNeverCompletesReleasesTheHeldText)
     EXPECT_EQ(result->finish_reason, text::FinishReason::Length);
 }
 
+TEST_F(TextGeneration, ASchemaThatIsNoJsonObjectIsInvalidAndOneTheGeneratorRefusesIsItsFailure)
+{
+    // The caller's mistake, refused before the engine: the same answer OxidANT gives.
+    for (const char *no_object : { "[]", "{", "\"object\"", "7" }) {
+        auto options = budget(1);
+        options.json_schema = no_object;
+        EXPECT_EQ(kataglyphis::test::error_of(generator.generate(user(expected.prompt), options)),
+          text::TextGenError::InvalidOptions)
+          << no_object;
+    }
+    // An object the grammar compiler refuses is the generator's failure, not an option the caller got wrong.
+    auto options = budget(1);
+    options.json_schema = R"({"type":"object","properties":{"a":{"$ref":"#/definitions/nowhere"}},"required":["a"]})";
+    const auto refused = kataglyphis::test::error_of(generator.generate(user(expected.prompt), options));
+    if constexpr (!kataglyphis::test::kGenaiHasGuidance) {
+        EXPECT_EQ(refused, text::TextGenError::JsonSchemaUnsupported);
+    } else {
+        EXPECT_EQ(refused, text::TextGenError::GenerationFailed);
+    }
+}
+
 TEST_F(TextGeneration, ANegativeSeedOrAnEmptyStopStringIsInvalid)
 {
     auto negative = budget(1);

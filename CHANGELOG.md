@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-13, a schema failure has the same kind as in Rust; owner decision)
+- **A generator that refuses a schema is `GenerationFailed`.** With a schema set, `TextGenerator::generate` turned
+  every generator error but "Guidance is unavailable" into `InvalidOptions`; OxidANT calls the same case
+  `GenerationFailed`. C++ now does too. **A caller that matched `InvalidOptions` for it matches
+  `GenerationFailed`** (status 8 in the C API, where it was 7).
+- **A schema that is no JSON object is `InvalidOptions` before the engine sees it**, as in OxidANT; before, the
+  engine's own complaint decided.
+
 ### Changed (2026-11-13, two owner decisions)
 - **A late frame and the end of a stream have codes of their own.** `YoloDetector::detect_from_gstreamer` returned
   `InputAllocationFailed` for every failed pull. It now returns `OnnxError::FrameTimeout` when no frame came in

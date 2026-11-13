@@ -313,14 +313,12 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `FramePreprocessing` and `YoloDetector` tests. The contract without `decode`, or with no decode case, fails the
   replay.
 
-- [ ] **The same schema failure is `InvalidOptions` here and `GenerationFailed` in Rust** (S, ★★; owner decision
-  2026-11-13: `GenerationFailed` for both, so this side changes). With a schema set, a generator error other than "Guidance is unavailable" becomes
-  `InvalidOptions` (`Src/text_generation.cpp:158-162`, `:352`); OxidANT maps the same case to `GenerationFailed` and
-  refuses a schema that is not an object before the engine. No shared case holds either answer. Decide which kind
-  the contract means; the other side changes, and a case in the hub's tiny-model `fixture.json` holds both (hub).
-  When that fixture grows a `cases` list, `Test/commit/text_generation_test.cpp` and `Test/python` read it instead
-  of retyping; here only the 0xBF rule is retyped (`text_generation_test.cpp:83-85`).
-  `Test/contract/text_contract_test.cpp:38-45` expects exactly one contract case on purpose, so plan it with the pin
+- [ ] **No shared case holds the two schema errors** (S, ★). C++ and Rust agree since 2026-11-13 (owner decision):
+  a schema that is no JSON object is `InvalidOptions` before the engine, and an object the generator refuses is
+  `GenerationFailed`. Each side tests it with its own schemas. A case in the hub's tiny-model `fixture.json` would
+  hold both (hub). When that fixture grows a `cases` list, `Test/commit/text_generation_test.cpp` and `Test/python`
+  read it instead of retyping; here only the 0xBF rule is retyped.
+  `Test/contract/text_contract_test.cpp` expects exactly one contract case on purpose, so plan it with the pin
   bump that adds one.
 
 - [ ] **Nothing runs the suite twice in one tree, and one script suite runs nowhere** (S, ★). c29f25a removed the

@@ -154,11 +154,11 @@ namespace {
     auto succeeded(const GenaiApi &api, OgaResult *result, std::string_view what) -> bool
     { return !failure(api, result, what); }
 
-    // GenAI built without llguidance refuses a schema with this text when the generator is created.
+    // GenAI built without llguidance refuses a schema with this text; any other refusal is the generator's, as in Rust.
     auto guidance_error(std::string_view message) -> TextGenError
     {
         return message.contains("Guidance is unavailable") ? TextGenError::JsonSchemaUnsupported
-                                                           : TextGenError::InvalidOptions;
+                                                           : TextGenError::GenerationFailed;
     }
 
     // The end of the longest stop-string prefix the text ends with: text that may still become a stop string.
@@ -219,9 +219,14 @@ namespace {
         return continuation == 0;
     }
 
+    // A schema is a JSON object; anything else is the caller's mistake, refused before the engine sees it.
+    auto is_json_object(const std::string &text) -> bool
+    { return nlohmann::json::parse(text, nullptr, false).is_object(); }
+
     auto valid_options(const GenerationOptions &options) -> bool
     {
         return options.max_new_tokens > 0 && (!options.seed || *options.seed >= 0)
+               && (options.json_schema.empty() || is_json_object(options.json_schema))
                && std::ranges::none_of(
                  options.stop, [](const std::string &stop) { return stop.empty() || !is_plain_utf8(stop); });
     }
