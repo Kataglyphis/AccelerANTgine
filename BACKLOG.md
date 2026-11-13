@@ -300,8 +300,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   overlap suppression in any of the three detectors, raw YOLO heads keep theirs; here since a3bc65d): suppression
   put back on `xyxy_score_class` rows must fail.
   Done when a workflow runs them and fails on a recipe no test catches. They need a build in the image, unlike the
-  fixture recipes `mutations.yml` runs today: ask the owner whether that is a job on the Linux x64 lane or a weekly
-  run.
+  fixture recipes `mutations.yml` runs today: owner decision 2026-11-13: a weekly run of its own, not a job on
+  the Linux x64 lane.
   Built by hand on 2026-11-13 (clang Debug, arm64), each caught: the cut to the frame removed, suppression put back
   on corner rows and the corner-order check dropped all fail
   `YoloDecoder.MatchesTheDecodeCasesOfTheSharedModelAntContract`; the cut moved before suppression fails
@@ -313,8 +313,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `FramePreprocessing` and `YoloDetector` tests. The contract without `decode`, or with no decode case, fails the
   replay.
 
-- [b] **The same schema failure is `InvalidOptions` here and `GenerationFailed` in Rust** (S, ★★; waits for an
-  owner decision). With a schema set, a generator error other than "Guidance is unavailable" becomes
+- [ ] **The same schema failure is `InvalidOptions` here and `GenerationFailed` in Rust** (S, ★★; owner decision
+  2026-11-13: `GenerationFailed` for both, so this side changes). With a schema set, a generator error other than "Guidance is unavailable" becomes
   `InvalidOptions` (`Src/text_generation.cpp:158-162`, `:352`); OxidANT maps the same case to `GenerationFailed` and
   refuses a schema that is not an object before the engine. No shared case holds either answer. Decide which kind
   the contract means; the other side changes, and a case in the hub's tiny-model `fixture.json` holds both (hub).
