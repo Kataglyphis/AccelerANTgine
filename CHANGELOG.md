@@ -18,6 +18,38 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-13, the decoder cuts to the frame and replays ModelANT's decode cases)
+- **`decode_detections` returns boxes cut to the frame, for every layout (lead, after the owner's rule of 2026-11-12).**
+  The cut sat in the private `YoloDetector::post_process`, so the public decoder returned uncut boxes and could not
+  meet two of ModelANT's nine decode cases (`box_cut_at_each_frame_edge`, `letterbox_box_in_padding_cut`). It is now
+  the decoder's last step, with the same arithmetic; the two raw layouts are still suppressed first and cut after.
+  `post_process` adds nothing to the boxes. Rust, Python and C++ each have one function from raw rows to cut boxes.
+- **`FrameMapping` carries the frame's size: `frame_width` and `frame_height` follow its four floats.**
+  `preprocess_frame` and `detect` fill them, and the detector reads the frame from the mapping alone. A mapping whose
+  size is zero is `InvalidInputShape` from `decode_detections`, so a caller cannot leave the frame out and get uncut
+  boxes: an old four-float initialiser still compiles, leaves the size at zero and is refused at the first call. The
+  function's signature is unchanged.
+- **The commit suite replays every decode case of `contracts/inference-v1.json`**
+  (`YoloDecoder.MatchesTheDecodeCasesOfTheSharedModelAntContract`): the case's rows, threshold, mapping and frame
+  through `decode_detections` with `CornersScoreClass`, the list compared in row order within the contract's
+  tolerances. It asserts the contract's layout, order and class count, and names no case, so one ModelANT appends is
+  replayed without an edit. The fuzz properties now also require every box to lie on the frame.
+- **The ModelANT pin moves from 78d10cf to a6eaca1**, the commit that adds the `decode` section. No fixture and no
+  preprocessing case changed; `models/models.lock` already names `deim_dfine_n_coco-v2`.
+- **An embedded text file is a char array, no longer one raw string literal.** MSVC refuses a string literal over 16380
+  bytes (65535 once adjacent literals are joined) and the contract is 12.5 KB, growing with every case.
+  `kataglyphis_embed_text_file` writes one char per byte with a terminator, so the variable is the same
+  `std::string_view` and no size limit applies; a CRLF checkout embeds LF. A path was not chosen: the staged Windows
+  suites run on another machine than the one that built them. `test-embed-text-file.sh` reads the include back.
+- **Proven with source mutants, by hand.** `mutations.yml` builds no C++, so `lane-mutations.json` gains recipes for
+  the embed alone (`embed.*`, four, each caught by `test-embed-text-file.sh`). Built in the image (clang Debug,
+  arm64): the cut removed fails the replay on `box_cut_at_each_frame_edge` and `letterbox_box_in_padding_cut`;
+  suppression on corner rows fails it on `overlapping_boxes_all_stay` and on the two cases whose row order it breaks;
+  the corner-order check dropped fails it on `corners_finite_and_ordered`; the cut moved before suppression and the
+  frame no longer required each fail their own test. Not built here: MSVC and clang-cl.
+- **For OmniAccelerANT:** the C ABI does not move. `packages/kataglyphis_native_inference` calls `kataglyphis_add`
+  alone and builds no `FrameMapping`. A C++ caller of `decode_detections` must now name the frame in its mapping.
+
 ### Changed (2026-11-12, MIGraphX is AMD's plugin module)
 - **`ExecutionProvider::MigraphX` goes through AMD's plugin execution provider (owner, 2026-11-12); it has not run with
   AMD's module yet (last but one point).** Hub ffdbcf1c took `libonnxruntime_providers_migraphx.so` out of

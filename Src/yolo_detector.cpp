@@ -231,6 +231,24 @@ namespace {
         }
         boxes = std::move(kept);
     }
+
+    // Cut to the picture as Rust and Python do; in double, a sum that is no number being the near edge, never NaN.
+    auto cut_to_frame(std::vector<BoundingBox> &boxes, const FrameMapping &mapping) -> void
+    {
+        const auto edge = [](double value, double far) -> float {
+            return static_cast<float>(std::isnan(value) ? 0.0 : std::clamp(value, 0.0, far));
+        };
+        const auto right = static_cast<double>(mapping.frame_width);
+        const auto bottom = static_cast<double>(mapping.frame_height);
+        for (auto &box : boxes) {
+            const float x1 = edge(box.x, right);
+            const float y1 = edge(box.y, bottom);
+            box.width = edge(static_cast<double>(box.x) + box.width, right) - x1;
+            box.height = edge(static_cast<double>(box.y) + box.height, bottom) - y1;
+            box.x = x1;
+            box.y = y1;
+        }
+    }
 }// namespace
 
 namespace {
@@ -349,6 +367,8 @@ auto yolo_config_from(const config::ModelConfig &model) -> std::expected<YoloCon
 auto decode_detections(const inference::TensorData &output, const YoloConfig &config, const FrameMapping &mapping)
   -> std::expected<std::vector<BoundingBox>, OnnxError>
 {
+    // Without a frame there is no edge to cut at, so a caller that left the size out gets an error, not uncut boxes.
+    if (mapping.frame_width == 0 || mapping.frame_height == 0) { return std::unexpected(OnnxError::InvalidInputShape); }
     const auto matrix = output_matrix(output);
     if (!matrix) { return std::unexpected(OnnxError::InvalidOutputShape); }
     const auto [rows, values] = *matrix;
@@ -378,6 +398,7 @@ auto decode_detections(const inference::TensorData &output, const YoloConfig &co
     }
     // Corner rows come from an end-to-end model, one per object: suppressing them merged two cats lying together.
     if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }
+    cut_to_frame(boxes, mapping);
     return boxes;
 }
 
@@ -428,7 +449,9 @@ auto preprocess_frame(const gstreamer::BufferInfo &buffer,
     result.mapping = { static_cast<float>(content_width) / meta.width,
         static_cast<float>(content_height) / meta.height,
         static_cast<float>(pad_x),
-        static_cast<float>(pad_y) };
+        static_cast<float>(pad_y),
+        meta.width,
+        meta.height };
     result.data.assign(3 * plane, mode == FramePreprocessMode::Letterbox ? 114.0F / 255.0F : 0.0F);
     // Every row samples the same columns, so their byte offsets are divided out once per frame.
     std::vector<std::size_t> column_offsets(content_width);
@@ -551,8 +574,10 @@ auto YoloDetector::detect(std::span<const float> image_data, std::uint32_t width
     const FrameMapping mapping{ static_cast<float>(impl_->config.input_width) / width,
         static_cast<float>(impl_->config.input_height) / height,
         0.0F,
-        0.0F };
-    return post_process(result.value(), width, height, mapping);
+        0.0F,
+        width,
+        height };
+    return post_process(result.value(), mapping);
 }
 
 auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline, std::uint32_t timeout_ms)
@@ -576,36 +601,20 @@ auto YoloDetector::detect_frame(const gstreamer::BufferInfo &frame) -> std::expe
     inference::TensorShape shape{ { 1, 3, impl_->config.input_height, impl_->config.input_width } };
     auto result = impl_->engine.run_inference_in_place(input->data, shape, "images");
     if (!result) { return std::unexpected(result.error()); }
-    return post_process(*result, frame.metadata.width, frame.metadata.height, input->mapping);
+    return post_process(*result, input->mapping);
 }
 
-auto YoloDetector::post_process(const inference::InferenceResult &raw_output,
-  std::uint32_t original_width,
-  std::uint32_t original_height,
-  const FrameMapping &mapping) -> std::expected<DetectionResult, OnnxError>
+auto YoloDetector::post_process(const inference::InferenceResult &raw_output, const FrameMapping &mapping)
+  -> std::expected<DetectionResult, OnnxError>
 {
     DetectionResult result;
-    result.original_width = original_width;
-    result.original_height = original_height;
+    result.original_width = mapping.frame_width;
+    result.original_height = mapping.frame_height;
     result.inference_time_ms = raw_output.inference_time_ms;
     if (raw_output.outputs.empty()) { return result; }
     auto boxes = decode_detections(raw_output.outputs[0], impl_->config, mapping);
     if (!boxes) { return std::unexpected(boxes.error()); }
     result.boxes = std::move(*boxes);
-    // Cut to the picture as Rust and Python do; in double, a sum that is no number being the near edge, never NaN.
-    const auto edge = [](double value, double far) -> float {
-        return static_cast<float>(std::isnan(value) ? 0.0 : std::clamp(value, 0.0, far));
-    };
-    const auto right = static_cast<double>(original_width);
-    const auto bottom = static_cast<double>(original_height);
-    for (auto &box : result.boxes) {
-        const float x1 = edge(box.x, right);
-        const float y1 = edge(box.y, bottom);
-        box.width = edge(static_cast<double>(box.x) + box.width, right) - x1;
-        box.height = edge(static_cast<double>(box.y) + box.height, bottom) - y1;
-        box.x = x1;
-        box.y = y1;
-    }
     return result;
 }
 

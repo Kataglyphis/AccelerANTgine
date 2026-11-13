@@ -311,7 +311,7 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Later: a dispatch-only tree with fuzzing mode on and a kept corpus; `third_party/CMakeLists.txt:83-93` forces it
   off because it clashed with ASan.
 
-- [ ] **No mutation recipe touches the detector code** (M, ★★; not double-checked). All 35 recipes in
+- [ ] **No mutation recipe touches the detector code** (M, ★★; not double-checked). All 60 recipes in
   `scripts/linux/tests/lane-mutations.json` change scripts, CMake or packaging files, none a file under `Src/`;
   OrchestrANT has 13 `yolo.*` and 7 `cv.*` recipes for the same decoding and preprocessing rules. So no recipe has
   shown that the contract and golden tests here can fail.
@@ -324,6 +324,16 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when a workflow runs them and fails on a recipe no test catches. They need a build in the image, unlike the
   fixture recipes `mutations.yml` runs today: ask the owner whether that is a job on the Linux x64 lane or a weekly
   run.
+  Built by hand on 2026-11-13 (clang Debug, arm64), each caught: the cut to the frame removed, suppression put back
+  on corner rows and the corner-order check dropped all fail
+  `YoloDecoder.MatchesTheDecodeCasesOfTheSharedModelAntContract`; the cut moved before suppression fails
+  `YoloDecoder.RawHeadBoxesAreCutToTheFrameAfterSuppression`; the frame no longer required fails
+  `YoloDecoder.AMappingWithoutAFrameIsInvalidInputShape`. These five are the first recipes for that workflow.
+  The review built nine more the same way, each caught. The class range unchecked or one too wide, the score's or
+  the corners' finiteness unchecked and a strict threshold fail the replay; the last three fail no other test. The
+  frame's sides swapped in `preprocess_frame`, and `detect` naming the input as the frame, fail the
+  `FramePreprocessing` and `YoloDetector` tests. The contract without `decode`, or with no decode case, fails the
+  replay.
 
 - [ ] **An old `uv` is not told that it is too old** (S, ★★). `uv.lock` is revision 5 and `pyproject.toml` sets no
   `required-version` under `[tool.uv]`. On the Pi uv 0.11.3 met a hub pin of 0.13, and the failure looked like a

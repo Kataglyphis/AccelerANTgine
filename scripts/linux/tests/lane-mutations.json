@@ -446,5 +446,37 @@
   "replace": "  )",
   "test": "bash scripts/linux/tests/test-ort-package-variant.sh",
   "why": "Unprotected, the ELF closure patches the module's run path."
+ },
+ {
+  "id": "embed.string-literal",
+  "target": "cmake/EmbedTextFile.cmake",
+  "find": "    \"inline constexpr char @variable@_bytes[] = {\\n@_bytes@'\\\\0' };\\ninline constexpr std::string_view @variable@{ @variable@_bytes, sizeof(@variable@_bytes) - 1 };\\n\"",
+  "replace": "    \"inline constexpr char @variable@_bytes[] = \\\"@_bytes@\\\";\\ninline constexpr std::string_view @variable@{ @variable@_bytes, sizeof(@variable@_bytes) - 1 };\\n\"",
+  "test": "bash scripts/linux/tests/test-embed-text-file.sh",
+  "why": "MSVC refuses a string literal over 16380 bytes, so the embedded contract must not come back as one."
+ },
+ {
+  "id": "embed.crlf",
+  "target": "cmake/EmbedTextFile.cmake",
+  "find": "    REPLACE \"'\\\\x0d','\\\\x0a',\"\n            \"'\\\\x0a',\"",
+  "replace": "    REPLACE \"'\\\\x0d','\\\\x0a',\"\n            \"'\\\\x0d','\\\\x0a',\"",
+  "test": "bash scripts/linux/tests/test-embed-text-file.sh",
+  "why": "A CRLF checkout must embed the LF text every other lane embeds."
+ },
+ {
+  "id": "embed.terminator",
+  "target": "cmake/EmbedTextFile.cmake",
+  "find": "sizeof(@variable@_bytes) - 1 }",
+  "replace": "sizeof(@variable@_bytes) }",
+  "test": "bash scripts/linux/tests/test-embed-text-file.sh",
+  "why": "The view must end before the array's terminator, or every embedded text gains a NUL."
+ },
+ {
+  "id": "embed.row",
+  "target": "cmake/EmbedTextFile.cmake",
+  "find": "    112\n",
+  "replace": "    111\n",
+  "test": "bash scripts/linux/tests/test-embed-text-file.sh",
+  "why": "A row that is no multiple of a byte's seven characters breaks a char in two."
  }
 ]

@@ -51,7 +51,8 @@ library itself; ``Test/python`` tests the Python bindings.
        decoding (thresholds, classes, NMS, scaling, NaN and infinity, rows
        shorter than the class count, YOLOv8/11 ``[1, 4 + C, N]`` columns, the
        ``kataglyphis.output`` metadata behind ``Auto``, labels from the config,
-       ``InvalidOutputShape``); the ORT thread count from the TOML config to the
+       ``InvalidOutputShape``, the cut to the frame, and every decode case of
+       ModelANT's contract through ``decode_detections``); the ORT thread count from the TOML config to the
        session options; XNNPACK and DNNL running or ``ProviderUnavailable``; the MIGraphX plugin's module search,
        registration guard and error paths, with a stand-in module in place of AMD's; GStreamer frames from ``videotestsrc`` and
        ``fakesrc`` through ``appsink``, callbacks and state; the WebRTC stream
@@ -69,7 +70,8 @@ library itself; ``Test/python`` tests the Python bindings.
        inference TOML on arbitrary bytes, unsigned fields that round-trip or are
        rejected, the stream-name mapping, the COCO table, the YOLO decoder on
        arbitrary floats, and ``decode_detections`` on arbitrary shapes, where an
-       unreadable shape must be ``InvalidOutputShape``
+       unreadable shape must be ``InvalidOutputShape`` and every box lies on the
+       frame
    * - ``Test/golden``
      - ``goldenTestSuite``
      - The ``golden`` ctest label, native Linux Debug only: the locked model

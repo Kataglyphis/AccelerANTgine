@@ -159,8 +159,11 @@ is what you want, update the gitlink **and** fix the fallout in the same change.
   --init` without `--recursive` satisfies every other consumer here and breaks this one (the
   symptom: § 4).
 - `third_party/ModelANT/contracts/inference-v1.json` is embedded into the C++ tests through
-  `kataglyphis_embed_text_file`. A contract pin bump must preserve the production preprocessing
-  checks; do not regenerate expected tensors from the C++ implementation being tested.
+  `kataglyphis_embed_text_file`, which writes a char array, never a string literal: MSVC refuses a
+  literal over 16380 bytes and the contract grows with every case. The commit suite runs its
+  preprocessing cases through `preprocess_frame` and every decode case through `decode_detections`;
+  a case ModelANT appends is replayed without an edit. A contract pin bump must preserve both
+  checks; do not regenerate expected tensors or boxes from the C++ implementation being tested.
 
 Drift is guarded by ANTfrastructure's shared suite, which `.github/workflows/submodule-pins.yml`
 runs on every push and PR that touches `.gitmodules` or `third_party/**`. It asserts that every
@@ -179,6 +182,12 @@ written out rather than linked.
   NCHW values. Both synchronous and asynchronous detection use `detect_frame`; never reinterpret
   frame bytes as floats. The selected stretch/letterbox policy belongs to `YoloConfig`, not a
   guessed tensor length. Details and shared cases: [`inference_preprocessing.rst`](docs/source/inference_preprocessing.rst).
+- **`decode_detections` is the one way from raw rows to boxes, and it cuts them to the frame** (owner,
+  2026-11-12: all three detectors cut). `FrameMapping` carries the frame's size beside the scale and
+  padding; `preprocess_frame` and `detect` fill it, and a mapping with a zero size is
+  `InvalidInputShape`. Corner rows are never suppressed; the two raw layouts are suppressed first and
+  cut after. `post_process` adds nothing to the boxes: never cut, sort or filter outside the decoder,
+  or ModelANT's decode cases stop describing what a frame gets.
 - **The engine returns dense FLOAT outputs only.** Check the ONNX value kind, element type,
   shape and pointer before copying; `InvalidOutputType` and `InvalidOutputShape` must reach both
   single-input and multi-input callers. New error enum values append to the stable existing
@@ -607,8 +616,10 @@ report, the coverage summary, the clang-tidy log), which `quality-report.toml` r
 
 **`mutations.yml` proves those gates can fail.** It calls the hub's `mutation-gates.yml` over
 `scripts/linux/tests/lane-mutations.json`: the skip gate, the coverage floors, the chain-only ORT
-proof (`accelerantgine_assert_ort_chain_build`) and the static-analysis gates, each through fixture
-inputs and stub tools on a hosted runner. Add a recipe with every new gate.
+proof (`accelerantgine_assert_ort_chain_build`), the static-analysis gates and the embedded-text include
+(`test-embed-text-file.sh`), each through fixture inputs and stub tools on a hosted runner. Add a recipe with
+every new gate. It builds no C++, so it holds no recipe against `Src/`: a detector change is proven with source
+mutants by hand until a lane builds them (`BACKLOG.md`).
 
 **The pre-commit hook** installs from the locked `docs` group into a `uv` venv; the commands are in
 `docs/source/development_workflow.rst` § *Static Analysis And Formatting*.

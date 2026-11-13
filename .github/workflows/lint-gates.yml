@@ -76,6 +76,7 @@ jobs:
           python3 scripts/linux/tests/test-perf-cachegrind.py
           python3 scripts/linux/tests/test-check-python-stub.py
           bash scripts/linux/tests/test-demo-model-path.sh
+          bash scripts/linux/tests/test-embed-text-file.sh
       - name: Test the package hardening gate
         shell: bash
         run: bash scripts/linux/tests/test-verify-package-hardening.sh

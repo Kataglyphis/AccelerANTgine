@@ -54,12 +54,15 @@ enum class YoloOutputLayout {
 
 enum class FramePreprocessMode { Stretch, Letterbox };
 
+// How a frame was fitted into the model input, and its size; a size of zero is unset and decode_detections refuses it.
 struct FrameMapping
 {
     float scale_x{ 1.0F };
     float scale_y{ 1.0F };
     float pad_x{ 0.0F };
     float pad_y{ 0.0F };
+    std::uint32_t frame_width{ 0 };
+    std::uint32_t frame_height{ 0 };
 };
 
 struct PreprocessedFrame
@@ -96,7 +99,7 @@ struct YoloConfig
 [[nodiscard]] KATAGLYPHIS_CPP_API auto yolo_config_from(const config::ModelConfig &model)
   -> std::expected<YoloConfig, config::ConfigError>;
 
-// Decodes with config's layout; the two raw layouts then suppress overlaps, corner rows are one per object already.
+// Raw rows to boxes cut to mapping's frame; the two raw layouts suppress overlaps first, corner rows are one per object.
 [[nodiscard]] KATAGLYPHIS_CPP_API auto decode_detections(const inference::TensorData &output,
   const YoloConfig &config,
   const FrameMapping &mapping) -> std::expected<std::vector<BoundingBox>, OnnxError>;
@@ -141,10 +144,8 @@ class KATAGLYPHIS_CPP_API YoloDetector
     struct Impl;
     std::unique_ptr<Impl> impl_;
 
-    auto post_process(const inference::InferenceResult &raw_output,
-      std::uint32_t original_width,
-      std::uint32_t original_height,
-      const FrameMapping &mapping) -> std::expected<DetectionResult, OnnxError>;
+    auto post_process(const inference::InferenceResult &raw_output, const FrameMapping &mapping)
+      -> std::expected<DetectionResult, OnnxError>;
 };
 
 struct VideoDetectionConfig

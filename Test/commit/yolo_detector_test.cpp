@@ -3,11 +3,13 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <climits>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <initializer_list>
@@ -688,6 +690,79 @@ TEST(FramePreprocessing, MatchesTheSharedModelAntContract)
         EXPECT_NEAR(result->mapping.scale_y, item["mapping"]["scale_y"].get<float>(), 1e-6F);
         EXPECT_FLOAT_EQ(result->mapping.pad_x, item["mapping"]["pad_x"].get<float>());
         EXPECT_FLOAT_EQ(result->mapping.pad_y, item["mapping"]["pad_y"].get<float>());
+        EXPECT_EQ(result->mapping.frame_width, frame.metadata.width);
+        EXPECT_EQ(result->mapping.frame_height, frame.metadata.height);
+    }
+}
+
+namespace {
+
+// JSON has no NaN and no infinity, so the contract spells them as strings that strtof reads.
+auto contract_number(const nlohmann::json &value) -> float
+{
+    if (!value.is_string()) { return value.get<float>(); }
+    const auto text = value.get<std::string>();
+    char *end = nullptr;
+    const float number = std::strtof(text.c_str(), &end);
+    EXPECT_TRUE(!text.empty() && end == text.c_str() + text.size()) << text;
+    return number;
+}
+
+}// namespace
+
+TEST(YoloDecoder, MatchesTheDecodeCasesOfTheSharedModelAntContract)
+{
+    const auto contract = nlohmann::json::parse(kInferenceContract, nullptr, false);
+    ASSERT_FALSE(contract.is_discarded());
+    ASSERT_EQ(contract["schema_version"], 1);
+    ASSERT_TRUE(contract.contains("decode"));
+    const auto &decode = contract["decode"];
+    // Corner rows compared in row order are all this test implements; another layout or order needs its own.
+    ASSERT_EQ(detection::layout_from_metadata(decode["layout"].get<std::string>()),
+      detection::YoloOutputLayout::CornersScoreClass);
+    ASSERT_EQ(decode["order"], "row");
+    detection::YoloConfig config;
+    config.output_layout = detection::YoloOutputLayout::CornersScoreClass;
+    // The cases are written for the class count the decoder checks a row's class against.
+    ASSERT_EQ(config.num_classes, contract["output"]["class_range"][1].get<int>() + 1);
+    const auto columns = contract["output"]["columns"].size();
+    const auto score_tolerance = decode["score_tolerance"].get<double>();
+    const auto coordinate_tolerance = decode["coordinate_tolerance"].get<double>();
+    ASSERT_FALSE(decode["cases"].empty());
+    for (const auto &item : decode["cases"]) {
+        SCOPED_TRACE(item["name"].get<std::string>());
+        config.confidence_threshold = item["score_threshold"].get<float>();
+        config.input_width = item["input_width"].get<std::uint32_t>();
+        config.input_height = item["input_height"].get<std::uint32_t>();
+        const detection::FrameMapping mapping{ item["mapping"]["scale_x"].get<float>(),
+            item["mapping"]["scale_y"].get<float>(),
+            item["mapping"]["pad_x"].get<float>(),
+            item["mapping"]["pad_y"].get<float>(),
+            item["width"].get<std::uint32_t>(),
+            item["height"].get<std::uint32_t>() };
+        kataglyphis::inference::TensorData tensor;
+        tensor.shape.dimensions = { 1, item["rows"].size(), columns };
+        for (const auto &row : item["rows"]) {
+            ASSERT_EQ(row.size(), columns);
+            for (const auto &value : row) { tensor.data.push_back(contract_number(value)); }
+        }
+        const auto found = detection::decode_detections(tensor, config, mapping);
+        ASSERT_TRUE(found.has_value());
+        const auto &expected = item["expected"];
+        ASSERT_EQ(found->size(), expected.size());
+        for (std::size_t i = 0; i < expected.size(); ++i) {
+            const auto &box = (*found)[i];
+            EXPECT_EQ(box.class_id, expected[i]["class"].get<int>()) << i;
+            EXPECT_NEAR(box.confidence, expected[i]["score"].get<double>(), score_tolerance) << i;
+            // The contract's box is x1, y1, x2, y2; this one is the near corner and a size.
+            const std::array<double, 4> corners{
+                box.x, box.y, static_cast<double>(box.x) + box.width, static_cast<double>(box.y) + box.height
+            };
+            for (std::size_t corner = 0; corner < corners.size(); ++corner) {
+                EXPECT_NEAR(corners[corner], expected[i]["box"][corner].get<double>(), coordinate_tolerance)
+                  << i << " corner " << corner;
+            }
+        }
     }
 }
 
@@ -793,6 +868,10 @@ auto anchor_config(int classes) -> detection::YoloConfig
     return config;
 }
 
+// A frame the model input fills: scale one, no padding.
+auto frame_of(std::uint32_t width, std::uint32_t height) -> detection::FrameMapping
+{ return { .frame_width = width, .frame_height = height }; }
+
 }// namespace
 
 TEST(YoloDecoder, DecodesYolov8AnchorColumns)
@@ -804,7 +883,7 @@ TEST(YoloDecoder, DecodesYolov8AnchorColumns)
         { 50, 50, 2, 2, 0.3F, 0.4F, 0.2F },// best score 0.4: dropped
         { 30, 5, 2, 4, 0.0F, 0.0F, 0.7F },// class 2 at 0.7: kept
       });
-    const detection::FrameMapping half{ 0.5F, 0.5F, 0.0F, 0.0F };
+    const detection::FrameMapping half{ 0.5F, 0.5F, 0.0F, 0.0F, 200, 200 };
     const auto boxes = detection::decode_detections(tensor, anchor_config(3), half);
     ASSERT_TRUE(boxes.has_value());
     ASSERT_EQ(boxes->size(), 2U);
@@ -820,7 +899,7 @@ TEST(YoloDecoder, DecodesYolov8AnchorColumns)
 
 TEST(YoloDecoder, AShapeTheLayoutCannotReadIsInvalidOutputShape)
 {
-    const detection::FrameMapping identity{};
+    const auto identity = frame_of(64, 64);
     // Three classes configured, two in the tensor: the class rows would read the next anchor's values.
     EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(
                 anchor_tensor(2, { { 1, 1, 1, 1, 0.9F, 0.1F } }), anchor_config(3), identity)),
@@ -849,18 +928,60 @@ TEST(YoloDecoder, AShapeTheLayoutCannotReadIsInvalidOutputShape)
       detection::OnnxError::InvalidOutputShape);
 }
 
+TEST(YoloDecoder, RawHeadBoxesAreCutToTheFrameAfterSuppression)
+{
+    const auto frame = frame_of(64, 64);
+    const auto expect = [](const detection::BoundingBox &box, float x, float y, float width, float height) {
+        EXPECT_FLOAT_EQ(box.x, x);
+        EXPECT_FLOAT_EQ(box.y, y);
+        EXPECT_FLOAT_EQ(box.width, width);
+        EXPECT_FLOAT_EQ(box.height, height);
+    };
+    // Uncut the two overlap at IoU 3/7 and both stay; cut first they would be one sliver and one would be suppressed.
+    const auto slivers = detection::decode_detections(
+      anchor_tensor(1, { { -10, 5, 30, 10, 0.9F }, { -30, 5, 70, 10, 0.8F } }), anchor_config(1), frame);
+    ASSERT_TRUE(slivers.has_value());
+    ASSERT_EQ(slivers->size(), 2U);
+    expect((*slivers)[0], 0.0F, 0.0F, 5.0F, 10.0F);
+    expect((*slivers)[1], 0.0F, 0.0F, 5.0F, 10.0F);
+
+    // A YOLOv5 row past the right and the bottom edge.
+    detection::YoloConfig rows;
+    rows.num_classes = 1;
+    rows.confidence_threshold = 0.5F;
+    const kataglyphis::inference::TensorData past_the_far_corner{ { 60, 60, 20, 20, 0.9F, 0.9F }, { { 1, 1, 6 } } };
+    const auto cut = detection::decode_detections(past_the_far_corner, rows, frame);
+    ASSERT_TRUE(cut.has_value());
+    ASSERT_EQ(cut->size(), 1U);
+    expect((*cut)[0], 50.0F, 50.0F, 14.0F, 14.0F);
+}
+
+TEST(YoloDecoder, AMappingWithoutAFrameIsInvalidInputShape)
+{
+    // The frame is where the boxes are cut, so a mapping that names none is refused before any row is read.
+    const auto tensor = anchor_tensor(1, { { 5, 5, 2, 2, 0.9F } });
+    // Four floats are a mapping written without the frame: scale and padding alone.
+    const detection::FrameMapping no_frame{ 0.5F, 0.5F, 0.0F, 0.0F };
+    for (const auto &mapping : { detection::FrameMapping{}, no_frame, frame_of(64, 0), frame_of(0, 64) }) {
+        EXPECT_EQ(kataglyphis::test::error_of(detection::decode_detections(tensor, anchor_config(1), mapping)),
+          detection::OnnxError::InvalidInputShape);
+    }
+    EXPECT_TRUE(detection::decode_detections(tensor, anchor_config(1), frame_of(64, 64)).has_value());
+}
+
 TEST(YoloDecoder, ClassNamesComeFromTheConfiguredLabels)
 {
     auto config = anchor_config(2);
     config.labels = { "tabby", "tom" };
     const auto boxes = detection::decode_detections(
-      anchor_tensor(2, { { 5, 5, 2, 2, 0.1F, 0.9F }, { 20, 20, 2, 2, 0.8F, 0.1F } }), config, {});
+      anchor_tensor(2, { { 5, 5, 2, 2, 0.1F, 0.9F }, { 20, 20, 2, 2, 0.8F, 0.1F } }), config, frame_of(64, 64));
     ASSERT_TRUE(boxes.has_value());
     ASSERT_EQ(boxes->size(), 2U);
     EXPECT_EQ((*boxes)[0].class_name, "tom");
     EXPECT_EQ((*boxes)[1].class_name, "tabby");
     config.labels = { "tabby" };
-    const auto beyond = detection::decode_detections(anchor_tensor(2, { { 5, 5, 2, 2, 0.1F, 0.9F } }), config, {});
+    const auto beyond =
+      detection::decode_detections(anchor_tensor(2, { { 5, 5, 2, 2, 0.1F, 0.9F } }), config, frame_of(64, 64));
     ASSERT_TRUE(beyond.has_value());
     ASSERT_EQ(beyond->size(), 1U);
     EXPECT_EQ((*beyond)[0].class_name, "unknown");
