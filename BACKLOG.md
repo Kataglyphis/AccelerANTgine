@@ -71,17 +71,13 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `-DKATAGLYPHIS_TEST_MIGRAPHX=ON`.
 
   What is likely to stop the first run, in order:
-  1. The hub's `verify-ort-appimage-payload.sh … amd` proves the packaged `libonnxruntime.so.1` against one chain
-     wheel. In the arm64 `:latest` image the CPU prefix's library matches no wheel in `/opt/onnxruntime-wheels`
-     (`stage-ort-wheel-licenses.py --require-unstripped`: "found 0", 2026-11-12); if `:latest-rocm` is the same, CPack's
-     AppImage check fails there. The tarball and DEB checks here prove the core against the image's CPU build
-     (`stage_ort_texts.py`) and do not need a wheel.
-  2. The hub's bundle census. OxidANT's first AMD candidate build on `:latest-rocm` (its run 43314831939) stopped
-     there: `UNRESOLVED /lib/libmigraphx-ep.so -- no libonnxruntime.so.1 on its ld.so search path`. The image's
-     module has no run path of its own and a package must not patch it. The hub's census gets an option for the
-     launcher's library path (hub CON256); this repo's package step passes it once its pin holds that option.
-     The hub's `verify_ort_profile.py` expects `MIGraphX` since hub 366b8259, and the pin here is past it;
-     `test-diagnose-migraphx-detector.sh` reads the name from the pinned hub's table.
+  1. The wheel proof and the bundle census, as OxidANT's first builds on `:latest-rocm` met them: hub BACKLOG CON256
+     (i). Here that is `verify-ort-appimage-payload.sh … amd` in CPack's AppImage check, which may ask for the
+     wheel's exact bytes where the image strips the CPU core; the tarball and DEB checks prove the core against the
+     image's CPU build (`stage_ort_texts.py`) and need no wheel. This repo calls no census on its Linux packages;
+     if it adds one, the hub's `--library-path` (pin ed3d170 holds it) names the launcher's directory.
+  2. The profile's provider name: the hub's `verify_ort_profile.py` expects `MIGraphX`, and
+     `test-diagnose-migraphx-detector.sh` reads the name from the pinned hub's table, so only a card shows a mismatch.
   3. Never run anywhere: the hub's `stage_ort_runtime … amd` in `CPackOptions.cmake`, the ELF closure with the module
      protected, the install-time proof against the image's module, and the plugin's licence tree, which nobody here
      has seen (the inventory takes whatever `licenses/` holds).
@@ -351,15 +347,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   of retyping; here only the 0xBF rule is retyped (`text_generation_test.cpp:83-85`).
   `Test/contract/text_contract_test.cpp:38-45` expects exactly one contract case on purpose, so plan it with the pin
   bump that adds one.
-
-- [b] **A clone without git hooks goes unnoticed, and the two kinds of hook exclude each other** (S, ★★; waits for
-  an owner decision and the hub's hook template). Measured on the Pi clone: `core.hooksPath` is unset and
-  `.git/hooks` holds samples only. `.pre-commit-config.yaml` runs clang-format, clang-tidy and cmake-format through
-  the pre-commit framework, which refuses to install while `core.hooksPath` is set, so a clone gets the format hook
-  or the lint gates, not both. The hub's template hook calls the bare aggregator, without the `--ratchets` that
-  `scripts/linux/run-lint-gates.sh` adds, so it is weaker than CI.
-  Decide which hook this repo installs. Then `run-lint-gates.sh` prints one warning line when `core.hooksPath` is
-  unset and `CI` is not set, so a clone without hooks shows at the first local run.
 
 - [ ] **Nothing runs the suite twice in one tree, and one script suite runs nowhere** (S, ★). c29f25a removed the
   known cause of a failing second `ctest` in one build directory: `--detector-image` decodes the image before it

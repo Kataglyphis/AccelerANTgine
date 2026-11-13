@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-13, the hub's hook pair)
+- **A push runs the lint gates and the script suites.** The hub pin moves from da9b23a to ed3d170, which holds the
+  consumer hook pair: `git config core.hooksPath third_party/ANTfrastructure/shared/linux/templates/git-hooks` once
+  per clone. A commit then checks what is staged in seconds; a push runs `scripts/linux/run-lint-gates.sh` and the
+  new `scripts/linux/pre-push-checks.sh`, every script suite that needs no build. The wrapper loses its own
+  stale-recipe loop, which the hub's gates do now. Owner, 2026-11-13: the hub pair is this repo's hook, and
+  `.pre-commit-config.yaml` stays as the configuration for a run by hand, because the pre-commit framework cannot
+  install beside `core.hooksPath`.
+
 ### Changed (2026-11-13, the decoder cuts to the frame and replays ModelANT's decode cases)
 - **`decode_detections` returns boxes cut to the frame, for every layout (lead, after the owner's rule of 2026-11-12).**
   The cut sat in the private `YoloDetector::post_process`, so the public decoder returned uncut boxes and could not

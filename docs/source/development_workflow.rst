@@ -359,14 +359,22 @@ malformed build script before checking its build steps.
   and the configs themselves are described in its
   `shared/config/README.md <https://github.com/Kataglyphis/ANTfrastructure/blob/develop/shared/config/README.md>`_.
 
-The pre-commit hook installs from the locked docs dependency group:
+The git hooks are the shared pair of ANTfrastructure, switched on once per clone. A commit then
+checks what is staged in seconds; a push runs ``scripts/linux/run-lint-gates.sh`` and
+``scripts/linux/pre-push-checks.sh``:
+
+.. code-block:: bash
+
+   git config core.hooksPath third_party/ANTfrastructure/shared/linux/templates/git-hooks
+
+The pre-commit framework cannot install beside ``core.hooksPath``, so its formatters run by hand,
+from the locked docs dependency group:
 
 .. code-block:: bash
 
    uv sync --locked --only-group docs --python 3.14
    source .venv/bin/activate # .venv/Scripts/activate on pwsh
-   pre-commit install
-   pre-commit run --all-files   # once, optional
+   pre-commit run --all-files
 
 Useful Tools
 ------------

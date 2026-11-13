@@ -621,8 +621,12 @@ proof (`accelerantgine_assert_ort_chain_build`), the static-analysis gates and t
 every new gate. It builds no C++, so it holds no recipe against `Src/`: a detector change is proven with source
 mutants by hand until a lane builds them (`BACKLOG.md`).
 
-**The pre-commit hook** installs from the locked `docs` group into a `uv` venv; the commands are in
-`docs/source/development_workflow.rst` § *Static Analysis And Formatting*.
+**The git hooks** are the hub's pair, once per clone: `git config core.hooksPath
+third_party/ANTfrastructure/shared/linux/templates/git-hooks`. A commit then checks what is staged in seconds, and a
+push runs `scripts/linux/run-lint-gates.sh` and `scripts/linux/pre-push-checks.sh`, the script suites. The pre-commit
+framework cannot install beside `core.hooksPath`, so `.pre-commit-config.yaml` (clang-format, clang-tidy,
+cmake-format) is run by hand; the commands are in `docs/source/development_workflow.rst` § *Static Analysis And
+Formatting*.
 
 Windows:
 
