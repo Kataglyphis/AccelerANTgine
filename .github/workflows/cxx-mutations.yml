@@ -1,0 +1,40 @@
+name: Linux x64 · C++ mutation gates (weekly)
+
+# Proves the decoder's and preprocessing's tests can fail; each recipe rebuilds, so it runs weekly, not on a push.
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cxx-mutations:
+    runs-on: ubuntu-26.04
+    # One build and eleven incremental rebuilds; a green run takes well under an hour.
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Prepare CI host
+        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-linux-ci-host@develop
+        with:
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GHCR_PAT }}
+          submodules: recursive
+
+      - name: Build once, then prove every C++ recipe on an incremental rebuild
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: --privileged -e CARGO_HOME=/tmp/cargo
+          script: >-
+            bash -lc 'set -e;
+            cmake --preset linux-debug-clang -B build;
+            cmake --build build -j "$(nproc)";
+            python3 third_party/ANTfrastructure/docs/scripts/verify_mutations.py
+            --root . --manifest scripts/linux/tests/cxx-mutations.json --in-place --jobs 1'

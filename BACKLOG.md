@@ -289,30 +289,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Later: a dispatch-only tree with fuzzing mode on and a kept corpus; `third_party/CMakeLists.txt:83-93` forces it
   off because it clashed with ASan.
 
-- [ ] **No mutation recipe touches the detector code** (M, ★★; not double-checked). All 60 recipes in
-  `scripts/linux/tests/lane-mutations.json` change scripts, CMake or packaging files, none a file under `Src/`;
-  OrchestrANT has 13 `yolo.*` and 7 `cv.*` recipes for the same decoding and preprocessing rules. So no recipe has
-  shown that the contract and golden tests here can fail.
-
-  First: a handful of recipes against `Src/yolo_detector.cpp` in OrchestrANT's style: swap red and blue, round the
-  letterbox down, drop the pad offset, ignore the score threshold. Each must fail the `FramePreprocessing` and
-  `YoloDetector` tests or the `golden` label. One more holds the owner decision of 2026-11-12 (DEIM rows get no
-  overlap suppression in any of the three detectors, raw YOLO heads keep theirs; here since a3bc65d): suppression
-  put back on `xyxy_score_class` rows must fail.
-  Done when a workflow runs them and fails on a recipe no test catches. They need a build in the image, unlike the
-  fixture recipes `mutations.yml` runs today: owner decision 2026-11-13: a weekly run of its own, not a job on
-  the Linux x64 lane.
-  Built by hand on 2026-11-13 (clang Debug, arm64), each caught: the cut to the frame removed, suppression put back
-  on corner rows and the corner-order check dropped all fail
-  `YoloDecoder.MatchesTheDecodeCasesOfTheSharedModelAntContract`; the cut moved before suppression fails
-  `YoloDecoder.RawHeadBoxesAreCutToTheFrameAfterSuppression`; the frame no longer required fails
-  `YoloDecoder.AMappingWithoutAFrameIsInvalidInputShape`. These five are the first recipes for that workflow.
-  The review built nine more the same way, each caught. The class range unchecked or one too wide, the score's or
-  the corners' finiteness unchecked and a strict threshold fail the replay; the last three fail no other test. The
-  frame's sides swapped in `preprocess_frame`, and `detect` naming the input as the frame, fail the
-  `FramePreprocessing` and `YoloDetector` tests. The contract without `decode`, or with no decode case, fails the
-  replay.
-
 - [ ] **No shared case holds the two schema errors** (S, ★). C++ and Rust agree since 2026-11-13 (owner decision):
   a schema that is no JSON object is `InvalidOptions` before the engine, and an object the generator refuses is
   `GenerationFailed`. Each side tests it with its own schemas. A case in the hub's tiny-model `fixture.json` would

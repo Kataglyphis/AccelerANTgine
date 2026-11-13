@@ -1,0 +1,90 @@
+[
+ {
+  "id": "cxx.decode-cut-to-frame-removed",
+  "target": "Src/yolo_detector.cpp",
+  "find": "    cut_to_frame(boxes, mapping);\n    return boxes;",
+  "replace": "    return boxes;",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "Boxes are cut to the picture in all three detectors (owner decision 2026-11-12)."
+ },
+ {
+  "id": "cxx.decode-corner-rows-suppressed",
+  "target": "Src/yolo_detector.cpp",
+  "find": "    if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }\n",
+  "replace": "    apply_nms(boxes, config.nms_threshold);\n",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "Corner rows of an end-to-end model get no overlap suppression (owner decision 2026-11-12)."
+ },
+ {
+  "id": "cxx.decode-cut-before-suppression",
+  "target": "Src/yolo_detector.cpp",
+  "find": "    if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }\n    cut_to_frame(boxes, mapping);\n",
+  "replace": "    cut_to_frame(boxes, mapping);\n    if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }\n",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "Raw-head boxes are suppressed on the model's own boxes, then cut to the frame."
+ },
+ {
+  "id": "cxx.decode-corner-order-unchecked",
+  "target": "Src/yolo_detector.cpp",
+  "find": "        return finite && row[2] >= row[0] && row[3] >= row[1];",
+  "replace": "        return finite;",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "A row whose corners are swapped is no box."
+ },
+ {
+  "id": "cxx.decode-frame-not-required",
+  "target": "Src/yolo_detector.cpp",
+  "find": "    if (mapping.frame_width == 0 || mapping.frame_height == 0) { return std::unexpected(OnnxError::InvalidInputShape); }\n",
+  "replace": "",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "Without a frame there is no edge to cut at; the caller gets an error, not uncut boxes."
+ },
+ {
+  "id": "cxx.decode-class-range-unchecked",
+  "target": "Src/yolo_detector.cpp",
+  "find": "        if (!(row[5] >= 0.0F) || !(row[5] < static_cast<float>(config.num_classes))) { return false; }\n",
+  "replace": "",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "A row of a class the model does not have is no detection."
+ },
+ {
+  "id": "cxx.decode-score-finiteness-unchecked",
+  "target": "Src/yolo_detector.cpp",
+  "find": "        if (!(row[4] >= config.confidence_threshold) || !std::isfinite(row[4])) { return false; }",
+  "replace": "        if (!(row[4] >= config.confidence_threshold)) { return false; }",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "An infinite score is no detection."
+ },
+ {
+  "id": "cxx.decode-strict-threshold",
+  "target": "Src/yolo_detector.cpp",
+  "find": "        if (!(row[4] >= config.confidence_threshold) || !std::isfinite(row[4])) { return false; }",
+  "replace": "        if (!(row[4] > config.confidence_threshold) || !std::isfinite(row[4])) { return false; }",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
+  "why": "A score equal to the threshold is kept, as the contract says."
+ },
+ {
+  "id": "cxx.preprocess-red-blue-swapped",
+  "target": "Src/yolo_detector.cpp",
+  "find": "            red[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[0])];",
+  "replace": "            red[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[2])];",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
+  "why": "The model reads RGB; a swapped channel shifts every score without an error."
+ },
+ {
+  "id": "cxx.preprocess-letterbox-pad-dropped",
+  "target": "Src/yolo_detector.cpp",
+  "find": "        const auto destination = static_cast<std::size_t>(y + pad_y) * width + pad_x;",
+  "replace": "        const auto destination = static_cast<std::size_t>(y) * width;",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
+  "why": "A letterboxed picture sits in the middle; its boxes are mapped back by the same offset."
+ },
+ {
+  "id": "cxx.preprocess-frame-sides-swapped",
+  "target": "Src/yolo_detector.cpp",
+  "find": "        static_cast<float>(content_height) / meta.height,\n",
+  "replace": "        static_cast<float>(content_width) / meta.height,\n",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
+  "why": "Each axis of the mapping uses its own side; a square test picture would hide the swap."
+ }
+]

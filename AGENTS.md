@@ -618,8 +618,10 @@ report, the coverage summary, the clang-tidy log), which `quality-report.toml` r
 `scripts/linux/tests/lane-mutations.json`: the skip gate, the coverage floors, the chain-only ORT
 proof (`accelerantgine_assert_ort_chain_build`), the static-analysis gates and the embedded-text include
 (`test-embed-text-file.sh`), each through fixture inputs and stub tools on a hosted runner. Add a recipe with
-every new gate. It builds no C++, so it holds no recipe against `Src/`: a detector change is proven with source
-mutants by hand until a lane builds them (`BACKLOG.md`).
+every new gate. It builds no C++. **`cxx-mutations.yml`** holds the recipes against `Src/`
+(`scripts/linux/tests/cxx-mutations.json`): weekly and on dispatch, it builds the clang Debug tree once, then
+proves each recipe in place on an incremental rebuild (`scripts/linux/cxx-mutation-test.sh <ctest regex>`).
+Add a recipe with every new decode or preprocessing rule; on a small host run one recipe with `--only`.
 
 **The git hooks** are the hub's pair, once per clone: `git config core.hooksPath
 third_party/ANTfrastructure/shared/linux/templates/git-hooks`. A commit then checks what is staged in seconds, and a

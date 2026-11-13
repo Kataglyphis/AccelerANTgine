@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-13, mutation recipes against the detector code, run weekly; owner decision)
+- **Eleven recipes mutate `Src/yolo_detector.cpp`** (`scripts/linux/tests/cxx-mutations.json`): the cut to the
+  frame removed or moved before suppression, suppression put back on corner rows, the frame no longer required, the
+  corner order, the class range and the score's finiteness unchecked, a strict threshold, red and blue swapped, the
+  letterbox offset dropped and the mapping's sides swapped. All eleven fail their tests (proved on the arm64 dev
+  host, clang Debug, in about three minutes on incremental rebuilds).
+- **`cxx-mutations.yml` runs them weekly and on dispatch**, not on a push: it builds the clang Debug tree once and
+  proves each recipe in place through `scripts/linux/cxx-mutation-test.sh <ctest regex>`, which reports a mutant that
+  does not compile instead of counting it as caught. The lint gates' staleness check covers the new manifest.
+
 ### Changed (2026-11-13, a schema failure has the same kind as in Rust; owner decision)
 - **A generator that refuses a schema is `GenerationFailed`.** With a schema set, `TextGenerator::generate` turned
   every generator error but "Guidance is unavailable" into `InvalidOptions`; OxidANT calls the same case
