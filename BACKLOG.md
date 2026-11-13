@@ -102,9 +102,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   meet either form of the module.
 
 - [ ] **Different causes share one error code, and the reason stays in the log** (M, ★★). Every code has a
-  name since 2026-11-13 (`to_string` beside each enum), but the code still says too little:
-  `YoloDetector::detect_from_gstreamer` turns every failed pull (late frame, end of stream, broken stream) into
-  `InputAllocationFailed`; in `VideoDetectorPipeline::initialize` a failed GStreamer init and a pipeline that does
+  name since 2026-11-13 (`to_string` beside each enum), but the code still says too little: in
+  `VideoDetectorPipeline::initialize` a failed GStreamer init and a pipeline that does
   not parse are both `SessionCreationFailed` (`Src/yolo_detector.cpp`). The reason is in the log only:
   `initialize_gstreamer` frees GLib's message unlogged (`Src/gstreamer_pipeline.cpp`), Python cannot read
   `provider_error()`, and the text generator logs GenAI's message (`Src/text_generation.cpp`) while Python and the
@@ -113,9 +112,9 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   First: a last-error text on the engine and the detector, as `provider_error()` keeps it for one case, bound to
   Python, whose exception becomes a `RuntimeError` subclass with `.code`; the C API gets a last-error function,
   appended. Done when a pytest reads the reason of a failed load from the exception.
-  Ask the owner before: (1) giving a late frame and the end of a stream their own values;
-  `Test/commit/gstreamer_pipeline_test.cpp` pins "The end is no error" since 2026-11-12, with `has_ended()`
-  to tell them apart. (2) Producing or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four
+  A late frame and the end of a stream have their own values since 2026-11-13 (`FrameTimeout`, `EndOfStream`); a
+  broken stream and a pipeline without a sink still share `InputAllocationFailed`.
+  Ask the owner before producing or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four
   `GStreamerError`, `OnnxError::MemoryAllocationError`).
 
 - [ ] **A callback that stops its own stream hangs, or ends the process** (M, ★★). Read from the lock order, not
@@ -214,12 +213,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   or an optional): it is public API, and `fixed` in `Src/yolo_detector.cpp` follows the answer.
   Done when `TheShapeOfASequenceOutputIsInvalidOutputType` (the existing `sequence_output_model()`) and
   `ADynamicDimensionIsReportedAsDynamic` pass under ASan and UBSan, with one pytest for the bound getters.
-
-- [b] **The two path-only pipeline builders refuse the shipped model** (S, ★; waits for an owner decision).
-  `create_camera_detection_pipeline` and `create_video_detection_pipeline` take only a model path and use the
-  `YoloConfig` defaults, the YOLOv5 layout, so since a3bc65d they refuse a model that names another layout, the
-  shipped one too; only the test `VideoDetectorPipeline.FactoriesFailOnAMissingModel` calls them. Decide whether
-  they move to `Auto` or go (an API break for `CHANGELOG.md`).
 
 - [ ] **"Newest frame, no backlog" is tested as text only, and the pipeline counts nothing** (M, ★★; not
   double-checked). `YoloDetector.TheCameraPipelineKeepsOneFrameBetweenCaptureAndTheDetector` checks substrings of

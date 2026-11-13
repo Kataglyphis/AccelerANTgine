@@ -18,6 +18,21 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-13, two owner decisions)
+- **A late frame and the end of a stream have codes of their own.** `YoloDetector::detect_from_gstreamer` returned
+  `InputAllocationFailed` for every failed pull. It now returns `OnnxError::FrameTimeout` when no frame came in
+  time and `OnnxError::EndOfStream` when the stream has ended; a broken stream and a pipeline without a sink keep
+  `InputAllocationFailed`. Both values are appended (15 and 16), so no existing number moves; Python has them as
+  `OnnxError.FrameTimeout` and `OnnxError.EndOfStream`. **A caller that compared with `InputAllocationFailed` to
+  notice the end of a file must compare with `EndOfStream`.**
+- **`GStreamerPipeline::has_ended()` is true right after the pull that met the end.** `pull_sample` asks the sink
+  itself; before, the answer came with the bus message, a moment later.
+- **The factories that take only a model path read the layout from the model.**
+  `create_camera_detection_pipeline(device, model_path, ...)` and `create_video_detection_pipeline(source,
+  model_path, ...)` used the `YoloConfig` default, the YOLOv5 layout, and so refused every model that names another
+  one, the shipped model too. They now take the layout the model names (`kataglyphis.output`); a model that names
+  none is read as the default, as before.
+
 ### Changed (2026-11-13, an error is printed under its name)
 - **`to_string` beside `OnnxError`, `GStreamerError`, `WebRTCError` and `ConfigError`.** Each is a `constexpr`
   `switch` without `default` in the enum's module interface, so a new value fails the build there. The demo printed

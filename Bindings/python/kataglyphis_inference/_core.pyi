@@ -337,6 +337,10 @@ class OnnxError(enum.Enum):
 
     ProviderUnavailable = 14
 
+    FrameTimeout = 15
+
+    EndOfStream = 16
+
 class ExecutionMode(enum.Enum):
     Sequential = 0
 

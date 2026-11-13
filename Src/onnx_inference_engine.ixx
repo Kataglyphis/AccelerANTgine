@@ -31,7 +31,11 @@ enum class OnnxError {
     InvalidOutputShape,
     ProfilingNotEnabled,
     ProfilingFailed,
-    ProviderUnavailable
+    ProviderUnavailable,
+    // No frame came in time; the stream may still deliver.
+    FrameTimeout,
+    // The stream has ended; no frame will come.
+    EndOfStream
 };
 
 // The value's own name, for a log line, a message or a binding; no default, so a new value fails the build here.
@@ -68,6 +72,10 @@ enum class OnnxError {
         return "ProfilingFailed";
     case OnnxError::ProviderUnavailable:
         return "ProviderUnavailable";
+    case OnnxError::FrameTimeout:
+        return "FrameTimeout";
+    case OnnxError::EndOfStream:
+        return "EndOfStream";
     }
     return "UnknownError";
 }

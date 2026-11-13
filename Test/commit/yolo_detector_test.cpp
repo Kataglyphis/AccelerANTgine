@@ -519,6 +519,29 @@ TEST(YoloDetectorGStreamer, RejectsFramesWithoutVideoGeometry)
     }
 }
 
+TEST(YoloDetectorGStreamer, ALateFrameAndTheEndOfTheStreamHaveCodesOfTheirOwn)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
+    const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    detection::YoloDetector detector;
+    ASSERT_TRUE(detector.initialize(two_class_config(model)).has_value());
+    gstreamer::GStreamerPipeline pipeline;
+    ASSERT_TRUE(pipeline
+        .create_pipeline_from_string("videotestsrc num-buffers=1 pattern=white "
+                                     "! video/x-raw,format=RGB,width=14,height=6,framerate=30/1 "
+                                     "! appsink name=sink sync=false")
+        .has_value());
+    // Not started yet: no frame comes, and none is ruled out.
+    EXPECT_EQ(
+      kataglyphis::test::error_of(detector.detect_from_gstreamer(pipeline, 50)), detection::OnnxError::FrameTimeout);
+    ASSERT_TRUE(pipeline.start().has_value());
+    ASSERT_TRUE(detector.detect_from_gstreamer(pipeline, 10000).has_value());
+    // The one frame is gone: the next pull is the end, known at once and without a look at the bus.
+    EXPECT_EQ(
+      kataglyphis::test::error_of(detector.detect_from_gstreamer(pipeline, 10000)), detection::OnnxError::EndOfStream);
+    EXPECT_TRUE(pipeline.has_ended());
+}
+
 TEST(YoloDetectorGStreamer, APipelineWithoutAppsinkGivesNoInput)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("fakesrc", "fakesink");
@@ -826,6 +849,32 @@ TEST(VideoDetectorPipeline, FactoriesFailOnAMissingModel)
     const auto camera = detection::create_camera_detection_pipeline("/dev/video0", missing, 64, 48, 30);
     ASSERT_FALSE(camera.has_value());
     EXPECT_EQ(camera.error(), detection::OnnxError::ModelLoadFailed);
+}
+
+TEST(VideoDetectorPipeline, AFactoryWithOnlyAPathTakesTheLayoutTheModelNames)
+{
+    ASSERT_TRUE(gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+    if (!kataglyphis::test::missing_gstreamer_element({ "filesrc", "decodebin", "videoscale", "videoconvert" })
+          .empty()) {
+        GTEST_SKIP() << "this GStreamer cannot parse the video pipeline";
+    }
+    // The default input size, 640 x 640, as rows of six values.
+    constexpr YoloReshapeGeometry kDefaultInput{ 640, 640, 204800, 6 };
+    const TempFile corners("kataglyphis-corners",
+      ".onnx",
+      kataglyphis::test::yolo_reshape_model(kDefaultInput, { { "kataglyphis.output", "xyxy_score_class" } }));
+    // The legacy default refuses this model, which is what the path-only factories did with the shipped one.
+    detection::YoloConfig legacy;
+    legacy.model_path = corners.path();
+    EXPECT_EQ(kataglyphis::test::error_of(detection::create_video_detection_pipeline("clip.mp4", legacy, 64, 48)),
+      detection::OnnxError::InvalidOutputShape);
+    EXPECT_TRUE(detection::create_video_detection_pipeline("clip.mp4", corners.path(), 64, 48).has_value());
+    // A model that names no layout is read as the legacy default, as before.
+    const TempFile unnamed("kataglyphis-unnamed", ".onnx", kataglyphis::test::yolo_reshape_model(kDefaultInput));
+    EXPECT_TRUE(detection::create_video_detection_pipeline("clip.mp4", unnamed.path(), 64, 48).has_value());
+    if (kataglyphis::test::missing_gstreamer_element({ "v4l2src" }).empty()) {
+        EXPECT_TRUE(detection::create_camera_detection_pipeline("/dev/video0", corners.path(), 64, 48, 30).has_value());
+    }
 }
 
 TEST(VideoDetectorPipeline, FactoriesForwardTheSelectedDeviceConfiguration)

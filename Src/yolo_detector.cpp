@@ -599,7 +599,13 @@ auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline,
     if (!is_initialized()) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
     auto buffer_result = pipeline.pull_sample(timeout_ms);
-    if (!buffer_result) { return std::unexpected(OnnxError::InputAllocationFailed); }
+    if (!buffer_result) {
+        // A late frame is worth another pull, the end is not, and a broken stream or a missing sink is neither.
+        if (buffer_result.error() != gstreamer::GStreamerError::BufferAllocationFailed) {
+            return std::unexpected(OnnxError::InputAllocationFailed);
+        }
+        return std::unexpected(pipeline.has_ended() ? OnnxError::EndOfStream : OnnxError::FrameTimeout);
+    }
 
     return detect_frame(*buffer_result);
 }
@@ -801,15 +807,30 @@ auto VideoDetectorPipeline::end_profiling() -> std::expected<std::string, OnnxEr
     return impl_->detector.end_profiling();
 }
 
+namespace {
+    // With only a path the model says its layout itself; one that names none is read as the legacy default, as before.
+    template<typename Build>
+    auto with_the_models_layout(const std::filesystem::path &model_path, Build build)
+      -> std::expected<VideoDetectorPipeline, OnnxError>
+    {
+        YoloConfig config;
+        config.model_path = model_path;
+        config.output_layout = YoloOutputLayout::Auto;
+        auto named = build(config);
+        if (named || named.error() != OnnxError::InvalidOutputShape) { return named; }
+        config.output_layout = YoloConfig{}.output_layout;
+        return build(config);
+    }
+}// namespace
+
 auto create_camera_detection_pipeline(const std::string &device,
   const std::filesystem::path &model_path,
   std::uint32_t width,
   std::uint32_t height,
   std::uint32_t fps) -> std::expected<VideoDetectorPipeline, OnnxError>
 {
-    YoloConfig config;
-    config.model_path = model_path;
-    return create_camera_detection_pipeline(device, config, width, height, fps);
+    return with_the_models_layout(model_path,
+      [&](const YoloConfig &config) { return create_camera_detection_pipeline(device, config, width, height, fps); });
 }
 
 auto create_camera_detection_pipeline(const std::string &device,
@@ -836,9 +857,8 @@ auto create_video_detection_pipeline(const std::string &video_source,
   std::uint32_t width,
   std::uint32_t height) -> std::expected<VideoDetectorPipeline, OnnxError>
 {
-    YoloConfig config;
-    config.model_path = model_path;
-    return create_video_detection_pipeline(video_source, config, width, height);
+    return with_the_models_layout(model_path,
+      [&](const YoloConfig &config) { return create_video_detection_pipeline(video_source, config, width, height); });
 }
 
 auto create_video_detection_pipeline(const std::string &video_source,

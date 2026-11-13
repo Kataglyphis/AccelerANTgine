@@ -125,7 +125,9 @@ void bind_onnx(nb::module_ &m)
       .value("InvalidOutputShape", OnnxError::InvalidOutputShape)
       .value("ProfilingNotEnabled", OnnxError::ProfilingNotEnabled)
       .value("ProfilingFailed", OnnxError::ProfilingFailed)
-      .value("ProviderUnavailable", OnnxError::ProviderUnavailable);
+      .value("ProviderUnavailable", OnnxError::ProviderUnavailable)
+      .value("FrameTimeout", OnnxError::FrameTimeout)
+      .value("EndOfStream", OnnxError::EndOfStream);
 
     nb::enum_<ExecutionMode>(m, "ExecutionMode")
       .value("Sequential", ExecutionMode::Sequential)

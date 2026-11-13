@@ -966,9 +966,9 @@ TEST(OnnxEngine, CustomMetadataIsReadFromTheModel)
 TEST(OnnxError, EveryValueHasANameOfItsOwn)
 {
     const auto names = kataglyphis::test::names_of<kataglyphis::inference::OnnxError>();
-    ASSERT_EQ(names.size(), 15U);
+    ASSERT_EQ(names.size(), 17U);
     EXPECT_EQ(names.front(), "SessionCreationFailed");
-    EXPECT_EQ(names.back(), "ProviderUnavailable");
+    EXPECT_EQ(names.back(), "EndOfStream");
     EXPECT_TRUE(kataglyphis::test::all_differ(names));
-    EXPECT_EQ(to_string(static_cast<kataglyphis::inference::OnnxError>(15)), "UnknownError");
+    EXPECT_EQ(to_string(static_cast<kataglyphis::inference::OnnxError>(17)), "UnknownError");
 }

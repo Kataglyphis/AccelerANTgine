@@ -476,6 +476,10 @@ auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms) -> std::expected<B
 
     // A failed stream is not a frame that is late: the caller of a camera has to tell the two apart.
     if (sample == nullptr) {
+        // Asked here too: the caller reads has_ended() right after this pull. A sink that never played says EOS as well.
+        if (impl_->is_playing.load() && gst_app_sink_is_eos(GST_APP_SINK(impl_->appsink)) != FALSE) {
+            impl_->ended.store(true);
+        }
         return std::unexpected(
           impl_->failed.load() ? GStreamerError::StreamError : GStreamerError::BufferAllocationFailed);
     }
