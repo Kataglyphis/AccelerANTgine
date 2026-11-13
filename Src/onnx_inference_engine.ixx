@@ -7,6 +7,7 @@ module;
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 export module kataglyphis.onnx_inference;
@@ -32,6 +33,44 @@ enum class OnnxError {
     ProfilingFailed,
     ProviderUnavailable
 };
+
+// The value's own name, for a log line, a message or a binding; no default, so a new value fails the build here.
+[[nodiscard]] constexpr auto to_string(OnnxError error) noexcept -> std::string_view
+{
+    switch (error) {
+    case OnnxError::SessionCreationFailed:
+        return "SessionCreationFailed";
+    case OnnxError::ModelLoadFailed:
+        return "ModelLoadFailed";
+    case OnnxError::InputAllocationFailed:
+        return "InputAllocationFailed";
+    case OnnxError::OutputAllocationFailed:
+        return "OutputAllocationFailed";
+    case OnnxError::InferenceFailed:
+        return "InferenceFailed";
+    case OnnxError::InvalidInputShape:
+        return "InvalidInputShape";
+    case OnnxError::InvalidInputType:
+        return "InvalidInputType";
+    case OnnxError::MemoryAllocationError:
+        return "MemoryAllocationError";
+    case OnnxError::SessionNotInitialized:
+        return "SessionNotInitialized";
+    case OnnxError::OutputNotFound:
+        return "OutputNotFound";
+    case OnnxError::InvalidOutputType:
+        return "InvalidOutputType";
+    case OnnxError::InvalidOutputShape:
+        return "InvalidOutputShape";
+    case OnnxError::ProfilingNotEnabled:
+        return "ProfilingNotEnabled";
+    case OnnxError::ProfilingFailed:
+        return "ProfilingFailed";
+    case OnnxError::ProviderUnavailable:
+        return "ProviderUnavailable";
+    }
+    return "UnknownError";
+}
 
 // Exported: a member defined in a module interface is not inline, so importers link against this one.
 struct KATAGLYPHIS_CPP_API TensorShape

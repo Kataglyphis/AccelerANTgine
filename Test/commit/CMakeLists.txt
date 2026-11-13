@@ -146,19 +146,19 @@ if(TARGET ${PROJECT_NAME}_demo)
   set_tests_properties(Demo.GStreamerExampleEnds PROPERTIES TIMEOUT 120)
   kataglyphis_add_demo_test(
     OnnxExampleReportsAMissingModel
-    "ONNX inference example failed!"
+    "Failed to initialize ONNX Runtime: ModelLoadFailed\n"
     --model
     "${_demo_missing_model}"
     --onnx-only)
   kataglyphis_add_demo_test(
     YoloExampleReportsAMissingModel
-    "YOLO detection example failed!"
+    "Failed to initialize YOLO detector: ModelLoadFailed\n"
     --model
     "${_demo_missing_model}"
     --yolo-only)
   kataglyphis_add_demo_test(
     VideoExampleReportsAMissingFile
-    "Video detection example failed!"
+    "Video detection pipeline creation failed: ModelLoadFailed\n"
     --model
     "${_demo_missing_model}"
     --video-only)

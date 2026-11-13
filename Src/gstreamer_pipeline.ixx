@@ -9,6 +9,7 @@ module;
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 export module kataglyphis.gstreamer_pipeline;
@@ -27,6 +28,34 @@ enum class GStreamerError {
     InvalidParameter,
     ResourceNotFound
 };
+
+// The value's own name, for a log line, a message or a binding; no default, so a new value fails the build here.
+[[nodiscard]] constexpr auto to_string(GStreamerError error) noexcept -> std::string_view
+{
+    switch (error) {
+    case GStreamerError::InitializationFailed:
+        return "InitializationFailed";
+    case GStreamerError::PipelineCreationFailed:
+        return "PipelineCreationFailed";
+    case GStreamerError::ElementCreationFailed:
+        return "ElementCreationFailed";
+    case GStreamerError::LinkFailed:
+        return "LinkFailed";
+    case GStreamerError::StateChangeFailed:
+        return "StateChangeFailed";
+    case GStreamerError::BufferAllocationFailed:
+        return "BufferAllocationFailed";
+    case GStreamerError::CapsNegotiationFailed:
+        return "CapsNegotiationFailed";
+    case GStreamerError::StreamError:
+        return "StreamError";
+    case GStreamerError::InvalidParameter:
+        return "InvalidParameter";
+    case GStreamerError::ResourceNotFound:
+        return "ResourceNotFound";
+    }
+    return "UnknownError";
+}
 
 struct TensorMeta
 {

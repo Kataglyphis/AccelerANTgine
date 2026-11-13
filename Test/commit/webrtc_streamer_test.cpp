@@ -318,3 +318,13 @@ TEST(WebRtcStreamer, AConfigFileDrivesTheFactory)
     ASSERT_TRUE(from_defaults.has_value());
     EXPECT_TRUE(from_defaults->get_producer_id().starts_with("stream-"));
 }
+
+TEST(WebRTCError, EveryValueHasANameOfItsOwn)
+{
+    const auto names = kataglyphis::test::names_of<kataglyphis::webrtc::WebRTCError>();
+    ASSERT_EQ(names.size(), 10U);
+    EXPECT_EQ(names.front(), "InitializationFailed");
+    EXPECT_EQ(names.back(), "Timeout");
+    EXPECT_TRUE(kataglyphis::test::all_differ(names));
+    EXPECT_EQ(to_string(static_cast<kataglyphis::webrtc::WebRTCError>(10)), "UnknownError");
+}

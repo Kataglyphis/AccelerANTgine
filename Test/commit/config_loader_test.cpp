@@ -209,3 +209,13 @@ TEST(WebRtcConfig, MalformedFileIsAParseError)
     ASSERT_FALSE(config.has_value());
     EXPECT_EQ(config.error(), cfg::ConfigError::ParseError);
 }
+
+TEST(ConfigError, EveryValueHasANameOfItsOwn)
+{
+    const auto names = kataglyphis::test::names_of<kataglyphis::config::ConfigError>();
+    ASSERT_EQ(names.size(), 4U);
+    EXPECT_EQ(names.front(), "FileNotFound");
+    EXPECT_EQ(names.back(), "InvalidValue");
+    EXPECT_TRUE(kataglyphis::test::all_differ(names));
+    EXPECT_EQ(to_string(static_cast<kataglyphis::config::ConfigError>(4)), "UnknownError");
+}

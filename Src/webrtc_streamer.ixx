@@ -7,6 +7,7 @@ module;
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 export module kataglyphis.webrtc_streamer;
@@ -29,6 +30,34 @@ enum class WebRTCError {
     InvalidConfiguration,
     Timeout
 };
+
+// The value's own name, for a log line, a message or a binding; no default, so a new value fails the build here.
+[[nodiscard]] constexpr auto to_string(WebRTCError error) noexcept -> std::string_view
+{
+    switch (error) {
+    case WebRTCError::InitializationFailed:
+        return "InitializationFailed";
+    case WebRTCError::SignallingConnectionFailed:
+        return "SignallingConnectionFailed";
+    case WebRTCError::PipelineCreationFailed:
+        return "PipelineCreationFailed";
+    case WebRTCError::NegotiationFailed:
+        return "NegotiationFailed";
+    case WebRTCError::MediaError:
+        return "MediaError";
+    case WebRTCError::LibcameraNotAvailable:
+        return "LibcameraNotAvailable";
+    case WebRTCError::EncoderNotAvailable:
+        return "EncoderNotAvailable";
+    case WebRTCError::StateChangeFailed:
+        return "StateChangeFailed";
+    case WebRTCError::InvalidConfiguration:
+        return "InvalidConfiguration";
+    case WebRTCError::Timeout:
+        return "Timeout";
+    }
+    return "UnknownError";
+}
 
 enum class VideoSource {
     Libcamera,// Raspberry Pi camera via libcamera

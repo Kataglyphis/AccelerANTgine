@@ -962,3 +962,13 @@ TEST(OnnxEngine, CustomMetadataIsReadFromTheModel)
     EXPECT_EQ(engine.get_custom_metadata("kataglyphis.output"), std::string("xyxy_score_class"));
     EXPECT_EQ(engine.get_custom_metadata("kataglyphis.absent"), std::string());
 }
+
+TEST(OnnxError, EveryValueHasANameOfItsOwn)
+{
+    const auto names = kataglyphis::test::names_of<kataglyphis::inference::OnnxError>();
+    ASSERT_EQ(names.size(), 15U);
+    EXPECT_EQ(names.front(), "SessionCreationFailed");
+    EXPECT_EQ(names.back(), "ProviderUnavailable");
+    EXPECT_TRUE(kataglyphis::test::all_differ(names));
+    EXPECT_EQ(to_string(static_cast<kataglyphis::inference::OnnxError>(15)), "UnknownError");
+}

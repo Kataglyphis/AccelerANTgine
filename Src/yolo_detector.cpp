@@ -679,7 +679,7 @@ struct VideoDetectorPipeline::Impl
         if (on_error) {
             on_error(detection.error());
         } else if (changed) {
-            log::error("Video detection failed: {}", static_cast<int>(detection.error()));
+            log::error("Video detection failed: {}", to_string(detection.error()));
         }
     }
 };

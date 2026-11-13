@@ -61,7 +61,7 @@ static auto run_onnx_inference_example(const detection::YoloConfig &base, const 
 
     auto init_result = engine.initialize(config);
     if (!init_result) {
-        std::cerr << "Failed to initialize ONNX Runtime: " << static_cast<int>(init_result.error()) << "\n";
+        std::cerr << "Failed to initialize ONNX Runtime: " << to_string(init_result.error()) << "\n";
         return 1;
     }
 
@@ -111,7 +111,7 @@ static auto run_onnx_inference_example(const detection::YoloConfig &base, const 
 
     auto result = engine.run_inference(dummy_input, input_shape, input_names[0]);
     if (!result) {
-        std::cerr << "Inference failed: " << static_cast<int>(result.error()) << "\n";
+        std::cerr << "Inference failed: " << to_string(result.error()) << "\n";
         return 1;
     }
 
@@ -155,14 +155,14 @@ static auto pull_gstreamer_samples() -> int
     std::cout << "Creating pipeline...\n";
     auto create_result = pipeline.create_pipeline(config);
     if (!create_result) {
-        std::cerr << "Failed to create pipeline: " << static_cast<int>(create_result.error()) << "\n";
+        std::cerr << "Failed to create pipeline: " << to_string(create_result.error()) << "\n";
         return 1;
     }
 
     std::cout << "Starting pipeline...\n";
     auto start_result = pipeline.start();
     if (!start_result) {
-        std::cerr << "Failed to start pipeline: " << static_cast<int>(start_result.error()) << "\n";
+        std::cerr << "Failed to start pipeline: " << to_string(start_result.error()) << "\n";
         return 1;
     }
 
@@ -194,7 +194,7 @@ static auto run_gstreamer_pipeline_example() -> int
 
     auto init_result = gstreamer::GStreamerPipeline::initialize_gstreamer();
     if (!init_result) {
-        std::cerr << "Failed to initialize GStreamer: " << static_cast<int>(init_result.error()) << "\n";
+        std::cerr << "Failed to initialize GStreamer: " << to_string(init_result.error()) << "\n";
         return 1;
     }
 
@@ -219,7 +219,7 @@ static auto run_yolo_detection_example(const detection::YoloConfig &config) -> i
 
     auto init_result = detector.initialize(config);
     if (!init_result) {
-        std::cerr << "Failed to initialize YOLO detector: " << static_cast<int>(init_result.error()) << "\n";
+        std::cerr << "Failed to initialize YOLO detector: " << to_string(init_result.error()) << "\n";
         return 1;
     }
 
@@ -233,7 +233,7 @@ static auto run_yolo_detection_example(const detection::YoloConfig &config) -> i
 
     auto result = detector.detect(dummy_image, 640, 480);
     if (!result) {
-        std::cerr << "Detection failed: " << static_cast<int>(result.error()) << "\n";
+        std::cerr << "Detection failed: " << to_string(result.error()) << "\n";
         return 1;
     }
 
@@ -249,7 +249,7 @@ static auto run_video_detection_example(const detection::YoloConfig &config) -> 
     auto pipeline_result = detection::create_video_detection_pipeline("test.mp4", config, 640, 480);
 
     if (!pipeline_result) {
-        std::cerr << "Video detection pipeline creation failed: " << static_cast<int>(pipeline_result.error()) << "\n";
+        std::cerr << "Video detection pipeline creation failed: " << to_string(pipeline_result.error()) << "\n";
         return 1;
     }
 
@@ -304,7 +304,7 @@ static auto run_video_detection_check(const detection::YoloConfig &yolo_config,
         ready.notify_one();
     });
     pipeline.set_error_callback([&](detection::OnnxError error) {
-        std::cerr << "Video inference failed: " << static_cast<int>(error) << "\n";
+        std::cerr << "Video inference failed: " << to_string(error) << "\n";
         {
             std::scoped_lock lock(mutex);
             failed = true;

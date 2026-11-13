@@ -45,6 +45,14 @@ def test_parse_webrtc_config_invalid_raises():
         ki.parse_webrtc_config("this is not json {")
 
 
+def test_a_config_error_is_raised_under_the_name_of_its_code(tmp_path):
+    """The text after the colon is the C++ to_string of the code, not a table the binding keeps."""
+    with pytest.raises(ValueError, match=r"^load_webrtc_config failed: FileNotFound$"):
+        ki.load_webrtc_config(str(tmp_path / "missing.json"))
+    with pytest.raises(ValueError, match=r"^parse_webrtc_config failed: ParseError$"):
+        ki.parse_webrtc_config("this is not json {")
+
+
 needs_onnx = pytest.mark.skipif(
     not getattr(ki, "HAS_ONNXRUNTIME", False),
     reason="built without ONNX Runtime",
@@ -63,6 +71,15 @@ def test_onnx_output_errors_are_exposed():
     assert ki.OnnxError.InvalidOutputType.name == "InvalidOutputType"
     assert ki.OnnxError.InvalidOutputShape.name == "InvalidOutputShape"
     assert ki.OnnxError.ProviderUnavailable.name == "ProviderUnavailable"
+
+
+@needs_onnx
+def test_an_onnx_error_is_raised_under_the_name_python_gives_the_same_code():
+    np = pytest.importorskip("numpy")
+    with pytest.raises(RuntimeError, match=r"^run_inference failed: \w+$") as raised:
+        ki.OnnxInferenceEngine().run_inference(np.zeros((1, 3, 640, 640), dtype=np.float32))
+    name = str(raised.value).rsplit(": ", 1)[1]
+    assert name == ki.OnnxError.SessionNotInitialized.name
 
 
 @needs_onnx

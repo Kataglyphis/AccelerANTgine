@@ -33,73 +33,17 @@ using namespace nb::literals;
 
 namespace {
 
-auto config_error_name(kataglyphis::config::ConfigError error) -> const char *
-{
-    using kataglyphis::config::ConfigError;
-    switch (error) {
-    case ConfigError::FileNotFound:
-        return "FileNotFound";
-    case ConfigError::ParseError:
-        return "ParseError";
-    case ConfigError::MissingField:
-        return "MissingField";
-    case ConfigError::InvalidValue:
-        return "InvalidValue";
-    }
-    return "UnknownError";
-}
-
 template<typename T>
 auto unwrap_config(std::expected<T, kataglyphis::config::ConfigError> &&result, const char *context) -> T
 {
-    if (!result) {
-        throw std::invalid_argument(std::format("{} failed: {}", context, config_error_name(result.error())));
-    }
+    if (!result) { throw std::invalid_argument(std::format("{} failed: {}", context, to_string(result.error()))); }
     return std::move(*result);
 }
 
 #if HAS_ONNXRUNTIME
 
-auto onnx_error_name(kataglyphis::inference::OnnxError error) -> const char *
-{
-    using kataglyphis::inference::OnnxError;
-    switch (error) {
-    case OnnxError::SessionCreationFailed:
-        return "SessionCreationFailed";
-    case OnnxError::ModelLoadFailed:
-        return "ModelLoadFailed";
-    case OnnxError::InputAllocationFailed:
-        return "InputAllocationFailed";
-    case OnnxError::OutputAllocationFailed:
-        return "OutputAllocationFailed";
-    case OnnxError::InferenceFailed:
-        return "InferenceFailed";
-    case OnnxError::InvalidInputShape:
-        return "InvalidInputShape";
-    case OnnxError::InvalidInputType:
-        return "InvalidInputType";
-    case OnnxError::MemoryAllocationError:
-        return "MemoryAllocationError";
-    case OnnxError::SessionNotInitialized:
-        return "SessionNotInitialized";
-    case OnnxError::OutputNotFound:
-        return "OutputNotFound";
-    case OnnxError::InvalidOutputType:
-        return "InvalidOutputType";
-    case OnnxError::InvalidOutputShape:
-        return "InvalidOutputShape";
-    case OnnxError::ProfilingNotEnabled:
-        return "ProfilingNotEnabled";
-    case OnnxError::ProfilingFailed:
-        return "ProfilingFailed";
-    case OnnxError::ProviderUnavailable:
-        return "ProviderUnavailable";
-    }
-    return "UnknownError";
-}
-
 [[noreturn]] void raise_onnx(const char *context, kataglyphis::inference::OnnxError error)
-{ throw std::runtime_error(std::format("{} failed: {}", context, onnx_error_name(error))); }
+{ throw std::runtime_error(std::format("{} failed: {}", context, to_string(error))); }
 
 using CpuFloatArray = nb::ndarray<const float, nb::c_contig, nb::device::cpu>;
 

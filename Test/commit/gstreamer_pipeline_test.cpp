@@ -370,3 +370,13 @@ TEST(GStreamerPipeline, EveryInferenceBuilderKeepsAPathWithASeparatorInOneValue)
     EXPECT_TRUE(camera.contains("device=\"/dev/video0 ! 1\" ! ")) << camera;
     EXPECT_TRUE(camera.contains(quoted_model)) << camera;
 }
+
+TEST(GStreamerError, EveryValueHasANameOfItsOwn)
+{
+    const auto names = kataglyphis::test::names_of<kataglyphis::gstreamer::GStreamerError>();
+    ASSERT_EQ(names.size(), 10U);
+    EXPECT_EQ(names.front(), "InitializationFailed");
+    EXPECT_EQ(names.back(), "ResourceNotFound");
+    EXPECT_TRUE(kataglyphis::test::all_differ(names));
+    EXPECT_EQ(to_string(static_cast<kataglyphis::gstreamer::GStreamerError>(10)), "UnknownError");
+}

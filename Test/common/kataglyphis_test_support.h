@@ -2,6 +2,7 @@
 #define KATAGLYPHIS_TEST_SUPPORT_H
 
 // Include before any `import`: a header after an import that pulled the same std headers can clash.
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -248,6 +249,25 @@ template<typename Expected> auto error_of(const Expected &result) -> std::option
 {
     if (result.has_value()) { return std::nullopt; }
     return result.error();
+}
+
+// The names to_string gives an enum's values from zero on; the walk ends at the first value without a name.
+template<typename Enum> auto names_of() -> std::vector<std::string>
+{
+    std::vector<std::string> names;
+    for (int value = 0; value < 256; ++value) {
+        const std::string_view name = to_string(static_cast<Enum>(value));
+        if (name == "UnknownError") { break; }
+        names.emplace_back(name);
+    }
+    return names;
+}
+
+// Whether no two of the names are the same.
+inline auto all_differ(std::vector<std::string> names) -> bool
+{
+    std::ranges::sort(names);
+    return std::ranges::adjacent_find(names) == names.end();
 }
 
 // A path in the temp directory that nothing created.

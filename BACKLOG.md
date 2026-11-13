@@ -101,23 +101,20 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the NVIDIA packages' card run (two entries up) passes on that image. Until it is published, a build may
   meet either form of the module.
 
-- [ ] **An error reaches the caller as a bare code, and different causes share one** (M, ★★).
+- [ ] **Different causes share one error code, and the reason stays in the log** (M, ★★). Every code has a
+  name since 2026-11-13 (`to_string` beside each enum), but the code still says too little:
   `YoloDetector::detect_from_gstreamer` turns every failed pull (late frame, end of stream, broken stream) into
   `InputAllocationFailed`; in `VideoDetectorPipeline::initialize` a failed GStreamer init and a pipeline that does
   not parse are both `SessionCreationFailed` (`Src/yolo_detector.cpp`). The reason is in the log only:
-  `initialize_gstreamer` frees GLib's message unlogged (`Src/gstreamer_pipeline.cpp:329-333`), Python cannot read
-  `provider_error()`, and the text generator logs GenAI's message (`Src/text_generation.cpp:145-152`) while Python
-  and the C API return one fixed text per status. The demo prints nine errors as `static_cast<int>`; the bindings
-  keep their own name tables (`Bindings/python/kataglyphis_bindings.cpp:36-50`, `:63-99`).
+  `initialize_gstreamer` frees GLib's message unlogged (`Src/gstreamer_pipeline.cpp`), Python cannot read
+  `provider_error()`, and the text generator logs GenAI's message (`Src/text_generation.cpp`) while Python and the
+  C API return one fixed text per status.
 
-  First: `to_string` beside `OnnxError`, `GStreamerError`, `WebRTCError` and `ConfigError`, each a `switch` without
-  `default`, used by the demo, the CLI, the "Video detection failed" log line and the bindings. Then a last-error
-  text on the engine and the detector, as `provider_error()` keeps it for one case, bound to Python, whose exception
-  becomes a `RuntimeError` subclass with `.code`; the C API gets a last-error function, appended.
-  Done when a commit test walks every value of each enum and finds a unique name, the demo tests expect the name
-  (`PASS_REGULAR_EXPRESSION`), and a pytest compares the Python names with `to_string`.
+  First: a last-error text on the engine and the detector, as `provider_error()` keeps it for one case, bound to
+  Python, whose exception becomes a `RuntimeError` subclass with `.code`; the C API gets a last-error function,
+  appended. Done when a pytest reads the reason of a failed load from the exception.
   Ask the owner before: (1) giving a late frame and the end of a stream their own values;
-  `Test/commit/gstreamer_pipeline_test.cpp:128-130` pins "The end is no error" since 2026-11-12, with `has_ended()`
+  `Test/commit/gstreamer_pipeline_test.cpp` pins "The end is no error" since 2026-11-12, with `has_ended()`
   to tell them apart. (2) Producing or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four
   `GStreamerError`, `OnnxError::MemoryAllocationError`).
 

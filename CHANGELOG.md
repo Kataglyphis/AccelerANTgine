@@ -18,6 +18,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-13, an error is printed under its name)
+- **`to_string` beside `OnnxError`, `GStreamerError`, `WebRTCError` and `ConfigError`.** Each is a `constexpr`
+  `switch` without `default` in the enum's module interface, so a new value fails the build there. The demo printed
+  nine errors as numbers (`Failed to initialize ONNX Runtime: 1`) and now prints `ModelLoadFailed`; the
+  `Video detection failed` log line names its code too.
+- **The Python bindings keep no name table of their own.** `kataglyphis_bindings.cpp` held one for `ConfigError` and
+  one for `OnnxError`; both are gone, and the exception text is `to_string`'s (the same names, so no message
+  changes).
+- Tests: one commit test per enum walks its values and finds a name of its own for each, three demo tests expect
+  the name, and two pytest cases read the name from the exception. Not done, kept in `BACKLOG.md`: a last-error
+  text with the reason, and the codes that several causes share.
+
 ### Fixed (2026-11-13, two small backlog entries)
 - **A model that names another preprocessing than the config fails at the start.** The DEIM model carries
   `kataglyphis.preprocess=stretch` beside `kataglyphis.output`, and `YoloDetector::initialize` read only the output
