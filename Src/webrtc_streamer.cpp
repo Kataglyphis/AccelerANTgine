@@ -15,6 +15,7 @@ module;
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 
 #define GST_USE_UNSTABLE_API
@@ -350,19 +351,16 @@ struct WebRTCStreamer::Impl
         const GstStructure *structure = gst_message_get_structure(msg);
         if (structure == nullptr) { return TRUE; }
 
-        const gchar *name = gst_structure_get_name(structure);
-        if (g_str_has_prefix(name, "webrtcsink") != 0) {
-            log::debug("WebRTC event: {}", name);
-
-            // Check for connection established
-            if (g_str_has_suffix(name, "consumer-added") != 0) {
-                log::info("WebRTC peer connected");
-                impl->set_state(StreamState::Streaming);
-            } else if (g_str_has_suffix(name, "consumer-removed") != 0) {
-                log::info("WebRTC peer disconnected");
-            }
+        // string_view, not g_str_has_prefix: GLib's macro form branches on every call and inflated this function.
+        const std::string_view name{ gst_structure_get_name(structure) };
+        if (!name.starts_with("webrtcsink")) { return TRUE; }
+        log::debug("WebRTC event: {}", name);
+        if (name.ends_with("consumer-added")) {
+            log::info("WebRTC peer connected");
+            impl->set_state(StreamState::Streaming);
+        } else if (name.ends_with("consumer-removed")) {
+            log::info("WebRTC peer disconnected");
         }
-
         return TRUE;
     }
 };

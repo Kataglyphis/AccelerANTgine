@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, two GStreamer callbacks leave the complexity list)
+- `find_element_of_type` walks the bin with `gst_iterator_find_custom`, which restarts the walk itself on a resync,
+  in place of a hand-written iterator loop. `on_bus_element` tests the event name with `std::string_view`'s
+  `starts_with`/`ends_with`: GLib's `g_str_has_prefix` and `g_str_has_suffix` are macros that branch on every call
+  and gave the eight-line callback a cognitive complexity of 44. The 63 pipeline and WebRTC cases pass in the arm64
+  image.
+
 ### Changed (2026-11-14, `populate_config` reads its keys through two helpers)
 - `populate_model` and `populate_pipeline` read each key through `take` (a value of another type gives the default,
   as `value_or` did) and `take_string` (text only), in an anonymous namespace. `populate_config` leaves clang-tidy's

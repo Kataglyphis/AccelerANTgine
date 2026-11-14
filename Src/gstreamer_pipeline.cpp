@@ -60,33 +60,19 @@ namespace {
         if (G_TYPE_CHECK_INSTANCE_TYPE(root, type)) { return GST_ELEMENT(gst_object_ref(root)); }
         if (!GST_IS_BIN(root)) { return nullptr; }
 
-        GstElement *found = nullptr;
+        // find_custom restarts the walk itself when the bin changes under it (a resync).
         GstIterator *iterator = gst_bin_iterate_recurse(GST_BIN(root));
         GValue item = G_VALUE_INIT;
-        bool done = false;
-        while (!done) {
-            switch (gst_iterator_next(iterator, &item)) {
-            case GST_ITERATOR_OK: {
-                auto *element = GST_ELEMENT(g_value_get_object(&item));
-                if (found == nullptr && G_TYPE_CHECK_INSTANCE_TYPE(element, type)) {
-                    found = GST_ELEMENT(gst_object_ref(element));
-                }
-                g_value_reset(&item);
-                break;
-            }
-            case GST_ITERATOR_RESYNC:
-                if (found != nullptr) {
-                    gst_object_unref(found);
-                    found = nullptr;
-                }
-                gst_iterator_resync(iterator);
-                break;
-            default:
-                done = true;
-                break;
-            }
+        GstElement *found = nullptr;
+        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): GLib's GCompareFunc fixes the two pointers.
+        const auto of_type = [](gconstpointer value, gconstpointer wanted) -> gint {
+            auto *element = g_value_get_object(static_cast<const GValue *>(value));
+            return G_TYPE_CHECK_INSTANCE_TYPE(element, *static_cast<const GType *>(wanted)) ? 0 : 1;
+        };
+        if (gst_iterator_find_custom(iterator, of_type, &item, &type) != 0) {
+            found = GST_ELEMENT(g_value_dup_object(&item));
+            g_value_unset(&item);
         }
-        g_value_unset(&item);
         gst_iterator_free(iterator);
         return found;
     }
