@@ -86,5 +86,21 @@
   "replace": "        static_cast<float>(content_width) / meta.height,\n",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
   "why": "Each axis of the mapping uses its own side; a square test picture would hide the swap."
+ },
+ {
+  "id": "cxx.preprocess-height-bound-removed",
+  "target": "Src/yolo_detector.cpp",
+  "find": "        || buffer.data.size() < buffer.size\n        || static_cast<std::size_t>(meta.height - 1) > (buffer.size - meta.plane_offset_bytes - row_bytes) / stride) {",
+  "replace": "        || buffer.data.size() < buffer.size) {",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^PreprocessFuzz\\.'",
+  "why": "A frame whose rows run past its buffer is refused, never read."
+ },
+ {
+  "id": "cxx.pipeline-quote-unescaped",
+  "target": "Src/gstreamer_pipeline.cpp",
+  "find": "        if (ch == '\\\\' || ch == '\"') { escaped.push_back('\\\\'); }",
+  "replace": "        if (ch == '\\\\') { escaped.push_back('\\\\'); }",
+  "test": "bash scripts/linux/cxx-mutation-test.sh '^PipelineQuoteFuzz\\.'",
+  "why": "A quote in a file name cannot end the pipeline string's quotes early."
  }
 ]

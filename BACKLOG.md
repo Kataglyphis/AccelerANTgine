@@ -272,21 +272,9 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when that row is in the baseline and a tiny-model test shows that turn 2, extending turn 1, gives the ids of
   a fresh run.
 
-- [ ] **`preprocess_frame` and the pipeline quoting are not fuzzed** (S, ★★). The nine fuzz targets cover the
-  decoder and the two parsers (`Test/fuzz/yolo_decoder_fuzz.cpp`, `Test/fuzz/config_fuzz.cpp`). `preprocess_frame`
-  does the size, stride and offset arithmetic before it reads raw bytes, 6219631 rewrote it for speed, and its
-  tests (the three `FramePreprocessing` cases) use frames of at most 3x2 pixels. `quote_pipeline_value`
-  (`Src/gstreamer_pipeline.cpp:488-499`), all that stands between a file name and a gst-launch string, has one
-  example test.
-
-  First: `FUZZ_TEST(PreprocessFuzz, NeverReadsOutsideTheBuffer)` over format, size, stride, offset, a declared size
-  apart from the real one, target size and both modes; the answer is an error or exactly 3*w*h values within 0 to 1.
-  Beside it a naive `nearest_floor` reference compared value by value, which protects every later speed-up. For the
-  quoting a pure property: an unescape rule written in the test gives the value back, and the quoted text holds no
-  unescaped quote.
-  Done when both run in the clang Debug lane's `fuzzTestSuite` (ASan, fatal UBSan), and the test's comment records
-  one run by hand with a bound check removed that the target caught.
-  Later: a dispatch-only tree with fuzzing mode on and a kept corpus; `third_party/CMakeLists.txt:83-93` forces it
+- [ ] **The fuzz targets run in unit mode only, with no kept corpus** (M, ★). Since 2026-11-14 eleven properties
+  run in the clang Debug lane's `fuzzTestSuite`, each for a second of random inputs.
+  Next: a dispatch-only tree with fuzzing mode on and a kept corpus; `third_party/CMakeLists.txt:83-93` forces it
   off because it clashed with ASan.
 
 - [ ] **No shared case holds the two schema errors** (S, ★). C++ and Rust agree since 2026-11-13 (owner decision):

@@ -18,6 +18,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-14, frame preprocessing and the pipeline quoting are fuzzed)
+- **`PreprocessFuzz.NeverReadsOutsideTheBuffer`** feeds `preprocess_frame` any format, frame size, stride, plane
+  offset, a declared size up to 8 bytes off the real one, target sizes up to 48 and both modes. The answer is an
+  error, or exactly 3*w*h values within 0 to 1 that equal a slow nearest-floor reference value by value, so a later
+  speed-up of the sampler cannot change a pixel. The reference also refuses any pixel past the declared size.
+- **`PipelineQuoteFuzz.QuotedValuesRoundTrip`**: whatever `quote_pipeline_value` gets, the quoted text holds no
+  unescaped quote and gst-launch's backslash rule gives the value back.
+- Both run in the clang Debug lane's `fuzzTestSuite` (ASan, fatal UBSan). Recipes
+  `cxx.preprocess-height-bound-removed` (a dropped bound check the property catches) and
+  `cxx.pipeline-quote-unescaped` join the weekly C++ mutation run.
+
 ### Added (2026-11-13, mutation recipes against the detector code, run weekly; owner decision)
 - **Eleven recipes mutate `Src/yolo_detector.cpp`** (`scripts/linux/tests/cxx-mutations.json`): the cut to the
   frame removed or moved before suppression, suppression put back on corner rows, the frame no longer required, the
