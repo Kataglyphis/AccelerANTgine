@@ -15,8 +15,11 @@ The module compiles against GenAI's C header, found by ``cmake/SystemLibDependen
 It loads ``libonnxruntime-genai.so`` or ``onnxruntime-genai.dll`` at run time through the system
 loader, which finds the chain install through ``ld.so.conf`` in the Linux image and through ``PATH``
 in the Windows image. The library therefore does not link GenAI, and the packages are unchanged.
-Where no GenAI is reachable, ``initialize`` returns ``LibraryUnavailable``; nothing proves that a
-GenAI found this way is the chain build, which the image builds verify instead.
+Where no GenAI is reachable, ``initialize`` returns ``LibraryUnavailable``. At configure time
+``accelerantgine_find_chain_genai`` (``cmake/OrtPackageVariant.cmake``) refuses a GenAI library under
+that root without the chain build's source path (``/opt/onnxruntime-genai/`` on Linux,
+``C:\temp\onnx-genai-src`` on Windows), as ORT's proof does; the library loaded at run time is still
+found by name, and the image builds and the hub's G6 census prove the shipped trees.
 
 ``initialize(model_dir, provider)`` reads a GenAI model directory: ``genai_config.json``, the ONNX
 files and the tokenizer. ``ExecutionProvider::Cpu`` clears the providers the config names;

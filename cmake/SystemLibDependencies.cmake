@@ -175,18 +175,7 @@ else()
   set(_genai_root "/usr/local/lib/onnxruntime-genai")
 endif()
 file(TO_CMAKE_PATH "${_genai_root}" _genai_root)
-unset(_ONNXRUNTIME_GENAI_INCLUDE_DIR CACHE)
-find_path(
-  _ONNXRUNTIME_GENAI_INCLUDE_DIR
-  NAMES ort_genai_c.h
-  PATHS "${_genai_root}/include" "${_genai_root}"
-  NO_DEFAULT_PATH)
-if(NOT _ONNXRUNTIME_GENAI_INCLUDE_DIR)
-  message(
-    FATAL_ERROR
-      "ONNX Runtime GenAI: no ort_genai_c.h under ${_genai_root}. Only the family image's chain build is allowed; nothing else is searched."
-  )
-endif()
+accelerantgine_find_chain_genai("${_genai_root}" "${CMAKE_SYSTEM_NAME}" _ONNXRUNTIME_GENAI_INCLUDE_DIR)
 add_library(onnxruntime_genai::headers INTERFACE IMPORTED)
 set_target_properties(onnxruntime_genai::headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
                                                             "${_ONNXRUNTIME_GENAI_INCLUDE_DIR}")

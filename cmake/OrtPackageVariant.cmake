@@ -6,8 +6,13 @@ function(
   runtime
   marker
   root)
+  # An optional fourth argument names the library in the messages; GenAI's proof passes its own name.
+  set(_what "ONNX Runtime")
+  if(ARGC GREATER 3)
+    set(_what "${ARGV3}")
+  endif()
   if(NOT EXISTS "${runtime}")
-    message(FATAL_ERROR "ONNX Runtime: ${runtime} is missing, so ${root} cannot be proved to be the chain build.")
+    message(FATAL_ERROR "${_what}: ${runtime} is missing, so ${root} cannot be proved to be the chain build.")
   endif()
   file(
     STRINGS "${runtime}" _ort_chain_hit
@@ -16,9 +21,44 @@ function(
   if(NOT _ort_chain_hit)
     message(
       FATAL_ERROR
-        "ONNX Runtime: ${runtime} is not the family's chain build (no '${marker}' source path in it). A downloaded, distro or vendor ORT is not allowed."
+        "${_what}: ${runtime} is not the family's chain build (no '${marker}' source path in it). A downloaded, distro or vendor build is not allowed."
     )
   endif()
+endfunction()
+
+# GenAI's header dir under root, and the chain proof ORT has for the library text_generation.cpp loads at run time.
+function(
+  accelerantgine_find_chain_genai
+  root
+  system_name
+  out_include_dir)
+  unset(_genai_include CACHE)
+  find_path(
+    _genai_include
+    NAMES ort_genai_c.h
+    PATHS "${root}/include" "${root}"
+    NO_DEFAULT_PATH NO_CACHE)
+  if(NOT _genai_include)
+    message(
+      FATAL_ERROR
+        "ONNX Runtime GenAI: no ort_genai_c.h under ${root}. Only the family image's chain build is allowed; nothing else is searched."
+    )
+  endif()
+  if(system_name STREQUAL "Windows")
+    find_file(
+      _genai_runtime
+      NAMES onnxruntime-genai.dll
+      PATHS "${root}/bin" "${root}/lib"
+      NO_DEFAULT_PATH NO_CACHE)
+    set(_genai_marker "temp.onnx-genai-src.")
+  else()
+    set(_genai_runtime "${root}/lib/libonnxruntime-genai.so")
+    set(_genai_marker "/opt/onnxruntime-genai/")
+  endif()
+  accelerantgine_assert_ort_chain_build("${_genai_runtime}" "${_genai_marker}" "${root}" "ONNX Runtime GenAI")
+  set(${out_include_dir}
+      "${_genai_include}"
+      PARENT_SCOPE)
 endfunction()
 
 function(

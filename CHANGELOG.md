@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-14, GenAI gets ORT's chain proof at configure time)
+- `accelerantgine_find_chain_genai` in `cmake/OrtPackageVariant.cmake` finds GenAI's header as before and then runs
+  `accelerantgine_assert_ort_chain_build` on the library `text_generation.cpp` loads: `lib/libonnxruntime-genai.so`
+  must hold `/opt/onnxruntime-genai/`, `onnxruntime-genai.dll` in `bin\` or `lib\` must hold the Windows chain's
+  `C:\temp\onnx-genai-src` path. The proof's messages name the library they judge. Nothing changes at run time.
+- Tests: six GenAI cases in `test-ort-chain-proof.sh` (chain and foreign on both systems, a header without its
+  library, no header); recipe `genai-chain.proof-dropped` in `lane-mutations.json`. The image's own GenAI passes.
+
 ### Added (2026-11-14, frame preprocessing and the pipeline quoting are fuzzed)
 - **`PreprocessFuzz.NeverReadsOutsideTheBuffer`** feeds `preprocess_frame` any format, frame size, stride, plane
   offset, a declared size up to 8 bytes off the real one, target sizes up to 48 and both modes. The answer is an

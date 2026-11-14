@@ -296,15 +296,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the Linux lane runs ctest a second time on the same tree and passes (about 13 s on the Pi, from the
   owner's notes, not a repo figure).
 
-- [ ] **GenAI gets no chain proof at configure time; ORT has one** (S, ★).
-  `cmake/SystemLibDependencies.cmake:106` asserts the chain marker in the ORT library and only searches GenAI's
-  header (`:163-196`); `Src/text_generation.cpp:80-105` loads the library by bare name. That load is a written
-  decision (`docs/source/text_generation.rst:15-19`) and the hub's G6 census proves shipped trees, so this is a known
-  limit, not an oversight.
-  First: call `accelerantgine_assert_ort_chain_build` for the GenAI library under the prefix its header was found
-  in, with GenAI's marker; nothing changes at run time. Done when its recipe in
-  `scripts/linux/tests/lane-mutations.json` fails without the call.
-
 - [ ] **`kGenaiHasGuidance` is a switch with one position** (S, ★). Since 2fb3ab7 every lane's GenAI has llguidance
   and the constant is `true` everywhere (`Test/common/kataglyphis_test_support.h:259`, read at
   `Test/commit/text_generation_test.cpp:203` and `Test/commit/c_api_test.cpp:240`). Delete it with its dead
