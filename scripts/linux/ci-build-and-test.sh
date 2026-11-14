@@ -81,6 +81,11 @@ python3 "${_SCRIPT_DIR}/check-junit-skips.py" "${WORKSPACE_DIR}/docs/test_result
   || die "A test skipped on Linux (listed above): a dependency the image should carry is missing."
 
 if [[ "${COMPILER}" == "clang" ]]; then
+  # The same tree again: a test that leaves a file behind fails here, not first on a developer's box.
+  ctest_with_junit "${BUILD_DIR}" "${WORKSPACE_DIR}/docs/test_results_second_run.xml"
+fi
+
+if [[ "${COMPILER}" == "clang" ]]; then
   # Not optional: the clang debug preset always configures Test/fuzz, so a missing binary is a broken build.
   FUZZ_TEST="${BUILD_DIR}/fuzzTestSuite"
   if [[ ! -x "${FUZZ_TEST}" ]]; then

@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-14, the suite runs twice in one tree, and the demo's output safety runs at all)
+- **`Golden.DemoKeepsExistingOutputs`** runs `scripts/linux/tests/test-demo-detector-safety.sh` with the built demo,
+  the locked model and `two_cats.jpg`: the demo refuses a detector output, a repeat output or a profile that already
+  exists, and a picture that is no JPEG. No workflow, script or CMake file named the suite before.
+- **The clang Linux lane runs ctest a second time on the same build tree** (`docs/test_results_second_run.xml`), so
+  a test that leaves a file behind fails in CI, not first on a developer's box, as the demo's image check did
+  before c29f25a. Its report joins the clang leg's gated list (`ci_junit_reports`), so a skip there fails too.
+
 ### Removed (2026-11-14, `kGenaiHasGuidance`)
 - Every lane's GenAI has llguidance since 2fb3ab7, so the test constant was `true` everywhere and its three
   `JsonSchemaUnsupported` branches were dead. They are gone; `TextGeneration.AJsonSchemaHoldsTheOutputOrIsUnsupported`

@@ -62,6 +62,11 @@ if(TARGET ${PROJECT_NAME}_demo)
                golden
                PASS_REGULAR_EXPRESSION
                "ORT intra-op threads: 2\n")
+  # The demo refuses an output, a repeat output or a profile that exists, and a picture that is no JPEG.
+  add_test(NAME Golden.DemoKeepsExistingOutputs
+           COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/linux/tests/test-demo-detector-safety.sh"
+                   $<TARGET_FILE:${PROJECT_NAME}_demo> "${_golden_model}" "${_golden_image}")
+  set_tests_properties(Golden.DemoKeepsExistingOutputs PROPERTIES LABELS golden)
   add_test(NAME Golden.DemoDetectorLatencyPrintsFigures
            COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> --model "${_golden_model}" --detector-image "${_golden_image}"
                    --detector-latency-runs 2 --device cpu)

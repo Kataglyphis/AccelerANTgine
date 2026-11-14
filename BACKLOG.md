@@ -285,17 +285,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `Test/contract/text_contract_test.cpp` expects exactly one contract case on purpose, so plan it with the pin
   bump that adds one.
 
-- [ ] **Nothing runs the suite twice in one tree, and one script suite runs nowhere** (S, ★). c29f25a removed the
-  known cause of a failing second `ctest` in one build directory: `--detector-image` decodes the image before it
-  creates its outputs. No guard holds that: CI runs ctest once per fresh checkout
-  (`scripts/linux/ci-build-and-test.sh:69-81`), so the next test that leaves a file behind fails only on a dev box.
-  `scripts/linux/tests/test-demo-detector-safety.sh`, the test of "outputs must be new", is named by no workflow,
-  script or CMake file.
-  First: register the safety suite as a ctest with the built demo, the locked model and `two_cats.jpg`; it takes
-  `DEMO MODEL FIXTURE.jpg`, so it cannot join a list of suites without arguments.
-  Done when the Linux lane runs ctest a second time on the same tree and passes (about 13 s on the Pi, from the
-  owner's notes, not a repo figure).
-
 - [ ] **Each frame is written twice in two places** (S, ★; the saving is not measured).
   `extract_buffer_info` resizes the vector, which zero-fills it, then copies the frame over it
   (`Src/gstreamer_pipeline.cpp:165-168`; 2,764,800 bytes at 1280x720 RGB). `preprocess_frame` fills the whole

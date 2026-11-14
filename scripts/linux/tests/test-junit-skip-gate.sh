@@ -36,7 +36,7 @@ grep -q '^junit skip gate: 2 report(s), 3 testcase(s), 0 skipped$' "${work}/out"
 lists="$(cd "${root}" && bash -c 'source scripts/linux/ci-common.sh >/dev/null 2>&1; ci_junit_reports clang; echo ---; ci_junit_reports gcc')"
 clang_list="${lists%%---*}"
 gcc_list="${lists##*---}"
-for report in docs/test_results.xml docs/test_results_tsan.xml logs/python-gil.xml logs/python-free-threaded.xml; do
+for report in docs/test_results.xml docs/test_results_second_run.xml docs/test_results_tsan.xml logs/python-gil.xml logs/python-free-threaded.xml; do
   grep -qxF "${report}" <<< "${clang_list}" || fail "the clang leg does not gate ${report}"
 done
 [[ "$(grep -c . <<< "${gcc_list}")" -eq 1 ]] && grep -qxF docs/test_results.xml <<< "${gcc_list}" \
