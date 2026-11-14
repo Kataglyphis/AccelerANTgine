@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, `parse_webrtc_config` reads its fields in one list)
+- The 28 `if (auto result = ...; !result)` blocks became one `first_error({...})` per section: the first failure in
+  field order is returned as before, and every field is read first, which only a valid file keeps. It leaves
+  clang-tidy's size and complexity lists (cognitive complexity 44 before). The 59 config cases pass in the arm64
+  image.
+
 ### Changed (2026-11-14, `OnnxInferenceEngine::initialize` is split)
 - `initialize` keeps the check, the session and the name caches; `configure_session_options` sets profiling,
   threads, execution mode and the memory pattern, and `append_provider` puts the provider on the options, with the

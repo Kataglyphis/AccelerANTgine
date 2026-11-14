@@ -3,6 +3,7 @@ module;
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -70,6 +71,16 @@ namespace {
         return parser(*it);
     }
 
+    // The first failure in field order; every field is read, which only a valid file keeps.
+    auto first_error(std::initializer_list<std::expected<void, ConfigError>> results)
+      -> std::expected<void, ConfigError>
+    {
+        for (const auto &result : results) {
+            if (!result) { return std::unexpected(result.error()); }
+        }
+        return {};
+    }
+
 }// namespace
 
 auto get_default_webrtc_config() -> WebRTCConfig
@@ -87,107 +98,54 @@ auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRT
     if (!j.is_object()) { return std::unexpected(ConfigError::InvalidValue); }
 
     WebRTCConfig config;
-    if (auto result = assign_optional_string(j, "signalingServerUrl", config.signaling_server_url); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = assign_optional_uint(j, "reconnectionTimeoutMs", config.reconnection_timeout_ms); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = assign_optional_string_array(j, "stunServers", config.stun_servers); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = assign_optional_string_array(j, "turnServers", config.turn_servers); !result) {
-        return std::unexpected(result.error());
-    }
-
-    if (auto result = parse_optional_object(j,
-          "video",
-          [&](const json &video) -> std::expected<void, ConfigError> {
-              if (auto value = assign_optional_uint(video, "defaultWidth", config.video.default_width); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_uint(video, "defaultHeight", config.video.default_height); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_uint(video, "defaultFramerate", config.video.default_framerate);
-                !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_uint(video, "defaultBitrateKbps", config.video.default_bitrate_kbps);
-                !value) {
-                  return std::unexpected(value.error());
-              }
-              return {};
-          });
-      !result) {
-        return std::unexpected(result.error());
-    }
-
-    if (auto result = parse_optional_object(j,
-          "texture",
-          [&](const json &texture) -> std::expected<void, ConfigError> {
-              if (auto value = assign_optional_uint(texture, "width", config.texture.width); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_uint(texture, "height", config.texture.height); !value) {
-                  return std::unexpected(value.error());
-              }
-              return {};
-          });
-      !result) {
-        return std::unexpected(result.error());
-    }
-
-    if (auto result = parse_optional_object(j,
-          "android",
-          [&](const json &android) -> std::expected<void, ConfigError> {
-              if (auto value = assign_optional_uint(android, "width", config.android.width); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_uint(android, "height", config.android.height); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_uint(android, "fps", config.android.fps); !value) {
-                  return std::unexpected(value.error());
-              }
-              return {};
-          });
-      !result) {
-        return std::unexpected(result.error());
-    }
-
-    if (auto result = parse_optional_object(j,
-          "stream",
-          [&](const json &stream) -> std::expected<void, ConfigError> {
-              if (auto value = assign_optional_string(stream, "source", config.stream.source); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_string(stream, "encoder", config.stream.encoder); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_string(stream, "device", config.stream.device); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_string(stream, "cameraId", config.stream.camera_id); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_string(stream, "inputPath", config.stream.input_path); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_string(stream, "inputUri", config.stream.input_uri); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_string(stream, "peerId", config.stream.peer_id); !value) {
-                  return std::unexpected(value.error());
-              }
-              if (auto value = assign_optional_string(stream, "producerId", config.stream.producer_id); !value) {
-                  return std::unexpected(value.error());
-              }
-              return {};
-          });
-      !result) {
-        return std::unexpected(result.error());
-    }
+    const auto read = first_error({
+      assign_optional_string(j, "signalingServerUrl", config.signaling_server_url),
+      assign_optional_uint(j, "reconnectionTimeoutMs", config.reconnection_timeout_ms),
+      assign_optional_string_array(j, "stunServers", config.stun_servers),
+      assign_optional_string_array(j, "turnServers", config.turn_servers),
+      parse_optional_object(j,
+        "video",
+        [&](const json &video) -> std::expected<void, ConfigError> {
+            return first_error({
+              assign_optional_uint(video, "defaultWidth", config.video.default_width),
+              assign_optional_uint(video, "defaultHeight", config.video.default_height),
+              assign_optional_uint(video, "defaultFramerate", config.video.default_framerate),
+              assign_optional_uint(video, "defaultBitrateKbps", config.video.default_bitrate_kbps),
+            });
+        }),
+      parse_optional_object(j,
+        "texture",
+        [&](const json &texture) -> std::expected<void, ConfigError> {
+            return first_error({
+              assign_optional_uint(texture, "width", config.texture.width),
+              assign_optional_uint(texture, "height", config.texture.height),
+            });
+        }),
+      parse_optional_object(j,
+        "android",
+        [&](const json &android) -> std::expected<void, ConfigError> {
+            return first_error({
+              assign_optional_uint(android, "width", config.android.width),
+              assign_optional_uint(android, "height", config.android.height),
+              assign_optional_uint(android, "fps", config.android.fps),
+            });
+        }),
+      parse_optional_object(j,
+        "stream",
+        [&](const json &stream) -> std::expected<void, ConfigError> {
+            return first_error({
+              assign_optional_string(stream, "source", config.stream.source),
+              assign_optional_string(stream, "encoder", config.stream.encoder),
+              assign_optional_string(stream, "device", config.stream.device),
+              assign_optional_string(stream, "cameraId", config.stream.camera_id),
+              assign_optional_string(stream, "inputPath", config.stream.input_path),
+              assign_optional_string(stream, "inputUri", config.stream.input_uri),
+              assign_optional_string(stream, "peerId", config.stream.peer_id),
+              assign_optional_string(stream, "producerId", config.stream.producer_id),
+            });
+        }),
+    });
+    if (!read) { return std::unexpected(read.error()); }
 
     return config;
 }
