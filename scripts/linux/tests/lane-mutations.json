@@ -482,7 +482,7 @@
  {
   "id": "genai-chain.proof-dropped",
   "target": "cmake/OrtPackageVariant.cmake",
-  "find": "  accelerantgine_assert_ort_chain_build(\"${_genai_runtime}\" \"${_genai_marker}\" \"${root}\" \"ONNX Runtime GenAI\")\n",
+  "find": "  accelerantgine_assert_ort_chain_build(\n    \"${_genai_runtime}\"\n    \"${_genai_marker}\"\n    \"${root}\"\n    \"ONNX Runtime GenAI\")\n",
   "replace": "",
   "test": "bash scripts/linux/tests/test-ort-chain-proof.sh",
   "why": "A GenAI without the chain build's source path is refused at configure time, as ORT is."

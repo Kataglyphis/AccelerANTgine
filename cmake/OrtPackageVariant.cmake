@@ -55,7 +55,11 @@ function(
     set(_genai_runtime "${root}/lib/libonnxruntime-genai.so")
     set(_genai_marker "/opt/onnxruntime-genai/")
   endif()
-  accelerantgine_assert_ort_chain_build("${_genai_runtime}" "${_genai_marker}" "${root}" "ONNX Runtime GenAI")
+  accelerantgine_assert_ort_chain_build(
+    "${_genai_runtime}"
+    "${_genai_marker}"
+    "${root}"
+    "ONNX Runtime GenAI")
   set(${out_include_dir}
       "${_genai_include}"
       PARENT_SCOPE)
