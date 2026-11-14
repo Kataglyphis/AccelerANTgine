@@ -29,3 +29,9 @@ Checks: -*,
         -clang-diagnostic-error
 HeaderFilterRegex: '^Src/.*\.h(pp)?$|^Src/.*\.ixx$'
 FormatStyle:     none
+# Written down, so the graded set does not move with the clang version: 80 lines as the other repos' gates, 25 as clang-tidy 23's default.
+CheckOptions:
+  - key: readability-function-size.LineThreshold
+    value: '80'
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '25'

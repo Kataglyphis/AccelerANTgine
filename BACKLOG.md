@@ -282,15 +282,16 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the contract test still gives identical floats and a Pi wall-time figure, before and after, is recorded
   here.
 
-- [ ] **clang-tidy's size and complexity limits are the tool's defaults** (S, ★). `.clang-tidy` turns on
-  `readability-*` (line 27) and sets no threshold for `readability-function-size` or
-  `readability-function-cognitive-complexity`, so the graded clang-tidy set can move with the clang version. A new
-  complex function already shows in that set; the limit it is held to is written nowhere. The hub's reader,
-  report-only for C++, counts 10 of 352 functions over its size limit (`OnnxInferenceEngine::initialize` 316 lines,
-  `prompt_tokens` 144, `best_class` 125).
-  First: write the line and cognitive thresholds into `.clang-tidy`; the first run names today's offenders.
-  Done when both thresholds are in `.clang-tidy` and the new members of the clang-tidy set are fixed or recorded.
-
+- [ ] **Five functions are over clang-tidy's 80-line threshold, seven over its complexity of 25** (S, ★). Since
+  2026-11-14 `.clang-tidy` writes both thresholds down (`readability-function-size.LineThreshold` 80,
+  `readability-function-cognitive-complexity.Threshold` 25), so the graded clang-tidy set no longer moves with the
+  clang version. The first run over `Src` added five size findings to that set: `main` (`Src/cli_main.cpp:245`),
+  `parse_webrtc_config` (`Src/config_loader.cpp:82`), `main` and `run_onnx_inference_example`
+  (`Src/inference_demo.cpp:383` and `:45`) and `OnnxInferenceEngine::initialize` (`Src/onnx_inference_engine.cpp:499`).
+  The seven complexity findings were there before: `parse_webrtc_config` 44, `find_element_of_type` 28, the demo's
+  `main` 78 and `run_onnx_inference_example` 42, `initialize` 29, `populate_config` 62, `on_bus_element` 44. Next:
+  split `initialize` and `parse_webrtc_config` first (library code; the two demo mains last). Done when the set
+  holds none of them or each has a reason here.
 - [ ] **`yolo_detector.cpp` does three jobs, and `Src/` is a recursive glob** (M, ★). One file of about 800 lines
   holds the pure math (preprocess, decode, suppression), the ORT-backed detector and the video pipeline with its
   factories. `Src/CMakeLists.txt:5-19` globs `*.cpp` and `*.ixx` without `CONFIGURE_DEPENDS`; stray cargo files

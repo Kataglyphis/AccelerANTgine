@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, clang-tidy's size and complexity limits are written down)
+- `.clang-tidy` sets `readability-function-size.LineThreshold` to 80 (the other repos' gates) and
+  `readability-function-cognitive-complexity.Threshold` to 25 (clang-tidy 23's default), so the graded clang-tidy
+  set no longer moves with the clang version. The first run adds five size findings: the two `main`s of the CLI
+  and the demo, `parse_webrtc_config`, `run_onnx_inference_example` and `OnnxInferenceEngine::initialize`; they and
+  the seven complexity findings are listed in `BACKLOG.md`.
+
 ### Changed (2026-11-14, a model's declared shape; owner decision of the day) — API change
 - **`get_input_shape` and `get_output_shape` return a `DeclaredShape`**, whose dimensions are
   `std::optional<std::size_t>`: a dynamic one (ONNX Runtime's -1) is empty, in Python `None`. They returned a
