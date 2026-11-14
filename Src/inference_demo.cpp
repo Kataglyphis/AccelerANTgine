@@ -2,10 +2,13 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
+#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -42,6 +45,34 @@ static void print_detection_results(const detection::DetectionResult &result)
     }
 }
 
+namespace {
+
+// The values comma-separated, as the demo prints a shape.
+template<typename Values> auto joined(const Values &values) -> std::string
+{
+    std::string text;
+    for (const auto &value : values) {
+        if (!text.empty()) { text += ", "; }
+        text += std::to_string(value);
+    }
+    return text;
+}
+
+// One input or output and its declared shape; a dynamic dimension prints as ?, as ONNX tools show it.
+auto print_declared_shape(const std::string &name,
+  const std::expected<inference::DeclaredShape, inference::OnnxError> &shape) -> void
+{
+    if (!shape) { return; }
+    std::string text;
+    for (const auto &dim : shape->dimensions) {
+        if (!text.empty()) { text += ", "; }
+        text += dim ? std::to_string(*dim) : std::string("?");
+    }
+    std::cout << "  " << name << ": [" << text << "]\n";
+}
+
+}// namespace
+
 static auto run_onnx_inference_example(const detection::YoloConfig &base, const std::filesystem::path &profile_prefix)
   -> int
 {
@@ -76,40 +107,9 @@ static auto run_onnx_inference_example(const detection::YoloConfig &base, const 
     }
 
     std::cout << "Model inputs:\n";
-    for (const auto &name : input_names) {
-        auto shape = engine.get_input_shape(name);
-        if (shape) {
-            std::cout << "  " << name << ": [";
-            for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
-                if (i > 0) { std::cout << ", "; }
-                // A dynamic dimension prints as ?, as ONNX tools show it.
-                if (const auto dim = shape->dimensions[i]) {
-                    std::cout << *dim;
-                } else {
-                    std::cout << '?';
-                }
-            }
-            std::cout << "]\n";
-        }
-    }
-
+    for (const auto &name : input_names) { print_declared_shape(name, engine.get_input_shape(name)); }
     std::cout << "\nModel outputs:\n";
-    for (const auto &name : output_names) {
-        auto shape = engine.get_output_shape(name);
-        if (shape) {
-            std::cout << "  " << name << ": [";
-            for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
-                if (i > 0) { std::cout << ", "; }
-                // A dynamic dimension prints as ?, as ONNX tools show it.
-                if (const auto dim = shape->dimensions[i]) {
-                    std::cout << *dim;
-                } else {
-                    std::cout << '?';
-                }
-            }
-            std::cout << "]\n";
-        }
-    }
+    for (const auto &name : output_names) { print_declared_shape(name, engine.get_output_shape(name)); }
 
     std::cout << "\nPerforming inference on dummy data...\n";
 
@@ -131,12 +131,8 @@ static auto run_onnx_inference_example(const detection::YoloConfig &base, const 
 
     for (std::size_t i = 0; i < result->outputs.size(); ++i) {
         const auto &output = result->outputs[i];
-        std::cout << "  Output " << i << " shape: [";
-        for (std::size_t j = 0; j < output.shape.dimensions.size(); ++j) {
-            if (j > 0) { std::cout << ", "; }
-            std::cout << output.shape.dimensions[j];
-        }
-        std::cout << "] (" << output.data.size() << " elements)\n";
+        std::cout << "  Output " << i << " shape: [" << joined(output.shape.dimensions) << "] (" << output.data.size()
+                  << " elements)\n";
     }
 
     if (!profile_prefix.empty()) {
@@ -380,6 +376,217 @@ static void print_usage(const char *program_name)
               << "  " << program_name << " --onnx-only\n";
 }
 
+namespace {
+
+// What the demo's command line asks for; parse_demo_options fills it in the order the flags arrive.
+struct DemoOptions
+{
+    std::filesystem::path model_path;
+    bool model_given = false;
+    std::filesystem::path config_path;
+    std::filesystem::path profile_prefix;
+    std::filesystem::path detector_image;
+    std::filesystem::path detector_output;
+    std::filesystem::path detector_repeat_output;
+    inference::ExecutionProvider provider{};
+    int device_id = 0;
+    int threads = 0;
+    int detector_latency_runs = 0;
+    bool run_onnx = false;
+    bool run_gstreamer = false;
+    bool run_yolo = false;
+    bool run_video = false;
+    bool run_video_check = false;
+};
+
+// Whether any example mode was asked for.
+auto any_mode(const DemoOptions &options) -> bool
+{
+    return options.run_onnx || options.run_gstreamer || options.run_yolo || options.run_video
+           || options.run_video_check;
+}
+
+// A whole decimal number of at least `minimum`, or nothing.
+auto whole_at_least(const std::string &value, int minimum) -> std::optional<int>
+{
+    int parsed = 0;
+    const auto *const last = value.data() + value.size();
+    const auto [end, error] = std::from_chars(value.data(), last, parsed);
+    if (error != std::errc{} || end != last || parsed < minimum) { return std::nullopt; }
+    return parsed;
+}
+
+// A value flag's number, or the demo's usage error printed with `what`.
+auto take_number(const std::string &value, int minimum, const char *what, int &field) -> bool
+{
+    if (const auto parsed = whole_at_least(value, minimum)) {
+        field = *parsed;
+        return true;
+    }
+    std::cerr << what << value << "\n";
+    return false;
+}
+
+// A flag that takes no value; false when `arg` is none of them.
+auto take_switch(const std::string &arg, DemoOptions &options) -> bool
+{
+    if (arg == "--onnx-only") {
+        options.run_onnx = true;
+    } else if (arg == "--gstreamer-only") {
+        options.run_gstreamer = true;
+    } else if (arg == "--yolo-only") {
+        options.run_yolo = true;
+    } else if (arg == "--video-only") {
+        options.run_video = true;
+    } else if (arg == "--video-check") {
+        options.run_video_check = true;
+    } else if (arg == "--all") {
+        options.run_onnx = options.run_gstreamer = options.run_yolo = options.run_video = true;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+// The flag at `index` with the value after it; the exit code for a bad value, 0 when taken, -1 when it is none.
+auto take_value(const std::vector<std::string> &args, std::size_t index, DemoOptions &options) -> int
+{
+    const std::string &arg = args.at(index);
+    const std::string &value = args.at(index + 1);
+    if (arg == "--model") {
+        options.model_path = value;
+        options.model_given = true;
+    } else if (arg == "--config") {
+        options.config_path = value;
+    } else if (arg == "--threads") {
+        if (!take_number(value, 1, "Invalid thread count: ", options.threads)) { return 2; }
+    } else if (arg == "--device") {
+        const auto provider = kataglyphis::demo::parse_device<inference::ExecutionProvider>(value);
+        if (!provider) {
+            std::cerr << "Unknown device: " << value << "\n";
+            return 2;
+        }
+        options.provider = *provider;
+    } else if (arg == "--device-id") {
+        if (!take_number(value, 0, "Invalid device index: ", options.device_id)) { return 2; }
+    } else if (arg == "--profile") {
+        options.profile_prefix = value;
+    } else if (arg == "--detector-image") {
+        options.detector_image = value;
+    } else if (arg == "--detector-output") {
+        options.detector_output = value;
+    } else if (arg == "--detector-repeat-output") {
+        options.detector_repeat_output = value;
+    } else if (arg == "--detector-latency-runs") {
+        if (!take_number(value, 1, "Invalid --detector-latency-runs value: ", options.detector_latency_runs)) {
+            return 2;
+        }
+    } else {
+        return -1;
+    }
+    return 0;
+}
+
+// The options, or the exit code: 0 after --help, 2 for a bad or unknown flag.
+auto parse_demo_options(int argc, char **argv, inference::ExecutionProvider provider) -> std::expected<DemoOptions, int>
+{
+    DemoOptions options;
+    options.provider = provider;
+    const std::vector<std::string> args(argv + 1, argv + argc);
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        const std::string &arg = args[i];
+        if (arg == "--help") {
+            print_usage(argv[0]);
+            return std::unexpected(0);
+        }
+        if (take_switch(arg, options)) { continue; }
+        if (i + 1 < args.size()) {
+            if (const int taken = take_value(args, i, options); taken >= 0) {
+                if (taken != 0) { return std::unexpected(taken); }
+                ++i;
+                continue;
+            }
+        }
+        std::cerr << "Unknown or incomplete option: " << arg << "\n";
+        return std::unexpected(2);
+    }
+    return options;
+}
+
+// The YOLO config the shipped or named TOML gives, with the command line's model, threads and device on top.
+auto base_config(const DemoOptions &options, const kataglyphis::config::InferenceConfig &loaded)
+  -> std::optional<detection::YoloConfig>
+{
+    auto configured = detection::yolo_config_from(loaded.model);
+    if (!configured) { return std::nullopt; }
+    detection::YoloConfig base = *configured;
+    if (options.model_given) {
+        base.model_path = options.model_path;
+    } else if (options.config_path.empty()) {
+        base.model_path = kataglyphis::demo::default_model(base.model_path);
+    }
+    if (options.threads > 0) { base.intra_op_num_threads = options.threads; }
+    base.execution_provider = options.provider;
+    base.device_id = options.device_id;
+    return base;
+}
+
+// The example's code when it was asked for and failed, after printing `failure` when there is one.
+template<typename Run> auto failed_example(bool wanted, const char *failure, Run run) -> std::optional<int>
+{
+    if (!wanted) { return std::nullopt; }
+    const int result = run();
+    if (result == 0) { return std::nullopt; }
+    if (failure != nullptr) { std::cerr << failure << "\n"; }
+    return result;
+}
+
+// The examples the options ask for, in order; the first that fails ends the run with its code.
+auto run_examples(DemoOptions options, const detection::YoloConfig &base) -> int
+{
+    if (!any_mode(options)) { options.run_onnx = options.run_yolo = true; }
+    const auto &profile = options.profile_prefix;
+    const auto onnx = [&] -> int { return run_onnx_inference_example(base, profile); };
+    const auto yolo = [&] -> int { return run_yolo_detection_example(base); };
+    const auto video = [&] -> int { return run_video_detection_example(base); };
+    const auto check = [&] -> int { return run_video_detection_check(base, profile); };
+    if (const auto code = failed_example(options.run_onnx, "ONNX inference example failed!", onnx)) { return *code; }
+    if (const auto code =
+          failed_example(options.run_gstreamer, "GStreamer pipeline example failed!", run_gstreamer_pipeline_example)) {
+        return *code;
+    }
+    if (const auto code = failed_example(options.run_yolo, "YOLO detection example failed!", yolo)) { return *code; }
+    if (const auto code = failed_example(options.run_video, "Video detection example failed!", video)) { return *code; }
+    if (const auto code = failed_example(options.run_video_check, nullptr, check)) { return *code; }
+    std::cout << "\nAll examples completed successfully!\n";
+    return 0;
+}
+
+// The detector-only modes; nothing when the options ask for the examples instead.
+auto run_detector_mode(const DemoOptions &options, const detection::YoloConfig &base) -> std::optional<int>
+{
+    if (options.detector_latency_runs > 0) {
+        if (options.detector_image.empty() || !options.detector_output.empty()
+            || !options.detector_repeat_output.empty() || !options.profile_prefix.empty() || any_mode(options)) {
+            std::cerr << "Latency runs require an image, without outputs, a profile or other modes\n";
+            return 2;
+        }
+        return run_detector_latency(base, options.detector_image, options.detector_latency_runs);
+    }
+    if (options.detector_image.empty() && options.detector_output.empty() && options.detector_repeat_output.empty()) {
+        return std::nullopt;
+    }
+    if (options.detector_image.empty() || options.detector_output.empty() || options.profile_prefix.empty()
+        || any_mode(options)) {
+        std::cerr << "Image detection requires an image, output and profile, without other modes\n";
+        return 2;
+    }
+    return run_detector_image(
+      base, options.detector_image, options.detector_output, options.detector_repeat_output, options.profile_prefix);
+}
+
+}// namespace
+
 auto main(int argc, char *argv[]) -> int
 {
 #if defined(_WIN32)
@@ -388,184 +595,32 @@ auto main(int argc, char *argv[]) -> int
         return 1;
     }
 #endif
-    std::filesystem::path model_path;
-    bool run_onnx = false;
-    bool run_gstreamer = false;
-    bool run_yolo = false;
-    bool run_video = false;
-    bool run_video_check = false;
-    auto provider = kataglyphis::demo::parse_device<inference::ExecutionProvider>(kataglyphis::demo::default_device);
+    const auto provider =
+      kataglyphis::demo::parse_device<inference::ExecutionProvider>(kataglyphis::demo::default_device);
     if (!provider) {
         kataglyphis::log::error("Invalid packaged default device");
         return 2;
     }
-    int device_id = 0;
-    int threads = 0;
-    bool model_given = false;
-    std::filesystem::path config_path;
-    std::filesystem::path profile_prefix;
-    std::filesystem::path detector_image;
-    std::filesystem::path detector_output;
-    std::filesystem::path detector_repeat_output;
-    int detector_latency_runs = 0;
+    const auto options = parse_demo_options(argc, argv, *provider);
+    if (!options) { return options.error(); }
 
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-
-        if (arg == "--model" && i + 1 < argc) {
-            model_path = argv[++i];
-            model_given = true;
-        } else if (arg == "--config" && i + 1 < argc) {
-            config_path = argv[++i];
-        } else if (arg == "--threads" && i + 1 < argc) {
-            const std::string value = argv[++i];
-            const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), threads);
-            if (error != std::errc{} || end != value.data() + value.size() || threads < 1) {
-                std::cerr << "Invalid thread count: " << value << "\n";
-                return 2;
-            }
-        } else if (arg == "--device" && i + 1 < argc) {
-            const std::string device = argv[++i];
-            provider = kataglyphis::demo::parse_device<inference::ExecutionProvider>(device);
-            if (!provider) {
-                std::cerr << "Unknown device: " << device << "\n";
-                return 2;
-            }
-        } else if (arg == "--device-id" && i + 1 < argc) {
-            const std::string value = argv[++i];
-            const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), device_id);
-            if (error != std::errc{} || end != value.data() + value.size() || device_id < 0) {
-                std::cerr << "Invalid device index: " << value << "\n";
-                return 2;
-            }
-        } else if (arg == "--profile" && i + 1 < argc) {
-            profile_prefix = argv[++i];
-        } else if (arg == "--detector-image" && i + 1 < argc) {
-            detector_image = argv[++i];
-        } else if (arg == "--detector-output" && i + 1 < argc) {
-            detector_output = argv[++i];
-        } else if (arg == "--detector-repeat-output" && i + 1 < argc) {
-            detector_repeat_output = argv[++i];
-        } else if (arg == "--detector-latency-runs" && i + 1 < argc) {
-            const std::string value = argv[++i];
-            const auto *const last = value.data() + value.size();
-            const auto parsed = std::from_chars(value.data(), last, detector_latency_runs);
-            if (parsed.ec != std::errc{} || parsed.ptr != last || detector_latency_runs <= 0) {
-                std::cerr << "Invalid --detector-latency-runs value: " << value << "\n";
-                return 2;
-            }
-        } else if (arg == "--onnx-only") {
-            run_onnx = true;
-        } else if (arg == "--gstreamer-only") {
-            run_gstreamer = true;
-        } else if (arg == "--yolo-only") {
-            run_yolo = true;
-        } else if (arg == "--video-only") {
-            run_video = true;
-        } else if (arg == "--video-check") {
-            run_video_check = true;
-        } else if (arg == "--all") {
-            run_onnx = true;
-            run_gstreamer = true;
-            run_yolo = true;
-            run_video = true;
-        } else if (arg == "--help") {
-            print_usage(argv[0]);
-            return 0;
-        } else {
-            std::cerr << "Unknown or incomplete option: " << arg << "\n";
-            return 2;
-        }
-    }
-
-    const auto loaded = config_path.empty()
+    const auto loaded = options->config_path.empty()
                           ? kataglyphis::config::parse_inference_config(std::string(kShippedInferenceConfig))
-                          : kataglyphis::config::load_inference_config(config_path);
+                          : kataglyphis::config::load_inference_config(options->config_path);
     if (!loaded) {
-        std::cerr << "Could not read the config " << config_path << "\n";
+        std::cerr << "Could not read the config " << options->config_path << "\n";
         return 2;
     }
-    auto configured = detection::yolo_config_from(loaded->model);
-    if (!configured) {
+    const auto base = base_config(*options, *loaded);
+    if (!base) {
         std::cerr << "Invalid output_layout: " << loaded->model.output_layout << "\n";
         return 2;
     }
-    detection::YoloConfig base = *configured;
-    if (model_given) {
-        base.model_path = model_path;
-    } else if (config_path.empty()) {
-        base.model_path = kataglyphis::demo::default_model(base.model_path);
-    }
-    if (threads > 0) { base.intra_op_num_threads = threads; }
-    base.execution_provider = *provider;
-    base.device_id = device_id;
-    model_path = base.model_path;
-
-    if (detector_latency_runs > 0) {
-        if (detector_image.empty() || !detector_output.empty() || !detector_repeat_output.empty()
-            || !profile_prefix.empty() || run_onnx || run_gstreamer || run_yolo || run_video || run_video_check) {
-            std::cerr << "Latency runs require an image, without outputs, a profile or other modes\n";
-            return 2;
-        }
-        return run_detector_latency(base, detector_image, detector_latency_runs);
-    }
-    if (!detector_image.empty() || !detector_output.empty() || !detector_repeat_output.empty()) {
-        if (detector_image.empty() || detector_output.empty() || profile_prefix.empty() || run_onnx || run_gstreamer
-            || run_yolo || run_video || run_video_check) {
-            std::cerr << "Image detection requires an image, output and profile, without other modes\n";
-            return 2;
-        }
-        return run_detector_image(base, detector_image, detector_output, detector_repeat_output, profile_prefix);
-    }
-    if (!run_onnx && !run_gstreamer && !run_yolo && !run_video && !run_video_check) {
-        run_onnx = true;
-        run_yolo = true;
-    }
+    if (const auto detected = run_detector_mode(*options, *base)) { return *detected; }
 
     std::cout << "Kataglyphis ONNX Runtime + GStreamer Inference Demo\n";
     std::cout << "==================================================\n\n";
-    std::cout << "Model: " << model_path << "\n";
+    std::cout << "Model: " << base->model_path << "\n";
     std::cout << "Output layout: " << loaded->model.output_layout << "\n\n";
-
-    int result = 0;
-
-    if (run_onnx) {
-        result = run_onnx_inference_example(base, profile_prefix);
-        if (result != 0) {
-            std::cerr << "ONNX inference example failed!\n";
-            return result;
-        }
-    }
-
-    if (run_gstreamer) {
-        result = run_gstreamer_pipeline_example();
-        if (result != 0) {
-            std::cerr << "GStreamer pipeline example failed!\n";
-            return result;
-        }
-    }
-
-    if (run_yolo) {
-        result = run_yolo_detection_example(base);
-        if (result != 0) {
-            std::cerr << "YOLO detection example failed!\n";
-            return result;
-        }
-    }
-
-    if (run_video) {
-        result = run_video_detection_example(base);
-        if (result != 0) {
-            std::cerr << "Video detection example failed!\n";
-            return result;
-        }
-    }
-
-    if (run_video_check) {
-        result = run_video_detection_check(base, profile_prefix);
-        if (result != 0) { return result; }
-    }
-
-    std::cout << "\nAll examples completed successfully!\n";
-    return 0;
+    return run_examples(*options, *base);
 }

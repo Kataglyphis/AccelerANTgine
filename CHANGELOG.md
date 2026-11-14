@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, the demo's `main` is split; clang-tidy's size and complexity lists are empty)
+- `inference_demo.cpp`: `parse_demo_options` reads the flags into `DemoOptions` (one `whole_at_least` for the three
+  numbers, `take_switch` and `take_value` for the two kinds of flag), `base_config` lays the command line over the
+  TOML, `run_detector_mode` holds the image and latency modes, and `run_examples` runs the asked-for examples through
+  `failed_example`. The example prints its shapes through `print_declared_shape` and `joined` instead of three copies
+  of the same loop. The file's clang-tidy warnings fall from 65 to 45; messages and exit codes are as before (the 9
+  golden cases, `--help`, an unknown flag, a bad number, a dangling value and the default run, checked in the
+  arm64 image). With this the size and complexity findings the thresholds named are all gone.
+
 ### Changed (2026-11-14, the CLI's `main` is split)
 - `apply_log_level`, `build_stream_config` (the `--config` file, the source, the encoder and the command-line
   overrides), `run_webrtc` and `wait_for_stream` take the work out of `main`, which leaves clang-tidy's size list.
