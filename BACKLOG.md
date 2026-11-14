@@ -282,7 +282,7 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the contract test still gives identical floats and a Pi wall-time figure, before and after, is recorded
   here.
 
-- [ ] **Three functions are over clang-tidy's 80-line threshold, five over its complexity of 25** (S, ★). Since
+- [ ] **Three functions are over clang-tidy's 80-line threshold, four over its complexity of 25** (S, ★). Since
   2026-11-14 `.clang-tidy` writes both thresholds down (`readability-function-size.LineThreshold` 80,
   `readability-function-cognitive-complexity.Threshold` 25), so the graded clang-tidy set no longer moves with the
   clang version. The first run over `Src` added five size findings to that set: `main` (`Src/cli_main.cpp:245`),
@@ -291,8 +291,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   there before: `parse_webrtc_config` 44, `find_element_of_type` 28, the demo's `main` 78 and
   `run_onnx_inference_example` 42, `initialize` 29, `populate_config` 62, `on_bus_element` 44. Done 2026-11-14:
   `initialize` is split (`configure_session_options`, `append_provider`), and `parse_webrtc_config` reads its fields
-  through `first_error`; both are in neither list. Next: `find_element_of_type`, `populate_config` and
-  `on_bus_element` (complexity only), then the two demo mains. Done when the set
+  through `first_error`; both are in neither list. `populate_config` reads its keys through `take` and `take_string` (also
+  2026-11-14). Next: `find_element_of_type` and `on_bus_element` (complexity only), then the two demo mains. Done when the set
   holds none of them or each has a reason here.
 - [ ] **`yolo_detector.cpp` does three jobs, and `Src/` is a recursive glob** (M, ★). One file of about 800 lines
   holds the pure math (preprocess, decode, suppression), the ORT-backed detector and the video pipeline with its

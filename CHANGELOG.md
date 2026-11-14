@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, `populate_config` reads its keys through two helpers)
+- `populate_model` and `populate_pipeline` read each key through `take` (a value of another type gives the default,
+  as `value_or` did) and `take_string` (text only), in an anonymous namespace. `populate_config` leaves clang-tidy's
+  complexity list (62 before), and the file's clang-tidy warnings fall from 34 to 11. The 13 TOML cases pass in the
+  arm64 image.
+
 ### Changed (2026-11-14, `parse_webrtc_config` reads its fields in one list)
 - The 28 `if (auto result = ...; !result)` blocks became one `first_error({...})` per section: the first failure in
   field order is returned as before, and every field is read first, which only a valid file keeps. It leaves
