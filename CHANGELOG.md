@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, `OnnxInferenceEngine::initialize` is split)
+- `initialize` keeps the check, the session and the name caches; `configure_session_options` sets profiling,
+  threads, execution mode and the memory pattern, and `append_provider` puts the provider on the options, with the
+  same error codes and `provider_error` texts as before (a failure with a way out is still logged). It leaves both
+  clang-tidy lists (it was 316 lines in the hub's count and of cognitive complexity 29). Build and 263 ctest cases
+  green in the arm64 image (22 skipped there, as before).
+
 ### Changed (2026-11-14, clang-tidy's size and complexity limits are written down)
 - `.clang-tidy` sets `readability-function-size.LineThreshold` to 80 (the other repos' gates) and
   `readability-function-cognitive-complexity.Threshold` to 25 (clang-tidy 23's default), so the graded clang-tidy

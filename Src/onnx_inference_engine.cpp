@@ -448,6 +448,98 @@ namespace {
         return shape;
     }
 
+
+    // What a session option of the config could not be set to; ProfilingFailed for the profile, else SessionCreationFailed.
+    auto configure_session_options(OrtSessionOptions *options, const SessionConfig &config, ExecutionProvider provider)
+      -> std::expected<void, OnnxError>
+    {
+        const OrtApi &api = Ort::GetApi();
+        if (!config.profiling_prefix.empty()
+            && !ort_succeeded(api.EnableProfiling(options, config.profiling_prefix.c_str()))) {
+            return std::unexpected(OnnxError::ProfilingFailed);
+        }
+        const auto execution_mode =
+          provider != ExecutionProvider::DirectML && config.execution_mode == ExecutionMode::Parallel ? ORT_PARALLEL
+                                                                                                      : ORT_SEQUENTIAL;
+        if (!ort_succeeded(api.SetIntraOpNumThreads(options, config.intra_op_num_threads))
+            || !ort_succeeded(api.SetInterOpNumThreads(options, config.inter_op_num_threads))
+            || !ort_succeeded(api.SetSessionExecutionMode(options, execution_mode))
+            || !ort_succeeded(config.enable_memory_pattern && provider != ExecutionProvider::DirectML
+                                ? api.EnableMemPattern(options)
+                                : api.DisableMemPattern(options))) {
+            return std::unexpected(OnnxError::SessionCreationFailed);
+        }
+        return {};
+    }
+
+    struct ProviderFailure
+    {
+        OnnxError error;
+        // Why, for provider_error; empty where the code says enough.
+        std::string reason;
+    };
+
+    // The demos print only the error code, so a failure with a way out is logged here too.
+    auto refused_with(OnnxError error, std::string reason, bool log) -> std::unexpected<ProviderFailure>
+    {
+        if (log) { kataglyphis::log::error("{}", reason); }
+        return std::unexpected(ProviderFailure{ error, std::move(reason) });
+    }
+
+    // A provider the runtime lacks is its own error, so a request never runs on plain CPU unnoticed.
+    auto
+      append_provider(OrtEnv *env, OrtSessionOptions *options, const SessionConfig &config, ExecutionProvider provider)
+        -> std::expected<void, ProviderFailure>
+    {
+        const ort_plugin::Plugin *plugin = ort_plugin::plugin_for(provider);
+        if (provider != ExecutionProvider::Cpu && plugin == nullptr && !provider_available(provider)) {
+            return refused_with(OnnxError::ProviderUnavailable,
+              std::string(provider_name(provider)) + " is not built into the loaded ONNX Runtime",
+              false);
+        }
+        if (provider == ExecutionProvider::Xnnpack || provider == ExecutionProvider::Dnnl) {
+            std::string reason;
+            if (auto appended = append_cpu_provider(options, provider, config.intra_op_num_threads, reason);
+              !appended) {
+                return refused_with(appended.error(), std::move(reason), false);
+            }
+            return {};
+        }
+        if (provider == ExecutionProvider::Cuda) {
+            if (const auto reason = cuda_probe::no_kernel_reason(run_one_cuda_kernel(env, config.device_id),
+                  [device = config.device_id] { return cuda_probe::card_on(cuda_probe::driver, device); })) {
+                return refused_with(OnnxError::ProviderUnavailable, *reason, true);
+            }
+            OrtCUDAProviderOptions cuda_options{};
+            cuda_options.device_id = config.device_id;
+            if (!ort_succeeded(Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options))) {
+                return refused_with(OnnxError::SessionCreationFailed, {}, false);
+            }
+            return {};
+        }
+        if (plugin != nullptr) {
+            // No by-name append comes first: a failed one leaves ep.* entries, and AMD's plugin fails on a foreign one.
+            if (auto reason = append_plugin(env, options, provider, *plugin, config.device_id); !reason.empty()) {
+                return refused_with(OnnxError::ProviderUnavailable, std::move(reason), true);
+            }
+            return {};
+        }
+        if (provider == ExecutionProvider::DirectML) {
+#ifdef _WIN32
+            const void *provider_api = nullptr;
+            if (ort_succeeded(Ort::GetApi().GetExecutionProviderApi("DML", ORT_API_VERSION, &provider_api))
+                && provider_api != nullptr
+                && ort_succeeded(static_cast<const OrtDmlApi *>(provider_api)
+                    ->SessionOptionsAppendExecutionProvider_DML(options, config.device_id))) {
+                return {};
+            }
+#endif
+            return refused_with(OnnxError::SessionCreationFailed, {}, false);
+        }
+        if (provider != ExecutionProvider::Cpu) { return refused_with(OnnxError::SessionCreationFailed, {}, false); }
+        return {};
+    }
+
 }// namespace
 
 struct OnnxInferenceEngine::Impl
@@ -515,83 +607,16 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     impl_->session_options = std::make_unique<Ort::SessionOptions>();
     OrtSessionOptions *options = *impl_->session_options;
 
-    if (!config.profiling_prefix.empty()
-        && !ort_succeeded(api.EnableProfiling(options, config.profiling_prefix.c_str()))) {
+    if (auto configured = configure_session_options(options, config, provider); !configured) {
         impl_->reset();
-        return std::unexpected(OnnxError::ProfilingFailed);
-    }
-
-    const auto execution_mode =
-      provider != ExecutionProvider::DirectML && config.execution_mode == ExecutionMode::Parallel ? ORT_PARALLEL
-                                                                                                  : ORT_SEQUENTIAL;
-    if (!ort_succeeded(api.SetIntraOpNumThreads(options, config.intra_op_num_threads))
-        || !ort_succeeded(api.SetInterOpNumThreads(options, config.inter_op_num_threads))
-        || !ort_succeeded(api.SetSessionExecutionMode(options, execution_mode))
-        || !ort_succeeded(config.enable_memory_pattern && provider != ExecutionProvider::DirectML
-                            ? api.EnableMemPattern(options)
-                            : api.DisableMemPattern(options))) {
-        impl_->reset();
-        return std::unexpected(OnnxError::SessionCreationFailed);
+        return std::unexpected(configured.error());
     }
     impl_->applied_intra_op_num_threads = config.intra_op_num_threads;
 
-    const ort_plugin::Plugin *plugin = ort_plugin::plugin_for(provider);
-    // A provider the runtime lacks is its own error, so a request never runs on plain CPU unnoticed.
-    if (provider != ExecutionProvider::Cpu && plugin == nullptr && !provider_available(provider)) {
+    if (auto appended = append_provider(*impl_->env, options, config, provider); !appended) {
         impl_->reset();
-        impl_->provider_error = std::string(provider_name(provider)) + " is not built into the loaded ONNX Runtime";
-        return std::unexpected(OnnxError::ProviderUnavailable);
-    }
-
-    if (provider == ExecutionProvider::Xnnpack || provider == ExecutionProvider::Dnnl) {
-        std::string reason;
-        if (auto appended = append_cpu_provider(options, provider, config.intra_op_num_threads, reason); !appended) {
-            impl_->reset();
-            impl_->provider_error = std::move(reason);
-            return std::unexpected(appended.error());
-        }
-    } else if (provider == ExecutionProvider::Cuda) {
-        const auto reason = cuda_probe::no_kernel_reason(run_one_cuda_kernel(*impl_->env, config.device_id),
-          [device = config.device_id] { return cuda_probe::card_on(cuda_probe::driver, device); });
-        if (reason) {
-            impl_->reset();
-            impl_->provider_error = *reason;
-            // The demos print only the error code, and this one has a way out.
-            kataglyphis::log::error("{}", impl_->provider_error);
-            return std::unexpected(OnnxError::ProviderUnavailable);
-        }
-        OrtCUDAProviderOptions cuda_options{};
-        cuda_options.device_id = config.device_id;
-        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_CUDA(options, &cuda_options))) {
-            impl_->reset();
-            return std::unexpected(OnnxError::SessionCreationFailed);
-        }
-    } else if (plugin != nullptr) {
-        // No by-name append comes first: a failed one leaves ep.* entries, and AMD's plugin fails on a foreign one.
-        auto reason = append_plugin(*impl_->env, options, provider, *plugin, config.device_id);
-        if (!reason.empty()) {
-            impl_->reset();
-            impl_->provider_error = std::move(reason);
-            // The demos print only the error code, and this one has a way out.
-            kataglyphis::log::error("{}", impl_->provider_error);
-            return std::unexpected(OnnxError::ProviderUnavailable);
-        }
-    } else if (provider == ExecutionProvider::DirectML) {
-#ifdef _WIN32
-        const void *provider_api = nullptr;
-        if (!ort_succeeded(api.GetExecutionProviderApi("DML", ORT_API_VERSION, &provider_api))
-            || provider_api == nullptr
-            || !ort_succeeded(static_cast<const OrtDmlApi *>(provider_api)
-                ->SessionOptionsAppendExecutionProvider_DML(options, config.device_id))) {
-#endif
-            impl_->reset();
-            return std::unexpected(OnnxError::SessionCreationFailed);
-#ifdef _WIN32
-        }
-#endif
-    } else if (provider != ExecutionProvider::Cpu) {
-        impl_->reset();
-        return std::unexpected(OnnxError::SessionCreationFailed);
+        impl_->provider_error = std::move(appended.error().reason);
+        return std::unexpected(appended.error().error);
     }
 
     OrtSession *session = nullptr;

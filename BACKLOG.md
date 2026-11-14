@@ -282,15 +282,16 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the contract test still gives identical floats and a Pi wall-time figure, before and after, is recorded
   here.
 
-- [ ] **Five functions are over clang-tidy's 80-line threshold, seven over its complexity of 25** (S, ★). Since
+- [ ] **Four functions are over clang-tidy's 80-line threshold, six over its complexity of 25** (S, ★). Since
   2026-11-14 `.clang-tidy` writes both thresholds down (`readability-function-size.LineThreshold` 80,
   `readability-function-cognitive-complexity.Threshold` 25), so the graded clang-tidy set no longer moves with the
   clang version. The first run over `Src` added five size findings to that set: `main` (`Src/cli_main.cpp:245`),
   `parse_webrtc_config` (`Src/config_loader.cpp:82`), `main` and `run_onnx_inference_example`
-  (`Src/inference_demo.cpp:383` and `:45`) and `OnnxInferenceEngine::initialize` (`Src/onnx_inference_engine.cpp:499`).
-  The seven complexity findings were there before: `parse_webrtc_config` 44, `find_element_of_type` 28, the demo's
-  `main` 78 and `run_onnx_inference_example` 42, `initialize` 29, `populate_config` 62, `on_bus_element` 44. Next:
-  split `initialize` and `parse_webrtc_config` first (library code; the two demo mains last). Done when the set
+  (`Src/inference_demo.cpp:383` and `:45`) and `OnnxInferenceEngine::initialize`; the seven complexity findings were
+  there before: `parse_webrtc_config` 44, `find_element_of_type` 28, the demo's `main` 78 and
+  `run_onnx_inference_example` 42, `initialize` 29, `populate_config` 62, `on_bus_element` 44. Done 2026-11-14:
+  `initialize` is split (`configure_session_options`, `append_provider`) and in neither list. Next:
+  `parse_webrtc_config` (library code), then the two demo mains. Done when the set
   holds none of them or each has a reason here.
 - [ ] **`yolo_detector.cpp` does three jobs, and `Src/` is a recursive glob** (M, ★). One file of about 800 lines
   holds the pure math (preprocess, decode, suppression), the ORT-backed detector and the video pipeline with its
