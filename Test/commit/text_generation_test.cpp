@@ -195,23 +195,19 @@ TEST_F(TextGeneration, FourSeedsSampleAtLeastTwoSequences)
     EXPECT_GE(sequences.size(), 2U);
 }
 
-TEST_F(TextGeneration, AJsonSchemaHoldsTheOutputOrIsUnsupported)
+TEST_F(TextGeneration, AJsonSchemaHoldsTheOutput)
 {
     auto options = budget(kSampledTokens);
     options.json_schema = kataglyphis::test::kTinyJsonSchema;
     const auto result = generator.generate(user(expected.prompt), options);
-    if constexpr (!kataglyphis::test::kGenaiHasGuidance) {
-        EXPECT_EQ(kataglyphis::test::error_of(result), text::TextGenError::JsonSchemaUnsupported);
-    } else {
-        ASSERT_TRUE(result.has_value());
-        const auto parsed = nlohmann::json::parse(result->text);
-        ASSERT_TRUE(parsed.is_object());
-        EXPECT_EQ(parsed.size(), 1U);
-        ASSERT_TRUE(parsed.contains("a") && parsed.at("a").is_string());
-        EXPECT_LE(parsed.at("a").get<std::string>().size(), 3U);
-        EXPECT_EQ(result->text, kataglyphis::test::kTinyJsonSchemaOutput);
-        EXPECT_EQ(result->finish_reason, text::FinishReason::Stop);
-    }
+    ASSERT_TRUE(result.has_value());
+    const auto parsed = nlohmann::json::parse(result->text);
+    ASSERT_TRUE(parsed.is_object());
+    EXPECT_EQ(parsed.size(), 1U);
+    ASSERT_TRUE(parsed.contains("a") && parsed.at("a").is_string());
+    EXPECT_LE(parsed.at("a").get<std::string>().size(), 3U);
+    EXPECT_EQ(result->text, kataglyphis::test::kTinyJsonSchemaOutput);
+    EXPECT_EQ(result->finish_reason, text::FinishReason::Stop);
 }
 
 TEST_F(TextGeneration, AStopStringEndsGenerationBeforeIt)
@@ -254,12 +250,8 @@ TEST_F(TextGeneration, ASchemaThatIsNoJsonObjectIsInvalidAndOneTheGeneratorRefus
     // An object the grammar compiler refuses is the generator's failure, not an option the caller got wrong.
     auto options = budget(1);
     options.json_schema = R"({"type":"object","properties":{"a":{"$ref":"#/definitions/nowhere"}},"required":["a"]})";
-    const auto refused = kataglyphis::test::error_of(generator.generate(user(expected.prompt), options));
-    if constexpr (!kataglyphis::test::kGenaiHasGuidance) {
-        EXPECT_EQ(refused, text::TextGenError::JsonSchemaUnsupported);
-    } else {
-        EXPECT_EQ(refused, text::TextGenError::GenerationFailed);
-    }
+    EXPECT_EQ(kataglyphis::test::error_of(generator.generate(user(expected.prompt), options)),
+      text::TextGenError::GenerationFailed);
 }
 
 TEST_F(TextGeneration, ANegativeSeedOrAnEmptyStopStringIsInvalid)

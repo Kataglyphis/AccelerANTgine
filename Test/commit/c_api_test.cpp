@@ -237,13 +237,8 @@ TEST(CTextApi, AJsonSchemaHoldsTheReplyOrReturnsItsOwnStatus)
     Collected collected;
     const int status =
       kataglyphis_text_generator_generate(generator, &kUser, 1, &options, collect, &collected, nullptr);
-    if constexpr (kataglyphis::test::kGenaiHasGuidance) {
-        EXPECT_EQ(status, KATAGLYPHIS_TEXT_OK);
-        EXPECT_EQ(collected.text, kataglyphis::test::kTinyJsonSchemaOutput);
-    } else {
-        EXPECT_EQ(status, KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED);
-        EXPECT_TRUE(collected.text.empty());
-    }
+    EXPECT_EQ(status, KATAGLYPHIS_TEXT_OK);
+    EXPECT_EQ(collected.text, kataglyphis::test::kTinyJsonSchemaOutput);
     EXPECT_STRNE(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED),
       kataglyphis_text_status_message(KATAGLYPHIS_TEXT_INVALID_ARGUMENT));
     kataglyphis_text_generator_destroy(generator);

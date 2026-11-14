@@ -296,12 +296,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the Linux lane runs ctest a second time on the same tree and passes (about 13 s on the Pi, from the
   owner's notes, not a repo figure).
 
-- [ ] **`kGenaiHasGuidance` is a switch with one position** (S, ★). Since 2fb3ab7 every lane's GenAI has llguidance
-  and the constant is `true` everywhere (`Test/common/kataglyphis_test_support.h:259`, read at
-  `Test/commit/text_generation_test.cpp:203` and `Test/commit/c_api_test.cpp:240`). Delete it with its dead
-  branches; the mapping of "Guidance is unavailable" to `JsonSchemaUnsupported` (`Src/text_generation.cpp:158-162`)
-  stays. Done when `rg kGenaiHasGuidance` finds nothing outside `CHANGELOG.md`.
-
 - [ ] **Each frame is written twice in two places** (S, ★; the saving is not measured).
   `extract_buffer_info` resizes the vector, which zero-fills it, then copies the frame over it
   (`Src/gstreamer_pipeline.cpp:165-168`; 2,764,800 bytes at 1280x720 RGB). `preprocess_frame` fills the whole

@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Removed (2026-11-14, `kGenaiHasGuidance`)
+- Every lane's GenAI has llguidance since 2fb3ab7, so the test constant was `true` everywhere and its three
+  `JsonSchemaUnsupported` branches were dead. They are gone; `TextGeneration.AJsonSchemaHoldsTheOutputOrIsUnsupported`
+  is `AJsonSchemaHoldsTheOutput`. `Src/text_generation.cpp` still maps GenAI's "guidance unavailable" text to
+  `JsonSchemaUnsupported` for a GenAI built without it.
+
 ### Added (2026-11-14, GenAI gets ORT's chain proof at configure time)
 - `accelerantgine_find_chain_genai` in `cmake/OrtPackageVariant.cmake` finds GenAI's header as before and then runs
   `accelerantgine_assert_ort_chain_build` on the library `text_generation.cpp` loads: `lib/libonnxruntime-genai.so`
