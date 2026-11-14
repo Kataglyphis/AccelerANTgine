@@ -5,7 +5,7 @@ Run with the staged package on the path, e.g.:
 """
 
 import pytest
-from onnx_models import yolo_reshape_model
+from onnx_models import dynamic_relu_model, yolo_reshape_model
 
 ki = pytest.importorskip("kataglyphis_inference")
 
@@ -85,6 +85,16 @@ def test_an_onnx_error_is_raised_under_the_name_python_gives_the_same_code():
 
 
 @needs_onnx
+def test_a_dynamic_dimension_is_none_and_a_fixed_one_its_size(tmp_path):
+    """The getters cast ONNX Runtime's -1 to size_t, so Python saw 18446744073709551615 for a dynamic batch."""
+    model = tmp_path / "dynamic.onnx"
+    model.write_bytes(dynamic_relu_model())
+    engine = ki.OnnxInferenceEngine()
+    engine.initialize(ki.default_session_config(str(model)))
+    assert engine.get_input_shape("X") == [None, 4]
+    assert engine.get_output_shape("Y") == [None, 4]
+
+
 def test_onnx_uninitialized_inference_raises():
     np = pytest.importorskip("numpy")
     engine = ki.OnnxInferenceEngine()

@@ -188,11 +188,32 @@ TEST(OnnxEngine, ReportsInputAndOutputNamesAndShapes)
 
     const auto input_shape = engine.get_input_shape("X");
     ASSERT_TRUE(input_shape.has_value());
-    EXPECT_EQ(input_shape->dimensions, (std::vector<std::size_t>{ 1, 4 }));
+    EXPECT_EQ(input_shape->dimensions, (std::vector<std::optional<std::size_t>>{ 1, 4 }));
 
     const auto output_shape = engine.get_output_shape("Y");
     ASSERT_TRUE(output_shape.has_value());
-    EXPECT_EQ(output_shape->dimensions, (std::vector<std::size_t>{ 1, 4 }));
+    EXPECT_EQ(output_shape->dimensions, (std::vector<std::optional<std::size_t>>{ 1, 4 }));
+}
+
+TEST(OnnxEngine, ADynamicDimensionIsReportedAsDynamic)
+{
+    // ONNX Runtime says -1; cast to size_t it read as SIZE_MAX, a 18-quintillion-wide input.
+    const TempFile model("kataglyphis-dynamic", ".onnx", kataglyphis::test::dynamic_relu_model());
+    const auto engine = initialized_engine(model);
+    const auto input_shape = engine.get_input_shape("X");
+    ASSERT_TRUE(input_shape.has_value());
+    EXPECT_EQ(input_shape->dimensions, (std::vector<std::optional<std::size_t>>{ std::nullopt, 4 }));
+}
+
+TEST(OnnxEngine, TheShapeOfASequenceOutputIsInvalidOutputType)
+{
+    // A sequence has no tensor shape: the wrapper's GetTensorTypeAndShapeInfo read through a null info here.
+    const TempFile model("kataglyphis-sequence", ".onnx", kataglyphis::test::sequence_output_model());
+    const auto engine = initialized_engine(model);
+    const auto output_shape = engine.get_output_shape("Y");
+    ASSERT_FALSE(output_shape.has_value());
+    EXPECT_EQ(output_shape.error(), inference::OnnxError::InvalidOutputType);
+    EXPECT_TRUE(engine.get_input_shape("X").has_value());
 }
 
 TEST(OnnxEngine, AnUnknownNameHasNoShape)

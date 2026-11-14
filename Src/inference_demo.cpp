@@ -82,7 +82,12 @@ static auto run_onnx_inference_example(const detection::YoloConfig &base, const 
             std::cout << "  " << name << ": [";
             for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
                 if (i > 0) { std::cout << ", "; }
-                std::cout << shape->dimensions[i];
+                // A dynamic dimension prints as ?, as ONNX tools show it.
+                if (const auto dim = shape->dimensions[i]) {
+                    std::cout << *dim;
+                } else {
+                    std::cout << '?';
+                }
             }
             std::cout << "]\n";
         }
@@ -95,7 +100,12 @@ static auto run_onnx_inference_example(const detection::YoloConfig &base, const 
             std::cout << "  " << name << ": [";
             for (std::size_t i = 0; i < shape->dimensions.size(); ++i) {
                 if (i > 0) { std::cout << ", "; }
-                std::cout << shape->dimensions[i];
+                // A dynamic dimension prints as ?, as ONNX tools show it.
+                if (const auto dim = shape->dimensions[i]) {
+                    std::cout << *dim;
+                } else {
+                    std::cout << '?';
+                }
             }
             std::cout << "]\n";
         }

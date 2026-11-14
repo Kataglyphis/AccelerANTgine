@@ -196,24 +196,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   stops the build until someone decides, and a pytest compares the attribute names of `YoloConfig()` and
   `SessionConfig()` with a list. Fields left out on purpose are named beside the guard.
 
-- [ ] **The shape getters may crash on a non-tensor and report a dynamic dimension as `SIZE_MAX`** (S, ★★; not
-  double-checked). Read from the source, not run. `get_named_shape` (`Src/onnx_inference_engine.cpp:278-288`, used
-  at `:596-614`) calls the C++ wrapper chain `GetTensorTypeAndShapeInfo().GetShape()`, although line 39 says a
-  fallible call goes through the C API because the wrapper aborts under `ORT_NO_EXCEPTIONS`. For a sequence or map
-  the wrapper should hand back a null info that `GetShape()` reads through; that part is from memory of the ORT
-  wrapper, whose headers were not at hand. `to_tensor_shape` (`:76-82`) casts `int64` to `size_t`, so a dynamic -1
-  becomes 18446744073709551615. Both getters are bound to Python
-  (`Bindings/python/kataglyphis_bindings.cpp:269-284`), and the shape tests ask tensor models only
-  (`OnnxEngine.ReportsInputAndOutputNamesAndShapes`, `AnUnknownNameHasNoShape`). Since a3bc65d
-  `YoloDetector::initialize` asks both getters for every model, and its `fixed` helper reads the wrapped -1 as
-  dynamic.
-
-  First: rewrite `get_named_shape` with the C API, as `to_tensor_data` does (`onnx_inference_engine.cpp:84-124`), so
-  a non-tensor is `InvalidInputType` or `InvalidOutputType`. Ask the owner how a dynamic dimension is reported (0,
-  or an optional): it is public API, and `fixed` in `Src/yolo_detector.cpp` follows the answer.
-  Done when `TheShapeOfASequenceOutputIsInvalidOutputType` (the existing `sequence_output_model()`) and
-  `ADynamicDimensionIsReportedAsDynamic` pass under ASan and UBSan, with one pytest for the bound getters.
-
 - [ ] **"Newest frame, no backlog" is tested as text only, and the pipeline counts nothing** (M, ★★; not
   double-checked). `YoloDetector.TheCameraPipelineKeepsOneFrameBetweenCaptureAndTheDetector` checks substrings of
   the camera description that 6219631 wrote; `v4l2src` is part of the same string

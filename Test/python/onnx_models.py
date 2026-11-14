@@ -30,7 +30,8 @@ def _bytes(field: int, value: bytes | str) -> bytes:
 
 
 def _value_info(name: str, dims: list[int]) -> bytes:
-    shape = b"".join(_bytes(1, _int(1, d)) for d in dims)
+    # A negative dimension is a named, dynamic one (dim_param), which ONNX Runtime reports as -1.
+    shape = b"".join(_bytes(1, _bytes(2, "N") if d < 0 else _int(1, d)) for d in dims)
     tensor_type = _int(1, ONNX_FLOAT) + _bytes(2, shape)
     return _bytes(1, name) + _bytes(2, _bytes(1, tensor_type))
 
@@ -59,6 +60,11 @@ def build_model(
 def relu_model() -> bytes:
     """X[1,4] -> Relu -> Y[1,4]."""
     return build_model([("X", [1, 4])], [("Y", [1, 4])], [("Relu", ["X"], ["Y"])])
+
+
+def dynamic_relu_model() -> bytes:
+    """X[N,4] -> Relu -> Y[N,4], N dynamic."""
+    return build_model([("X", [-1, 4])], [("Y", [-1, 4])], [("Relu", ["X"], ["Y"])])
 
 
 def yolo_reshape_model(height: int, width: int, rows: int, values: int) -> bytes:

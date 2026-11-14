@@ -84,7 +84,12 @@ inline auto encode_value_info(const ValueSpec &value) -> ProtoWriter
     ProtoWriter shape;
     for (const auto dim : value.dims) {
         ProtoWriter dimension;
-        dimension.int_field(1, dim);
+        // A negative dimension is a named, dynamic one (dim_param), which ONNX Runtime reports as -1.
+        if (dim < 0) {
+            dimension.bytes_field(2, "N");
+        } else {
+            dimension.int_field(1, dim);
+        }
         shape.message_field(1, dimension);
     }
     ProtoWriter tensor_type;
@@ -165,6 +170,10 @@ inline auto build_onnx_model(const std::vector<ValueSpec> &inputs,
 // X[1,4] -> Relu -> Y[1,4]
 inline auto relu_model() -> std::string
 { return build_onnx_model({ { "X", { 1, 4 } } }, { { "Y", { 1, 4 } } }, { { "Relu", { "X" }, { "Y" } } }); }
+
+// X[N,4] -> Relu -> Y[N,4], N dynamic
+inline auto dynamic_relu_model() -> std::string
+{ return build_onnx_model({ { "X", { -1, 4 } } }, { { "Y", { -1, 4 } } }, { { "Relu", { "X" }, { "Y" } } }); }
 
 // A[2,3] + B[2,3] -> C[2,3]
 inline auto add_model() -> std::string

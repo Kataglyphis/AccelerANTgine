@@ -18,6 +18,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, a model's declared shape; owner decision of the day) — API change
+- **`get_input_shape` and `get_output_shape` return a `DeclaredShape`**, whose dimensions are
+  `std::optional<std::size_t>`: a dynamic one (ONNX Runtime's -1) is empty, in Python `None`. They returned a
+  `TensorShape` whose cast turned -1 into 18446744073709551615. The owner chose the optional over 0 and over a signed
+  type. `TensorShape` stays for tensors, whose dimensions are always known.
+- **A non-tensor input or output is `InvalidInputType` or `InvalidOutputType`.** The getters read the shape through
+  the C++ wrapper, which aborts under `ORT_NO_EXCEPTIONS` and read a sequence's null tensor info; they now use the C
+  API, as `to_tensor_data` does. `YoloDetector`'s `fixed` reads an empty dimension as dynamic, and the demo prints it
+  as `?`.
+- Tests: `OnnxEngine.ADynamicDimensionIsReportedAsDynamic`, `OnnxEngine.TheShapeOfASequenceOutputIsInvalidOutputType`
+  and a pytest for the bound getters; both test model builders write a negative dimension as a `dim_param`.
+
 ### Changed (2026-11-14, a frame is copied once, and every run borrows one MemoryInfo)
 - `extract_buffer_info` assigns the mapped frame to its vector in one pass; `resize` zero-filled the 2.7 MB of a
   720p RGB frame that the following `memcpy` overwrote at once.

@@ -5,6 +5,7 @@ module;
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -93,6 +94,10 @@ struct KATAGLYPHIS_CPP_API TensorShape
     }
 };
 
+// A model input's or output's shape as its file declares it; an empty dimension is dynamic, -1 in ONNX Runtime.
+struct DeclaredShape
+{ std::vector<std::optional<std::size_t>> dimensions; };
+
 struct TensorData
 {
     std::vector<float> data;
@@ -151,8 +156,8 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
 
     [[nodiscard]] auto get_input_names() const -> std::vector<std::string>;
     [[nodiscard]] auto get_output_names() const -> std::vector<std::string>;
-    [[nodiscard]] auto get_input_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>;
-    [[nodiscard]] auto get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>;
+    [[nodiscard]] auto get_input_shape(const std::string &name) const -> std::expected<DeclaredShape, OnnxError>;
+    [[nodiscard]] auto get_output_shape(const std::string &name) const -> std::expected<DeclaredShape, OnnxError>;
     // The model's custom metadata value for key; empty when absent.
     [[nodiscard]] auto get_custom_metadata(const std::string &key) const -> std::expected<std::string, OnnxError>;
     // Why the last initialize returned ProviderUnavailable; empty otherwise.

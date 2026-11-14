@@ -253,10 +253,11 @@ namespace {
 
 namespace {
     // A dimension the model fixes; dynamic ones come back as 0 or as a wrapped -1.
-    auto fixed(const std::vector<std::size_t> &dimensions, std::size_t index) -> std::optional<std::size_t>
+    auto fixed(const std::vector<std::optional<std::size_t>> &dimensions, std::size_t index)
+      -> std::optional<std::size_t>
     {
-        if (index >= dimensions.size()) { return std::nullopt; }
-        const std::size_t value = dimensions[index];
+        if (index >= dimensions.size() || !dimensions[index]) { return std::nullopt; }
+        const std::size_t value = *dimensions[index];
         if (value == 0 || value > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) {
             return std::nullopt;
         }

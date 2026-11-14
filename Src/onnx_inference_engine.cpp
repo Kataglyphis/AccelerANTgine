@@ -25,6 +25,7 @@ module;
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <span>
 #include <string>
@@ -415,16 +416,36 @@ namespace {
         return {};
     }
 
+    // The C API, as for a fallible call everywhere here: the wrapper aborts under ORT_NO_EXCEPTIONS on a non-tensor.
     template<typename TypeInfoGetter>
-    auto get_named_shape(const std::vector<std::string> &names, const std::string &name, TypeInfoGetter &&get_type_info)
-      -> std::expected<TensorShape, OnnxError>
+    auto get_named_shape(const std::vector<std::string> &names,
+      const std::string &name,
+      OnnxError not_a_tensor,
+      TypeInfoGetter &&get_type_info) -> std::expected<DeclaredShape, OnnxError>
     {
         const auto it = std::ranges::find(names, name);
         if (it == names.end()) { return std::unexpected(OnnxError::OutputNotFound); }
 
-        const auto index = static_cast<std::size_t>(std::distance(names.begin(), it));
-        const auto type_info = get_type_info(index);
-        return to_tensor_shape(type_info.GetTensorTypeAndShapeInfo().GetShape());
+        const OrtApi &api = Ort::GetApi();
+        OrtTypeInfo *raw_type_info = nullptr;
+        if (!ort_succeeded(get_type_info(static_cast<std::size_t>(std::distance(names.begin(), it)), &raw_type_info))) {
+            return std::unexpected(not_a_tensor);
+        }
+        const Ort::TypeInfo type_info{ raw_type_info };
+        const OrtTensorTypeAndShapeInfo *tensor_info = nullptr;
+        if (!ort_succeeded(api.CastTypeInfoToTensorInfo(type_info, &tensor_info)) || tensor_info == nullptr) {
+            return std::unexpected(not_a_tensor);
+        }
+        std::size_t rank = 0;
+        if (!ort_succeeded(api.GetDimensionsCount(tensor_info, &rank))) { return std::unexpected(not_a_tensor); }
+        std::vector<int64_t> dims(rank);
+        if (!ort_succeeded(api.GetDimensions(tensor_info, dims.data(), rank))) { return std::unexpected(not_a_tensor); }
+        DeclaredShape shape;
+        shape.dimensions.reserve(rank);
+        for (const auto dim : dims) {
+            shape.dimensions.push_back(dim < 0 ? std::nullopt : std::optional{ static_cast<std::size_t>(dim) });
+        }
+        return shape;
     }
 
 }// namespace
@@ -721,24 +742,30 @@ auto OnnxInferenceEngine::get_output_names() const -> std::vector<std::string>
     return impl_->output_names_cache;
 }
 
-auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
+auto OnnxInferenceEngine::get_input_shape(const std::string &name) const -> std::expected<DeclaredShape, OnnxError>
 {
     const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
-    return get_named_shape(impl_->input_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo {
-        return impl_->session->GetInputTypeInfo(index);
-    });
+    return get_named_shape(impl_->input_names_cache,
+      name,
+      OnnxError::InvalidInputType,
+      [this](std::size_t index, OrtTypeInfo **out) -> OrtStatus * {
+          return Ort::GetApi().SessionGetInputTypeInfo(*impl_->session, index, out);
+      });
 }
 
-auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std::expected<TensorShape, OnnxError>
+auto OnnxInferenceEngine::get_output_shape(const std::string &name) const -> std::expected<DeclaredShape, OnnxError>
 {
     const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
 
-    return get_named_shape(impl_->output_names_cache, name, [this](std::size_t index) -> Ort::TypeInfo {
-        return impl_->session->GetOutputTypeInfo(index);
-    });
+    return get_named_shape(impl_->output_names_cache,
+      name,
+      OnnxError::InvalidOutputType,
+      [this](std::size_t index, OrtTypeInfo **out) -> OrtStatus * {
+          return Ort::GetApi().SessionGetOutputTypeInfo(*impl_->session, index, out);
+      });
 }
 
 auto OnnxInferenceEngine::get_custom_metadata(const std::string &key) const -> std::expected<std::string, OnnxError>
