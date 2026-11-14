@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, the CLI's `main` is split)
+- `apply_log_level`, `build_stream_config` (the `--config` file, the source, the encoder and the command-line
+  overrides), `run_webrtc` and `wait_for_stream` take the work out of `main`, which leaves clang-tidy's size list.
+  Checked by hand in the arm64 image: a bad `--log_level` exits 2, no flag prints the version, and `--webrtc`
+  against a server that is not there ends in "Stream failed" with exit 1.
+
 ### Changed (2026-11-14, two GStreamer callbacks leave the complexity list)
 - `find_element_of_type` walks the bin with `gst_iterator_find_custom`, which restarts the walk itself on a resync,
   in place of a hand-written iterator loop. `on_bus_element` tests the event name with `std::string_view`'s

@@ -282,7 +282,7 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the contract test still gives identical floats and a Pi wall-time figure, before and after, is recorded
   here.
 
-- [ ] **Three demo functions are over clang-tidy's 80-line threshold, two over its complexity of 25** (S, ★). Since
+- [ ] **Two demo functions are over clang-tidy's 80-line threshold and its complexity of 25** (S, ★). Since
   2026-11-14 `.clang-tidy` writes both thresholds down (`readability-function-size.LineThreshold` 80,
   `readability-function-cognitive-complexity.Threshold` 25), so the graded clang-tidy set no longer moves with the
   clang version. The first run over `Src` added five size findings to that set: `main` (`Src/cli_main.cpp:245`),
@@ -294,7 +294,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   through `first_error`; both are in neither list. `populate_config` reads its keys through `take` and `take_string` (also
   2026-11-14). `find_element_of_type` walks the bin with `gst_iterator_find_custom`, and
   `on_bus_element` tests the event name with `std::string_view` (GLib's `g_str_has_prefix` macro branched on every
-  call). Next: the two demo mains (`Src/cli_main.cpp`, `Src/inference_demo.cpp`), size and complexity. Done when the set
+  call). The CLI's `main` is split (`apply_log_level`, `build_stream_config`, `run_webrtc`,
+  `wait_for_stream`). Next: the demo's `main` and `run_onnx_inference_example` (`Src/inference_demo.cpp`). Done when the set
   holds none of them or each has a reason here.
 - [ ] **`yolo_detector.cpp` does three jobs, and `Src/` is a recursive glob** (M, ★). One file of about 800 lines
   holds the pure math (preprocess, decode, suppression), the ORT-backed detector and the video pipeline with its

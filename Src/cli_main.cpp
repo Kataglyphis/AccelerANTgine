@@ -3,6 +3,7 @@
 #include <csignal>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -240,6 +241,101 @@ auto apply_cli_overrides(kataglyphis::webrtc::StreamConfig &config, const CliOve
         config.bitrate_kbps = cli_bitrate;
     }
 }
+
+// The exit code when --log_level names no level; nothing when it is unset or valid.
+auto apply_log_level() -> std::optional<int>
+{
+    const std::string requested = absl::GetFlag(FLAGS_log_level);
+    if (requested.empty()) { return std::nullopt; }
+    const auto parsed = kataglyphis::log::parse_level(requested);
+    if (!parsed) {
+        std::cerr << "Unknown --log_level '" << requested << "'; use debug, info, warning, error or off\n";
+        return 2;
+    }
+    kataglyphis::log::set_level(*parsed);
+    return std::nullopt;
+}
+
+// The stream the flags and the --config file describe; a flag given on the command line wins over the file.
+auto build_stream_config(const CliOverrideFlags &override_flags) -> kataglyphis::webrtc::StreamConfig
+{
+    using kataglyphis::webrtc::ConfigOverrideMode;
+    const auto source = parse_video_source(absl::GetFlag(FLAGS_source));
+    const auto encoder = parse_video_encoder(absl::GetFlag(FLAGS_encoder));
+    const auto source_mode = override_flags.source ? ConfigOverrideMode::Override : ConfigOverrideMode::UseConfig;
+    const auto encoder_mode = override_flags.encoder ? ConfigOverrideMode::Override : ConfigOverrideMode::UseConfig;
+    auto webrtc_config = kataglyphis::config::get_default_webrtc_config();
+    if (const std::string path = absl::GetFlag(FLAGS_config); !path.empty()) {
+        kataglyphis::log::info("Loading configuration from: {}", path);
+        if (auto result = kataglyphis::config::load_webrtc_config(path)) {
+            webrtc_config = *result;
+            kataglyphis::log::info("Configuration loaded successfully");
+        } else {
+            kataglyphis::log::warning("Failed to load config file, using defaults");
+        }
+    }
+    auto config = kataglyphis::webrtc::create_stream_config_from_webrtc_config(
+      webrtc_config, source, encoder, source_mode, encoder_mode);
+    apply_cli_overrides(config, override_flags);
+    return config;
+}
+
+// Waits until a signal, an error or the end of a finite source; true when the stream failed.
+auto wait_for_stream(kataglyphis::webrtc::WebRTCStreamer &streamer, const std::atomic<bool> &stream_failed) -> bool
+{
+    using kataglyphis::webrtc::StreamState;
+    while (g_running.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        const auto state = streamer.get_state();
+        if (stream_failed.load() || state == StreamState::Error || state == StreamState::Disconnected) { break; }
+    }
+    // Read before stop(), whose EOS must not change it; a signal or a finite source's end is success.
+    return stream_failed.load() || streamer.get_state() == StreamState::Error;
+}
+
+// Streams `config` until it ends; the process exit code.
+auto run_webrtc(int *argc, char ***argv, const kataglyphis::webrtc::StreamConfig &config) -> int
+{
+    kataglyphis::log::info("Initializing WebRTC streaming");
+    if (!kataglyphis::webrtc::WebRTCStreamer::initialize(argc, argv)) {
+        std::cerr << "Failed to initialize GStreamer for WebRTC\n";
+        return 1;
+    }
+    // Latched: a later state message can overwrite Error before the loop reads it.
+    std::atomic<bool> stream_failed{ false };
+    kataglyphis::webrtc::WebRTCStreamer streamer;
+    streamer.set_state_callback(
+      [](kataglyphis::webrtc::StreamState old_state, kataglyphis::webrtc::StreamState new_state) -> void {
+          kataglyphis::log::info("State: {} -> {}", state_to_string(old_state), state_to_string(new_state));
+      });
+    streamer.set_error_callback(
+      [&stream_failed](kataglyphis::webrtc::WebRTCError /*error*/, const std::string &message) -> void {
+          stream_failed.store(true);
+          std::cerr << "Error: " << message << '\n';
+      });
+    if (!streamer.configure(config)) {
+        std::cerr << "Failed to configure WebRTC streamer\n";
+        return 1;
+    }
+    kataglyphis::log::info("Connecting to signalling server: {}", config.signalling_server_uri);
+    kataglyphis::log::info("Producer ID: {}", streamer.get_producer_id());
+    kataglyphis::log::info("Resolution: {}x{}@{}fps", config.width, config.height, config.framerate);
+    if (!streamer.start()) {
+        std::cerr << "Failed to start WebRTC stream\n";
+        return 1;
+    }
+    (void)std::signal(SIGINT, signal_handler);
+    (void)std::signal(SIGTERM, signal_handler);
+    std::cout << "Streaming... Press Ctrl+C to stop.\n";
+    const bool failed = wait_for_stream(streamer, stream_failed);
+    if (failed) { std::cerr << "Stream failed\n"; }
+    kataglyphis::log::info("Stopping stream");
+    (void)streamer.stop();
+    kataglyphis::webrtc::WebRTCStreamer::deinitialize();
+    kataglyphis::log::info("Done");
+    return failed ? 1 : 0;
+}
+
 }// namespace
 
 auto main(int argc, char **argv) -> int
@@ -263,119 +359,17 @@ auto main(int argc, char **argv) -> int
       "  --webrtc --source test   # For testing without camera");
 
     absl::ParseCommandLine(argc, argv);
-
-    if (const std::string requested = absl::GetFlag(FLAGS_log_level); !requested.empty()) {
-        const auto parsed = kataglyphis::log::parse_level(requested);
-        if (!parsed) {
-            std::cerr << "Unknown --log_level '" << requested << "'; use debug, info, warning, error or off\n";
-            return 2;
-        }
-        kataglyphis::log::set_level(*parsed);
-    }
+    if (const auto refused = apply_log_level()) { return *refused; }
 
     if (absl::GetFlag(FLAGS_gst_check)) { return check_gstreamer(&argc, &argv); }
     if (const std::string model = absl::GetFlag(FLAGS_chat_model); !model.empty()) {
         return chat(model, absl::GetFlag(FLAGS_prompt));
     }
-
-    const bool start_webrtc = absl::GetFlag(FLAGS_webrtc);
-    if (!start_webrtc) {
+    if (!absl::GetFlag(FLAGS_webrtc)) {
         std::cout << "AccelerANTgine " << kataglyphis::project_config::project_version_major << "."
                   << kataglyphis::project_config::project_version_minor << '\n';
         std::cout << "Use --help for usage information\n";
         return 0;
     }
-
-    const auto source = parse_video_source(absl::GetFlag(FLAGS_source));
-    const auto encoder = parse_video_encoder(absl::GetFlag(FLAGS_encoder));
-    const auto source_override_mode = override_flags.source ? kataglyphis::webrtc::ConfigOverrideMode::Override
-                                                            : kataglyphis::webrtc::ConfigOverrideMode::UseConfig;
-    const auto encoder_override_mode = override_flags.encoder ? kataglyphis::webrtc::ConfigOverrideMode::Override
-                                                              : kataglyphis::webrtc::ConfigOverrideMode::UseConfig;
-    auto webrtc_config = kataglyphis::config::get_default_webrtc_config();
-
-    const std::string config_file_path = absl::GetFlag(FLAGS_config);
-
-    if (!config_file_path.empty()) {
-        kataglyphis::log::info("Loading configuration from: {}", config_file_path);
-        auto result = kataglyphis::config::load_webrtc_config(config_file_path);
-        if (result) {
-            webrtc_config = *result;
-            kataglyphis::log::info("Configuration loaded successfully");
-        } else {
-            kataglyphis::log::warning("Failed to load config file, using defaults");
-        }
-    }
-
-    auto config = kataglyphis::webrtc::create_stream_config_from_webrtc_config(
-      webrtc_config, source, encoder, source_override_mode, encoder_override_mode);
-
-    apply_cli_overrides(config, override_flags);
-
-    kataglyphis::log::info("Initializing WebRTC streaming");
-
-    auto init_result = kataglyphis::webrtc::WebRTCStreamer::initialize(&argc, &argv);
-    if (!init_result) {
-        std::cerr << "Failed to initialize GStreamer for WebRTC\n";
-        return 1;
-    }
-
-    // Latched: a later state message can overwrite Error before the loop below reads it.
-    std::atomic<bool> stream_failed{ false };
-
-    kataglyphis::webrtc::WebRTCStreamer streamer;
-
-    streamer.set_state_callback(
-      [](kataglyphis::webrtc::StreamState old_state, kataglyphis::webrtc::StreamState new_state) -> void {
-          kataglyphis::log::info("State: {} -> {}", state_to_string(old_state), state_to_string(new_state));
-      });
-
-    streamer.set_error_callback(
-      [&stream_failed](kataglyphis::webrtc::WebRTCError /*error*/, const std::string &message) -> void {
-          stream_failed.store(true);
-          std::cerr << "Error: " << message << '\n';
-      });
-
-    auto configure_result = streamer.configure(config);
-    if (!configure_result) {
-        std::cerr << "Failed to configure WebRTC streamer\n";
-        return 1;
-    }
-
-    kataglyphis::log::info("Connecting to signalling server: {}", config.signalling_server_uri);
-    kataglyphis::log::info("Producer ID: {}", streamer.get_producer_id());
-    kataglyphis::log::info("Resolution: {}x{}@{}fps", config.width, config.height, config.framerate);
-
-    auto start_result = streamer.start();
-    if (!start_result) {
-        std::cerr << "Failed to start WebRTC stream\n";
-        return 1;
-    }
-
-    (void)std::signal(SIGINT, signal_handler);
-    (void)std::signal(SIGTERM, signal_handler);
-
-    std::cout << "Streaming... Press Ctrl+C to stop.\n";
-
-    while (g_running.load()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-        auto state = streamer.get_state();
-        if (stream_failed.load() || state == kataglyphis::webrtc::StreamState::Error
-            || state == kataglyphis::webrtc::StreamState::Disconnected) {
-            break;
-        }
-    }
-
-    // Read before stop(), whose EOS must not change it; a signal or a finite source's end is success.
-    const bool failed = stream_failed.load() || streamer.get_state() == kataglyphis::webrtc::StreamState::Error;
-    if (failed) { std::cerr << "Stream failed\n"; }
-
-    kataglyphis::log::info("Stopping stream");
-    (void)streamer.stop();
-
-    kataglyphis::webrtc::WebRTCStreamer::deinitialize();
-
-    kataglyphis::log::info("Done");
-    return failed ? 1 : 0;
+    return run_webrtc(&argc, &argv, build_stream_config(override_flags));
 }
