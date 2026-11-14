@@ -292,8 +292,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   instruction count our code is about 1 % of a detected frame (11.8 of 1,199.5 million,
   `perf/cachegrind-baseline.json`), and the gate runs with `--cache-sim=no`: only wall time on the Pi can show a
   gain.
-  First, as small changes on the way: `data.assign(ptr, ptr + size)`, and one `Ort::MemoryInfo` made in
-  `initialize`. Then a scratch tensor in `VideoDetectorPipeline::Impl` through a `detect_frame` overload, not
+  Done 2026-11-14 on the way: `extract_buffer_info` assigns the mapped bytes once, and one `Ort::MemoryInfo` is
+  made in `initialize`. Next: a scratch tensor in `VideoDetectorPipeline::Impl` through a `detect_frame` overload, not
   `thread_local` (the TLS trap of the module targets, `AGENTS.md` § 4). A live RTSP camera is a `://` source and is
   treated as lossless like a file (`video_detection_pipeline_description`, on purpose in 6219631); it wants an
   explicit switch.

@@ -438,6 +438,8 @@ struct OnnxInferenceEngine::Impl
     std::unique_ptr<Ort::Session> session;
     std::unique_ptr<Ort::SessionOptions> session_options;
     Ort::AllocatorWithDefaultOptions allocator;
+    // Made once in initialize; every run borrows it instead of creating its own.
+    Ort::MemoryInfo cpu_memory{ nullptr };
     SessionConfig config;
     bool initialized{ false };
     bool profiling_active{ false };
@@ -592,6 +594,7 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
           return impl_->session->GetOutputNameAllocated(index, impl_->allocator);
       });
 
+    impl_->cpu_memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
     impl_->initialized = true;
     impl_->profiling_active = !config.profiling_prefix.empty();
 
@@ -649,9 +652,7 @@ auto OnnxInferenceEngine::run_inference_in_place(std::span<float> input_data,
 
     const auto input_dims = to_ort_dimensions(input_shape);
 
-    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-
-    auto input_tensor = make_float_tensor(memory_info, input_data, input_dims);
+    auto input_tensor = make_float_tensor(impl_->cpu_memory, input_data, input_dims);
     if (!input_tensor) { return std::unexpected(input_tensor.error()); }
 
     std::vector<Ort::Value> inputs;
@@ -674,8 +675,6 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
     std::unique_lock run_lock(impl_->directml_run_mutex, std::defer_lock);
     if (impl_->config.execution_provider == ExecutionProvider::DirectML) { run_lock.lock(); }
 
-    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-
     // Ort::Value borrows its buffer, so the copied inputs must outlive the Run.
     std::vector<std::vector<float>> owned_input_data;
     std::vector<std::vector<int64_t>> input_dims_storage;
@@ -695,7 +694,7 @@ auto OnnxInferenceEngine::run_inference_multi_input(const std::vector<std::pair<
         auto &mutable_data = owned_input_data.emplace_back(tensor_data.data.begin(), tensor_data.data.end());
         auto &dims = input_dims_storage.emplace_back(to_ort_dimensions(tensor_data.shape));
 
-        auto input_tensor = make_float_tensor(memory_info, mutable_data, dims);
+        auto input_tensor = make_float_tensor(impl_->cpu_memory, mutable_data, dims);
         if (!input_tensor) { return std::unexpected(input_tensor.error()); }
 
         input_tensors.push_back(std::move(*input_tensor));

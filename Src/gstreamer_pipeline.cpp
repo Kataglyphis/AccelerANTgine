@@ -5,7 +5,7 @@ module;
 #include "bundled_gstreamer.hpp"
 #endif
 #include <atomic>
-#include <cstring>
+#include <cstddef>
 #include <expected>
 #include <gst/analytics/analytics.h>
 #include <gst/analytics/gsttensor.h>
@@ -15,6 +15,7 @@ module;
 #include <gst/video/video.h>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
@@ -164,8 +165,9 @@ namespace {
 
         BufferInfo buffer_info;
         buffer_info.size = map_info.size;
-        buffer_info.data.resize(map_info.size);
-        std::memcpy(buffer_info.data.data(), map_info.data, map_info.size);
+        // assign, not resize and memcpy: resize zero-fills 2.7 MB at 720p that the copy overwrites at once.
+        const auto mapped = std::as_bytes(std::span(map_info.data, map_info.size));
+        buffer_info.data.assign(mapped.begin(), mapped.end());
 
         append_tensor_metadata(buffer, buffer_info);
         append_frame_metadata(gst_sample_get_caps(sample), buffer, buffer_info);

@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-14, a frame is copied once, and every run borrows one MemoryInfo)
+- `extract_buffer_info` assigns the mapped frame to its vector in one pass; `resize` zero-filled the 2.7 MB of a
+  720p RGB frame that the following `memcpy` overwrote at once.
+- `OnnxInferenceEngine::initialize` makes the CPU `Ort::MemoryInfo` once, and `run_inference` and
+  `run_inference_multi_input` borrow it instead of creating one per call. No gain is measured: by instruction count
+  our code is about 1 % of a detected frame. The scratch tensor stays in `BACKLOG.md`.
+
 ### Added (2026-11-14, the suite runs twice in one tree, and the demo's output safety runs at all)
 - **`Golden.DemoKeepsExistingOutputs`** runs `scripts/linux/tests/test-demo-detector-safety.sh` with the built demo,
   the locked model and `two_cats.jpg`: the demo refuses a detector output, a repeat output or a profile that already
