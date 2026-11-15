@@ -229,6 +229,10 @@ if(TARGET nlohmann_json_modules)
         target_link_options(nlohmann_json_modules PUBLIC -pthread)
     endif()
     target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
+    # GCC 16's _mm_loadl_epi64 fails UBSan's alignment check in nlohmann's vector scan, an unaligned load by design.
+    if(myproject_ENABLE_SANITIZER_UNDEFINED AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NO_SIMD)
+    endif()
     # PIC: GCC bakes a module-instantiated thread_local's TLS model into the CMI
     # (AGENTS.md § 4, "Both module targets are PIC").
     set_target_properties(nlohmann_json_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)

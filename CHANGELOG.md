@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-15, nlohmann's vector scan under GCC's UBSan)
+- The Linux x64 GCC Debug lane failed `AContinuedGeneratorGivesTheTokensOfAFreshOne` (run 43707801504): UBSan
+  reported `_mm_loadl_epi64` in nlohmann's `copy_plain_halves` as a misaligned load of `__m64_u`, an unaligned load
+  by design that GCC 16's header type trips; the first assistant message of 8 to 15 bytes took that path. Under GCC
+  with UBSan the nlohmann module is built with `JSON_NO_SIMD`.
+
 ### Changed (2026-11-15, a chat turn continues the last generator)
 - A greedy `generate` without `json_schema` keeps its GenAI generator: the next prompt rewinds it to the start the
   two share (`OgaGenerator_RewindTo`) and appends only the rest (`OgaGenerator_AppendTokens`), so a chat turn no
