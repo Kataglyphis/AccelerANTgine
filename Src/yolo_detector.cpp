@@ -337,8 +337,10 @@ auto camera_detection_pipeline_description(const std::string &device,
              "appsink name=detector_sink emit-signals=true sync=false max-buffers=1 drop=true";
 }
 
-auto video_detection_pipeline_description(const std::string &video_source, std::uint32_t width, std::uint32_t height)
-  -> std::string
+auto video_detection_pipeline_description(const std::string &video_source,
+  std::uint32_t width,
+  std::uint32_t height,
+  VideoPace pace) -> std::string
 {
     std::string pipeline_desc;
 
@@ -348,11 +350,15 @@ auto video_detection_pipeline_description(const std::string &video_source, std::
         pipeline_desc = "filesrc location=" + gstreamer::quote_pipeline_value(video_source) + " ! decodebin ! ";
     }
 
+    const bool live = pace == VideoPace::Live;
+    // Live: the camera pipeline's leaky queue and dropping sink, so a slow detector sees the newest frame.
+    if (live) { pipeline_desc += "queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "; }
     pipeline_desc +=
       "videoconvert ! videoscale ! "
       "video/x-raw,format=RGB,width="
       + std::to_string(width) + ",height=" + std::to_string(height)
       + " ! appsink name=detector_sink emit-signals=true sync=false";
+    if (live) { pipeline_desc += " max-buffers=1 drop=true"; }
     return pipeline_desc;
 }
 
@@ -885,23 +891,27 @@ auto create_camera_detection_pipeline(const std::string &device,
 auto create_video_detection_pipeline(const std::string &video_source,
   const std::filesystem::path &model_path,
   std::uint32_t width,
-  std::uint32_t height) -> std::expected<VideoDetectorPipeline, OnnxError>
+  std::uint32_t height,
+  VideoPace pace) -> std::expected<VideoDetectorPipeline, OnnxError>
 {
-    return with_the_models_layout(model_path,
-      [&](const YoloConfig &config) { return create_video_detection_pipeline(video_source, config, width, height); });
+    return with_the_models_layout(model_path, [&](const YoloConfig &config) {
+        return create_video_detection_pipeline(video_source, config, width, height, pace);
+    });
 }
 
 auto create_video_detection_pipeline(const std::string &video_source,
   const YoloConfig &yolo_config,
   std::uint32_t width,
-  std::uint32_t height) -> std::expected<VideoDetectorPipeline, OnnxError>
+  std::uint32_t height,
+  VideoPace pace) -> std::expected<VideoDetectorPipeline, OnnxError>
 {
     VideoDetectorPipeline pipeline;
     VideoDetectionConfig config;
 
     config.yolo_config = yolo_config;
 
-    config.gstreamer_config.pipeline_description = video_detection_pipeline_description(video_source, width, height);
+    config.gstreamer_config.pipeline_description =
+      video_detection_pipeline_description(video_source, width, height, pace);
 
     auto result = pipeline.initialize(config);
     if (!result) { return std::unexpected(result.error()); }

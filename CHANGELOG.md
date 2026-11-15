@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-15, a live video source drops stale frames on request)
+- `VideoPace`: `video_detection_pipeline_description` and both `create_video_detection_pipeline` overloads take
+  `VideoPace::Live`, which adds the camera pipeline's leaky one-frame queue and `max-buffers=1 drop=true` sink, so
+  an RTSP camera behind a slow detector shows the newest frame. `Lossless`, the default, keeps reading a file at the
+  detector's pace, as 6219631 chose.
+
 ### Changed (2026-11-15, the video pipeline keeps its model input)
 - `preprocess_frame_into` fills a `PreprocessedFrame` the caller keeps: its buffer keeps its capacity, and a stretch,
   which writes every value, no longer fills it first. `YoloDetector::detect_frame` takes such a scratch input, and

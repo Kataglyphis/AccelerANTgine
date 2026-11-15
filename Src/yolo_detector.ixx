@@ -211,9 +211,13 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
   std::uint32_t height,
   std::uint32_t fps) -> std::string;
 
+// Lossless reads at the detector's pace, as a file wants; Live keeps only the newest frame, as an RTSP camera wants.
+enum class VideoPace { Lossless, Live };
+
 [[nodiscard]] KATAGLYPHIS_CPP_API auto video_detection_pipeline_description(const std::string &video_source,
   std::uint32_t width,
-  std::uint32_t height) -> std::string;
+  std::uint32_t height,
+  VideoPace pace = VideoPace::Lossless) -> std::string;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_camera_detection_pipeline(const std::string &device,
   const std::filesystem::path &model_path,
@@ -230,11 +234,13 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_video_detection_pipeline(const std::string &video_source,
   const std::filesystem::path &model_path,
   std::uint32_t width = 640,
-  std::uint32_t height = 480) -> std::expected<VideoDetectorPipeline, OnnxError>;
+  std::uint32_t height = 480,
+  VideoPace pace = VideoPace::Lossless) -> std::expected<VideoDetectorPipeline, OnnxError>;
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_video_detection_pipeline(const std::string &video_source,
   const YoloConfig &config,
   std::uint32_t width = 640,
-  std::uint32_t height = 480) -> std::expected<VideoDetectorPipeline, OnnxError>;
+  std::uint32_t height = 480,
+  VideoPace pace = VideoPace::Lossless) -> std::expected<VideoDetectorPipeline, OnnxError>;
 
 }// namespace kataglyphis::detection

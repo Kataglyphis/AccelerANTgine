@@ -169,6 +169,13 @@ TEST(YoloDetector, TheCameraPipelineKeepsOneFrameBetweenCaptureAndTheDetector)
     const auto video = detection::video_detection_pipeline_description("clip.mp4", 64, 48);
     EXPECT_FALSE(video.contains("leaky")) << video;
     EXPECT_FALSE(video.contains("drop=true")) << video;
+    // A live RTSP camera asks for the camera's rule: the newest frame, never a backlog.
+    const auto live =
+      detection::video_detection_pipeline_description("rtsp://cam/1", 64, 48, detection::VideoPace::Live);
+    EXPECT_TRUE(live.contains(" ! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "))
+      << live;
+    EXPECT_TRUE(live.ends_with("appsink name=detector_sink emit-signals=true sync=false max-buffers=1 drop=true"))
+      << live;
 }
 
 TEST(YoloDetector, DetectBeforeInitializeFails)
