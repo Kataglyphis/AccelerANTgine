@@ -327,10 +327,15 @@ auto camera_detection_pipeline_description(const std::string &device,
   std::uint32_t height,
   std::uint32_t fps) -> std::string
 {
-    // The detector runs on the streaming thread; the leaky queue hands it the newest frame, not the oldest queued one.
     return "v4l2src device=" + gstreamer::quote_pipeline_value(device) + " ! "
-           "video/x-raw,width="
-           + std::to_string(width) + ",height=" + std::to_string(height) + ",framerate=" + std::to_string(fps)
+           + camera_detection_pipeline_tail(width, height, fps);
+}
+
+auto camera_detection_pipeline_tail(std::uint32_t width, std::uint32_t height, std::uint32_t fps) -> std::string
+{
+    // The detector runs on the streaming thread; the leaky queue hands it the newest frame, not the oldest queued one.
+    return "video/x-raw,width=" + std::to_string(width) + ",height=" + std::to_string(height)
+           + ",framerate=" + std::to_string(fps)
            + "/1 ! "
              "queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "
              "videoconvert ! video/x-raw,format=RGB ! "
@@ -342,24 +347,23 @@ auto video_detection_pipeline_description(const std::string &video_source,
   std::uint32_t height,
   VideoPace pace) -> std::string
 {
-    std::string pipeline_desc;
+    const std::string head =
+      video_source.contains("://")
+        ? "uridecodebin uri=" + gstreamer::quote_pipeline_value(video_source) + " ! "
+        : "filesrc location=" + gstreamer::quote_pipeline_value(video_source) + " ! decodebin ! ";
+    return head + video_detection_pipeline_tail(width, height, pace);
+}
 
-    if (video_source.contains("://")) {
-        pipeline_desc = "uridecodebin uri=" + gstreamer::quote_pipeline_value(video_source) + " ! ";
-    } else {
-        pipeline_desc = "filesrc location=" + gstreamer::quote_pipeline_value(video_source) + " ! decodebin ! ";
-    }
-
+auto video_detection_pipeline_tail(std::uint32_t width, std::uint32_t height, VideoPace pace) -> std::string
+{
     const bool live = pace == VideoPace::Live;
+    std::string tail;
     // Live: the camera pipeline's leaky queue and dropping sink, so a slow detector sees the newest frame.
-    if (live) { pipeline_desc += "queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "; }
-    pipeline_desc +=
-      "videoconvert ! videoscale ! "
-      "video/x-raw,format=RGB,width="
-      + std::to_string(width) + ",height=" + std::to_string(height)
-      + " ! appsink name=detector_sink emit-signals=true sync=false";
-    if (live) { pipeline_desc += " max-buffers=1 drop=true"; }
-    return pipeline_desc;
+    if (live) { tail += "queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! "; }
+    tail += "videoconvert ! videoscale ! video/x-raw,format=RGB,width=" + std::to_string(width)
+            + ",height=" + std::to_string(height) + " ! appsink name=detector_sink emit-signals=true sync=false";
+    if (live) { tail += " max-buffers=1 drop=true"; }
+    return tail;
 }
 
 auto yolo_config_from(const config::ModelConfig &model) -> std::expected<YoloConfig, config::ConfigError>
@@ -673,6 +677,44 @@ auto YoloDetector::get_coco_class_name(int class_id) -> std::string_view
     return "unknown";
 }
 
+namespace {
+    // Written by the streaming thread, read by stats() on any.
+    class FrameCounter
+    {
+      public:
+        void count(const gstreamer::FrameMetadata &meta, const std::expected<DetectionResult, OnnxError> &detection)
+        {
+            const std::scoped_lock lock(mutex_);
+            if (counted_.frames > 0 && meta.fps_n > 0 && meta.timestamp_ns > counted_.last_timestamp_ns) {
+                constexpr std::uint64_t nanoseconds_per_second = 1'000'000'000;
+                const std::uint64_t period = nanoseconds_per_second * meta.fps_d / meta.fps_n;
+                // A gap of n periods is n - 1 frames the source made and the leaky queue dropped; half a period is jitter.
+                const std::uint64_t gap = meta.timestamp_ns - counted_.last_timestamp_ns;
+                const std::uint64_t periods = period == 0 ? 1 : (gap + (period / 2)) / period;
+                if (periods > 1) { counted_.dropped += periods - 1; }
+            }
+            if (counted_.frames == 0) { counted_.first_timestamp_ns = meta.timestamp_ns; }
+            counted_.last_timestamp_ns = meta.timestamp_ns;
+            ++counted_.frames;
+            if (detection) {
+                counted_.last_inference_ms = detection->inference_time_ms;
+            } else {
+                ++counted_.errors;
+            }
+        }
+
+        [[nodiscard]] auto snapshot() const -> VideoDetectionStats
+        {
+            const std::scoped_lock lock(mutex_);
+            return counted_;
+        }
+
+      private:
+        mutable std::mutex mutex_;
+        VideoDetectionStats counted_;
+    };
+}// namespace
+
 struct VideoDetectorPipeline::Impl
 {
     YoloDetector detector;
@@ -690,8 +732,12 @@ struct VideoDetectorPipeline::Impl
     bool starting{ false };
     bool stopping{ false };
     VideoDetectionConfig config;
-    // The model's input, kept for the streaming thread, the one caller of on_frame_received.
-    PreprocessedFrame scratch;
+    // The streaming thread's own: the model's input it reuses and what it counts, for on_frame_received alone.
+    struct Streaming
+    {
+        PreprocessedFrame scratch;
+        FrameCounter counter;
+    } streaming;
     // Last, so it is destroyed first: its streaming thread calls into every member above.
     gstreamer::GStreamerPipeline pipeline;
 
@@ -705,7 +751,8 @@ struct VideoDetectorPipeline::Impl
             on_detection = callbacks.detection;
         }
         if (on_frame) { on_frame(buffer); }
-        auto detection = detector.detect_frame(buffer, scratch);
+        auto detection = detector.detect_frame(buffer, streaming.scratch);
+        streaming.counter.count(buffer.metadata, detection);
         if (detection) {
             if (on_detection) { on_detection(*detection, buffer); }
             return;
@@ -725,6 +772,8 @@ struct VideoDetectorPipeline::Impl
         }
     }
 };
+
+auto VideoDetectorPipeline::stats() const -> VideoDetectionStats { return impl_->streaming.counter.snapshot(); }
 
 VideoDetectorPipeline::VideoDetectorPipeline() : impl_(std::make_unique<Impl>()) {}
 

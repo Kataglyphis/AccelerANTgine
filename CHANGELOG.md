@@ -11,6 +11,14 @@ every push to `main` releases `v<that version>` once every lane is green
 `## [<version>]` section as the notes. So before a merge, raise the version and
 turn `## [Unreleased]` into that section.
 
+### Added (2026-11-15, the video pipeline counts what it does)
+- `VideoDetectorPipeline::stats()` returns `VideoDetectionStats`: frames, errors, the last inference time, the first
+  and last timestamps, and `dropped`, the frames a live source made between two that reached the detector (from
+  their timestamps and the caps' rate). `camera_detection_pipeline_tail` and `video_detection_pipeline_tail` export
+  what follows the source, so `YoloDetector.ASlowDetectorSeesTheNewestFrame` runs the camera's leaky tail behind
+  `videotestsrc is-live=true`: five 200 ms detections at 30 fps drop frames, the lossless tail drops none of 12. The
+  string test of the camera description stays. clang-tidy counts per check unchanged for the two files.
+
 A change here surfaces in OmniAccelerANT only once its
 `third_party/AccelerANTgine` pin is bumped (and thus in the in-tree
 `packages/kataglyphis_native_inference`), so anything that moves the C ABI

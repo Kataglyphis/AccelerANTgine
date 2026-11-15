@@ -196,19 +196,12 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   stops the build until someone decides, and a pytest compares the attribute names of `YoloConfig()` and
   `SessionConfig()` with a list. Fields left out on purpose are named beside the guard.
 
-- [ ] **"Newest frame, no backlog" is tested as text only, and the pipeline counts nothing** (M, ★★; not
-  double-checked). `YoloDetector.TheCameraPipelineKeepsOneFrameBetweenCaptureAndTheDetector` checks substrings of
-  the camera description that 6219631 wrote; `v4l2src` is part of the same string
-  (`camera_detection_pipeline_description`), so CI cannot run the leaky tail without a camera.
-  `VideoDetectorPipeline::Impl` keeps no frame count, lag or inference time, so "does the detector keep up?" cannot
-  be asked, tested or benchmarked.
-
-  First: split the camera description into a source head and an exported live tail that a test puts behind
-  `videotestsrc is-live=true`. Add a few atomics behind a `stats()` accessor: frames processed, first and last frame
-  time, last inference ms, error count. Dropped frames follow from the frame times and rate `FrameMetadata` carries.
-  Done when `ASlowDetectorSeesTheNewestFrame` passes, on the TSan lane too: a live 30 fps source and a detection
-  callback that sleeps 200 ms for five frames give gaps of several frame periods and `stats().dropped` above zero,
-  and the file tail gives zero. The counters then feed a warn-only pipeline benchmark in `bench-history`.
+- [ ] **The pipeline's frame counts feed no benchmark** (S, ★). Since 2026-11-15 `VideoDetectorPipeline::stats()`
+  counts frames, errors, the last inference time and the frames a live source made while the detector was busy
+  (from the timestamps and the caps' rate), and `ASlowDetectorSeesTheNewestFrame` runs the exported live tail
+  (`camera_detection_pipeline_tail`) behind `videotestsrc is-live=true`: five 200 ms detections at 30 fps drop
+  frames, the lossless tail (`video_detection_pipeline_tail`) drops none. Left: a warn-only pipeline benchmark in
+  `bench-history` from those counters, and the counters in the Python bindings.
 
 - [ ] **The instruction-count gate cannot tighten and guards x64 only** (M, ★★). `check()` fails only on "over"
   (`scripts/linux/perf-cachegrind.py:88-100`), so after a speed-up the old ceiling stays and the gain can be lost

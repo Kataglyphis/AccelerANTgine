@@ -165,6 +165,18 @@ struct VideoDetectionConfig
     std::filesystem::path output_path{ "output.mp4" };
 };
 
+// What a running pipeline did: a detector slower than its live source shows here as dropped frames.
+struct VideoDetectionStats
+{
+    std::uint64_t frames{ 0 };
+    std::uint64_t errors{ 0 };
+    // Frames the source made between two that reached the detector, from their timestamps and the caps' rate.
+    std::uint64_t dropped{ 0 };
+    double last_inference_ms{ 0.0 };
+    std::uint64_t first_timestamp_ns{ 0 };
+    std::uint64_t last_timestamp_ns{ 0 };
+};
+
 class KATAGLYPHIS_CPP_API VideoDetectorPipeline
 {
   public:
@@ -199,6 +211,8 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
     [[nodiscard]] auto has_ended() const -> bool;
     [[nodiscard]] auto stream_error() const -> std::optional<std::string>;
 
+    [[nodiscard]] auto stats() const -> VideoDetectionStats;
+
     [[nodiscard]] auto end_profiling() -> std::expected<std::string, OnnxError>;
 
   private:
@@ -211,11 +225,20 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
   std::uint32_t height,
   std::uint32_t fps) -> std::string;
 
+// Everything after the camera's source element, so a test runs the live tail behind videotestsrc is-live=true.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto
+  camera_detection_pipeline_tail(std::uint32_t width, std::uint32_t height, std::uint32_t fps) -> std::string;
+
 // Lossless reads at the detector's pace, as a file wants; Live keeps only the newest frame, as an RTSP camera wants.
 enum class VideoPace { Lossless, Live };
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto video_detection_pipeline_description(const std::string &video_source,
   std::uint32_t width,
+  std::uint32_t height,
+  VideoPace pace = VideoPace::Lossless) -> std::string;
+
+// Everything after the decoder, so a test runs either pace behind a test source.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto video_detection_pipeline_tail(std::uint32_t width,
   std::uint32_t height,
   VideoPace pace = VideoPace::Lossless) -> std::string;
 

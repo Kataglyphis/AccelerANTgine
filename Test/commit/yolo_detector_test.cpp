@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <climits>
 #include <condition_variable>
@@ -176,6 +177,58 @@ TEST(YoloDetector, TheCameraPipelineKeepsOneFrameBetweenCaptureAndTheDetector)
       << live;
     EXPECT_TRUE(live.ends_with("appsink name=detector_sink emit-signals=true sync=false max-buffers=1 drop=true"))
       << live;
+}
+
+namespace {
+constexpr auto kSlowDetection = std::chrono::milliseconds(200);
+constexpr auto kRunLimit = std::chrono::seconds(20);
+constexpr auto kPollEvery = std::chrono::milliseconds(20);
+
+// One run of a pipeline on `description` whose detection callback takes kSlowDetection for the first `slow` frames.
+auto run_slowly(const std::string &description, const TempFile &model, int slow) -> detection::VideoDetectionStats
+{
+    detection::VideoDetectionConfig config;
+    config.yolo_config = two_class_config(model);
+    config.gstreamer_config.pipeline_description = description;
+    detection::VideoDetectorPipeline pipeline;
+    EXPECT_TRUE(pipeline.initialize(config).has_value()) << description;
+    std::atomic<int> seen{ 0 };
+    pipeline.set_detection_callback(
+      [&seen, slow](const detection::DetectionResult &, const gstreamer::BufferInfo &) -> void {
+          if (seen.fetch_add(1) < slow) { std::this_thread::sleep_for(kSlowDetection); }
+      });
+    EXPECT_TRUE(pipeline.start().has_value()) << description;
+    const auto deadline = std::chrono::steady_clock::now() + kRunLimit;
+    while (seen.load() < slow + 3 && !pipeline.has_ended() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(kPollEvery);
+    }
+    EXPECT_TRUE(pipeline.stop().has_value());
+    return pipeline.stats();
+}
+}// namespace
+
+TEST(YoloDetector, ASlowDetectorSeesTheNewestFrame)
+{
+    ASSERT_TRUE(gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+    if (!kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "queue", "videoconvert", "videoscale" })
+          .empty()) {
+        GTEST_SKIP() << "the test source or the converters are missing";
+    }
+    const TempFile model("slow detector", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    // A live camera keeps running while the detector sleeps: the leaky queue drops what it made meanwhile.
+    const auto live =
+      run_slowly("videotestsrc is-live=true ! " + detection::camera_detection_pipeline_tail(64, 48, 30), model, 5);
+    EXPECT_GE(live.frames, 8U);
+    EXPECT_GT(live.dropped, 0U) << "five 200 ms detections at 30 fps leave gaps of several frames";
+    EXPECT_EQ(live.errors, 0U);
+    EXPECT_GT(live.last_timestamp_ns, live.first_timestamp_ns);
+    // A file waits for the detector, so every frame of it arrives.
+    const auto file = run_slowly(
+      "videotestsrc num-buffers=12 ! video/x-raw,framerate=30/1 ! " + detection::video_detection_pipeline_tail(64, 48),
+      model,
+      5);
+    EXPECT_EQ(file.frames, 12U);
+    EXPECT_EQ(file.dropped, 0U);
 }
 
 TEST(YoloDetector, DetectBeforeInitializeFails)
