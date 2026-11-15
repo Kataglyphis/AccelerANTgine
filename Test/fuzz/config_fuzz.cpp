@@ -106,12 +106,13 @@ void StreamNamesAlwaysMap(const std::string &source, const std::string &encoder)
       settings, webrtc::VideoSource::TestPattern, webrtc::VideoEncoder::VP9);
     const bool known_source =
       source == "libcamera" || source == "v4l2" || source == "test" || source == "file" || source == "uri";
-    const bool known_encoder = encoder == "h264-hw" || encoder == "h264-sw" || encoder == "vp8" || encoder == "vp9";
+    const bool known_encoder =
+      encoder == "h264" || encoder == "h264-hw" || encoder == "h264-sw" || encoder == "vp8" || encoder == "vp9";
     if (!known_source) { EXPECT_EQ(config.source, webrtc::VideoSource::TestPattern); }
     if (!known_encoder) { EXPECT_EQ(config.encoder, webrtc::VideoEncoder::VP9); }
 }
 FUZZ_TEST(ConfigFuzz, StreamNamesAlwaysMap)
-  .WithSeeds({ { "libcamera", "h264-hw" }, { "v4l2", "vp8" }, { "file", "h264-sw" }, { "camera", "h265" } });
+  .WithSeeds({ { "libcamera", "h264" }, { "v4l2", "vp8" }, { "file", "h264-sw" }, { "camera", "h265" } });
 
 void CocoClassNamesAreTotal(int class_id)
 {

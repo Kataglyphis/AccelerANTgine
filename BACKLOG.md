@@ -147,29 +147,16 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Ask the owner before touching `reconnection_timeout_ms`: reconnect with a backoff, or write "exit 1 and let the
   service manager restart" in the docs and delete the field.
 
-- [ ] **Stream settings that do nothing, and config mistakes that fall back to defaults** (M, ★★).
-  The WebRTC pipeline text never uses `bitrate_kbps`, `turn_servers`, `peer_id` or `producer_id`, and both H.264
-  encoder choices give the same text (`Src/webrtc_streamer.cpp:252-290`); `set_bitrate` only stores its number
-  (`:657-662`) behind the CLI's `--bitrate`. `initialize` accepts a host that has `webrtcbin` alone, while every
-  pipeline names `webrtcsink` (`:447-462`). A `--config` file that fails to load is a warning and the stream starts
-  on defaults (`Src/cli_main.cpp:299-308`), and an unknown source or encoder name falls back with a warning
-  (`:184-201`); a TOML value of the wrong type keeps the default without a word (`Src/toml_config.cpp:27-48`). The
-  default STUN server is written `stun:host:port` (`Src/config_loader.cpp:78`) and the fallback `stun://`
-  (`webrtc_streamer.cpp:286`); nobody ran the first form.
-  Never read: `DetectionResult::class_confidences`, `VideoDetectionConfig::output_path`,
-  `PipelineConfig::timeout_ms`, and the leftover members at `Src/gstreamer_pipeline.cpp:192-205` and `:305-308`.
-
-  First: export `webrtc_pipeline_description(const StreamConfig&)` like the other builders, then wire or delete each
-  `StreamConfig` field; a named `--config` that does not load exits 2 with the reason.
-  Done when a table test `EveryStreamSettingChangesThePipelineText` holds every field, with a structured binding of
-  the exact field count beside it, and a ctest `Cli.ABrokenConfigFileFails` passes.
-  Ask the owner before: (1) changing a fall-back that a named test pins
-  (`TomlConfig.WrongTypesFallBackToTheDefaults`, `OutOfRangeIntegersFallBackToTheDefaults`,
-  `WebRtcStreamConfig.UnknownNamesFallBackToTheArguments`). Proposed: TOML reports a wrong type and keeps ignoring
-  unknown keys, as the JSON loader does, and the tests flip in the same commit. (2) Deleting the six tensor builders
-  (`Src/gstreamer_pipeline.cpp:375-398`, `:501-613`), which only tests call: hub CON185 and CON198 are still open
-  on whether the image gets their elements. On the day the elements arrive
-  `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule.
+- [ ] **Config mistakes fall back to defaults** (M, ★★). The stream settings half is done (2026-11-15):
+  `webrtc_pipeline_description(const StreamConfig&)` is exported and every field changes it (bitrate as
+  `start-bitrate`, TURN as `turn-servers`, the producer name as `meta`; `peer_id` deleted and the two H.264 choices
+  merged into `H264`, owner decisions), held by `EveryStreamSettingChangesThePipelineText` with a 14-field structured
+  binding. Left, owner decision of 2026-11-15: a TOML value of the wrong type or out of range is an error with its key
+  and reason, as the JSON loader does (unknown keys stay ignored), and `TomlConfig.WrongTypesFallBackToTheDefaults` and
+  `OutOfRangeIntegersFallBackToTheDefaults` flip in the same commit; a named `--config` that does not load exits 2
+  with the reason (ctest `Cli.ABrokenConfigFileFails`). `WebRtcStreamConfig.UnknownNamesFallBackToTheArguments`
+  stays. Never read: `DetectionResult::class_confidences`, `VideoDetectionConfig::output_path`,
+  `PipelineConfig::timeout_ms`. The six tensor builders stay until hub CON185/CON198 decide (owner).
 
 - [ ] **The Python surface lags the C++ structs, and nothing fails when a field is added** (M, ★★).
   `YoloConfig` has 13 fields (`Src/yolo_detector.ixx:76-93`) and the bindings expose nine

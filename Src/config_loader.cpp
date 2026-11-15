@@ -86,7 +86,8 @@ namespace {
 auto get_default_webrtc_config() -> WebRTCConfig
 {
     WebRTCConfig config;
-    config.stun_servers.emplace_back("stun:stun.l.google.com:19302");
+    // The form webrtcsink parses, as the streamer's own fallback writes it.
+    config.stun_servers.emplace_back("stun://stun.l.google.com:19302");
     return config;
 }
 
@@ -140,7 +141,6 @@ auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRT
               assign_optional_string(stream, "cameraId", config.stream.camera_id),
               assign_optional_string(stream, "inputPath", config.stream.input_path),
               assign_optional_string(stream, "inputUri", config.stream.input_uri),
-              assign_optional_string(stream, "peerId", config.stream.peer_id),
               assign_optional_string(stream, "producerId", config.stream.producer_id),
             });
         }),

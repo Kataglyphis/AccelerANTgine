@@ -205,7 +205,7 @@ TEST(CppApiContract, ConfigurationDefaults)
 
     const webrtc::StreamConfig stream;
     EXPECT_EQ(stream.source, webrtc::VideoSource::Libcamera);
-    EXPECT_EQ(stream.encoder, webrtc::VideoEncoder::H264_Hardware);
+    EXPECT_EQ(stream.encoder, webrtc::VideoEncoder::H264);
     EXPECT_EQ(stream.signalling_server_uri, "ws://127.0.0.1:8443");
     EXPECT_EQ(stream.width, 1280U);
     EXPECT_EQ(stream.height, 720U);

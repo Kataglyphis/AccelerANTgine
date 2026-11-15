@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -61,7 +62,6 @@ TEST(WebRtcStreamConfig, CopiesEveryFieldFromTheSettings)
     settings.stream.camera_id = "imx219";
     settings.stream.input_path = "/clips/a.mp4";
     settings.stream.input_uri = "rtsp://cam/stream";
-    settings.stream.peer_id = "peer";
     settings.stream.producer_id = "producer";
     settings.stun_servers = { "stun:a", "stun:b" };
     settings.turn_servers = { "turn:c" };
@@ -78,10 +78,112 @@ TEST(WebRtcStreamConfig, CopiesEveryFieldFromTheSettings)
     EXPECT_EQ(config.camera_id, "imx219");
     EXPECT_EQ(config.input_path, "/clips/a.mp4");
     EXPECT_EQ(config.input_uri, "rtsp://cam/stream");
-    EXPECT_EQ(config.peer_id, "peer");
     EXPECT_EQ(config.producer_id, "producer");
     EXPECT_EQ(config.stun_servers, (std::vector<std::string>{ "stun:a", "stun:b" }));
     EXPECT_EQ(config.turn_servers, (std::vector<std::string>{ "turn:c" }));
+}
+
+// A field the pipeline text ignores is a setting that does nothing, as bitrate, TURN and the producer name once were.
+TEST(WebRtcStreamConfig, EveryStreamSettingChangesThePipelineText)
+{
+    // Stops compiling when StreamConfig gains a field, so the table below grows with it.
+    [[maybe_unused]] const auto &[source,
+      encoder,
+      signalling,
+      producer,
+      width,
+      height,
+      framerate,
+      bitrate,
+      camera,
+      device,
+      path,
+      uri,
+      stun,
+      turn] = webrtc::StreamConfig{};
+    using Change = void (*)(webrtc::StreamConfig &);
+    const std::initializer_list<std::tuple<std::string_view, webrtc::VideoSource, Change>> rows{
+        {
+          "source",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.source = webrtc::VideoSource::TestPattern; },
+        },
+        {
+          "encoder",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.encoder = webrtc::VideoEncoder::VP8; },
+        },
+        {
+          "signalling_server_uri",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.signalling_server_uri = "wss://elsewhere/ws"; },
+        },
+        {
+          "producer_id",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.producer_id = "garden cam"; },
+        },
+        {
+          "width",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.width /= 2; },
+        },
+        {
+          "height",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.height /= 2; },
+        },
+        {
+          "framerate",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.framerate /= 2; },
+        },
+        {
+          "bitrate_kbps",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.bitrate_kbps /= 4; },
+        },
+        {
+          "camera_id",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.camera_id = "imx708"; },
+        },
+        {
+          "v4l2_device",
+          webrtc::VideoSource::V4L2,
+          [](auto &config) -> void { config.v4l2_device = "/dev/video9"; },
+        },
+        {
+          "input_path",
+          webrtc::VideoSource::File,
+          [](auto &config) -> void { config.input_path = "/clips/b.mp4"; },
+        },
+        {
+          "input_uri",
+          webrtc::VideoSource::Uri,
+          [](auto &config) -> void { config.input_uri = "rtsp://cam/2"; },
+        },
+        {
+          "stun_servers",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.stun_servers = { "stun://stun.example:3478" }; },
+        },
+        {
+          "turn_servers",
+          webrtc::VideoSource::Libcamera,
+          [](auto &config) -> void { config.turn_servers = { "turn://user:secret@turn.example:3478" }; },
+        },
+    };
+    EXPECT_EQ(rows.size(), 14U) << "one row per StreamConfig field";
+    for (const auto &[field, kind, change] : rows) {
+        webrtc::StreamConfig base;
+        base.source = kind;
+        base.input_path = "/clips/a.mp4";
+        base.input_uri = "rtsp://cam/1";
+        auto changed = base;
+        change(changed);
+        EXPECT_NE(webrtc::webrtc_pipeline_description(base), webrtc::webrtc_pipeline_description(changed)) << field;
+    }
 }
 
 TEST(WebRtcStreamConfig, SourceNamesMapToTheirSources)
@@ -104,8 +206,10 @@ TEST(WebRtcStreamConfig, SourceNamesMapToTheirSources)
 TEST(WebRtcStreamConfig, EncoderNamesMapToTheirEncoders)
 {
     const std::initializer_list<std::pair<std::string_view, webrtc::VideoEncoder>> names{
-        { "h264-hw", webrtc::VideoEncoder::H264_Hardware },
-        { "h264-sw", webrtc::VideoEncoder::H264_Software },
+        { "h264", webrtc::VideoEncoder::H264 },
+        // The names of the two H.264 choices webrtcsink never told apart.
+        { "h264-hw", webrtc::VideoEncoder::H264 },
+        { "h264-sw", webrtc::VideoEncoder::H264 },
         { "vp8", webrtc::VideoEncoder::VP8 },
         { "vp9", webrtc::VideoEncoder::VP9 },
     };
@@ -136,19 +240,19 @@ TEST(WebRtcStreamConfig, OverrideModeIgnoresTheSettingsNames)
     settings.stream.encoder = "vp9";
     const auto config = webrtc::create_stream_config_from_webrtc_config(settings,
       webrtc::VideoSource::Uri,
-      webrtc::VideoEncoder::H264_Software,
+      webrtc::VideoEncoder::H264,
       webrtc::ConfigOverrideMode::Override,
       webrtc::ConfigOverrideMode::Override);
     EXPECT_EQ(config.source, webrtc::VideoSource::Uri);
-    EXPECT_EQ(config.encoder, webrtc::VideoEncoder::H264_Software);
+    EXPECT_EQ(config.encoder, webrtc::VideoEncoder::H264);
 
     const auto mixed = webrtc::create_stream_config_from_webrtc_config(settings,
       webrtc::VideoSource::Uri,
-      webrtc::VideoEncoder::H264_Software,
+      webrtc::VideoEncoder::H264,
       webrtc::ConfigOverrideMode::UseConfig,
       webrtc::ConfigOverrideMode::Override);
     EXPECT_EQ(mixed.source, webrtc::VideoSource::V4L2);
-    EXPECT_EQ(mixed.encoder, webrtc::VideoEncoder::H264_Software);
+    EXPECT_EQ(mixed.encoder, webrtc::VideoEncoder::H264);
 }
 
 TEST(WebRtcStreamer, AnUnconfiguredStreamerRefusesToRun)
@@ -197,13 +301,15 @@ TEST(WebRtcStreamer, ConfiguresATestPatternStream)
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "videoconvert", "webrtcsink");
     auto config = test_pattern_config();
     config.producer_id = "kataglyphis-test";
+    // The array and structure syntax webrtcsink parses: gst_parse_launch refuses a wrong one here.
+    config.turn_servers = { "turn://user:secret@turn.example:3478", "turn://other.example:3478" };
     webrtc::WebRTCStreamer streamer;
     ASSERT_TRUE(streamer.configure(config).has_value());
     EXPECT_EQ(streamer.get_producer_id(), "kataglyphis-test");
     EXPECT_EQ(streamer.get_state(), webrtc::StreamState::Idle);
     // Configuring again replaces the pipeline and keeps the streamer usable.
     config.producer_id.clear();
-    config.encoder = webrtc::VideoEncoder::H264_Software;
+    config.encoder = webrtc::VideoEncoder::H264;
     ASSERT_TRUE(streamer.configure(config).has_value());
     EXPECT_TRUE(streamer.get_producer_id().starts_with("stream-"));
     EXPECT_TRUE(streamer.stop().has_value());

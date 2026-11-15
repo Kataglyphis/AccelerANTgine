@@ -41,12 +41,11 @@ struct AndroidConfig
 struct StreamSettingsConfig
 {
     std::string source{ "libcamera" };
-    std::string encoder{ "h264-hw" };
+    std::string encoder{ "h264" };
     std::string device{ "/dev/video0" };
     std::string camera_id;
     std::string input_path;
     std::string input_uri;
-    std::string peer_id;
     std::string producer_id;
 };
 

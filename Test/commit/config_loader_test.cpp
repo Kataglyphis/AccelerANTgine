@@ -28,7 +28,6 @@ constexpr std::string_view kFullSettings = R"({
     "cameraId": "imx708",
     "inputPath": "/tmp/clip.mp4",
     "inputUri": "rtsp://camera.example/stream",
-    "peerId": "peer-1",
     "producerId": "producer-7"
   }
 })";
@@ -42,7 +41,7 @@ TEST(WebRtcConfig, DefaultsPointAtALocalSignallingServer)
     const auto config = cfg::get_default_webrtc_config();
     EXPECT_EQ(config.signaling_server_url, "ws://127.0.0.1:8443");
     EXPECT_EQ(config.reconnection_timeout_ms, 5000U);
-    EXPECT_EQ(config.stun_servers, (std::vector<std::string>{ "stun:stun.l.google.com:19302" }));
+    EXPECT_EQ(config.stun_servers, (std::vector<std::string>{ "stun://stun.l.google.com:19302" }));
     EXPECT_TRUE(config.turn_servers.empty());
     EXPECT_EQ(config.video.default_width, 1280U);
     EXPECT_EQ(config.video.default_height, 720U);
@@ -54,7 +53,7 @@ TEST(WebRtcConfig, DefaultsPointAtALocalSignallingServer)
     EXPECT_EQ(config.android.height, 240U);
     EXPECT_EQ(config.android.fps, 15U);
     EXPECT_EQ(config.stream.source, "libcamera");
-    EXPECT_EQ(config.stream.encoder, "h264-hw");
+    EXPECT_EQ(config.stream.encoder, "h264");
     EXPECT_EQ(config.stream.device, "/dev/video0");
     EXPECT_TRUE(config.stream.camera_id.empty());
     EXPECT_TRUE(config.stream.producer_id.empty());
@@ -93,7 +92,6 @@ TEST(WebRtcConfig, ParsesEveryField)
     EXPECT_EQ(config->stream.camera_id, "imx708");
     EXPECT_EQ(config->stream.input_path, "/tmp/clip.mp4");
     EXPECT_EQ(config->stream.input_uri, "rtsp://camera.example/stream");
-    EXPECT_EQ(config->stream.peer_id, "peer-1");
     EXPECT_EQ(config->stream.producer_id, "producer-7");
 }
 
@@ -104,7 +102,7 @@ TEST(WebRtcConfig, PartialSectionsOnlyOverrideWhatTheyName)
     EXPECT_EQ(config->video.default_framerate, 15U);
     EXPECT_EQ(config->video.default_width, 1280U);
     EXPECT_EQ(config->stream.source, "test");
-    EXPECT_EQ(config->stream.encoder, "h264-hw");
+    EXPECT_EQ(config->stream.encoder, "h264");
 }
 
 TEST(WebRtcConfig, UnknownKeysAreIgnored)

@@ -32,7 +32,7 @@ ABSL_FLAG(std::string, input_uri, "", "Media URI for --source uri");
 ABSL_FLAG(std::uint32_t, width, 0, "Video width in pixels (0 = use config default)");
 ABSL_FLAG(std::uint32_t, height, 0, "Video height in pixels (0 = use config default)");
 ABSL_FLAG(std::uint32_t, fps, 0, "Framerate (0 = use config default)");
-ABSL_FLAG(std::string, encoder, "h264-hw", "Encoder: h264-hw, h264-sw, vp8, vp9");
+ABSL_FLAG(std::string, encoder, "h264", "Encoder: h264 (webrtcsink picks a hardware one where it can), vp8, vp9");
 ABSL_FLAG(std::uint32_t, bitrate, 0, "Bitrate in kbps (0 = use config default)");
 ABSL_FLAG(std::string,
   log_level,
@@ -194,11 +194,13 @@ auto parse_video_source(std::string_view name) -> kataglyphis::webrtc::VideoSour
 
 auto parse_video_encoder(std::string_view name) -> kataglyphis::webrtc::VideoEncoder
 {
-    if (name == "h264-sw") { return kataglyphis::webrtc::VideoEncoder::H264_Software; }
     if (name == "vp8") { return kataglyphis::webrtc::VideoEncoder::VP8; }
     if (name == "vp9") { return kataglyphis::webrtc::VideoEncoder::VP9; }
-    if (name != "h264-hw") { kataglyphis::log::warning("unknown encoder '{}', falling back to h264-hw", name); }
-    return kataglyphis::webrtc::VideoEncoder::H264_Hardware;
+    // h264-hw and h264-sw gave one pipeline, as webrtcsink picks the encoder; the old names still read.
+    if (name != "h264" && name != "h264-hw" && name != "h264-sw") {
+        kataglyphis::log::warning("unknown encoder '{}', falling back to h264", name);
+    }
+    return kataglyphis::webrtc::VideoEncoder::H264;
 }
 
 auto state_to_string(kataglyphis::webrtc::StreamState state) -> const char *

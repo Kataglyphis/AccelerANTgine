@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-15, every WebRTC stream setting reaches the pipeline)
+- `webrtc_pipeline_description(const StreamConfig&)` is exported, and every `StreamConfig` field changes its text:
+  `bitrate_kbps` is webrtcsink's `start-bitrate`, `turn_servers` its `turn-servers` array, `producer_id` its `meta`
+  name. `peer_id`, which webrtcsink has no use for, is deleted from `StreamConfig`, the config loader's
+  `StreamSettingsConfig` (`peerId`) and the Python binding. `VideoEncoder::H264_Hardware` and `H264_Software`, which
+  gave the same pipeline because webrtcsink picks the encoder by rank, are one `H264`; the CLI and config name is
+  `h264`, and `h264-hw` and `h264-sw` still read (owner decisions). The default STUN server is written `stun://`, the
+  form webrtcsink parses. Test `WebRtcStreamConfig.EveryStreamSettingChangesThePipelineText` with a structured
+  binding of StreamConfig's 14 fields; `ConfiguresATestPatternStream` parses a TURN array and a producer name.
+
 ### Fixed (2026-11-15, a callback that stops its own stream no longer hangs)
 - `GStreamerPipeline::stop()` and `create_pipeline()` called from inside the buffer callback waited for that callback
   forever (it holds `callback_mutex`); they now refuse with one log line and `StateChangeFailed`. `request_stop()`,

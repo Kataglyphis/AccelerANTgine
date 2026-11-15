@@ -360,7 +360,6 @@ void bind_config(nb::module_ &m)
       .def_rw("camera_id", &StreamSettingsConfig::camera_id, nb::lock_self())
       .def_rw("input_path", &StreamSettingsConfig::input_path, nb::lock_self())
       .def_rw("input_uri", &StreamSettingsConfig::input_uri, nb::lock_self())
-      .def_rw("peer_id", &StreamSettingsConfig::peer_id, nb::lock_self())
       .def_rw("producer_id", &StreamSettingsConfig::producer_id, nb::lock_self());
 
     nb::class_<WebRTCConfig>(m, "WebRTCConfig")

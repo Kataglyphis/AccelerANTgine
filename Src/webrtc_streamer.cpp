@@ -106,8 +106,8 @@ namespace {
 
     auto parse_configured_encoder(const std::string &name, VideoEncoder fallback) -> VideoEncoder
     {
-        if (name == "h264-hw") { return VideoEncoder::H264_Hardware; }
-        if (name == "h264-sw") { return VideoEncoder::H264_Software; }
+        // h264-hw and h264-sw were one pipeline already, as webrtcsink picks the encoder; the old names still read.
+        if (name == "h264" || name == "h264-hw" || name == "h264-sw") { return VideoEncoder::H264; }
         if (name == "vp8") { return VideoEncoder::VP8; }
         if (name == "vp9") { return VideoEncoder::VP9; }
         return fallback;
@@ -124,7 +124,98 @@ namespace {
 
         return streamer;
     }
+
+    auto raw_video_caps(const StreamConfig &config) -> std::string
+    {
+        std::ostringstream ss;
+        ss << "video/x-raw,width=" << config.width << ",height=" << config.height << ",framerate=" << config.framerate
+           << "/1";
+        return ss.str();
+    }
+
+    auto source_elements(const StreamConfig &config) -> std::string
+    {
+        std::ostringstream ss;
+        const auto raw_caps = raw_video_caps(config);
+        switch (config.source) {
+        case VideoSource::Libcamera:
+            // libcamerasrc for Raspberry Pi cameras
+            ss << "libcamerasrc";
+            if (!config.camera_id.empty()) { ss << " camera-name=" << quote_pipeline_value(config.camera_id); }
+            ss << " ! " << raw_caps;
+            break;
+
+        case VideoSource::V4L2:
+            ss << "v4l2src device=" << quote_pipeline_value(config.v4l2_device) << " ! " << raw_caps;
+            break;
+
+        case VideoSource::TestPattern:
+            ss << "videotestsrc is-live=true pattern=ball ! " << raw_caps;
+            break;
+
+        case VideoSource::File: {
+            const auto uri = to_file_uri(config.input_path);
+            if (uri.empty()) { return {}; }
+
+            ss << "uridecodebin name=src uri=" << quote_pipeline_value(uri)
+               << " src. ! queue ! videoconvert ! videoscale ! videorate ! " << raw_caps;
+            break;
+        }
+
+        case VideoSource::Uri:
+            ss << "uridecodebin name=src uri=" << quote_pipeline_value(config.input_uri)
+               << " src. ! queue ! videoconvert ! videoscale ! videorate ! " << raw_caps;
+            break;
+        }
+
+        return ss.str();
+    }
+
+
+    // A GstValueArray of strings as gst-launch writes it, <"a","b">, which the caller quotes as one value.
+    auto value_array(const std::vector<std::string> &values) -> std::string
+    {
+        std::string array = "<";
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            if (i > 0) { array += ','; }
+            array += quote_pipeline_value(values[i]);
+        }
+        return array + ">";
+    }
+
 }// namespace
+
+auto webrtc_pipeline_description(const StreamConfig &config) -> std::string
+{
+    std::ostringstream ss;
+    // webrtcsink encodes, payloads and signals itself; every property below comes from a StreamConfig field.
+    ss << source_elements(config)
+       << " ! videoconvert ! webrtcsink name=ws signaller::uri=" << quote_pipeline_value(config.signalling_server_uri);
+    switch (config.encoder) {
+    case VideoEncoder::H264:
+        ss << " video-caps=\"video/x-h264\"";
+        break;
+    case VideoEncoder::VP8:
+        ss << " video-caps=\"video/x-vp8\"";
+        break;
+    case VideoEncoder::VP9:
+        ss << " video-caps=\"video/x-vp9\"";
+        break;
+    }
+    constexpr std::uint64_t bits_per_kilobit = 1000;
+    ss << " start-bitrate=" << (std::uint64_t{ config.bitrate_kbps } * bits_per_kilobit);
+    ss << " stun-server="
+       << quote_pipeline_value(
+            config.stun_servers.empty() ? std::string{ kDefaultStunServer } : config.stun_servers.front());
+    if (!config.turn_servers.empty()) {
+        ss << " turn-servers=" << quote_pipeline_value(value_array(config.turn_servers));
+    }
+    // The name a consumer's producer list shows.
+    if (!config.producer_id.empty()) {
+        ss << " meta=" << quote_pipeline_value("meta,name=" + quote_pipeline_value(config.producer_id));
+    }
+    return ss.str();
+}
 
 struct WebRTCStreamer::Impl
 {
@@ -201,93 +292,6 @@ struct WebRTCStreamer::Impl
         std::string full_message = error_to_string(error);
         if (!message.empty()) { full_message += ": " + message; }
         error_callback(error, full_message);
-    }
-
-    auto build_raw_video_caps() const -> std::string
-    {
-        std::ostringstream ss;
-        ss << "video/x-raw,width=" << config.width << ",height=" << config.height << ",framerate=" << config.framerate
-           << "/1";
-        return ss.str();
-    }
-
-    auto build_source_element() const -> std::string
-    {
-        std::ostringstream ss;
-        const auto raw_caps = build_raw_video_caps();
-
-        switch (config.source) {
-        case VideoSource::Libcamera:
-            // libcamerasrc for Raspberry Pi cameras
-            ss << "libcamerasrc";
-            if (!config.camera_id.empty()) { ss << " camera-name=" << quote_pipeline_value(config.camera_id); }
-            ss << " ! " << raw_caps;
-            break;
-
-        case VideoSource::V4L2:
-            ss << "v4l2src device=" << quote_pipeline_value(config.v4l2_device) << " ! " << raw_caps;
-            break;
-
-        case VideoSource::TestPattern:
-            ss << "videotestsrc is-live=true pattern=ball ! " << raw_caps;
-            break;
-
-        case VideoSource::File: {
-            const auto uri = to_file_uri(config.input_path);
-            if (uri.empty()) { return {}; }
-
-            ss << "uridecodebin name=src uri=" << quote_pipeline_value(uri)
-               << " src. ! queue ! videoconvert ! videoscale ! videorate ! " << raw_caps;
-            break;
-        }
-
-        case VideoSource::Uri:
-            ss << "uridecodebin name=src uri=" << quote_pipeline_value(config.input_uri)
-               << " src. ! queue ! videoconvert ! videoscale ! videorate ! " << raw_caps;
-            break;
-        }
-
-        return ss.str();
-    }
-
-    auto build_pipeline_description() -> std::string
-    {
-        std::ostringstream ss;
-
-        // Source
-        ss << build_source_element();
-
-        // Video conversion for compatibility
-        ss << " ! videoconvert";
-
-        // webrtcsink handles encoding, payloading, and signalling automatically
-        ss << " ! webrtcsink name=ws";
-
-        // Configure signalling server URI
-        ss << " signaller::uri=" << quote_pipeline_value(config.signalling_server_uri);
-
-        // Set up video encoding based on encoder preference
-        switch (config.encoder) {
-        case VideoEncoder::H264_Hardware:
-        case VideoEncoder::H264_Software:
-            ss << " video-caps=\"video/x-h264\"";
-            break;
-        case VideoEncoder::VP8:
-            ss << " video-caps=\"video/x-vp8\"";
-            break;
-        case VideoEncoder::VP9:
-            ss << " video-caps=\"video/x-vp9\"";
-            break;
-        }
-
-        // Add STUN server
-        if (!config.stun_servers.empty()) {
-            ss << " stun-server=" << quote_pipeline_value(config.stun_servers[0]);
-        } else {
-            ss << " stun-server=" << quote_pipeline_value("stun://stun.l.google.com:19302");
-        }
-
-        return ss.str();
     }
 
     // Callback for when pipeline encounters an error
@@ -505,7 +509,9 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
     }
 
     // Build pipeline
-    std::string pipeline_desc = impl_->build_pipeline_description();
+    StreamConfig described = config;
+    described.producer_id = impl_->producer_id;
+    std::string pipeline_desc = webrtc_pipeline_description(described);
     log::debug("Pipeline: {}", pipeline_desc);
 
     GError *error = nullptr;
@@ -668,7 +674,7 @@ auto create_libcamera_webrtc_stream(const std::string &signalling_server,
 {
     StreamConfig config;
     config.source = VideoSource::Libcamera;
-    config.encoder = VideoEncoder::H264_Hardware;
+    config.encoder = VideoEncoder::H264;
     config.signalling_server_uri = signalling_server;
     config.width = width;
     config.height = height;
@@ -685,7 +691,7 @@ auto create_v4l2_webrtc_stream(const std::string &signalling_server,
 {
     StreamConfig config;
     config.source = VideoSource::V4L2;
-    config.encoder = VideoEncoder::H264_Hardware;
+    config.encoder = VideoEncoder::H264;
     config.signalling_server_uri = signalling_server;
     config.v4l2_device = device;
     config.width = width;
@@ -699,7 +705,7 @@ auto create_test_webrtc_stream(const std::string &signalling_server) -> std::exp
 {
     StreamConfig config;
     config.source = VideoSource::TestPattern;
-    config.encoder = VideoEncoder::H264_Software;
+    config.encoder = VideoEncoder::H264;
     config.signalling_server_uri = signalling_server;
     config.width = 1280;
     config.height = 720;
@@ -732,7 +738,6 @@ auto create_stream_config_from_webrtc_config(const config::WebRTCConfig &webrtc_
     config.v4l2_device = webrtc_config.stream.device;
     config.input_path = webrtc_config.stream.input_path;
     config.input_uri = webrtc_config.stream.input_uri;
-    config.peer_id = webrtc_config.stream.peer_id;
     config.producer_id = webrtc_config.stream.producer_id;
     config.stun_servers = webrtc_config.stun_servers;
     config.turn_servers = webrtc_config.turn_servers;

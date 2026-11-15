@@ -68,8 +68,8 @@ enum class VideoSource {
 };
 
 enum class VideoEncoder {
-    H264_Software,// x264enc
-    H264_Hardware,// v4l2h264enc (Pi hardware encoder)
+    // webrtcsink picks the H.264 encoder by rank, a hardware one where the host has it.
+    H264,
     VP8,// vp8enc
     VP9// vp9enc
 };
@@ -77,13 +77,13 @@ enum class VideoEncoder {
 struct StreamConfig
 {
     VideoSource source{ VideoSource::Libcamera };
-    VideoEncoder encoder{ VideoEncoder::H264_Hardware };
+    VideoEncoder encoder{ VideoEncoder::H264 };
 
     std::string signalling_server_uri{ "ws://127.0.0.1:8443" };
-    std::string peer_id;// Target peer ID (empty = produce stream)
-    std::string producer_id;// Our producer ID for the stream
+    // The name consumers see in the producer list; empty generates one.
+    std::string producer_id;
 
-    // Video settings
+    // Video settings; bitrate_kbps is webrtcsink's start bitrate, which its congestion control moves from.
     std::uint32_t width{ 1280 };
     std::uint32_t height{ 720 };
     std::uint32_t framerate{ 30 };
@@ -103,6 +103,12 @@ struct StreamConfig
     std::vector<std::string> stun_servers;
     std::vector<std::string> turn_servers;
 };
+
+// The webrtcsink STUN server when the config names none.
+inline constexpr std::string_view kDefaultStunServer = "stun://stun.l.google.com:19302";
+
+// The gst-launch text a WebRTCStreamer runs for `config`: the source, conversion and webrtcsink with every setting.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto webrtc_pipeline_description(const StreamConfig &config) -> std::string;
 
 enum class StreamState { Idle, Connecting, Negotiating, Streaming, Paused, Error, Disconnected };
 
@@ -189,14 +195,14 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_stream_config_from_webrtc_config(
   const config::WebRTCConfig &webrtc_config,
   VideoSource source = VideoSource::Libcamera,
-  VideoEncoder encoder = VideoEncoder::H264_Hardware,
+  VideoEncoder encoder = VideoEncoder::H264,
   ConfigOverrideMode source_override_mode = ConfigOverrideMode::UseConfig,
   ConfigOverrideMode encoder_override_mode = ConfigOverrideMode::UseConfig) -> StreamConfig;
 
 // Load config from JSON file and create a configured WebRTCStreamer
 [[nodiscard]] KATAGLYPHIS_CPP_API auto create_webrtc_stream_from_config(const std::filesystem::path &config_path,
   VideoSource source = VideoSource::Libcamera,
-  VideoEncoder encoder = VideoEncoder::H264_Hardware,
+  VideoEncoder encoder = VideoEncoder::H264,
   ConfigOverrideMode source_override_mode = ConfigOverrideMode::UseConfig,
   ConfigOverrideMode encoder_override_mode = ConfigOverrideMode::UseConfig)
   -> std::expected<WebRTCStreamer, WebRTCError>;
