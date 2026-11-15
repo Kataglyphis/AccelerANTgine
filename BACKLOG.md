@@ -147,16 +147,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Ask the owner before touching `reconnection_timeout_ms`: reconnect with a backoff, or write "exit 1 and let the
   service manager restart" in the docs and delete the field.
 
-- [ ] **Config mistakes fall back to defaults** (M, ★★). The stream settings half is done (2026-11-15):
-  `webrtc_pipeline_description(const StreamConfig&)` is exported and every field changes it (bitrate as
-  `start-bitrate`, TURN as `turn-servers`, the producer name as `meta`; `peer_id` deleted and the two H.264 choices
-  merged into `H264`, owner decisions), held by `EveryStreamSettingChangesThePipelineText` with a 14-field structured
-  binding. Left, owner decision of 2026-11-15: a TOML value of the wrong type or out of range is an error with its key
-  and reason, as the JSON loader does (unknown keys stay ignored), and `TomlConfig.WrongTypesFallBackToTheDefaults` and
-  `OutOfRangeIntegersFallBackToTheDefaults` flip in the same commit; a named `--config` that does not load exits 2
-  with the reason (ctest `Cli.ABrokenConfigFileFails`). `WebRtcStreamConfig.UnknownNamesFallBackToTheArguments`
-  stays. Never read: `DetectionResult::class_confidences`, `VideoDetectionConfig::output_path`,
-  `PipelineConfig::timeout_ms`. The six tensor builders stay until hub CON185/CON198 decide (owner).
+- [ ] **Fields nothing reads** (S, ★). The stream settings and the config mistakes are done (2026-11-15, owner
+  decisions): every `StreamConfig` field changes the WebRTC pipeline text, a TOML value of the wrong type or out of
+  range is `InvalidValue` with its key in the log, and a named `--config` that does not load exits 2. Left, never
+  read: `DetectionResult::class_confidences`, `VideoDetectionConfig::output_path`, `PipelineConfig::timeout_ms`; wire
+  or delete each with a test. The six tensor builders stay until hub CON185/CON198 decide (owner).
 
 - [ ] **The Python surface lags the C++ structs, and nothing fails when a field is added** (M, ★★).
   `YoloConfig` has 13 fields (`Src/yolo_detector.ixx:76-93`) and the bindings expose nine

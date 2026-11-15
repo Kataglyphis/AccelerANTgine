@@ -82,15 +82,15 @@ void ParseInferenceConfigNeverCrashes(const std::string &bytes)
 FUZZ_TEST(ConfigFuzz, ParseInferenceConfigNeverCrashes)
   .WithSeeds({ { std::string(kShippedInferenceConfig) }, { "[model]\ninput_width = 320\n" }, { "" } });
 
-// An integer the uint32 fields cannot hold falls back to the default instead of wrapping.
+// An integer the uint32 fields cannot hold is InvalidValue, never a wrapped number or a silent default.
 void TomlUnsignedFieldsTakeOnlyTheirRange(std::int64_t value)
 {
     const auto config = cfg::parse_inference_config("[model]\ninput_width = " + std::to_string(value) + "\n");
-    ASSERT_TRUE(config.has_value()) << value;
     if (value >= 0 && value <= std::numeric_limits<std::uint32_t>::max()) {
+        ASSERT_TRUE(config.has_value()) << value;
         EXPECT_EQ(config->model.input_width, static_cast<std::uint64_t>(value));
     } else {
-        EXPECT_EQ(config->model.input_width, 640U) << value;
+        EXPECT_EQ(kataglyphis::test::error_of(config), cfg::ConfigError::InvalidValue) << value;
     }
 }
 FUZZ_TEST(ConfigFuzz, TomlUnsignedFieldsTakeOnlyTheirRange)

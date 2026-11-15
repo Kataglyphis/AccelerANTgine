@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-15, a config mistake is an error, not a default)
+- The TOML loader refuses a value of the wrong type and an integer its field cannot hold with `InvalidValue`, and logs
+  the key and what it should have held (`config: input_width must be a whole number from 0 to 4294967295`); a key
+  nobody reads stays ignored, as in the JSON loader (owner decision). `TomlConfig.WrongTypesFallBackToTheDefaults`,
+  `OutOfRangeIntegersFallBackToTheDefaults` and `LabelArraysKeepOnlyTheirStrings` became `AWrongTypeIsInvalidValue`
+  and `AnIntegerOutsideItsRangeIsInvalidValue`, and the fuzz property `TomlUnsignedFieldsTakeOnlyTheirRange` expects
+  the error. The CLI exits 2 with `cannot load --config <path>: <reason>` when a named `--config` does not load; it
+  streamed on defaults (ctest `Cli.ABrokenConfigFileFails`). Unknown source and encoder names still fall back.
+
 ### Changed (2026-11-15, every WebRTC stream setting reaches the pipeline)
 - `webrtc_pipeline_description(const StreamConfig&)` is exported, and every `StreamConfig` field changes its text:
   `bitrate_kbps` is webrtcsink's `start-bitrate`, `turn_servers` its `turn-servers` array, `producer_id` its `meta`

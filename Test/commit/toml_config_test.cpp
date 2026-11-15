@@ -114,47 +114,37 @@ TEST(TomlConfig, MalformedDocumentsAreParseErrors)
     }
 }
 
-TEST(TomlConfig, WrongTypesFallBackToTheDefaults)
+// A value of the wrong type is a mistake to report, as the JSON loader does (owner decision 2026-11-15).
+TEST(TomlConfig, AWrongTypeIsInvalidValue)
 {
-    const auto config = cfg::parse_inference_config(R"(
-[model]
-model_path = 5
-framework = true
-input_width = "wide"
-labels = "person"
-
-[pipeline]
-camera_device = 0
-enable_inference = "yes"
-
-[general]
-log_level = 3
-)");
-    ASSERT_TRUE(config.has_value());
-    EXPECT_TRUE(config->model.model_path.empty());
-    EXPECT_EQ(config->model.framework, "onnx");
-    EXPECT_EQ(config->model.input_width, 640U);
-    EXPECT_TRUE(config->model.labels.empty());
-    EXPECT_EQ(config->pipeline.camera_device, "0");
-    EXPECT_TRUE(config->pipeline.enable_inference);
-    EXPECT_EQ(config->log_level, "info");
+    for (const auto *wrong : {
+           "[model]\nmodel_path = 5\n",
+           "[model]\nframework = true\n",
+           "[model]\ninput_width = \"wide\"\n",
+           "[model]\nlabels = \"person\"\n",
+           "[model]\nlabels = [\"person\", 3]\n",
+           "[model]\nconfidence_threshold = \"high\"\n",
+           "[pipeline]\ncamera_device = 0\n",
+           "[pipeline]\nenable_inference = \"yes\"\n",
+           "[general]\nlog_level = 3\n",
+         }) {
+        EXPECT_EQ(kataglyphis::test::error_of(cfg::parse_inference_config(wrong)), cfg::ConfigError::InvalidValue)
+          << wrong;
+    }
+    // A key nobody reads stays ignored, as in the JSON loader.
+    EXPECT_TRUE(cfg::parse_inference_config("[model]\nnobody_reads_this = 5\n").has_value());
 }
 
-TEST(TomlConfig, LabelArraysKeepOnlyTheirStrings)
+TEST(TomlConfig, AnIntegerOutsideItsRangeIsInvalidValue)
 {
-    const auto config = cfg::parse_inference_config("[model]\nlabels = [1, \"cat\", true, \"dog\", 2.5]\n");
-    ASSERT_TRUE(config.has_value());
-    EXPECT_EQ(config->model.labels, (std::vector<std::string>{ "cat", "dog" }));
-}
-
-TEST(TomlConfig, OutOfRangeIntegersFallBackToTheDefaults)
-{
-    const auto config = cfg::parse_inference_config(
-      "[model]\ninput_width = -1\ninput_height = 4294967296\n[pipeline]\ncapture_fps = -30\n");
-    ASSERT_TRUE(config.has_value());
-    EXPECT_EQ(config->model.input_width, 640U);
-    EXPECT_EQ(config->model.input_height, 640U);
-    EXPECT_EQ(config->pipeline.capture_fps, 30U);
+    for (const auto *outside :
+      { "[model]\ninput_width = -1\n", "[model]\ninput_height = 4294967296\n", "[pipeline]\ncapture_fps = -30\n" }) {
+        EXPECT_EQ(kataglyphis::test::error_of(cfg::parse_inference_config(outside)), cfg::ConfigError::InvalidValue)
+          << outside;
+    }
+    const auto widest = cfg::parse_inference_config("[model]\ninput_width = 4294967295\n");
+    ASSERT_TRUE(widest.has_value());
+    EXPECT_EQ(widest->model.input_width, 4294967295U);
 }
 
 TEST(TomlConfig, IntegerThresholdsReadAsDoubles)

@@ -1,6 +1,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <expected>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -259,7 +260,8 @@ auto apply_log_level() -> std::optional<int>
 }
 
 // The stream the flags and the --config file describe; a flag given on the command line wins over the file.
-auto build_stream_config(const CliOverrideFlags &override_flags) -> kataglyphis::webrtc::StreamConfig
+auto build_stream_config(const CliOverrideFlags &override_flags)
+  -> std::expected<kataglyphis::webrtc::StreamConfig, std::string>
 {
     using kataglyphis::webrtc::ConfigOverrideMode;
     const auto source = parse_video_source(absl::GetFlag(FLAGS_source));
@@ -269,12 +271,13 @@ auto build_stream_config(const CliOverrideFlags &override_flags) -> kataglyphis:
     auto webrtc_config = kataglyphis::config::get_default_webrtc_config();
     if (const std::string path = absl::GetFlag(FLAGS_config); !path.empty()) {
         kataglyphis::log::info("Loading configuration from: {}", path);
-        if (auto result = kataglyphis::config::load_webrtc_config(path)) {
-            webrtc_config = *result;
-            kataglyphis::log::info("Configuration loaded successfully");
-        } else {
-            kataglyphis::log::warning("Failed to load config file, using defaults");
+        auto result = kataglyphis::config::load_webrtc_config(path);
+        // A file the user named and that does not load must not stream on defaults instead.
+        if (!result) {
+            return std::unexpected(
+              "cannot load --config " + path + ": " + std::string(kataglyphis::config::to_string(result.error())));
         }
+        webrtc_config = *result;
     }
     auto config = kataglyphis::webrtc::create_stream_config_from_webrtc_config(
       webrtc_config, source, encoder, source_mode, encoder_mode);
@@ -373,5 +376,10 @@ auto main(int argc, char **argv) -> int
         std::cout << "Use --help for usage information\n";
         return 0;
     }
-    return run_webrtc(&argc, &argv, build_stream_config(override_flags));
+    const auto config = build_stream_config(override_flags);
+    if (!config) {
+        std::cerr << config.error() << '\n';
+        return 2;
+    }
+    return run_webrtc(&argc, &argv, *config);
 }

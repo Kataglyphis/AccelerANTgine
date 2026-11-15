@@ -94,6 +94,17 @@ if(TARGET ${PROJECT_NAME}_cli)
   set_tests_properties(Cli.ChatFollowsAJsonSchema PROPERTIES PASS_REGULAR_EXPRESSION "^\\{\"a\":\"#\\$%\"\\}\n")
 endif()
 
+# A --config the user named and that does not load ends the run with 2 and the reason, not a stream on defaults.
+if(TARGET ${PROJECT_NAME}_cli AND UNIX)
+  # The regular expression replaces the exit status check, so the shell prints the status for it to read.
+  add_test(NAME Cli.ABrokenConfigFileFails
+           COMMAND sh -c "\"$0\" --webrtc --config /nonexistent/stream.json 2>&1; echo \"exit $?\""
+                   $<TARGET_FILE:${PROJECT_NAME}_cli>)
+  set_tests_properties(
+    Cli.ABrokenConfigFileFails PROPERTIES PASS_REGULAR_EXPRESSION
+                                          "cannot load --config /nonexistent/stream.json: FileNotFound\nexit 2")
+endif()
+
 # The CLI's stream status needs a shell and a native binary; the source is shared, so the other lanes add no proof.
 if(TARGET ${PROJECT_NAME}_cli
    AND UNIX
