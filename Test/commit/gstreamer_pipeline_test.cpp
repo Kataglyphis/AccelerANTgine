@@ -9,7 +9,9 @@
 #include <cstdlib>
 #include <future>
 #include <initializer_list>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -227,6 +229,82 @@ TEST(GStreamerPipeline, DeliversEveryFrameToTheCallback)
 
     std::scoped_lock lock(seen_mutex);
     EXPECT_EQ(timestamps, (std::vector<std::uint64_t>{ 0, frame_start_30fps(1), frame_start_30fps(2) }));
+}
+
+namespace {
+constexpr std::string_view kEndlessBlack =
+  "videotestsrc is-live=true pattern=black "
+  "! video/x-raw,format=RGBA,width=8,height=4,framerate=30/1 "
+  "! appsink name=sink sync=false";
+
+// Whether the stream ended within the stream timeout.
+auto ends_in_time(const gstreamer::GStreamerPipeline &pipeline) -> bool
+{
+    const auto deadline = std::chrono::steady_clock::now() + kataglyphis::test::kStreamTimeout;
+    while (!pipeline.has_ended() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return pipeline.has_ended();
+}
+
+// A pipeline whose first frame's callback tries stop() and create_pipeline(), then asks to stop; true per refusal.
+auto stopped_from_its_first_frame(gstreamer::GStreamerPipeline &pipeline, EventCounter &frames)
+  -> std::future<std::pair<bool, bool>>
+{
+    const auto refused = std::make_shared<std::promise<std::pair<bool, bool>>>();
+    pipeline.set_buffer_callback([&pipeline, &frames, refused](const gstreamer::BufferInfo &) -> void {
+        if (frames.count() == 0) {
+            const bool stop_refused = !pipeline.stop().has_value();
+            const bool create_refused = !pipeline.create_pipeline_from_string("fakesrc ! fakesink").has_value();
+            pipeline.request_stop();
+            refused->set_value({ stop_refused, create_refused });
+        }
+        frames.add();
+    });
+    return refused->get_future();
+}
+
+// The endless source, started with that callback; nullopt when it could not start.
+auto start_stopping_itself(gstreamer::GStreamerPipeline &pipeline, EventCounter &frames)
+  -> std::optional<std::future<std::pair<bool, bool>>>
+{
+    if (!pipeline.create_pipeline_from_string(std::string(kEndlessBlack)).has_value()) { return std::nullopt; }
+    auto refused = stopped_from_its_first_frame(pipeline, frames);
+    if (!pipeline.start().has_value()) { return std::nullopt; }
+    return refused;
+}
+
+auto has_test_source() -> bool
+{ return kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "capsfilter", "appsink" }).empty(); }
+}// namespace
+
+// stop() from inside the callback would wait for that callback forever; request_stop() ends the stream instead.
+TEST(GStreamerPipeline, StopFromInsideACallbackIsRefusedAndRequestStopEndsTheStream)
+{
+    if (!has_test_source()) { GTEST_SKIP() << "the test source is missing"; }
+    gstreamer::GStreamerPipeline pipeline;
+    EventCounter frames;
+    auto refused = start_stopping_itself(pipeline, frames);
+    if (!refused) { FAIL() << "the endless source did not start"; }
+    ASSERT_EQ(refused->wait_for(kataglyphis::test::kStreamTimeout), std::future_status::ready) << "no frame came";
+    EXPECT_EQ(refused->get(), std::make_pair(true, true));
+    EXPECT_TRUE(ends_in_time(pipeline) && !pipeline.stream_error().has_value()) << "no clean end after request_stop()";
+    EXPECT_EQ(frames.count(), 1) << "frames after request_stop()";
+    EXPECT_TRUE(pipeline.stop().has_value());
+}
+
+// From the caller's thread stop() works, and the next start forgets the request.
+TEST(GStreamerPipeline, ARestartAfterRequestStopStreamsAgain)
+{
+    if (!has_test_source()) { GTEST_SKIP() << "the test source is missing"; }
+    gstreamer::GStreamerPipeline pipeline;
+    EventCounter frames;
+    const auto refused = start_stopping_itself(pipeline, frames);
+    ASSERT_TRUE(refused.has_value() && ends_in_time(pipeline));
+    ASSERT_TRUE(pipeline.stop().has_value() && pipeline.start().has_value());
+    EXPECT_TRUE(frames.wait_for(3, kataglyphis::test::kStreamTimeout));
+    EXPECT_FALSE(pipeline.has_ended());
+    EXPECT_TRUE(pipeline.stop().has_value());
 }
 
 // A pull can take the frame a callback was told about; the callback must not wait for another.

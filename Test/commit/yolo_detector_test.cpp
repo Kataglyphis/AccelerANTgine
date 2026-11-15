@@ -183,6 +183,10 @@ namespace {
 constexpr auto kSlowDetection = std::chrono::milliseconds(200);
 constexpr auto kRunLimit = std::chrono::seconds(20);
 constexpr auto kPollEvery = std::chrono::milliseconds(20);
+// The live test source's frames: small, so a run costs the model little, at a camera's 30 fps.
+constexpr std::uint32_t kLiveWidth = 64;
+constexpr std::uint32_t kLiveHeight = 48;
+constexpr std::uint32_t kLiveFps = 30;
 
 // One run of a pipeline on `description` whose detection callback takes kSlowDetection for the first `slow` frames.
 auto run_slowly(const std::string &description, const TempFile &model, int slow) -> detection::VideoDetectionStats
@@ -216,8 +220,10 @@ TEST(YoloDetector, ASlowDetectorSeesTheNewestFrame)
     }
     const TempFile model("slow detector", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
     // A live camera keeps running while the detector sleeps: the leaky queue drops what it made meanwhile.
-    const auto live =
-      run_slowly("videotestsrc is-live=true ! " + detection::camera_detection_pipeline_tail(64, 48, 30), model, 5);
+    const auto live = run_slowly(
+      "videotestsrc is-live=true ! " + detection::camera_detection_pipeline_tail(kLiveWidth, kLiveHeight, kLiveFps),
+      model,
+      5);
     EXPECT_GE(live.frames, 8U);
     EXPECT_GT(live.dropped, 0U) << "five 200 ms detections at 30 fps leave gaps of several frames";
     EXPECT_EQ(live.errors, 0U);
@@ -229,6 +235,39 @@ TEST(YoloDetector, ASlowDetectorSeesTheNewestFrame)
       5);
     EXPECT_EQ(file.frames, 12U);
     EXPECT_EQ(file.dropped, 0U);
+}
+
+// The detection callback runs on the streaming thread: stop() there is refused, request_stop() ends the stream.
+TEST(YoloDetector, StopFromInsideACallbackIsRefusedAndRequestStopEndsTheStream)
+{
+    ASSERT_TRUE(gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+    if (!kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "queue", "videoconvert" }).empty()) {
+        GTEST_SKIP() << "the test source or the converters are missing";
+    }
+    const TempFile model("stop from a callback", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    detection::VideoDetectionConfig config;
+    config.yolo_config = two_class_config(model);
+    config.gstreamer_config.pipeline_description =
+      "videotestsrc is-live=true ! " + detection::camera_detection_pipeline_tail(kLiveWidth, kLiveHeight, kLiveFps);
+    detection::VideoDetectorPipeline pipeline;
+    ASSERT_TRUE(pipeline.initialize(config).has_value());
+    std::atomic<int> detections{ 0 };
+    std::atomic<bool> stop_refused{ false };
+    pipeline.set_detection_callback([&](const detection::DetectionResult &, const gstreamer::BufferInfo &) -> void {
+        if (detections.fetch_add(1) == 0) {
+            stop_refused.store(!pipeline.stop().has_value());
+            pipeline.request_stop();
+        }
+    });
+    ASSERT_TRUE(pipeline.start().has_value());
+    const auto deadline = std::chrono::steady_clock::now() + kRunLimit;
+    while (!pipeline.has_ended() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(kPollEvery);
+    }
+    EXPECT_TRUE(pipeline.has_ended()) << "request_stop() did not end the stream";
+    EXPECT_TRUE(stop_refused.load()) << "stop() from the detection callback was not refused";
+    EXPECT_EQ(detections.load(), 1);
+    EXPECT_TRUE(pipeline.stop().has_value());
 }
 
 TEST(YoloDetector, DetectBeforeInitializeFails)

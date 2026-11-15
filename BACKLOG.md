@@ -117,23 +117,14 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Ask the owner before producing or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four
   `GStreamerError`, `OnnxError::MemoryAllocationError`).
 
-- [ ] **A callback that stops its own stream hangs, or ends the process** (M, ★★). Read from the lock order, not
-  run. `on_new_sample` calls the buffer callback under `callback_mutex` (`Src/gstreamer_pipeline.cpp:297-298`) and
-  `stop()` waits on that mutex (`:421`), so `stop()` from a frame, detection or error callback never returns.
-  `WebRTCStreamer` calls its state and error callbacks under its lock on the loop thread
-  (`Src/webrtc_streamer.cpp:184-203`) and `stop()` joins that thread (`:604`): a thread that joins itself throws,
-  and `-fno-exceptions` makes that the end of the process. Nobody does it today: demo and CLI stop from the main
-  thread, and Python binds none of the three classes. Only the text generator states its rule
-  (`Src/text_generation.ixx:88`).
-
-  First: one comment line at each `set_*_callback` and a sentence in `docs/source/inference_preprocessing.rst`, which
-  says only where callbacks run. Then remember the callback's thread and refuse `stop()` and `create_pipeline()` from
-  it with one log line, and add `request_stop()`, an atomic flag that makes `on_new_sample` return `GST_FLOW_EOS`, so
-  `has_ended()` reports the end. `WebRTCStreamer` gets its `request_stop()` with its bus rework (the entry on its
-  older copies).
-  Done when `StopFromInsideACallbackIsRefusedAndRequestStopEndsTheStream` passes per class, on the TSan lane too, and
-  the ctest call in `ci-build-and-test.sh` passes `--timeout 300`: only two tests set `TIMEOUT` today
-  (`Test/commit/CMakeLists.txt:91`, `:134`), so a hang ends late, at ctest's default limit.
+- [ ] **`WebRTCStreamer` ends the process when a callback stops it** (M, ★★). Read from the lock order, not run:
+  it calls its state and error callbacks under its lock on the loop thread (`Src/webrtc_streamer.cpp`), and `stop()`
+  joins that thread: a thread that joins itself throws, and `-fno-exceptions` makes that the end of the process.
+  Nobody does it today, and Python binds none of the classes. `GStreamerPipeline` and `VideoDetectorPipeline` are done
+  (2026-11-15): `stop()` and `create_pipeline()` from inside a callback are refused with one log line, `request_stop()`
+  ends the stream after the current frame, and CI's ctest runs with `--timeout 300`. Next: `WebRTCStreamer` refuses
+  `stop()` from its loop thread and gets `request_stop()`, with its bus rework (the entry on its older copies); done
+  when its `StopFromInsideACallbackIsRefusedAndRequestStopEndsTheStream` passes, on the TSan lane too.
 
 - [ ] **`WebRTCStreamer` keeps older copies of code that `GStreamerPipeline` has since improved** (L, ★★). Each
   file owns its own "GStreamer is initialised" flag and its own `gst_deinit` (`Src/webrtc_streamer.cpp:33-35`,

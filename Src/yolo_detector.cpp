@@ -773,6 +773,8 @@ struct VideoDetectorPipeline::Impl
     }
 };
 
+auto VideoDetectorPipeline::request_stop() -> void { impl_->pipeline.request_stop(); }
+
 auto VideoDetectorPipeline::stats() const -> VideoDetectionStats { return impl_->streaming.counter.snapshot(); }
 
 VideoDetectorPipeline::VideoDetectorPipeline() : impl_(std::make_unique<Impl>()) {}

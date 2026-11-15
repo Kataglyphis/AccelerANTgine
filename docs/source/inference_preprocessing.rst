@@ -115,7 +115,9 @@ The Python bindings export the new error names and report failed operations as e
 
 For asynchronous video, register ``VideoDetectorPipeline::set_error_callback`` to receive
 failed-frame errors and inspect ``last_error()`` for the most recent failure. Callbacks run on
-the streaming thread. ``start()`` clears the stored error; subsequent successful frames do not.
+the streaming thread, one frame at a time, so ``stop()`` from inside one would wait for itself: it is
+refused with a log line there, and ``request_stop()`` ends the stream after the current frame instead,
+after which ``has_ended()`` is true. ``start()`` clears the stored error; subsequent successful frames do not.
 Without a callback, a changed error is printed to stderr instead of being silently discarded.
 
 Validation

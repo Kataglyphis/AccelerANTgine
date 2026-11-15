@@ -121,8 +121,12 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
       const std::string &output_format = "RAW") -> std::expected<void, GStreamerError>;
 
     [[nodiscard]] auto start() -> std::expected<void, GStreamerError>;
+    // Refused from inside the buffer callback, which it would wait for forever: call request_stop() there.
     [[nodiscard]] auto stop() -> std::expected<void, GStreamerError>;
     [[nodiscard]] auto pause() -> std::expected<void, GStreamerError>;
+
+    // Safe from any thread, the buffer callback included: the stream ends after the current frame, has_ended() says so.
+    auto request_stop() -> void;
 
     [[nodiscard]] auto is_playing() const -> bool;
 
@@ -132,6 +136,7 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     // What the first failing element reported, such as a camera that was unplugged or a device that is busy.
     [[nodiscard]] auto stream_error() const -> std::optional<std::string>;
 
+    // The callback runs on GStreamer's streaming thread; stop() and create_pipeline() are refused from inside it.
     auto set_buffer_callback(BufferCallback callback) -> void;
 
     [[nodiscard]] auto pull_sample(std::uint32_t timeout_ms = 5000) -> std::expected<BufferInfo, GStreamerError>;

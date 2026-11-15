@@ -172,8 +172,15 @@ struct GStreamerPipeline::Impl
     std::mutex callback_mutex;
     std::atomic<bool> is_playing{ false };
     std::atomic<bool> is_paused{ false };
-    std::atomic<bool> ended{ false };
-    std::atomic<bool> failed{ false };
+    // How the stream stands, written by the bus, the streaming thread and request_stop(), read from any thread.
+    struct Stream
+    {
+        std::atomic<bool> ended{ false };
+        std::atomic<bool> failed{ false };
+        std::atomic<bool> stop_requested{ false };
+        // The thread inside the buffer callback, so stop() refuses there instead of waiting for itself.
+        std::atomic<std::thread::id> callback_thread;
+    } stream;
     std::mutex error_mutex;
     std::string stream_error;
 
@@ -230,27 +237,36 @@ struct GStreamerPipeline::Impl
     {
         std::scoped_lock lock(error_mutex);
         stream_error.clear();
-        failed.store(false);
-        ended.store(false);
+        stream.failed.store(false);
+        stream.ended.store(false);
+        stream.stop_requested.store(false);
+    }
+
+    // stop() and create_pipeline() from inside the callback would wait on callback_mutex, which this thread holds.
+    [[nodiscard]] auto refuse_from_callback(const char *what) const -> bool
+    {
+        if (stream.callback_thread.load() != std::this_thread::get_id()) { return false; }
+        log::error("GStreamerPipeline::{} called from its own buffer callback; call request_stop() there", what);
+        return true;
     }
 
     static auto on_bus_message([[maybe_unused]] GstBus *bus, GstMessage *message, gpointer user_data) -> GstBusSyncReply
     {
         auto *self = static_cast<Impl *>(user_data);
         if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_EOS) {
-            self->ended.store(true);
+            self->stream.ended.store(true);
         } else if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
             GError *error = nullptr;
             gst_message_parse_error(message, &error, nullptr);
             {
                 std::scoped_lock lock(self->error_mutex);
                 // The first error names the cause; the elements around it only report that the stream broke.
-                if (!self->failed.load()) {
+                if (!self->stream.failed.load()) {
                     const GstObject *source = GST_MESSAGE_SRC(message);
                     self->stream_error = source != nullptr ? std::string(GST_OBJECT_NAME(source)) + ": " : "";
                     self->stream_error += error != nullptr ? error->message : "unknown error";
                 }
-                self->failed.store(true);
+                self->stream.failed.store(true);
             }
             g_clear_error(&error);
         }
@@ -276,6 +292,8 @@ struct GStreamerPipeline::Impl
     static auto on_new_sample(GstAppSink *sink, gpointer user_data) -> GstFlowReturn
     {
         auto *self = static_cast<Impl *>(user_data);
+        // EOS upstream: the source sends its end, the bus reports it, and has_ended() turns true.
+        if (self->stream.stop_requested.load()) { return GST_FLOW_EOS; }
         // A concurrent pull_sample may have taken it; a blocking pull here would stall the streaming thread and stop().
         GstSample *sample = gst_app_sink_try_pull_sample(sink, 0);
 
@@ -283,11 +301,15 @@ struct GStreamerPipeline::Impl
             auto buffer_info = extract_buffer_info(sample);
             if (buffer_info) {
                 std::scoped_lock lock(self->callback_mutex);
-                if (self->buffer_callback) { self->buffer_callback(*buffer_info); }
+                if (self->buffer_callback) {
+                    self->stream.callback_thread.store(std::this_thread::get_id());
+                    self->buffer_callback(*buffer_info);
+                    self->stream.callback_thread.store(std::thread::id{});
+                }
             }
             gst_sample_unref(sample);
         }
-        return GST_FLOW_OK;
+        return self->stream.stop_requested.load() ? GST_FLOW_EOS : GST_FLOW_OK;
     }
 
     static auto on_pad_probe([[maybe_unused]] GstPad *pad,
@@ -337,6 +359,7 @@ auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::ex
 {
 
     if (!g_gstreamer_initialized.load()) { return std::unexpected(GStreamerError::InitializationFailed); }
+    if (impl_->refuse_from_callback("create_pipeline")) { return std::unexpected(GStreamerError::StateChangeFailed); }
 
     impl_->cleanup();
 
@@ -404,6 +427,7 @@ auto GStreamerPipeline::start() -> std::expected<void, GStreamerError>
 auto GStreamerPipeline::stop() -> std::expected<void, GStreamerError>
 {
     if (impl_->pipeline == nullptr) { return {}; }
+    if (impl_->refuse_from_callback("stop")) { return std::unexpected(GStreamerError::StateChangeFailed); }
 
     GstStateChangeReturn ret = gst_element_set_state(impl_->pipeline, GST_STATE_NULL);
     impl_->wait_for_callbacks();
@@ -427,14 +451,16 @@ auto GStreamerPipeline::pause() -> std::expected<void, GStreamerError>
     return {};
 }
 
+auto GStreamerPipeline::request_stop() -> void { impl_->stream.stop_requested.store(true); }
+
 auto GStreamerPipeline::is_playing() const -> bool { return impl_->is_playing.load() && !impl_->is_paused.load(); }
 
-auto GStreamerPipeline::has_ended() const -> bool { return impl_->ended.load() || impl_->failed.load(); }
+auto GStreamerPipeline::has_ended() const -> bool { return impl_->stream.ended.load() || impl_->stream.failed.load(); }
 
 auto GStreamerPipeline::stream_error() const -> std::optional<std::string>
 {
     std::scoped_lock lock(impl_->error_mutex);
-    if (!impl_->failed.load()) { return std::nullopt; }
+    if (!impl_->stream.failed.load()) { return std::nullopt; }
     return impl_->stream_error;
 }
 
@@ -466,10 +492,10 @@ auto GStreamerPipeline::pull_sample(std::uint32_t timeout_ms) -> std::expected<B
     if (sample == nullptr) {
         // Asked here too: the caller reads has_ended() right after this pull. A sink that never played says EOS as well.
         if (impl_->is_playing.load() && gst_app_sink_is_eos(GST_APP_SINK(impl_->appsink)) != FALSE) {
-            impl_->ended.store(true);
+            impl_->stream.ended.store(true);
         }
         return std::unexpected(
-          impl_->failed.load() ? GStreamerError::StreamError : GStreamerError::BufferAllocationFailed);
+          impl_->stream.failed.load() ? GStreamerError::StreamError : GStreamerError::BufferAllocationFailed);
     }
 
     auto buffer_info = extract_buffer_info(sample);

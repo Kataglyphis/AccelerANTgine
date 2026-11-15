@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-15, a callback that stops its own stream no longer hangs)
+- `GStreamerPipeline::stop()` and `create_pipeline()` called from inside the buffer callback waited for that callback
+  forever (it holds `callback_mutex`); they now refuse with one log line and `StateChangeFailed`. `request_stop()`,
+  on `GStreamerPipeline` and `VideoDetectorPipeline`, is safe from any thread: the next sample returns
+  `GST_FLOW_EOS`, the source ends the stream and `has_ended()` turns true; a new `start()` forgets it. The flags and
+  the callback's thread are one `Impl` member. Each `set_*_callback` says where it runs, and
+  `docs/source/inference_preprocessing.rst` says so too. Tests `StopFromInsideACallbackIsRefusedAndRequestStopEndsTheStream`
+  for both classes and `ARestartAfterRequestStopStreamsAgain`; `ci-build-and-test.sh` passes ctest `--timeout 300`, so
+  a hang ends after five minutes. clang-tidy counts per check unchanged or lower.
+
 ### Added (2026-11-15, the video pipeline counts what it does)
 - `VideoDetectorPipeline::stats()` returns `VideoDetectionStats`: frames, errors, the last inference time, the first
   and last timestamps, and `dropped`, the frames a live source made between two that reached the detector (from

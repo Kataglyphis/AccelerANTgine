@@ -194,9 +194,14 @@ class KATAGLYPHIS_CPP_API VideoDetectorPipeline
       -> std::expected<void, OnnxError>;
 
     [[nodiscard]] auto start() -> std::expected<void, gstreamer::GStreamerError>;
+    // Refused from inside a frame, detection or error callback: call request_stop() there.
     [[nodiscard]] auto stop() -> std::expected<void, gstreamer::GStreamerError>;
     [[nodiscard]] auto pause() -> std::expected<void, gstreamer::GStreamerError>;
 
+    // Safe from any thread, a callback included: the stream ends after the current frame, has_ended() says so.
+    auto request_stop() -> void;
+
+    // The three callbacks run on GStreamer's streaming thread, one frame at a time.
     auto set_detection_callback(std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> callback)
       -> void;
 

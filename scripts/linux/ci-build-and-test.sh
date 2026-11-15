@@ -72,7 +72,7 @@ ctest_with_junit() {
     ctest_run_main \
       --build-dir "$1" \
       --build-type "${BUILD_TYPE}" \
-      -- --output-junit "$2" --no-tests=error
+      -- --output-junit "$2" --no-tests=error --timeout 300
   )
 }
 ctest_with_junit "${BUILD_DIR}" "${WORKSPACE_DIR}/docs/test_results.xml"
