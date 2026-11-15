@@ -50,6 +50,9 @@ if(TARGET ${PROJECT_NAME}_demo)
                                                                 "${_golden_model}" --yolo-only --threads 3)
   add_test(NAME Golden.DemoConfigThreadsReachTheSession COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> --config
                                                                 "${_golden_config}" --yolo-only)
+  # 0 is ONNX Runtime's own default and wins over the config's count, as the perf row against it needs.
+  add_test(NAME Golden.DemoThreadsZeroAsksForOrtsDefault COMMAND $<TARGET_FILE:${PROJECT_NAME}_demo> --config
+                                                                 "${_golden_config}" --yolo-only --threads 0)
   set_tests_properties(
     Golden.DemoThreadsFlagReachesTheSession
     PROPERTIES LABELS
@@ -62,6 +65,12 @@ if(TARGET ${PROJECT_NAME}_demo)
                golden
                PASS_REGULAR_EXPRESSION
                "ORT intra-op threads: 2\n")
+  set_tests_properties(
+    Golden.DemoThreadsZeroAsksForOrtsDefault
+    PROPERTIES LABELS
+               golden
+               PASS_REGULAR_EXPRESSION
+               "ORT intra-op threads: 0\n")
   # The demo refuses an output, a repeat output or a profile that exists, and a picture that is no JPEG.
   add_test(NAME Golden.DemoKeepsExistingOutputs
            COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/linux/tests/test-demo-detector-safety.sh"

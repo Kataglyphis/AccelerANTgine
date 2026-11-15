@@ -112,11 +112,14 @@ struct InferenceResult
 
 enum class ExecutionMode { Sequential, Parallel };
 
+// The family's ORT pool: usable CPUs but one, 1 to 8 (owner decision); ORT's own default ignores the affinity mask.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto shipped_ort_threads() -> int;
+
 struct SessionConfig
 {
     std::filesystem::path model_path;
-    int intra_op_num_threads = 4;
-    int inter_op_num_threads = 4;
+    int intra_op_num_threads = shipped_ort_threads();
+    int inter_op_num_threads = shipped_ort_threads();
     bool enable_cuda = false;
     bool enable_memory_pattern = true;
     ExecutionMode execution_mode{ ExecutionMode::Sequential };

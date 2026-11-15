@@ -14,9 +14,19 @@ module;
 
 #ifndef _WIN32
 #include <dlfcn.h>
+#include <sched.h>
+#else
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #endif
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -30,6 +40,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -834,12 +845,31 @@ KATAGLYPHIS_CPP_API auto provider_available(ExecutionProvider provider) -> bool
     return available_by_name(provider_name(provider));
 }
 
+KATAGLYPHIS_CPP_API auto shipped_ort_threads() -> int
+{
+    constexpr int kMaxThreads = 8;
+    auto usable = static_cast<int>(std::thread::hardware_concurrency());
+#ifdef _WIN32
+    DWORD_PTR process_mask = 0;
+    DWORD_PTR system_mask = 0;
+    if (GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask) != 0) {
+        usable = std::popcount(static_cast<std::uint64_t>(process_mask));
+    }
+#else
+    cpu_set_t allowed;
+    CPU_ZERO(&allowed);
+    if (sched_getaffinity(0, sizeof(allowed), &allowed) == 0) { usable = CPU_COUNT(&allowed); }
+#endif
+    // A pool that fills the mask loses its tail latency to whatever else needs a CPU.
+    return std::clamp(usable - 1, 1, kMaxThreads);
+}
+
 KATAGLYPHIS_CPP_API auto create_default_session_config(const std::filesystem::path &model_path) -> SessionConfig
 {
     SessionConfig config;
     config.model_path = model_path;
-    config.intra_op_num_threads = 4;
-    config.inter_op_num_threads = 4;
+    config.intra_op_num_threads = shipped_ort_threads();
+    config.inter_op_num_threads = shipped_ort_threads();
     config.enable_cuda = false;
     config.enable_memory_pattern = true;
     config.execution_mode = ExecutionMode::Sequential;

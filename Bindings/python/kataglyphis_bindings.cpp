@@ -144,6 +144,10 @@ void bind_onnx(nb::module_ &m)
       .def_rw("execution_provider", &SessionConfig::execution_provider, nb::lock_self())
       .def_rw("device_id", &SessionConfig::device_id, nb::lock_self());
 
+    m.def("shipped_ort_threads",
+      &shipped_ort_threads,
+      "ONNX Runtime threads a new config gets: usable CPUs but one, 1 to 8.");
+
     m.def("default_session_config",
       &create_default_session_config,
       "model_path"_a,

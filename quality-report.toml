@@ -98,6 +98,12 @@ name = "detector_cpu"
 run = "build-perf/bin/AccelerANTgine_demo --model models/deim_dfine_n_coco.onnx --detector-image third_party/ModelANT/contracts/fixtures/two_cats.jpg --detector-latency-runs 30 --device cpu"
 metrics = [{ key = "p50_ms", unit = "ms", better = "lower" }, { key = "p95_ms", unit = "ms", better = "lower" }]
 
+# ONNX Runtime's own thread default beside the shipped usable-CPUs-but-one, in one run, so the rule stays weighed.
+[[perf.command]]
+name = "detector_cpu_ort_default"
+run = "build-perf/bin/AccelerANTgine_demo --model models/deim_dfine_n_coco.onnx --detector-image third_party/ModelANT/contracts/fixtures/two_cats.jpg --detector-latency-runs 30 --device cpu --threads 0"
+metrics = [{ key = "p50_ms", unit = "ms", better = "lower" }, { key = "p95_ms", unit = "ms", better = "lower" }]
+
 [[perf.command]]
 name = "detector_xnnpack"
 run = "build-perf/bin/AccelerANTgine_demo --model models/deim_dfine_n_coco.onnx --detector-image third_party/ModelANT/contracts/fixtures/two_cats.jpg --detector-latency-runs 30 --device xnnpack"

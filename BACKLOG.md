@@ -229,20 +229,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Ask the owner before letting one run lower an entry: `AGENTS.md` (section 5, the perf gate) re-records from five or more runs, and a
   lower bound adds a re-record step after every intended speed-up.
 
-- [ ] **The ORT thread default is a fixed 4 and 4, measured on no target** (S, ★★). `YoloConfig` and
-  `SessionConfig` default to 4 intra-op and 4 inter-op threads whatever the machine (`Src/yolo_detector.ixx:89-90`,
-  `Src/onnx_inference_engine.ixx:66-67`). The recorded baselines of one Ryzen host pinned to 8 CPUs, same photo and
-  model: C++ 30.27 ms, Python 24.13 ms with its default (usable CPUs minus one, at most 8) and 51.26 ms with ORT's.
-  That the thread count explains the gap is inferred, not run; nothing is measured on the Pi, where four ORT threads
-  meet four cores.
-
-  First: measure, change nothing: the demo's `--detector-latency-runs 30` with `--threads` 2, 3, 4 and 7, pinned and
-  unpinned, and on the Pi when it is quiet.
-  Done when `quality-report.toml`'s `[perf]` times the shipped default against ORT's default in one run with a ratio
-  check, as OrchestrANT's does.
-  Ask the owner, with the numbers, before replacing the literal 4: the family policy from Python, or another value
-  for a 4-core board; the inter-op 4 needs its own answer.
-
 - [ ] **Every chat turn runs the whole conversation through the model again** (M, ★★; not double-checked, not
   measured). `TextGenerator::generate` templates and encodes all messages and builds a new generator on every call
   (`Src/text_generation.cpp:519-523`), so the time to the first token should grow with the length of the chat.

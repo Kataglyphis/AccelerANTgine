@@ -359,7 +359,8 @@ static void print_usage(const char *program_name)
               << "  --device <name>    cpu, cuda, migraphx, directml, xnnpack or dnnl (default: "
               << kataglyphis::demo::default_device << ")\n"
               << "  --device-id <id>   Provider device index (default: 0)\n"
-              << "  --threads <n>      ONNX Runtime intra-op threads (default: the config's, else 4)\n"
+              << "  --threads <n>      ONNX Runtime intra-op threads, 0 for its own default (default: the config's, "
+                 "else usable CPUs but one, 1 to 8)\n"
               << "  --profile <prefix> Write an operator profile (--onnx-only or --video-check)\n"
               << "  --detector-latency-runs <n> With --detector-image: warm p50 and p95 as one JSON line\n"
               << "  --gstreamer-only   Run only GStreamer pipeline example\n"
@@ -390,7 +391,8 @@ struct DemoOptions
     std::filesystem::path detector_repeat_output;
     inference::ExecutionProvider provider{};
     int device_id = 0;
-    int threads = 0;
+    // -1 keeps the config's count; 0 asks for ONNX Runtime's own default.
+    int threads = -1;
     int detector_latency_runs = 0;
     bool run_onnx = false;
     bool run_gstreamer = false;
@@ -459,7 +461,7 @@ auto take_value(const std::vector<std::string> &args, std::size_t index, DemoOpt
     } else if (arg == "--config") {
         options.config_path = value;
     } else if (arg == "--threads") {
-        if (!take_number(value, 1, "Invalid thread count: ", options.threads)) { return 2; }
+        if (!take_number(value, 0, "Invalid thread count: ", options.threads)) { return 2; }
     } else if (arg == "--device") {
         const auto provider = kataglyphis::demo::parse_device<inference::ExecutionProvider>(value);
         if (!provider) {
@@ -525,7 +527,7 @@ auto base_config(const DemoOptions &options, const kataglyphis::config::Inferenc
     } else if (options.config_path.empty()) {
         base.model_path = kataglyphis::demo::default_model(base.model_path);
     }
-    if (options.threads > 0) { base.intra_op_num_threads = options.threads; }
+    if (options.threads >= 0) { base.intra_op_num_threads = options.threads; }
     base.execution_provider = options.provider;
     base.device_id = options.device_id;
     return base;

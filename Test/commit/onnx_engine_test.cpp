@@ -36,6 +36,7 @@
 #include <dlfcn.h>
 #include <link.h>
 #include <onnxruntime_c_api.h>
+#include <sched.h>
 #include <sys/resource.h>
 #include <unistd.h>
 #endif
@@ -69,12 +70,27 @@ TEST(TensorShape, TotalElementsIsTheProductOfTheDimensions)
     EXPECT_EQ(shape({ 5, 0, 2 }).total_elements(), 0U);
 }
 
-TEST(OnnxEngine, DefaultSessionConfigIsSequentialCpuWithFourThreads)
+// Owner decision 2026-11-15: on a Pi 5 three threads beat four and ORT's own default; seven doubled the time.
+TEST(OnnxEngine, ShippedThreadsAreTheUsableCpusButOneFromOneToEight)
+{
+    const int shipped = inference::shipped_ort_threads();
+#ifndef _WIN32
+    cpu_set_t allowed;
+    CPU_ZERO(&allowed);
+    ASSERT_EQ(sched_getaffinity(0, sizeof(allowed), &allowed), 0);
+    EXPECT_EQ(shipped, std::clamp(CPU_COUNT(&allowed) - 1, 1, 8));
+#else
+    EXPECT_GE(shipped, 1);
+    EXPECT_LE(shipped, 8);
+#endif
+}
+
+TEST(OnnxEngine, DefaultSessionConfigIsSequentialCpuWithTheShippedThreads)
 {
     const auto config = inference::create_default_session_config("model.onnx");
     EXPECT_EQ(config.model_path, std::filesystem::path("model.onnx"));
-    EXPECT_EQ(config.intra_op_num_threads, 4);
-    EXPECT_EQ(config.inter_op_num_threads, 4);
+    EXPECT_EQ(config.intra_op_num_threads, inference::shipped_ort_threads());
+    EXPECT_EQ(config.inter_op_num_threads, inference::shipped_ort_threads());
     EXPECT_FALSE(config.enable_cuda);
     EXPECT_TRUE(config.enable_memory_pattern);
     EXPECT_EQ(config.execution_mode, inference::ExecutionMode::Sequential);

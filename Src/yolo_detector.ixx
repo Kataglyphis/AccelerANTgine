@@ -89,8 +89,8 @@ struct YoloConfig
     inference::ExecutionProvider execution_provider{ inference::ExecutionProvider::Cpu };
     int device_id = 0;
     // One thread each makes an instruction count repeatable (the cachegrind check); the defaults are the engine's.
-    int intra_op_num_threads{ 4 };
-    int inter_op_num_threads{ 4 };
+    int intra_op_num_threads{ inference::shipped_ort_threads() };
+    int inter_op_num_threads{ inference::shipped_ort_threads() };
     // Names by class index; empty keeps the built-in COCO names.
     std::vector<std::string> labels;
 };

@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-15, the ORT thread default is the family's rule)
+- `SessionConfig` and `YoloConfig` default their intra- and inter-op threads to `shipped_ort_threads()`: usable CPUs
+  (the affinity mask) but one, 1 to 8, as OrchestrANT does (owner decision; was a fixed 4 and 4). Measured on a Pi 5
+  with four CPUs (p50 of two-cats, two runs each): 3 threads 227-229 ms, 4 threads 235-252 ms, ORT's own default
+  237-250 ms, 7 threads 520-542 ms. A config's `intra_op_threads` and the demo's `--threads` still win; the Python
+  binding exposes `shipped_ort_threads()`.
+- The demo's `--threads 0` asks for ONNX Runtime's own default, and `quality-report.toml`'s `[perf]` times it beside
+  the shipped count (`detector_cpu_ort_default`); new golden test `Golden.DemoThreadsZeroAsksForOrtsDefault`.
+
 ### Changed (2026-11-14, the demo's `main` is split; clang-tidy's size and complexity lists are empty)
 - `inference_demo.cpp`: `parse_demo_options` reads the flags into `DemoOptions` (one `whole_at_least` for the three
   numbers, `take_switch` and `take_value` for the two kinds of flag), `base_config` lays the command line over the

@@ -175,8 +175,8 @@ TEST(CppApiContract, ConfigurationDefaults)
 {
     const inference::SessionConfig session;
     EXPECT_TRUE(session.model_path.empty());
-    EXPECT_EQ(session.intra_op_num_threads, 4);
-    EXPECT_EQ(session.inter_op_num_threads, 4);
+    EXPECT_EQ(session.intra_op_num_threads, inference::shipped_ort_threads());
+    EXPECT_EQ(session.inter_op_num_threads, inference::shipped_ort_threads());
     EXPECT_FALSE(session.enable_cuda);
     EXPECT_TRUE(session.enable_memory_pattern);
     EXPECT_EQ(session.execution_mode, inference::ExecutionMode::Sequential);

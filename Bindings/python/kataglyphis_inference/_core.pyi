@@ -397,6 +397,9 @@ class SessionConfig:
     @device_id.setter
     def device_id(self, arg: int, /) -> None: ...
 
+def shipped_ort_threads() -> int:
+    """ONNX Runtime threads a new config gets: usable CPUs but one, 1 to 8."""
+
 def default_session_config(model_path: str | os.PathLike) -> SessionConfig:
     """Create a SessionConfig with sensible defaults for the given model."""
 

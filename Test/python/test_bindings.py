@@ -4,6 +4,8 @@ Run with the staged package on the path, e.g.:
     PYTHONPATH=<build-dir>/python python -m pytest Test/python -v
 """
 
+import os
+
 import pytest
 from onnx_models import dynamic_relu_model, yolo_reshape_model
 
@@ -106,7 +108,9 @@ def test_onnx_uninitialized_inference_raises():
 def test_session_config_defaults():
     assert [p.name for p in ki.ExecutionProvider] == ["Cpu", "Cuda", "MigraphX", "DirectML", "Xnnpack", "Dnnl"]
     cfg = ki.SessionConfig()
-    assert cfg.intra_op_num_threads == 4
+    assert cfg.intra_op_num_threads == cfg.inter_op_num_threads == ki.shipped_ort_threads()
+    if hasattr(os, "sched_getaffinity"):
+        assert ki.shipped_ort_threads() == min(max(len(os.sched_getaffinity(0)) - 1, 1), 8)
     assert cfg.execution_mode == ki.ExecutionMode.Sequential
     assert cfg.execution_provider == ki.ExecutionProvider.Cpu
     assert cfg.device_id == 0
