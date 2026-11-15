@@ -153,21 +153,14 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The Python surface lags the C++ structs, and nothing fails when a field is added** (M, ★★).
-  `YoloConfig` has 13 fields (`Src/yolo_detector.ixx:76-93`) and the bindings expose nine
-  (`Bindings/python/kataglyphis_bindings.cpp:326-336`): `preprocess_mode`, both thread counts and `labels` are
-  missing. `YoloDetector` binds `detect` on ready float tensors only (`:338-372`), so every Python caller writes by
-  hand the resize and normalise step that the ModelANT contract pins
-  (`docs/source/inference_preprocessing.rst:10-14`).
-  The engine lacks `provider_error`, `end_profiling`, `get_custom_metadata` and `applied_intra_op_num_threads`
-  (`kataglyphis_bindings.cpp:210-284`), and `SessionConfig` lacks `profiling_prefix` (`:190-199`).
-
-  First: bind the frame path, `detect_frame` and `preprocess_frame` on a C-contiguous uint8 HWC array plus its
-  format; only then does `preprocess_mode` do anything and can be bound. Then the thread counts, `labels` (with
-  `nb::lock_self()`), the detector's `output_layout()` and the error text; copy the built stub over the tracked one.
-  Done when each bound struct has a structured binding with its exact field count in the bindings, so a new field
-  stops the build until someone decides, and a pytest compares the attribute names of `YoloConfig()` and
-  `SessionConfig()` with a list. Fields left out on purpose are named beside the guard.
+- [ ] **The Python engine lacks four C++ methods** (S, ★★). Since 2026-11-15 Python has the frame path
+  (`YoloDetector.detect_frame` and `preprocess_frame` on an RGB or RGBA uint8 HWC array), `YoloConfig`'s
+  `preprocess_mode`, both thread counts and `labels`, and `SessionConfig.profiling_prefix`; the bindings hold a
+  structured binding of each config's exact field count, so a new C++ field stops the build, and
+  `test_the_bound_configs_show_every_field` lists Python's names. Left: the engine's `provider_error`,
+  `end_profiling`, `get_custom_metadata` and `applied_intra_op_num_threads` (`kataglyphis_bindings.cpp`), the
+  detector's `output_layout()`, and the same count guard for `DetectionResult`, `BoundingBox` and the WebRTC config
+  structs.
 
 - [ ] **The pipeline's frame counts feed no benchmark** (S, ★). Since 2026-11-15 `VideoDetectorPipeline::stats()`
   counts frames, errors, the last inference time and the frames a live source made while the detector was busy

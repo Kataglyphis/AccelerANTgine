@@ -391,6 +391,12 @@ class SessionConfig:
     @device_id.setter
     def device_id(self, arg: int, /) -> None: ...
 
+    @property
+    def profiling_prefix(self) -> pathlib.Path: ...
+
+    @profiling_prefix.setter
+    def profiling_prefix(self, arg: str | os.PathLike, /) -> None: ...
+
 def shipped_ort_threads() -> int:
     """ONNX Runtime threads a new config gets: usable CPUs but one, 1 to 8."""
 
@@ -491,6 +497,11 @@ class DetectionResult:
     @property
     def original_height(self) -> int: ...
 
+class FramePreprocessMode(enum.Enum):
+    Stretch = 0
+
+    Letterbox = 1
+
 class YoloOutputLayout(enum.Enum):
     CenterObjectnessScores = 0
 
@@ -546,6 +557,12 @@ class YoloConfig:
     def output_layout(self, arg: YoloOutputLayout, /) -> None: ...
 
     @property
+    def preprocess_mode(self) -> FramePreprocessMode: ...
+
+    @preprocess_mode.setter
+    def preprocess_mode(self, arg: FramePreprocessMode, /) -> None: ...
+
+    @property
     def execution_provider(self) -> ExecutionProvider: ...
 
     @execution_provider.setter
@@ -556,6 +573,29 @@ class YoloConfig:
 
     @device_id.setter
     def device_id(self, arg: int, /) -> None: ...
+
+    @property
+    def intra_op_num_threads(self) -> int: ...
+
+    @intra_op_num_threads.setter
+    def intra_op_num_threads(self, arg: int, /) -> None: ...
+
+    @property
+    def inter_op_num_threads(self) -> int: ...
+
+    @inter_op_num_threads.setter
+    def inter_op_num_threads(self, arg: int, /) -> None: ...
+
+    @property
+    def labels(self) -> list[str]: ...
+
+    @labels.setter
+    def labels(self, arg: Sequence[str], /) -> None: ...
+
+def preprocess_frame(image: Annotated[NDArray[numpy.uint8], dict(shape=(None, None, None), order='C', device='cpu', writable=False)], width: int, height: int, mode: FramePreprocessMode = FramePreprocessMode.Stretch) -> NDArray[numpy.float32]:
+    """
+    The model input of an RGB or RGBA uint8 HWC frame: 3 x height x width float32 in [0, 1], the ModelANT contract's resize. Releases the GIL.
+    """
 
 class YoloDetector:
     def __init__(self) -> None: ...
@@ -570,6 +610,11 @@ class YoloDetector:
     def detect(self, image: Annotated[NDArray[numpy.float32], dict(order='C', device='cpu', writable=False)], width: int = 0, height: int = 0) -> DetectionResult:
         """
         Detect in normalized RGB float32 CHW or single-batch NCHW. Width/height describe the original frame. Releases the GIL.
+        """
+
+    def detect_frame(self, image: Annotated[NDArray[numpy.uint8], dict(shape=(None, None, None), order='C', device='cpu', writable=False)]) -> DetectionResult:
+        """
+        Detect in an RGB or RGBA uint8 HWC frame, resized as the config's preprocess_mode says, with boxes in the frame's pixels. Releases the GIL.
         """
 
     @staticmethod

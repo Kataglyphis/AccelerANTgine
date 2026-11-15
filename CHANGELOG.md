@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-15, Python reads camera frames itself)
+- `YoloDetector.detect_frame(image)` and `preprocess_frame(image, width, height, mode)` take an RGB or RGBA uint8
+  height x width x channels array, so a Python caller no longer writes the ModelANT contract's resize and
+  normalisation by hand; a BGR array is refused with a hint to convert it. `FramePreprocessMode` is bound, and
+  `YoloConfig` shows `preprocess_mode`, `intra_op_num_threads`, `inter_op_num_threads` and `labels`, `SessionConfig`
+  `profiling_prefix`. The bindings hold a structured binding of both configs' exact field counts, so a new C++ field
+  stops the build until someone decides about Python, and `test_the_bound_configs_show_every_field` lists the names.
+  `_core.pyi` is the built stub; both wheels pass 34 tests on a Pi 5.
+
 ### Removed (2026-11-15, three fields nothing read)
 - `DetectionResult::class_confidences` (never filled, so Python's `class_confidences` was always empty),
   `VideoDetectionConfig::output_path` (nothing wrote that file) and `PipelineConfig::timeout_ms` (`pull_sample` takes its

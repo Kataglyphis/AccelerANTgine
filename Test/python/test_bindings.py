@@ -178,3 +178,59 @@ def test_yolo_end_to_end_rows_decode_using_selected_layout(tmp_path):
         detector.detect(image, width=3)
     flattened = detector.detect(rows, width=3, height=2)
     assert flattened.boxes[0].class_id == 2
+
+
+@needs_onnx
+def test_detect_frame_reads_an_rgb_uint8_frame_through_the_contracts_resize(tmp_path):
+    np = pytest.importorskip("numpy")
+    model = tmp_path / "frame.onnx"
+    model.write_bytes(yolo_reshape_model(height=2, width=3, rows=3, values=6))
+    config = ki.YoloConfig()
+    config.model_path = model
+    config.input_width, config.input_height = 3, 2
+    config.output_layout = ki.YoloOutputLayout.CornersScoreClass
+    detector = ki.YoloDetector()
+    detector.initialize(config)
+
+    # The red plane is the model's first output row: corners (0, 0) to (1, 1), score 204/255 = 0.8, class 0.
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    frame[:, :, 0] = [[0, 0, 255], [255, 204, 0]]
+    planes = ki.preprocess_frame(frame, 3, 2)
+    assert planes.shape == (3, 2, 3)
+    assert planes.dtype == np.float32
+    np.testing.assert_allclose(planes, frame.transpose(2, 0, 1) / 255.0, rtol=0, atol=1e-7)
+
+    result = detector.detect_frame(frame)
+    assert (result.original_width, result.original_height) == (3, 2)
+    (box,) = result.boxes
+    assert box.class_id == 0
+    assert box.confidence == pytest.approx(0.8, abs=1e-6)
+    assert (box.x, box.y, box.width, box.height) == pytest.approx((0.0, 0.0, 1.0, 1.0))
+    rgba = np.concatenate([frame, np.full((2, 3, 1), 255, dtype=np.uint8)], axis=2)
+    assert len(detector.detect_frame(rgba).boxes) == 1
+    with pytest.raises(ValueError, match="convert BGR first"):
+        detector.detect_frame(np.zeros((2, 3, 2), dtype=np.uint8))
+
+
+@needs_onnx
+def test_the_bound_configs_show_every_field():
+    """The C++ side stops building when a field is added; this list is Python's half of that guard."""
+
+    def public(obj):
+        return sorted(name for name in dir(obj) if not name.startswith("_"))
+
+    assert public(ki.YoloConfig()) == sorted([
+        "model_path", "confidence_threshold", "nms_threshold", "input_width", "input_height", "num_classes",
+        "output_layout", "preprocess_mode", "execution_provider", "device_id", "intra_op_num_threads",
+        "inter_op_num_threads", "labels",
+    ])
+    assert public(ki.SessionConfig()) == sorted([
+        "model_path", "intra_op_num_threads", "inter_op_num_threads", "enable_cuda", "enable_memory_pattern",
+        "execution_mode", "execution_provider", "device_id", "profiling_prefix",
+    ])
+    yolo = ki.YoloConfig()
+    assert yolo.preprocess_mode == ki.FramePreprocessMode.Stretch
+    yolo.preprocess_mode = ki.FramePreprocessMode.Letterbox
+    yolo.labels = ["cat", "dog"]
+    assert (yolo.preprocess_mode, yolo.labels) == (ki.FramePreprocessMode.Letterbox, ["cat", "dog"])
+    assert yolo.intra_op_num_threads == yolo.inter_op_num_threads == ki.shipped_ort_threads()

@@ -7,6 +7,7 @@
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/vector.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -24,6 +25,7 @@ import kataglyphis.text_generation;
 #if HAS_ONNXRUNTIME
 import kataglyphis.onnx_inference;
 import kataglyphis.yolo_detector;
+import kataglyphis.gstreamer_pipeline;
 #endif
 
 namespace nb = nanobind;
@@ -46,6 +48,40 @@ auto unwrap_config(std::expected<T, kataglyphis::config::ConfigError> &&result, 
 { throw std::runtime_error(std::format("{} failed: {}", context, to_string(error))); }
 
 using CpuFloatArray = nb::ndarray<const float, nb::c_contig, nb::device::cpu>;
+// A camera frame as Python holds it: height x width x 3 (RGB) or 4 (RGBA) bytes, rows packed.
+using CpuFrameArray = nb::ndarray<const std::uint8_t, nb::ndim<3>, nb::c_contig, nb::device::cpu>;
+
+// The frame as the C++ frame path takes it; the channel count names the format, as numpy arrays carry none.
+auto frame_from_array(const CpuFrameArray &image) -> kataglyphis::gstreamer::BufferInfo
+{
+    const auto channels = image.shape(2);
+    if (channels != 3 && channels != 4) {
+        throw std::invalid_argument("image must be height x width x 3 (RGB) or 4 (RGBA) uint8; convert BGR first");
+    }
+    if (image.shape(0) == 0 || image.shape(1) == 0 || image.shape(0) > UINT32_MAX || image.shape(1) > UINT32_MAX) {
+        throw std::invalid_argument("image dimensions must be positive 32-bit values");
+    }
+    kataglyphis::gstreamer::BufferInfo frame;
+    const auto *bytes = reinterpret_cast<const std::byte *>(image.data());
+    frame.data.assign(bytes, bytes + image.size());
+    frame.size = frame.data.size();
+    frame.metadata.width = static_cast<std::uint32_t>(image.shape(1));
+    frame.metadata.height = static_cast<std::uint32_t>(image.shape(0));
+    frame.metadata.format = channels == 3 ? "RGB" : "RGBA";
+    return frame;
+}
+
+// The model input as numpy, 3 x height x width float32; the vector moves to the heap behind a capsule.
+auto planes_to_numpy(std::vector<float> &&planes, std::uint32_t width, std::uint32_t height)
+  -> nb::ndarray<nb::numpy, float>
+{
+    auto data = std::make_unique<std::vector<float>>(std::move(planes));
+    const std::array<std::size_t, 3> shape{ 3, height, width };
+    nb::capsule owner(data.get(), [](void *ptr) noexcept { delete static_cast<std::vector<float> *>(ptr); });
+    float *raw = data->data();
+    data.release();
+    return { raw, shape.size(), shape.data(), owner };
+}
 
 auto yolo_image_dimensions(const CpuFloatArray &image, std::uint32_t width, std::uint32_t height)
   -> std::pair<std::uint32_t, std::uint32_t>
@@ -142,7 +178,18 @@ void bind_onnx(nb::module_ &m)
       .def_rw("enable_memory_pattern", &SessionConfig::enable_memory_pattern, nb::lock_self())
       .def_rw("execution_mode", &SessionConfig::execution_mode, nb::lock_self())
       .def_rw("execution_provider", &SessionConfig::execution_provider, nb::lock_self())
-      .def_rw("device_id", &SessionConfig::device_id, nb::lock_self());
+      .def_rw("device_id", &SessionConfig::device_id, nb::lock_self())
+      .def_rw("profiling_prefix", &SessionConfig::profiling_prefix, nb::lock_self());
+    // Stops the build when SessionConfig gains a field, so someone decides whether Python sees it.
+    [[maybe_unused]] const auto &[session_model,
+      session_intra,
+      session_inter,
+      session_cuda,
+      session_memory_pattern,
+      session_mode,
+      session_provider,
+      session_device,
+      session_profiling] = SessionConfig{};
 
     m.def("shipped_ort_threads",
       &shipped_ort_threads,
@@ -266,6 +313,10 @@ void bind_yolo(nb::module_ &m)
       .def_ro("original_width", &DetectionResult::original_width)
       .def_ro("original_height", &DetectionResult::original_height);
 
+    nb::enum_<FramePreprocessMode>(m, "FramePreprocessMode")
+      .value("Stretch", FramePreprocessMode::Stretch)
+      .value("Letterbox", FramePreprocessMode::Letterbox);
+
     nb::enum_<YoloOutputLayout>(m, "YoloOutputLayout")
       .value("CenterObjectnessScores", YoloOutputLayout::CenterObjectnessScores)
       .value("CornersScoreClass", YoloOutputLayout::CornersScoreClass)
@@ -281,8 +332,46 @@ void bind_yolo(nb::module_ &m)
       .def_rw("input_height", &YoloConfig::input_height, nb::lock_self())
       .def_rw("num_classes", &YoloConfig::num_classes, nb::lock_self())
       .def_rw("output_layout", &YoloConfig::output_layout, nb::lock_self())
+      .def_rw("preprocess_mode", &YoloConfig::preprocess_mode, nb::lock_self())
       .def_rw("execution_provider", &YoloConfig::execution_provider, nb::lock_self())
-      .def_rw("device_id", &YoloConfig::device_id, nb::lock_self());
+      .def_rw("device_id", &YoloConfig::device_id, nb::lock_self())
+      .def_rw("intra_op_num_threads", &YoloConfig::intra_op_num_threads, nb::lock_self())
+      .def_rw("inter_op_num_threads", &YoloConfig::inter_op_num_threads, nb::lock_self())
+      .def_rw("labels", &YoloConfig::labels, nb::lock_self());
+    // Stops the build when YoloConfig gains a field, so someone decides whether Python sees it.
+    [[maybe_unused]] const auto &[yolo_model,
+      yolo_confidence,
+      yolo_nms,
+      yolo_width,
+      yolo_height,
+      yolo_classes,
+      yolo_layout,
+      yolo_preprocess,
+      yolo_provider,
+      yolo_device,
+      yolo_intra,
+      yolo_inter,
+      yolo_labels] = YoloConfig{};
+
+    m.def(
+      "preprocess_frame",
+      [](const CpuFrameArray &image, std::uint32_t width, std::uint32_t height, FramePreprocessMode mode) {
+          const auto frame = frame_from_array(image);
+          std::expected<PreprocessedFrame, OnnxError> result;
+          {
+              nb::gil_scoped_release release;
+              result = preprocess_frame(frame, width, height, mode);
+          }
+          if (!result) { raise_onnx("preprocess_frame", result.error()); }
+          return planes_to_numpy(std::move(result->data), width, height);
+      },
+      "image"_a,
+      "width"_a,
+      "height"_a,
+      "mode"_a = FramePreprocessMode::Stretch,
+      "The model input of an RGB or RGBA uint8 HWC frame: 3 x height x width float32 in [0, 1], the ModelANT "
+      "contract's "
+      "resize. Releases the GIL.");
 
     nb::class_<YoloDetector>(m, "YoloDetector")
       .def(nb::init<>())
@@ -318,6 +407,21 @@ void bind_yolo(nb::module_ &m)
         "height"_a = 0,
         "Detect in normalized RGB float32 CHW or single-batch NCHW. Width/height describe the original frame. Releases "
         "the GIL.")
+      .def(
+        "detect_frame",
+        [](YoloDetector &self, const CpuFrameArray &image) {
+            const auto frame = frame_from_array(image);
+            std::expected<DetectionResult, OnnxError> result;
+            {
+                nb::gil_scoped_release release;
+                result = self.detect_frame(frame);
+            }
+            if (!result) { raise_onnx("detect_frame", result.error()); }
+            return std::move(*result);
+        },
+        "image"_a,
+        "Detect in an RGB or RGBA uint8 HWC frame, resized as the config's preprocess_mode says, with boxes in the "
+        "frame's pixels. Releases the GIL.")
       .def_static("get_coco_class_name", &YoloDetector::get_coco_class_name, "class_id"_a);
 }
 
