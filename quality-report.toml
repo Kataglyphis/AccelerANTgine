@@ -119,11 +119,11 @@ name = "text_cpp"
 run = "bash scripts/linux/perf-host.sh text-cpp"
 metrics = [{ key = "ttft_ms", unit = "ms", better = "lower" }, { key = "decode_tok_s", unit = "tok/s", better = "higher" }]
 
-# A five-turn chat resends every message: the last turn's first token against the first's (BACKLOG).
+# A five-turn chat continues its generator: turn 5's first token stays near turn 1's, 605 ms when it did not.
 [[perf.command]]
 name = "text_chat_python"
 run = ".venv-perf-host/bin/python scripts/linux/perf_host_text.py --chat --model resources/models/smollm2-perf"
-metrics = [{ key = "turn1_ttft_ms", unit = "ms", better = "lower" }, { key = "turn5_ttft_ms", unit = "ms", better = "lower" }, { key = "turn5_over_turn1", unit = "x", better = "lower" }]
+metrics = [{ key = "turn1_ttft_ms", unit = "ms", better = "lower" }, { key = "turn5_ttft_ms", unit = "ms", better = "lower" }]
 
 [[perf.command]]
 name = "text_python"

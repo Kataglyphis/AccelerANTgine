@@ -98,6 +98,30 @@ TEST_F(TextGeneration, GreedyDecodingYieldsTheFixtureContinuation)
     EXPECT_GT(result->decode_tokens_per_second, 0.0);
 }
 
+// A greedy turn continues the last generator when its prompt extends what that one holds; it must give what a fresh one gives.
+TEST_F(TextGeneration, AContinuedGeneratorGivesTheTokensOfAFreshOne)
+{
+    const auto first = generator.generate(user(expected.prompt), budget(expected.ids.size()));
+    ASSERT_TRUE(first.has_value());
+    const std::vector<text::ChatMessage> second{
+        { .role = "user", .content = expected.prompt },
+        { .role = "assistant", .content = first->text },
+        { .role = "user", .content = "ab" },
+    };
+    // Extending the first turn, asking it again, and a conversation that shares nothing with it.
+    for (const auto &messages : { second, user(expected.prompt), user("xyz") }) {
+        const auto continued = generator.generate(messages, budget(8));
+        text::TextGenerator fresh;
+        ASSERT_TRUE(fresh.initialize(kModelDir).has_value());
+        const auto alone = fresh.generate(messages, budget(8));
+        ASSERT_TRUE(continued.has_value());
+        ASSERT_TRUE(alone.has_value());
+        EXPECT_EQ(continued->tokens, alone->tokens) << messages.back().content;
+        EXPECT_EQ(continued->text, alone->text) << messages.back().content;
+        EXPECT_EQ(continued->finish_reason, alone->finish_reason) << messages.back().content;
+    }
+}
+
 TEST_F(TextGeneration, StreamsEveryPieceInOrder)
 {
     std::vector<std::string> pieces;

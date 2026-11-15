@@ -31,7 +31,9 @@ def run(model: str) -> dict[str, float]:
     generator.initialize(pathlib.Path(model))
     options = ki.GenerationOptions()
     options.max_new_tokens = TOKENS
-    options.temperature = 0.0
+    # Sampling from the top token is greedy, yet it takes a fresh generator: each first token is a whole prefill again.
+    options.temperature = 1.0
+    options.top_k = 1
     messages = [("user", PROMPT)]
     generator.generate(messages, options)
     results = [generator.generate(messages, options) for _ in range(TIMED_REPLIES)]
@@ -61,8 +63,7 @@ def chat(model: str) -> dict[str, float]:
             messages.append(("assistant", result.text))
         first.append(ttfts[0])
         last.append(ttfts[-1])
-    turn1, turn5 = statistics.median(first), statistics.median(last)
-    return {"turn1_ttft_ms": turn1, "turn5_ttft_ms": turn5, "turn5_over_turn1": turn5 / turn1}
+    return {"turn1_ttft_ms": statistics.median(first), "turn5_ttft_ms": statistics.median(last)}
 
 
 def main(argv: list[str] | None = None) -> int:

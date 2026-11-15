@@ -10,6 +10,7 @@ module;
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -61,6 +62,7 @@ namespace {
         decltype(&OgaDestroySequences) DestroySequences;
         decltype(&OgaTokenizerEncode) TokenizerEncode;
         decltype(&OgaSequencesGetSequenceCount) SequencesGetSequenceCount;
+        decltype(&OgaSequencesGetSequenceData) SequencesGetSequenceData;
         decltype(&OgaCreateTokenizerStream) CreateTokenizerStream;
         decltype(&OgaDestroyTokenizerStream) DestroyTokenizerStream;
         decltype(&OgaTokenizerStreamDecode) TokenizerStreamDecode;
@@ -75,6 +77,10 @@ namespace {
         decltype(&OgaGenerator_IsDone) GeneratorIsDone;
         decltype(&OgaGenerator_GenerateNextToken) GeneratorGenerateNextToken;
         decltype(&OgaGenerator_GetNextTokens) GeneratorGetNextTokens;
+        decltype(&OgaGenerator_AppendTokens) GeneratorAppendTokens;
+        decltype(&OgaGenerator_RewindTo) GeneratorRewindTo;
+        decltype(&OgaGenerator_GetSequenceCount) GeneratorGetSequenceCount;
+        decltype(&OgaGenerator_GetSequenceData) GeneratorGetSequenceData;
     };
 
 #ifdef _WIN32
@@ -123,6 +129,7 @@ namespace {
               && bind(library, "OgaDestroySequences", table->DestroySequences)
               && bind(library, "OgaTokenizerEncode", table->TokenizerEncode)
               && bind(library, "OgaSequencesGetSequenceCount", table->SequencesGetSequenceCount)
+              && bind(library, "OgaSequencesGetSequenceData", table->SequencesGetSequenceData)
               && bind(library, "OgaCreateTokenizerStream", table->CreateTokenizerStream)
               && bind(library, "OgaDestroyTokenizerStream", table->DestroyTokenizerStream)
               && bind(library, "OgaTokenizerStreamDecode", table->TokenizerStreamDecode)
@@ -136,7 +143,11 @@ namespace {
               && bind(library, "OgaGenerator_AppendTokenSequences", table->GeneratorAppendTokenSequences)
               && bind(library, "OgaGenerator_IsDone", table->GeneratorIsDone)
               && bind(library, "OgaGenerator_GenerateNextToken", table->GeneratorGenerateNextToken)
-              && bind(library, "OgaGenerator_GetNextTokens", table->GeneratorGetNextTokens);
+              && bind(library, "OgaGenerator_GetNextTokens", table->GeneratorGetNextTokens)
+              && bind(library, "OgaGenerator_AppendTokens", table->GeneratorAppendTokens)
+              && bind(library, "OgaGenerator_RewindTo", table->GeneratorRewindTo)
+              && bind(library, "OgaGenerator_GetSequenceCount", table->GeneratorGetSequenceCount)
+              && bind(library, "OgaGenerator_GetSequenceData", table->GeneratorGetSequenceData);
             return complete ? std::move(table) : nullptr;
         }();
         return api.get();
@@ -283,6 +294,23 @@ namespace {
         return array.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
     }
 
+    // Room a greedy generator keeps for the turns after this one; its KV buffer is as long (45 KB a token for SmolLM2-135M).
+    constexpr std::size_t kTurnHeadroom = 1024;
+
+    // Sampling and guidance carry state a continued generator would not reset, so only a greedy turn continues one.
+    auto continues(const GenerationOptions &options) -> bool
+    { return !(options.temperature > 0.0) && options.json_schema.empty(); }
+
+    // genai_config.json's model.context_length, or 0: then a greedy generator is not capped by it.
+    auto context_length(const std::filesystem::path &model_dir) -> std::size_t
+    {
+        std::ifstream file(model_dir / "genai_config.json");
+        const auto config = nlohmann::json::parse(file, nullptr, false);
+        if (config.is_discarded()) { return 0; }
+        const auto length = config.value(nlohmann::json::json_pointer("/model/context_length"), std::int64_t{ 0 });
+        return length > 0 ? static_cast<std::size_t>(length) : 0;
+    }
+
     auto milliseconds(Clock::duration duration) -> double
     { return std::chrono::duration<double, std::milli>(duration).count(); }
 
@@ -293,17 +321,31 @@ struct TextGenerator::Impl
     const GenaiApi *api = nullptr;
     Model model;
     Tokenizer tokenizer;
-    std::vector<std::int32_t> eos_tokens;
+    // What the loaded model says about itself, and the greedy generator it keeps between turns.
+    struct State
+    {
+        std::vector<std::int32_t> eos_tokens;
+        // genai_config.json's context_length, 0 when it names none.
+        std::size_t context_tokens = 0;
+        // The last greedy generator, every token it holds and its room: a turn that extends them appends only the rest.
+        Generator live;
+        std::vector<std::int32_t> live_ids;
+        std::size_t live_room = 0;
+    } state;
     mutable std::shared_mutex mutex;
     std::atomic<bool> cancel{ false };
     // Read without the mutex: a caller asking during a generation, from its own callback even, must not wait for it.
     std::atomic<bool> ready{ false };
 
     auto prompt_tokens(const std::vector<ChatMessage> &messages) const -> std::expected<Sequences, TextGenError>;
-    auto make_generator(const OgaSequences &prompt, std::size_t prompt_count, const GenerationOptions &options) const
+    auto make_generator(const OgaSequences &prompt, std::size_t max_length, const GenerationOptions &options) const
       -> std::expected<Generator, TextGenError>;
-    auto configure(OgaGeneratorParams *params, std::size_t prompt_count, const GenerationOptions &options) const
-      -> bool;
+    auto configure(OgaGeneratorParams *params, std::size_t max_length, const GenerationOptions &options) const -> bool;
+    auto continue_live(std::span<const std::int32_t> ids, std::size_t needed) -> OgaGenerator *;
+    auto greedy_generator(const OgaSequences &prompt,
+      std::span<const std::int32_t> ids,
+      const GenerationOptions &options) -> std::expected<OgaGenerator *, TextGenError>;
+    void remember(OgaGenerator *generator);
     auto next_token(OgaGenerator *generator, OgaTokenizerStream *stream, GenerationResult &result) const
       -> std::expected<void, TextGenError>;
     auto decode(OgaGenerator *generator,
@@ -342,7 +384,7 @@ auto TextGenerator::Impl::prompt_tokens(const std::vector<ChatMessage> &messages
 }
 
 auto TextGenerator::Impl::make_generator(const OgaSequences &prompt,
-  std::size_t prompt_count,
+  std::size_t max_length,
   const GenerationOptions &options) const -> std::expected<Generator, TextGenError>
 {
     OgaGeneratorParams *raw_params = nullptr;
@@ -350,7 +392,7 @@ auto TextGenerator::Impl::make_generator(const OgaSequences &prompt,
         return std::unexpected(TextGenError::GenerationFailed);
     }
     const Params params{ raw_params, { api } };
-    if (!configure(params.get(), prompt_count, options)) { return std::unexpected(TextGenError::InvalidOptions); }
+    if (!configure(params.get(), max_length, options)) { return std::unexpected(TextGenError::InvalidOptions); }
     OgaGenerator *raw_generator = nullptr;
     if (const auto error =
           failure(*api, api->CreateGenerator(model.get(), params.get(), &raw_generator), "generator")) {
@@ -363,14 +405,57 @@ auto TextGenerator::Impl::make_generator(const OgaSequences &prompt,
     return generator;
 }
 
+auto TextGenerator::Impl::continue_live(std::span<const std::int32_t> ids, std::size_t needed) -> OgaGenerator *
+{
+    if (state.live == nullptr || ids.empty() || needed > state.live_room) { return nullptr; }
+    // The last prompt token goes in again at least: the generator needs a new token to give its next logits.
+    const auto held = std::ranges::mismatch(state.live_ids, ids.first(ids.size() - 1)).in1;
+    const auto common = static_cast<std::size_t>(std::distance(state.live_ids.begin(), held));
+    const auto rest = ids.subspan(common);
+    if (common == 0
+        || (common < state.live_ids.size()
+            && !succeeded(*api, api->GeneratorRewindTo(state.live.get(), common), "rewind"))
+        || !succeeded(*api, api->GeneratorAppendTokens(state.live.get(), rest.data(), rest.size()), "append")) {
+        state.live.reset();
+        return nullptr;
+    }
+    return state.live.get();
+}
+
+auto TextGenerator::Impl::greedy_generator(const OgaSequences &prompt,
+  std::span<const std::int32_t> ids,
+  const GenerationOptions &options) -> std::expected<OgaGenerator *, TextGenError>
+{
+    const std::size_t needed = ids.size() + static_cast<std::size_t>(options.max_new_tokens);
+    if (OgaGenerator *continued = continue_live(ids, needed); continued != nullptr) { return continued; }
+    std::size_t room = needed + kTurnHeadroom;
+    if (state.context_tokens > 0) { room = std::min(room, std::max(state.context_tokens, needed)); }
+    auto made = make_generator(prompt, room, options);
+    if (!made) { return std::unexpected(made.error()); }
+    state.live = std::move(*made);
+    state.live_room = room;
+    return state.live.get();
+}
+
+void TextGenerator::Impl::remember(OgaGenerator *generator)
+{
+    const std::int32_t *data = api->GeneratorGetSequenceData(generator, 0);
+    if (data == nullptr) {
+        state.live.reset();
+        return;
+    }
+    const std::span<const std::int32_t> held(data, api->GeneratorGetSequenceCount(generator, 0));
+    state.live_ids.assign(held.begin(), held.end());
+}
+
 auto TextGenerator::Impl::configure(OgaGeneratorParams *params,
-  std::size_t prompt_count,
+  std::size_t max_length,
   const GenerationOptions &options) const -> bool
 {
     const bool sample = options.temperature > 0.0;
-    const double max_length = static_cast<double>(prompt_count) + options.max_new_tokens;
     bool configured =
-      succeeded(*api, api->GeneratorParamsSetSearchNumber(params, "max_length", max_length), "max_length")
+      succeeded(
+        *api, api->GeneratorParamsSetSearchNumber(params, "max_length", static_cast<double>(max_length)), "max_length")
       && succeeded(*api, api->GeneratorParamsSetSearchBool(params, "do_sample", sample), "do_sample");
     if (configured && sample) {
         configured =
@@ -424,7 +509,9 @@ auto TextGenerator::Impl::decode(OgaGenerator *generator,
     auto first = start;
     std::size_t emitted = 0;
     bool stopped = false;
-    while (!stopped && !api->GeneratorIsDone(generator)) {
+    const auto budget = static_cast<std::size_t>(options.max_new_tokens);
+    // A greedy generator has room past this turn's budget, so the budget ends the turn, not only the generator.
+    while (!stopped && result.tokens.size() < budget && !api->GeneratorIsDone(generator)) {
         if (cancel.load()) {
             result.finish_reason = FinishReason::Cancelled;
             break;
@@ -451,7 +538,7 @@ void TextGenerator::Impl::finish(GenerationResult &result,
 {
     if (result.finish_reason != FinishReason::Cancelled) {
         const bool ended =
-          stopped || (!result.tokens.empty() && std::ranges::contains(eos_tokens, result.tokens.back()));
+          stopped || (!result.tokens.empty() && std::ranges::contains(state.eos_tokens, result.tokens.back()));
         result.finish_reason = ended ? FinishReason::Stop : FinishReason::Length;
     }
     if (!result.tokens.empty()) { result.time_to_first_token_ms = milliseconds(first - start); }
@@ -501,7 +588,9 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
         return std::unexpected(TextGenError::TokenizerFailed);
     }
     const std::span<const std::int32_t> eos_ids(eos, eos_count);
-    impl_->eos_tokens.assign(eos_ids.begin(), eos_ids.end());
+    impl_->state.eos_tokens.assign(eos_ids.begin(), eos_ids.end());
+    impl_->state.context_tokens = context_length(model_dir);
+    impl_->state.live.reset();
     impl_->api = api;
     impl_->tokenizer = std::move(tokenizer);
     impl_->model = std::move(model);
@@ -525,11 +614,30 @@ auto TextGenerator::generate(const std::vector<ChatMessage> &messages,
     if (!prompt) { return std::unexpected(prompt.error()); }
     GenerationResult result;
     result.prompt_tokens = impl_->api->SequencesGetSequenceCount(prompt->get(), 0);
-    auto generator = impl_->make_generator(**prompt, result.prompt_tokens, options);
-    if (!generator) { return std::unexpected(generator.error()); }
-    if (auto decoded = impl_->decode(generator->get(), options, on_text, result, start); !decoded) {
-        return std::unexpected(decoded.error());
+    const std::span<const std::int32_t> ids(
+      impl_->api->SequencesGetSequenceData(prompt->get(), 0), result.prompt_tokens);
+    Generator fresh;
+    OgaGenerator *generator = nullptr;
+    if (continues(options)) {
+        auto live = impl_->greedy_generator(**prompt, ids, options);
+        if (!live) { return std::unexpected(live.error()); }
+        generator = *live;
+    } else {
+        auto made =
+          impl_->make_generator(**prompt, ids.size() + static_cast<std::size_t>(options.max_new_tokens), options);
+        if (!made) { return std::unexpected(made.error()); }
+        fresh = std::move(*made);
+        generator = fresh.get();
     }
+    const auto decoded = impl_->decode(generator, options, on_text, result, start);
+    if (generator == impl_->state.live.get()) {
+        if (decoded) {
+            impl_->remember(generator);
+        } else {
+            impl_->state.live.reset();
+        }
+    }
+    if (!decoded) { return std::unexpected(decoded.error()); }
     return result;
 }
 

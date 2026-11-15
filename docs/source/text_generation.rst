@@ -44,6 +44,15 @@ tokenizer's end tokens, ``Length`` when the budget ran out, and ``Cancelled`` af
 ``request_cancel``. A cancel ends the run after its current token and applies only to a running
 ``generate``. One generator serves one call at a time; concurrent callers wait.
 
+A greedy call without ``json_schema`` keeps its GenAI generator for the next one. When the next
+prompt shares a start with what that generator holds, the prompt and the reply so far, the
+generator rewinds to the shared start and takes only the rest, so a chat turn no longer runs the
+whole conversation through the model again. Its tokens are those of a fresh generator, which a
+tiny-model test asserts. The kept generator has room for the prompt, the budget and 1024 more
+tokens, capped at ``genai_config.json``'s ``context_length``; a turn that does not fit, sampling,
+a schema or a prompt that shares nothing starts a fresh one. The room costs memory: SmolLM2-135M
+keeps about 45 KB of cache a token.
+
 Three options shape the reply:
 
 - ``seed`` makes sampling repeatable: the same seed, prompt and options give the same token ids.

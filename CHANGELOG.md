@@ -18,6 +18,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-15, a chat turn continues the last generator)
+- A greedy `generate` without `json_schema` keeps its GenAI generator: the next prompt rewinds it to the start the
+  two share (`OgaGenerator_RewindTo`) and appends only the rest (`OgaGenerator_AppendTokens`), so a chat turn no
+  longer runs the whole conversation through the model. The kept generator has room for the prompt, the budget and
+  1024 more tokens, capped at `genai_config.json`'s `context_length`; the decode loop now ends at
+  `max_new_tokens` itself. Sampling, a schema, a prompt that shares nothing or one that does not fit start a fresh
+  one. New test `AContinuedGeneratorGivesTheTokensOfAFreshOne`. On a Pi 5, turn 5 of the replayed chat reaches its
+  first token after 48 ms instead of 605 ms. `perf_host_text.py`'s single reply samples with `top_k` 1, greedy on a
+  fresh generator, so its time to first token stays a whole prefill (97 ms); `text_chat_python` drops the ratio,
+  which a lost continuation would not move.
+
 ### Added (2026-11-15, a replayed chat timed)
 - `perf_host_text.py --chat` replays a fixed five-turn chat through the Python binding and reports the first and the
   last turn's time to first token; `quality-report.toml` declares it as `text_chat_python`. On a Pi 5 turn 5 waited

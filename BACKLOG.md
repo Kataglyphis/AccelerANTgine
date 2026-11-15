@@ -229,16 +229,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Ask the owner before letting one run lower an entry: `AGENTS.md` (section 5, the perf gate) re-records from five or more runs, and a
   lower bound adds a re-record step after every intended speed-up.
 
-- [ ] **Every chat turn runs the whole conversation through the model again** (M, ★★). `TextGenerator::generate`
-  templates and encodes all messages and builds a new generator on every call (`Src/text_generation.cpp:519-523`).
-  Measured 2026-11-15 on a Pi 5 (CI image, Python binding, `perf_host_text.py --chat`, median of three replays of a
-  fixed five-turn chat, 48 tokens a reply): the first token of turn 5 came 4.75 times later than turn 1's (127 ms ->
-  605 ms) on the shipped SmolLM2-135M, 7.6 times on the seven-thread perf copy (212 ms -> 1610 ms). It matters, so
-  next: check the pinned `ort_genai_c.h` for appending to a live generator, then keep the last generator and its
-  token ids with the model and append only the new tokens when the old ids are a prefix of the new prompt.
-  `quality-report.toml`'s `text_chat_python` row times it. Done when that row is in the baseline and a tiny-model
-  test shows that turn 2, extending turn 1, gives the ids of a fresh run.
-
 - [ ] **The fuzz targets run in unit mode only, with no kept corpus** (M, ★). Since 2026-11-14 eleven properties
   run in the clang Debug lane's `fuzzTestSuite`, each for a second of random inputs.
   Next: a dispatch-only tree with fuzzing mode on and a kept corpus; `third_party/CMakeLists.txt:83-93` forces it
