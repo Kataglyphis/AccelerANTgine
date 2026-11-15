@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-15, a replayed chat timed)
+- `perf_host_text.py --chat` replays a fixed five-turn chat through the Python binding and reports the first and the
+  last turn's time to first token; `quality-report.toml` declares it as `text_chat_python`. On a Pi 5 turn 5 waited
+  4.75 times as long as turn 1 (127 -> 605 ms), since every turn sends the whole conversation again (BACKLOG).
+
 ### Changed (2026-11-15, the ORT thread default is the family's rule)
 - `SessionConfig` and `YoloConfig` default their intra- and inter-op threads to `shipped_ort_threads()`: usable CPUs
   (the affinity mask) but one, 1 to 8, as OrchestrANT does (owner decision; was a fixed 4 and 4). Measured on a Pi 5
