@@ -262,7 +262,6 @@ void bind_yolo(nb::module_ &m)
 
     nb::class_<DetectionResult>(m, "DetectionResult")
       .def_ro("boxes", &DetectionResult::boxes)
-      .def_ro("class_confidences", &DetectionResult::class_confidences)
       .def_ro("inference_time_ms", &DetectionResult::inference_time_ms)
       .def_ro("original_width", &DetectionResult::original_width)
       .def_ro("original_height", &DetectionResult::original_height);

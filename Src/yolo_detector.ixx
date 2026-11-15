@@ -35,7 +35,6 @@ struct BoundingBox
 struct DetectionResult
 {
     std::vector<BoundingBox> boxes;
-    std::vector<float> class_confidences;
     double inference_time_ms{ 0.0 };
     std::uint32_t original_width{ 0 };
     std::uint32_t original_height{ 0 };
@@ -162,7 +161,6 @@ struct VideoDetectionConfig
 {
     YoloConfig yolo_config;
     gstreamer::PipelineConfig gstreamer_config;
-    std::filesystem::path output_path{ "output.mp4" };
 };
 
 // What a running pipeline did: a detector slower than its live source shows here as dropped frames.

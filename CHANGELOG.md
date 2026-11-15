@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Removed (2026-11-15, three fields nothing read)
+- `DetectionResult::class_confidences` (never filled, so Python's `class_confidences` was always empty),
+  `VideoDetectionConfig::output_path` (nothing wrote that file) and `PipelineConfig::timeout_ms` (`pull_sample` takes its
+  own timeout). The contract test and the Python stub follow.
+
 ### Changed (2026-11-15, a config mistake is an error, not a default)
 - The TOML loader refuses a value of the wrong type and an integer its field cannot hold with `InvalidValue`, and logs
   the key and what it should have held (`config: input_width must be a whole number from 0 to 4294967295`); a key

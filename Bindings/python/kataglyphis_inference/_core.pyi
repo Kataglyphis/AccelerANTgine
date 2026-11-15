@@ -483,9 +483,6 @@ class DetectionResult:
     def boxes(self) -> list[BoundingBox]: ...
 
     @property
-    def class_confidences(self) -> list[float]: ...
-
-    @property
     def inference_time_ms(self) -> float: ...
 
     @property

@@ -147,11 +147,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Ask the owner before touching `reconnection_timeout_ms`: reconnect with a backoff, or write "exit 1 and let the
   service manager restart" in the docs and delete the field.
 
-- [ ] **Fields nothing reads** (S, ★). The stream settings and the config mistakes are done (2026-11-15, owner
-  decisions): every `StreamConfig` field changes the WebRTC pipeline text, a TOML value of the wrong type or out of
-  range is `InvalidValue` with its key in the log, and a named `--config` that does not load exits 2. Left, never
-  read: `DetectionResult::class_confidences`, `VideoDetectionConfig::output_path`, `PipelineConfig::timeout_ms`; wire
-  or delete each with a test. The six tensor builders stay until hub CON185/CON198 decide (owner).
+- [b] **The six tensor builders wait for the hub's nnstreamer decision** (S, ★). `Src/gstreamer_pipeline.cpp`'s
+  tensor pipeline builders are called by tests only; hub CON185 and CON198 decide whether the image gets their
+  elements, and the owner chose on 2026-11-15 to keep them until then. On the day the elements arrive
+  `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
+  unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
 - [ ] **The Python surface lags the C++ structs, and nothing fails when a field is added** (M, ★★).
   `YoloConfig` has 13 fields (`Src/yolo_detector.ixx:76-93`) and the bindings expose nine

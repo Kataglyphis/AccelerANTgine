@@ -192,12 +192,8 @@ TEST(CppApiContract, ConfigurationDefaults)
     EXPECT_EQ(box.class_id, -1);
     EXPECT_TRUE(box.class_name.empty());
 
-    const detection::VideoDetectionConfig video;
-    EXPECT_EQ(video.output_path, std::filesystem::path("output.mp4"));
-
     const gstreamer::PipelineConfig pipeline;
     EXPECT_TRUE(pipeline.pipeline_description.empty());
-    EXPECT_EQ(pipeline.timeout_ms, 5000U);
 
     const gstreamer::FrameMetadata frame;
     EXPECT_EQ(frame.fps_n, 0U);

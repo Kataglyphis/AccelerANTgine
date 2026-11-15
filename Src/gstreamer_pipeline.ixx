@@ -89,10 +89,7 @@ struct BufferInfo
 using BufferCallback = std::function<void(const BufferInfo &)>;
 
 struct PipelineConfig
-{
-    std::string pipeline_description;
-    std::uint32_t timeout_ms{ 5000 };
-};
+{ std::string pipeline_description; };
 
 class KATAGLYPHIS_CPP_API GStreamerPipeline
 {
