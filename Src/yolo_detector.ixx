@@ -76,6 +76,13 @@ struct PreprocessedFrame
   std::uint32_t height,
   FramePreprocessMode mode = FramePreprocessMode::Stretch) -> std::expected<PreprocessedFrame, OnnxError>;
 
+// The same into `result`, whose buffer a caller keeps from frame to frame; its values equal preprocess_frame's.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto preprocess_frame_into(const gstreamer::BufferInfo &buffer,
+  std::uint32_t width,
+  std::uint32_t height,
+  FramePreprocessMode mode,
+  PreprocessedFrame &result) -> std::expected<void, OnnxError>;
+
 struct YoloConfig
 {
     std::filesystem::path model_path;
@@ -137,6 +144,9 @@ class KATAGLYPHIS_CPP_API YoloDetector
       -> std::expected<DetectionResult, OnnxError>;
 
     [[nodiscard]] auto detect_frame(const gstreamer::BufferInfo &frame) -> std::expected<DetectionResult, OnnxError>;
+    // The same with the caller's scratch input, which one caller reuses frame after frame.
+    [[nodiscard]] auto detect_frame(const gstreamer::BufferInfo &frame, PreprocessedFrame &scratch)
+      -> std::expected<DetectionResult, OnnxError>;
 
     static auto get_coco_class_name(int class_id) -> std::string_view;
 

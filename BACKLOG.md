@@ -242,20 +242,10 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `Test/contract/text_contract_test.cpp` expects exactly one contract case on purpose, so plan it with the pin
   bump that adds one.
 
-- [ ] **Each frame is written twice in two places** (S, ★; the saving is not measured).
-  `extract_buffer_info` resizes the vector, which zero-fills it, then copies the frame over it
-  (`Src/gstreamer_pipeline.cpp:165-168`; 2,764,800 bytes at 1280x720 RGB). `preprocess_frame` fills the whole
-  3x640x640 float tensor and in stretch mode overwrites every value, and builds `column_offsets` anew per frame. By
-  instruction count our code is about 1 % of a detected frame (11.8 of 1,199.5 million,
-  `perf/cachegrind-baseline.json`), and the gate runs with `--cache-sim=no`: only wall time on the Pi can show a
-  gain.
-  Done 2026-11-14 on the way: `extract_buffer_info` assigns the mapped bytes once, and one `Ort::MemoryInfo` is
-  made in `initialize`. Next: a scratch tensor in `VideoDetectorPipeline::Impl` through a `detect_frame` overload, not
-  `thread_local` (the TLS trap of the module targets, `AGENTS.md` § 4). A live RTSP camera is a `://` source and is
-  treated as lossless like a file (`video_detection_pipeline_description`, on purpose in 6219631); it wants an
-  explicit switch.
-  Done when the contract test still gives identical floats and a Pi wall-time figure, before and after, is recorded
-  here.
+- [ ] **A live RTSP camera is treated as a lossless file** (S, ★). `video_detection_pipeline_description` takes every
+  `://` source as lossless like a file, on purpose in 6219631; a live RTSP camera wants an explicit switch that drops
+  stale frames instead. (The frame-buffer half of this entry is done since 2026-11-15: `preprocess_frame_into` fills
+  a buffer the video pipeline keeps, 1.97-2.16 ms instead of 2.69-2.77 ms per 1280x720 frame on a Pi 5.)
 
 - [ ] **`yolo_detector.cpp` does three jobs, and `Src/` is a recursive glob** (M, ★). One file of about 800 lines
   holds the pure math (preprocess, decode, suppression), the ORT-backed detector and the video pipeline with its

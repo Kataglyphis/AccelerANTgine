@@ -231,6 +231,21 @@ static void BM_PreprocessFrame(benchmark::State &state)
 }
 BENCHMARK(BM_PreprocessFrame);
 
+// The same into one kept buffer, as the video pipeline runs it: no allocation, and no fill before a stretch.
+static void BM_PreprocessFrameInto(benchmark::State &state)
+{
+    const auto frame = synthetic_frame();
+    detection::PreprocessedFrame input;
+    for (auto _ : state) {
+        if (!detection::preprocess_frame_into(frame, 640, 640, detection::FramePreprocessMode::Stretch, input)) {
+            state.SkipWithError("preprocess_frame_into refused the synthetic frame");
+            break;
+        }
+        benchmark::DoNotOptimize(input.data.data());
+    }
+}
+BENCHMARK(BM_PreprocessFrameInto);
+
 // One frame through the shipped DEIM detector on the CPU: preprocess, inference and decoding.
 static void BM_DetectFrame(benchmark::State &state)
 {

@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-15, the video pipeline keeps its model input)
+- `preprocess_frame_into` fills a `PreprocessedFrame` the caller keeps: its buffer keeps its capacity, and a stretch,
+  which writes every value, no longer fills it first. `YoloDetector::detect_frame` takes such a scratch input, and
+  `VideoDetectorPipeline` keeps one for its streaming thread. On a Pi 5 a 1280x720 frame took 1.97-2.16 ms instead
+  of 2.69-2.77 ms to preprocess (`BM_PreprocessFrameInto` against `BM_PreprocessFrame`, RelWithDebInfo, three runs).
+  New test `AKeptBufferHoldsWhatAFreshOneDoes`; the pipeline's three callbacks sit in one struct.
+
 ### Fixed (2026-11-15, nlohmann's vector scan under GCC's UBSan)
 - The Linux x64 GCC Debug lane failed `AContinuedGeneratorGivesTheTokensOfAFreshOne` (run 43707801504): UBSan
   reported `_mm_loadl_epi64` in nlohmann's `copy_plain_halves` as a misaligned load of `__m64_u`, an unaligned load

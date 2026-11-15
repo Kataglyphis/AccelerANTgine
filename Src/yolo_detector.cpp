@@ -431,6 +431,19 @@ auto preprocess_frame(const gstreamer::BufferInfo &buffer,
   std::uint32_t height,
   FramePreprocessMode mode) -> std::expected<PreprocessedFrame, OnnxError>
 {
+    PreprocessedFrame result;
+    if (auto done = preprocess_frame_into(buffer, width, height, mode, result); !done) {
+        return std::unexpected(done.error());
+    }
+    return result;
+}
+
+auto preprocess_frame_into(const gstreamer::BufferInfo &buffer,
+  std::uint32_t width,
+  std::uint32_t height,
+  FramePreprocessMode mode,
+  PreprocessedFrame &result) -> std::expected<void, OnnxError>
+{
     const auto &meta = buffer.metadata;
     if (width == 0 || height == 0 || meta.width == 0 || meta.height == 0 || meta.row_stride_bytes < 0) {
         return std::unexpected(OnnxError::InvalidInputShape);
@@ -458,14 +471,15 @@ auto preprocess_frame(const gstreamer::BufferInfo &buffer,
     const auto pad_x = (width - content_width) / 2;
     const auto pad_y = (height - content_height) / 2;
     const auto plane = static_cast<std::size_t>(width) * height;
-    PreprocessedFrame result;
     result.mapping = { static_cast<float>(content_width) / meta.width,
         static_cast<float>(content_height) / meta.height,
         static_cast<float>(pad_x),
         static_cast<float>(pad_y),
         meta.width,
         meta.height };
-    result.data.assign(3 * plane, mode == FramePreprocessMode::Letterbox ? 114.0F / 255.0F : 0.0F);
+    // A kept buffer keeps its capacity; stretch writes every value below, so only a letterbox's padding needs a fill.
+    result.data.resize(3 * plane);
+    if (mode == FramePreprocessMode::Letterbox) { std::ranges::fill(result.data, 114.0F / 255.0F); }
     // Every row samples the same columns, so their byte offsets are divided out once per frame.
     std::vector<std::size_t> column_offsets(content_width);
     for (std::uint32_t x = 0; x < content_width; ++x) {
@@ -488,7 +502,7 @@ auto preprocess_frame(const gstreamer::BufferInfo &buffer,
             blue[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[2])];
         }
     }
-    return result;
+    return {};
 }
 
 struct YoloDetector::Impl
@@ -613,15 +627,24 @@ auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline,
 
 auto YoloDetector::detect_frame(const gstreamer::BufferInfo &frame) -> std::expected<DetectionResult, OnnxError>
 {
+    PreprocessedFrame input;
+    return detect_frame(frame, input);
+}
+
+auto YoloDetector::detect_frame(const gstreamer::BufferInfo &frame, PreprocessedFrame &scratch)
+  -> std::expected<DetectionResult, OnnxError>
+{
     const std::shared_lock lock(impl_->mutex);
     if (!impl_->initialized) { return std::unexpected(OnnxError::SessionNotInitialized); }
-    auto input =
-      preprocess_frame(frame, impl_->config.input_width, impl_->config.input_height, impl_->config.preprocess_mode);
-    if (!input) { return std::unexpected(input.error()); }
+    if (auto done = preprocess_frame_into(
+          frame, impl_->config.input_width, impl_->config.input_height, impl_->config.preprocess_mode, scratch);
+      !done) {
+        return std::unexpected(done.error());
+    }
     inference::TensorShape shape{ { 1, 3, impl_->config.input_height, impl_->config.input_width } };
-    auto result = impl_->engine.run_inference_in_place(input->data, shape, "images");
+    auto result = impl_->engine.run_inference_in_place(scratch.data, shape, "images");
     if (!result) { return std::unexpected(result.error()); }
-    return post_process(*result, input->mapping);
+    return post_process(*result, scratch.mapping);
 }
 
 auto YoloDetector::post_process(const inference::InferenceResult &raw_output, const FrameMapping &mapping)
@@ -648,15 +671,21 @@ struct VideoDetectorPipeline::Impl
 {
     YoloDetector detector;
     mutable std::mutex callback_mutex;
-    std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> detection_callback;
-    std::function<void(const gstreamer::BufferInfo &)> frame_callback;
-    std::function<void(OnnxError)> error_callback;
+    // Set by the caller's thread, read by the streaming one, both under callback_mutex.
+    struct Callbacks
+    {
+        std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> detection;
+        std::function<void(const gstreamer::BufferInfo &)> frame;
+        std::function<void(OnnxError)> error;
+    } callbacks;
     std::optional<OnnxError> last_error;
     std::atomic<bool> running{ false };
     std::mutex lifecycle_mutex;
     bool starting{ false };
     bool stopping{ false };
     VideoDetectionConfig config;
+    // The model's input, kept for the streaming thread, the one caller of on_frame_received.
+    PreprocessedFrame scratch;
     // Last, so it is destroyed first: its streaming thread calls into every member above.
     gstreamer::GStreamerPipeline pipeline;
 
@@ -666,11 +695,11 @@ struct VideoDetectorPipeline::Impl
         std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> on_detection;
         {
             const std::scoped_lock lock(callback_mutex);
-            on_frame = frame_callback;
-            on_detection = detection_callback;
+            on_frame = callbacks.frame;
+            on_detection = callbacks.detection;
         }
         if (on_frame) { on_frame(buffer); }
-        auto detection = detector.detect_frame(buffer);
+        auto detection = detector.detect_frame(buffer, scratch);
         if (detection) {
             if (on_detection) { on_detection(*detection, buffer); }
             return;
@@ -681,7 +710,7 @@ struct VideoDetectorPipeline::Impl
             const std::scoped_lock lock(callback_mutex);
             changed = last_error != detection.error();
             last_error = detection.error();
-            on_error = error_callback;
+            on_error = callbacks.error;
         }
         if (on_error) {
             on_error(detection.error());
@@ -771,19 +800,19 @@ auto VideoDetectorPipeline::set_detection_callback(
   std::function<void(const DetectionResult &, const gstreamer::BufferInfo &)> callback) -> void
 {
     const std::scoped_lock lock(impl_->callback_mutex);
-    impl_->detection_callback = std::move(callback);
+    impl_->callbacks.detection = std::move(callback);
 }
 
 auto VideoDetectorPipeline::set_frame_callback(std::function<void(const gstreamer::BufferInfo &)> callback) -> void
 {
     const std::scoped_lock lock(impl_->callback_mutex);
-    impl_->frame_callback = std::move(callback);
+    impl_->callbacks.frame = std::move(callback);
 }
 
 auto VideoDetectorPipeline::set_error_callback(std::function<void(OnnxError)> callback) -> void
 {
     const std::scoped_lock lock(impl_->callback_mutex);
-    impl_->error_callback = std::move(callback);
+    impl_->callbacks.error = std::move(callback);
 }
 
 auto VideoDetectorPipeline::last_error() const -> std::optional<OnnxError>

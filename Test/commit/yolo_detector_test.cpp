@@ -789,6 +789,38 @@ TEST(YoloDecoder, MatchesTheDecodeCasesOfTheSharedModelAntContract)
     }
 }
 
+namespace {
+// One frame into the kept buffer and into a fresh one, which must agree.
+void expect_kept_matches_fresh(const gstreamer::BufferInfo &frame,
+  std::uint32_t size,
+  detection::FramePreprocessMode mode,
+  detection::PreprocessedFrame &kept)
+{
+    ASSERT_TRUE(detection::preprocess_frame_into(frame, size, size, mode, kept).has_value());
+    const auto fresh = detection::preprocess_frame(frame, size, size, mode);
+    ASSERT_TRUE(fresh.has_value());
+    EXPECT_EQ(kept.data, fresh->data) << size;
+    EXPECT_FLOAT_EQ(kept.mapping.pad_y, fresh->mapping.pad_y) << size;
+}
+}// namespace
+
+// The video pipeline keeps one buffer: after a letterbox, a stretch and a smaller input it must hold what a fresh one does.
+TEST(FramePreprocessing, AKeptBufferHoldsWhatAFreshOneDoes)
+{
+    gstreamer::BufferInfo frame;
+    frame.metadata.width = 3;
+    frame.metadata.height = 2;
+    frame.metadata.format = "RGB";
+    for (int value = 0; value < 18; ++value) { frame.data.push_back(static_cast<std::byte>(value * 13)); }
+    frame.size = frame.data.size();
+    detection::PreprocessedFrame kept;
+    using Mode = detection::FramePreprocessMode;
+    expect_kept_matches_fresh(frame, 8, Mode::Letterbox, kept);
+    expect_kept_matches_fresh(frame, 8, Mode::Stretch, kept);
+    expect_kept_matches_fresh(frame, 4, Mode::Letterbox, kept);
+    expect_kept_matches_fresh(frame, 6, Mode::Stretch, kept);
+}
+
 TEST(FramePreprocessing, LetterboxesRgbaAndReturnsTheActualPixelMapping)
 {
     gstreamer::BufferInfo frame;
