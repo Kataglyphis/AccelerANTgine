@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-16, a failed model load says why)
+- `OnnxInferenceEngine::last_error()` and `YoloDetector::last_error()` keep why the last initialize failed: ONNX
+  Runtime's own words for a model that does not load, the provider's reason, or which config check refused it; the
+  provider reason still comes from `provider_error()` too. Python raises `OnnxRuntimeError`, a `RuntimeError`
+  subclass, whose `.code` is the `OnnxError` and whose `.reason` and text carry those words
+  (`initialize failed: ModelLoadFailed: <ONNX Runtime's message>`); a call without words keeps the old text. Test
+  `test_a_failed_load_carries_its_code_and_onnx_runtimes_reason`; both wheels pass 37 tests, 273 ctest tests.
+
 ### Fixed (2026-11-16, the slow-detector test on the TSan lane)
 - `YoloDetector.ASlowDetectorSeesTheNewestFrame` stopped its lossless file run after eight detections, which on the
   slower TSan build came before the twelfth frame (run 43782842473: 11 of 12). A finite source now runs to its end;

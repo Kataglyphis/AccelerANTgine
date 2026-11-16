@@ -165,6 +165,8 @@ class KATAGLYPHIS_CPP_API OnnxInferenceEngine
     [[nodiscard]] auto get_custom_metadata(const std::string &key) const -> std::expected<std::string, OnnxError>;
     // Why the last initialize returned ProviderUnavailable; empty otherwise.
     [[nodiscard]] auto provider_error() const -> std::string;
+    // Why the last initialize failed, ONNX Runtime's own words where it gave them; empty after a success.
+    [[nodiscard]] auto last_error() const -> std::string;
     // The intra-op thread count the session options were given; 0 before initialize.
     [[nodiscard]] auto applied_intra_op_num_threads() const -> int;
 

@@ -44,8 +44,21 @@ auto unwrap_config(std::expected<T, kataglyphis::config::ConfigError> &&result, 
 
 #if HAS_ONNXRUNTIME
 
-[[noreturn]] void raise_onnx(const char *context, kataglyphis::inference::OnnxError error)
-{ throw std::runtime_error(std::format("{} failed: {}", context, to_string(error))); }
+// OnnxRuntimeError, made once in the module's init; a RuntimeError, so callers that catch that still do.
+PyObject *g_onnx_error = nullptr;
+
+// The failure as Python sees it: the code as .code, ONNX Runtime's words as .reason and behind the code in the text.
+[[noreturn]] void
+  raise_onnx(const char *context, kataglyphis::inference::OnnxError error, const std::string &reason = {})
+{
+    std::string message = std::format("{} failed: {}", context, to_string(error));
+    if (!reason.empty()) { message += ": " + reason; }
+    nb::object exception = nb::borrow(g_onnx_error)(message);
+    exception.attr("code") = nb::cast(error);
+    exception.attr("reason") = reason;
+    PyErr_SetObject(g_onnx_error, exception.ptr());
+    throw nb::python_error();
+}
 
 using CpuFloatArray = nb::ndarray<const float, nb::c_contig, nb::device::cpu>;
 // A camera frame as Python holds it: height x width x 3 (RGB) or 4 (RGBA) bytes, rows packed.
@@ -216,7 +229,7 @@ void bind_onnx(nb::module_ &m)
                 nb::gil_scoped_release release;
                 result = self.initialize(snapshot);
             }
-            if (!result) { raise_onnx("initialize", result.error()); }
+            if (!result) { raise_onnx("initialize", result.error(), self.last_error()); }
         },
         "config"_a.lock(),
         "Load the model in config. Releases the GIL while the session is created.")
@@ -291,6 +304,9 @@ void bind_onnx(nb::module_ &m)
       .def("provider_error",
         &OnnxInferenceEngine::provider_error,
         "Why the last initialize found its execution provider unavailable; empty otherwise.")
+      .def("last_error",
+        &OnnxInferenceEngine::last_error,
+        "Why the last initialize failed, in ONNX Runtime's words where it gave them; empty after a success.")
       .def("applied_intra_op_num_threads",
         &OnnxInferenceEngine::applied_intra_op_num_threads,
         "The intra-op thread count the session was given; 0 before initialize.")
@@ -416,7 +432,7 @@ void bind_yolo(nb::module_ &m)
                 nb::gil_scoped_release release;
                 result = self.initialize(snapshot);
             }
-            if (!result) { raise_onnx("YoloDetector.initialize", result.error()); }
+            if (!result) { raise_onnx("YoloDetector.initialize", result.error(), self.last_error()); }
         },
         "config"_a.lock(),
         "Load the model in config. Releases the GIL while the session is created.")
@@ -684,6 +700,9 @@ NB_MODULE(_core, m)
     bind_config(m);
     bind_text(m);
 #if HAS_ONNXRUNTIME
+    // Kept for the process's life, as the module attribute keeps it too; Python owns no reference to release here.
+    g_onnx_error = PyErr_NewException("kataglyphis_inference._core.OnnxRuntimeError", PyExc_RuntimeError, nullptr);
+    m.attr("OnnxRuntimeError") = nb::borrow(g_onnx_error);
     bind_onnx(m);
     bind_yolo(m);
 #endif

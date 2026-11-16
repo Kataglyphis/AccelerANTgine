@@ -582,6 +582,8 @@ auto YoloDetector::applied_intra_op_num_threads() const -> int
     return impl_->engine.applied_intra_op_num_threads();
 }
 
+auto YoloDetector::last_error() const -> std::string { return impl_->engine.last_error(); }
+
 auto YoloDetector::is_initialized() const -> bool
 {
     const std::shared_lock lock(impl_->mutex);

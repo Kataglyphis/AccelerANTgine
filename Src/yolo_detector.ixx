@@ -135,6 +135,8 @@ class KATAGLYPHIS_CPP_API YoloDetector
 
     // The intra-op thread count the ORT session options were given.
     [[nodiscard]] auto applied_intra_op_num_threads() const -> int;
+    // Why the last initialize failed in the engine, ONNX Runtime's words; empty after a success or a config check.
+    [[nodiscard]] auto last_error() const -> std::string;
 
     [[nodiscard]] auto detect(std::span<const float> image_data, std::uint32_t width, std::uint32_t height)
       -> std::expected<DetectionResult, OnnxError>;

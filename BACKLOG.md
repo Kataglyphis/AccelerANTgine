@@ -101,21 +101,16 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the NVIDIA packages' card run (two entries up) passes on that image. Until it is published, a build may
   meet either form of the module.
 
-- [ ] **Different causes share one error code, and the reason stays in the log** (M, ★★). Every code has a
-  name since 2026-11-13 (`to_string` beside each enum), but the code still says too little: in
-  `VideoDetectorPipeline::initialize` a failed GStreamer init and a pipeline that does
-  not parse are both `SessionCreationFailed` (`Src/yolo_detector.cpp`). The reason is in the log only:
-  `initialize_gstreamer` frees GLib's message unlogged (`Src/gstreamer_pipeline.cpp`), Python cannot read
-  `provider_error()`, and the text generator logs GenAI's message (`Src/text_generation.cpp`) while Python and the
-  C API return one fixed text per status.
-
-  First: a last-error text on the engine and the detector, as `provider_error()` keeps it for one case, bound to
-  Python, whose exception becomes a `RuntimeError` subclass with `.code`; the C API gets a last-error function,
-  appended. Done when a pytest reads the reason of a failed load from the exception.
-  A late frame and the end of a stream have their own values since 2026-11-13 (`FrameTimeout`, `EndOfStream`); a
-  broken stream and a pipeline without a sink still share `InputAllocationFailed`.
-  Ask the owner before producing or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four
-  `GStreamerError`, `OnnxError::MemoryAllocationError`).
+- [ ] **The text generator's and the video pipeline's reasons stay in the log** (M, ★★). Since 2026-11-16 the engine
+  and the detector keep why their last initialize failed (`last_error()`, ONNX Runtime's words for a model that does
+  not load), and Python raises `OnnxRuntimeError`, a `RuntimeError` with `.code` and `.reason`. Left: the text
+  generator logs GenAI's message (`Src/text_generation.cpp`) while Python and the C API return one fixed text per
+  status: a `last_error()` there, bound to Python, and a C function `kataglyphis_text_generator_last_error`, appended.
+  In `VideoDetectorPipeline::initialize` a failed GStreamer init and a pipeline that does not parse are both
+  `SessionCreationFailed`, and `initialize_gstreamer` frees GLib's message unlogged (`Src/gstreamer_pipeline.cpp`).
+  A broken stream and a pipeline without a sink still share `InputAllocationFailed`. Ask the owner before producing
+  or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four `GStreamerError`,
+  `OnnxError::MemoryAllocationError`).
 
 - [ ] **`WebRTCStreamer` keeps older copies of code that `GStreamerPipeline` has since improved** (L, ★★). Each
   file owns its own "GStreamer is initialised" flag and its own `gst_deinit` (`Src/webrtc_streamer.cpp:33-35`,

@@ -300,6 +300,9 @@ class TextGenerator:
         End a running generate() after its current token; safe from any thread.
         """
 
+class OnnxRuntimeError(RuntimeError):
+    pass
+
 class OnnxError(enum.Enum):
     SessionCreationFailed = 0
 
@@ -445,6 +448,11 @@ class OnnxInferenceEngine:
     def provider_error(self) -> str:
         """
         Why the last initialize found its execution provider unavailable; empty otherwise.
+        """
+
+    def last_error(self) -> str:
+        """
+        Why the last initialize failed, in ONNX Runtime's words where it gave them; empty after a success.
         """
 
     def applied_intra_op_num_threads(self) -> int:

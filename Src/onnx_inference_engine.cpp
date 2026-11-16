@@ -568,7 +568,12 @@ struct OnnxInferenceEngine::Impl
     bool initialized{ false };
     bool profiling_active{ false };
     int applied_intra_op_num_threads{ 0 };
-    std::string provider_error;
+    // Why the last initialize failed, as ONNX Runtime or the config check put it; the code says which kind.
+    struct Failure
+    {
+        std::optional<OnnxError> code;
+        std::string reason;
+    } failure;
 
     std::vector<std::string> input_names_cache;
     std::vector<std::string> output_names_cache;
@@ -580,7 +585,7 @@ struct OnnxInferenceEngine::Impl
         initialized = false;
         profiling_active = false;
         applied_intra_op_num_threads = 0;
-        provider_error.clear();
+        failure = {};
         input_name_ptrs.clear();
         output_name_ptrs.clear();
         input_names_cache.clear();
@@ -609,6 +614,11 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
     if (config.device_id < 0
         || (config.enable_cuda && config.execution_provider != ExecutionProvider::Cpu
             && config.execution_provider != ExecutionProvider::Cuda)) {
+        impl_->failure = {
+            .code = OnnxError::SessionCreationFailed,
+            .reason =
+              config.device_id < 0 ? "device_id is negative" : "enable_cuda names CUDA, execution_provider another one",
+        };
         return std::unexpected(OnnxError::SessionCreationFailed);
     }
     const auto provider = config.enable_cuda ? ExecutionProvider::Cuda : config.execution_provider;
@@ -626,13 +636,15 @@ auto OnnxInferenceEngine::initialize(const SessionConfig &config) -> std::expect
 
     if (auto appended = append_provider(*impl_->env, options, config, provider); !appended) {
         impl_->reset();
-        impl_->provider_error = std::move(appended.error().reason);
+        impl_->failure = { .code = appended.error().error, .reason = std::move(appended.error().reason) };
         return std::unexpected(appended.error().error);
     }
 
     OrtSession *session = nullptr;
-    if (!ort_succeeded(api.CreateSession(*impl_->env, config.model_path.c_str(), options, &session))) {
+    std::string why;
+    if (!ort_succeeded(api.CreateSession(*impl_->env, config.model_path.c_str(), options, &session), &why)) {
         impl_->reset();
+        impl_->failure = { .code = OnnxError::ModelLoadFailed, .reason = std::move(why) };
         return std::unexpected(OnnxError::ModelLoadFailed);
     }
     impl_->session = std::make_unique<Ort::Session>(session);
@@ -829,7 +841,13 @@ auto OnnxInferenceEngine::get_custom_metadata(const std::string &key) const -> s
 auto OnnxInferenceEngine::provider_error() const -> std::string
 {
     const std::shared_lock lock(impl_->mutex);
-    return impl_->provider_error;
+    return impl_->failure.code == OnnxError::ProviderUnavailable ? impl_->failure.reason : std::string{};
+}
+
+auto OnnxInferenceEngine::last_error() const -> std::string
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->failure.reason;
 }
 
 auto OnnxInferenceEngine::applied_intra_op_num_threads() const -> int

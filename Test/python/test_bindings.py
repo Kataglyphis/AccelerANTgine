@@ -268,3 +268,29 @@ def test_the_detector_names_the_layout_it_decodes(tmp_path):
     detector.initialize(config)
     assert detector.output_layout() == ki.YoloOutputLayout.CornersScoreClass
     assert detector.applied_intra_op_num_threads() == 1
+
+
+@needs_onnx
+def test_a_failed_load_carries_its_code_and_onnx_runtimes_reason(tmp_path):
+    broken = tmp_path / "broken.onnx"
+    broken.write_bytes(b"not a model")
+    config = ki.SessionConfig()
+    config.model_path = broken
+    engine = ki.OnnxInferenceEngine()
+    with pytest.raises(ki.OnnxRuntimeError) as raised:
+        engine.initialize(config)
+    assert isinstance(raised.value, RuntimeError)
+    assert raised.value.code == ki.OnnxError.ModelLoadFailed
+    assert raised.value.reason
+    assert raised.value.reason == engine.last_error()
+    assert str(raised.value).startswith("initialize failed: ModelLoadFailed: ")
+    yolo = ki.YoloConfig()
+    yolo.model_path = broken
+    with pytest.raises(ki.OnnxRuntimeError) as from_detector:
+        ki.YoloDetector().initialize(yolo)
+    assert from_detector.value.code == ki.OnnxError.ModelLoadFailed
+    assert from_detector.value.reason == raised.value.reason
+    # A call that failed without ONNX Runtime's words keeps the old text and an empty reason.
+    with pytest.raises(ki.OnnxRuntimeError) as uninitialized:
+        engine.get_output_shape("output")
+    assert uninitialized.value.reason == ""
