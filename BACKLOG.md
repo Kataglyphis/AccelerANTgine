@@ -153,15 +153,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The Python engine lacks four C++ methods** (S, ★★). Since 2026-11-15 Python has the frame path
-  (`YoloDetector.detect_frame` and `preprocess_frame` on an RGB or RGBA uint8 HWC array), `YoloConfig`'s
-  `preprocess_mode`, both thread counts and `labels`, and `SessionConfig.profiling_prefix`; the bindings hold a
-  structured binding of each config's exact field count, so a new C++ field stops the build, and
-  `test_the_bound_configs_show_every_field` lists Python's names. Left: the engine's `provider_error`,
-  `end_profiling`, `get_custom_metadata` and `applied_intra_op_num_threads` (`kataglyphis_bindings.cpp`), the
-  detector's `output_layout()`, and the same count guard for `DetectionResult`, `BoundingBox` and the WebRTC config
-  structs.
-
 - [ ] **The pipeline's frame counts feed no benchmark** (S, ★). Since 2026-11-15 `VideoDetectorPipeline::stats()`
   counts frames, errors, the last inference time and the frames a live source made while the detector was busy
   (from the timestamps and the caps' rate), and `ASlowDetectorSeesTheNewestFrame` runs the exported live tail

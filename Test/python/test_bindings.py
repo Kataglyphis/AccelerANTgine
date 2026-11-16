@@ -7,7 +7,7 @@ Run with the staged package on the path, e.g.:
 import os
 
 import pytest
-from onnx_models import dynamic_relu_model, yolo_reshape_model
+from onnx_models import dynamic_relu_model, relu_model, yolo_reshape_model
 
 ki = pytest.importorskip("kataglyphis_inference")
 
@@ -234,3 +234,37 @@ def test_the_bound_configs_show_every_field():
     yolo.labels = ["cat", "dog"]
     assert (yolo.preprocess_mode, yolo.labels) == (ki.FramePreprocessMode.Letterbox, ["cat", "dog"])
     assert yolo.intra_op_num_threads == yolo.inter_op_num_threads == ki.shipped_ort_threads()
+
+
+@needs_onnx
+def test_the_engine_reports_its_threads_metadata_and_profile(tmp_path):
+    model = tmp_path / "relu.onnx"
+    model.write_bytes(relu_model())
+    config = ki.SessionConfig()
+    config.model_path = model
+    config.intra_op_num_threads = 1
+    config.profiling_prefix = tmp_path / "profile"
+    engine = ki.OnnxInferenceEngine()
+    assert engine.applied_intra_op_num_threads() == 0
+    engine.initialize(config)
+    assert engine.applied_intra_op_num_threads() == 1
+    assert engine.provider_error() == ""
+    assert engine.get_custom_metadata("kataglyphis.preprocess") == ""
+    profile = engine.end_profiling()
+    assert profile.endswith(".json")
+    assert (tmp_path / profile).exists() or os.path.exists(profile)
+
+
+@needs_onnx
+def test_the_detector_names_the_layout_it_decodes(tmp_path):
+    model = tmp_path / "detections.onnx"
+    model.write_bytes(yolo_reshape_model(height=2, width=3, rows=3, values=6))
+    config = ki.YoloConfig()
+    config.model_path = model
+    config.input_width, config.input_height = 3, 2
+    config.output_layout = ki.YoloOutputLayout.CornersScoreClass
+    config.intra_op_num_threads = 1
+    detector = ki.YoloDetector()
+    detector.initialize(config)
+    assert detector.output_layout() == ki.YoloOutputLayout.CornersScoreClass
+    assert detector.applied_intra_op_num_threads() == 1

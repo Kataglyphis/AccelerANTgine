@@ -437,6 +437,24 @@ class OnnxInferenceEngine:
 
     def get_output_shape(self, name: str) -> list[int | None]: ...
 
+    def get_custom_metadata(self, key: str) -> str:
+        """
+        The model's custom metadata value for key, such as kataglyphis.preprocess; empty when absent.
+        """
+
+    def provider_error(self) -> str:
+        """
+        Why the last initialize found its execution provider unavailable; empty otherwise.
+        """
+
+    def applied_intra_op_num_threads(self) -> int:
+        """The intra-op thread count the session was given; 0 before initialize."""
+
+    def end_profiling(self) -> str:
+        """
+        Stop the profiling a SessionConfig.profiling_prefix started and return the JSON file it wrote.
+        """
+
 class BoundingBox:
     def __init__(self) -> None: ...
 
@@ -606,6 +624,13 @@ class YoloDetector:
         """
 
     def is_initialized(self) -> bool: ...
+
+    def output_layout(self) -> YoloOutputLayout:
+        """
+        The layout the detector decodes, resolved from the model when the config said Auto.
+        """
+
+    def applied_intra_op_num_threads(self) -> int: ...
 
     def detect(self, image: Annotated[NDArray[numpy.float32], dict(order='C', device='cpu', writable=False)], width: int = 0, height: int = 0) -> DetectionResult:
         """

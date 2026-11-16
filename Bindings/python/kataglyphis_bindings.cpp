@@ -278,7 +278,34 @@ void bind_onnx(nb::module_ &m)
             if (!result) { raise_onnx("get_output_shape", result.error()); }
             return result->dimensions;
         },
-        "name"_a);
+        "name"_a)
+      .def(
+        "get_custom_metadata",
+        [](const OnnxInferenceEngine &self, const std::string &key) {
+            auto result = self.get_custom_metadata(key);
+            if (!result) { raise_onnx("get_custom_metadata", result.error()); }
+            return std::move(*result);
+        },
+        "key"_a,
+        "The model's custom metadata value for key, such as kataglyphis.preprocess; empty when absent.")
+      .def("provider_error",
+        &OnnxInferenceEngine::provider_error,
+        "Why the last initialize found its execution provider unavailable; empty otherwise.")
+      .def("applied_intra_op_num_threads",
+        &OnnxInferenceEngine::applied_intra_op_num_threads,
+        "The intra-op thread count the session was given; 0 before initialize.")
+      .def(
+        "end_profiling",
+        [](OnnxInferenceEngine &self) {
+            std::expected<std::string, OnnxError> result;
+            {
+                nb::gil_scoped_release release;
+                result = self.end_profiling();
+            }
+            if (!result) { raise_onnx("end_profiling", result.error()); }
+            return std::move(*result);
+        },
+        "Stop the profiling a SessionConfig.profiling_prefix started and return the JSON file it wrote.");
 }
 
 void bind_yolo(nb::module_ &m)
@@ -322,6 +349,11 @@ void bind_yolo(nb::module_ &m)
       .value("CornersScoreClass", YoloOutputLayout::CornersScoreClass)
       .value("CenterScoresByAnchor", YoloOutputLayout::CenterScoresByAnchor)
       .value("Auto", YoloOutputLayout::Auto);
+
+    // Stop the build when a result struct gains a field, so someone decides whether Python sees it.
+    [[maybe_unused]] const auto &[box_x, box_y, box_width, box_height, box_confidence, box_class, box_name] =
+      BoundingBox{};
+    [[maybe_unused]] const auto &[result_boxes, result_ms, result_width, result_height] = DetectionResult{};
 
     nb::class_<YoloConfig>(m, "YoloConfig")
       .def(nb::init<>())
@@ -389,6 +421,10 @@ void bind_yolo(nb::module_ &m)
         "config"_a.lock(),
         "Load the model in config. Releases the GIL while the session is created.")
       .def("is_initialized", &YoloDetector::is_initialized)
+      .def("output_layout",
+        &YoloDetector::output_layout,
+        "The layout the detector decodes, resolved from the model when the config said Auto.")
+      .def("applied_intra_op_num_threads", &YoloDetector::applied_intra_op_num_threads)
       .def(
         "detect",
         [](YoloDetector &self, const CpuFloatArray &image, std::uint32_t width, std::uint32_t height) {
@@ -464,6 +500,22 @@ void bind_config(nb::module_ &m)
       .def_rw("input_path", &StreamSettingsConfig::input_path, nb::lock_self())
       .def_rw("input_uri", &StreamSettingsConfig::input_uri, nb::lock_self())
       .def_rw("producer_id", &StreamSettingsConfig::producer_id, nb::lock_self());
+
+    // Stop the build when a config struct gains a field, so someone decides whether Python sees it.
+    [[maybe_unused]] const auto &[video_width, video_height, video_framerate, video_bitrate] = VideoConfig{};
+    [[maybe_unused]] const auto &[texture_width, texture_height] = TextureConfig{};
+    [[maybe_unused]] const auto &[android_width, android_height, android_fps] = AndroidConfig{};
+    [[maybe_unused]] const auto
+      &[stream_source, stream_encoder, stream_device, stream_camera, stream_path, stream_uri, stream_producer] =
+        StreamSettingsConfig{};
+    [[maybe_unused]] const auto &[webrtc_server,
+      webrtc_reconnect,
+      webrtc_stun,
+      webrtc_turn,
+      webrtc_video,
+      webrtc_texture,
+      webrtc_android,
+      webrtc_stream] = WebRTCConfig{};
 
     nb::class_<WebRTCConfig>(m, "WebRTCConfig")
       .def(nb::init<>())

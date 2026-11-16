@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-15, the rest of the engine in Python)
+- `OnnxInferenceEngine` binds `get_custom_metadata`, `provider_error`, `applied_intra_op_num_threads` and
+  `end_profiling`, which ends what `SessionConfig.profiling_prefix` started and returns the JSON file; `YoloDetector`
+  binds `output_layout()` and `applied_intra_op_num_threads()`. Every bound struct (`BoundingBox`, `DetectionResult`,
+  both model configs and the five WebRTC config structs) now has a structured binding of its exact field count in
+  the bindings. Tests for the engine's figures and profile and the detector's layout; both wheels pass 36 tests.
+
 ### Added (2026-11-15, Python reads camera frames itself)
 - `YoloDetector.detect_frame(image)` and `preprocess_frame(image, width, height, mode)` take an RGB or RGBA uint8
   height x width x channels array, so a Python caller no longer writes the ModelANT contract's resize and
