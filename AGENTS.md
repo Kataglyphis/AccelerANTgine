@@ -578,10 +578,12 @@ in wall time (run 41271221703 doubled `BM_DetectFrame` at an unchanged instructi
 (the host Profile run's `dist/windows-x64/perf/results.json`) and **`perf-win-arm64`** (the staged
 suite's `results.json` on windows-11-arm, with the model staged beside it). `perf-cachegrind.py` then counts the instructions per
 iteration of `BM_PreprocessFrame` and `BM_DetectFrame` at one ORT thread
-(`valgrind --tool=cachegrind --cache-sim=no`, 4 minus 2 iterations) and fails a key over its entry in
-`perf/cachegrind-baseline.json` by more than max(3 %, 3 x the spread recorded there over at least 5
-hosted runs). `x64-clang` and `x64-gcc` have entries, from six hosted runs on five CPU models
-(spread under 1e-5, so the 3 % floor rules) and fail when missing; an arm64 key only records. Re-record after an intended change with
+(`valgrind --tool=cachegrind --cache-sim=no`, 4 minus 2 iterations) and fails a key that leaves its entry in
+`perf/cachegrind-baseline.json`, over or under it, by more than max(3 %, 3 x the spread recorded there over at least 5
+hosted runs): a speed-up past the floor fails too, so the gain is kept in the baseline and cannot be lost again
+unseen. `x64-clang` and `x64-gcc` have entries, from six hosted runs on five CPU models each (re-recorded 2026-11-16
+after `preprocess_frame_into` halved `BM_PreprocessFrame`; spread under 5e-4, so the 3 % floor rules) and fail when
+missing; an arm64 key only records. Re-record after an intended change with
 `perf-cachegrind.py --summarize <cachegrind.json from 5+ CI runs>`; never widen an entry by hand.
 
 The whole Linux CI chain, in order:

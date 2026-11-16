@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-16, the instruction-count gate fails a speed-up it has not recorded)
+- `perf-cachegrind.py`'s `check()` fails a count under its baseline by more than the allowance too ("under", with
+  "re-record the baseline from five runs"), so a gain is kept in `perf/cachegrind-baseline.json` and cannot be lost
+  again unseen. Both x64 entries are re-recorded from six green runs each (`--summarize`): `BM_PreprocessFrame` had
+  dropped from 11.8 M to 5.6 M instructions on clang and from 10.6 M to 6.4 M on gcc since `preprocess_frame_into`,
+  under a ceiling nobody lowered; `BM_DetectFrame` moved 0.7 %. A test for both bands and the mutation recipes
+  `perf-cachegrind.no-ceiling` and `no-floor`; `AGENTS.md` section 5 says so.
+
 ### Added (2026-11-16, a benchmark asks whether the detector keeps up with a camera)
 - `BM_VideoPipelineKeepsUp` runs the DEIM model behind a live 30 fps `videotestsrc` and the camera's leaky tail for two
   seconds and reports `frames_per_second`, from the first frame's timestamp to the last so the model's load does not

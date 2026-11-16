@@ -133,24 +133,14 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The instruction-count gate cannot tighten and guards x64 only** (M, ★★). `check()` fails only on "over"
-  (`scripts/linux/perf-cachegrind.py:88-100`), so after a speed-up the old ceiling stays and the gain can be lost
-  again without a failure. Not measured: whether 6219631 moved `BM_PreprocessFrame`;
-  `perf/cachegrind-baseline.json` is unchanged since 3441996. It holds `x64-clang` and `x64-gcc` only, and `perf/`
-  has one host baseline, a Ryzen 9 5950X, so nothing is graded on the Pi's CPU. The gate has a unit test
-  (`.github/workflows/lint-gates.yml:76`) and no recipe in `scripts/linux/tests/lane-mutations.json`.
-
-  First: a lower bound in `check()`: a count under the baseline by more than the allowance fails with "re-record the
-  baseline". One run may lower an entry, since the recorded spread is under 1e-5; widening keeps its five runs. Add
-  the case to `test-perf-cachegrind.py` and one mutation recipe per bound.
-  Then: arm64 entries from five `[ci arm64]` runs with `--summarize`; a gated benchmark of `run_inference_in_place`
-  at 3x640x640, the path the detector takes since 6219631 (`BM_OnnxRunInference` times the copying one,
-  `Test/perf/perfSuite.cpp:157`); `BM_TextGenerateTiny` under the same counter if its spread stays under 1 %, which
-  nobody has tried; `perf/baseline-<cpu>.json` for the Pi from `quality-report.sh --perf-host --update-baseline`, as
-  a `systemd-run` unit when the board is quiet.
-  Done when both x64 keys fail in either direction and the arm64 keys fail when missing.
-  Ask the owner before letting one run lower an entry: `AGENTS.md` (section 5, the perf gate) re-records from five or more runs, and a
-  lower bound adds a re-record step after every intended speed-up.
+- [ ] **The instruction-count gate guards x64 only** (M, ★★). Since 2026-11-16 `check()` fails under the band as well
+  as over it, with "re-record the baseline", and both x64 entries are re-recorded from six hosted runs each
+  (`BM_PreprocessFrame` 11.8 M to 5.6 M instructions on clang, 10.6 M to 6.4 M on gcc, the uncredited speed-up of
+  `preprocess_frame_into`). Next: arm64 entries from five `[ci arm64]` runs with `--summarize`; a gated benchmark of
+  `run_inference_in_place` at 3x640x640, the path the detector takes (`BM_OnnxRunInference` times the copying one);
+  `BM_TextGenerateTiny` under the same counter if its spread stays under 1 %; `perf/baseline-<cpu>.json` for the Pi
+  from `quality-report.sh --perf-host --update-baseline`, as a `systemd-run` unit when the board is quiet (owner).
+  Done when the arm64 keys fail when missing.
 
 - [ ] **The fuzz targets run in unit mode only, with no kept corpus** (M, ★). Since 2026-11-14 eleven properties
   run in the clang Debug lane's `fuzzTestSuite`, each for a second of random inputs.

@@ -68,6 +68,17 @@ class PerfCachegrind(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("::error title=Instruction count regressed::BM_DetectFrame", result.stderr)
 
+    def test_a_count_under_the_band_asks_for_a_new_baseline(self) -> None:
+        # The same 3 % floor below: 970 passes, 969 is a speed-up the baseline has to take on.
+        self.assertEqual(self.run_tool(970, 100000).returncode, 0)
+        result = self.run_tool(969, 100000)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("BM_PreprocessFrame under", result.stdout)
+        self.assertIn("re-record the baseline", result.stderr)
+        # Three times the wider spread below as well.
+        self.assertEqual(self.run_tool(1000, 94000).returncode, 0)
+        self.assertEqual(self.run_tool(1000, 93999).returncode, 1)
+
     def test_a_key_without_baseline_records_only_unless_required(self) -> None:
         self.assertEqual(self.run_tool(9999, 999999, "--key", "arm64-gcc").returncode, 0)
         self.assertEqual(self.run_tool(9999, 999999, "--key", "arm64-gcc", "--require-baseline").returncode, 1)

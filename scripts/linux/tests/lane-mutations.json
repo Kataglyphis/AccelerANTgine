@@ -486,5 +486,21 @@
   "replace": "",
   "test": "bash scripts/linux/tests/test-ort-chain-proof.sh",
   "why": "A GenAI without the chain build's source path is refused at configure time, as ORT is."
+ },
+ {
+  "id": "perf-cachegrind.no-ceiling",
+  "target": "scripts/linux/perf-cachegrind.py",
+  "find": "        verdict = \"over\" if counts[bench] > ceiling else \"under\" if counts[bench] < lowest else \"ok\"\n",
+  "replace": "        verdict = \"under\" if counts[bench] < lowest else \"ok\"\n",
+  "test": "python3 scripts/linux/tests/test-perf-cachegrind.py",
+  "why": "A count over the band is a regression the gate exists to stop."
+ },
+ {
+  "id": "perf-cachegrind.no-floor",
+  "target": "scripts/linux/perf-cachegrind.py",
+  "find": "        verdict = \"over\" if counts[bench] > ceiling else \"under\" if counts[bench] < lowest else \"ok\"\n",
+  "replace": "        verdict = \"over\" if counts[bench] > ceiling else \"ok\"\n",
+  "test": "python3 scripts/linux/tests/test-perf-cachegrind.py",
+  "why": "A speed-up past the floor must be re-recorded, or the gain can be lost again without a failure."
  }
 ]

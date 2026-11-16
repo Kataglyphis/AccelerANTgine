@@ -79,23 +79,37 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return entry
 
 
+def allowance(baseline: dict[str, Any]) -> float:
+    """max(3 %, 3 x the recorded spread), in either direction."""
+    return max(FLOOR, SPREAD_FACTOR * float(baseline["spread"]))
+
+
 def limit(baseline: dict[str, Any]) -> float:
-    """The highest count that passes: max(3 %, 3 x the recorded spread) over the baseline."""
-    allowance = max(FLOOR, SPREAD_FACTOR * float(baseline["spread"]))
-    return int(baseline["instructions"]) * (1 + allowance)
+    """The highest count that passes."""
+    return int(baseline["instructions"]) * (1 + allowance(baseline))
+
+
+def floor(baseline: dict[str, Any]) -> float:
+    """The lowest count that passes: a speed-up past it is kept only by re-recording, or a later loss stays unseen."""
+    return int(baseline["instructions"]) * (1 - allowance(baseline))
 
 
 def check(counts: dict[str, int], entry: dict[str, dict[str, Any]]) -> int:
-    """1 when a benchmark exceeds its limit; each verdict is printed."""
+    """1 when a benchmark leaves its band, over the limit or under the floor; each verdict is printed."""
     failed = 0
     for bench in BENCHES:
         ceiling = limit(entry[bench])
+        lowest = floor(entry[bench])
         base = int(entry[bench]["instructions"])
-        verdict = "over" if counts[bench] > ceiling else "ok"
+        verdict = "over" if counts[bench] > ceiling else "under" if counts[bench] < lowest else "ok"
         print(f"perf-cachegrind: {bench} {verdict}: {counts[bench]} instructions, baseline {base}, "
-              f"limit {int(ceiling)} ({(counts[bench] / base - 1) * 100:+.2f} %)")
+              f"band {int(lowest)}-{int(ceiling)} ({(counts[bench] / base - 1) * 100:+.2f} %)")
         if verdict == "over":
             print(f"::error title=Instruction count regressed::{bench} {counts[bench]} > {int(ceiling)}", file=sys.stderr)
+            failed = 1
+        elif verdict == "under":
+            print(f"::error title=Instruction count dropped::{bench} {counts[bench]} < {int(lowest)}: "
+                  "re-record the baseline from five runs (AGENTS.md section 5)", file=sys.stderr)
             failed = 1
     return failed
 
