@@ -86,13 +86,17 @@ class PerfCachegrind(unittest.TestCase):
         self.assertEqual(self.run_tool(9999, 999999, "--key", "arm64-gcc").returncode, 0)
         self.assertEqual(self.run_tool(9999, 999999, "--key", "arm64-gcc", "--require-baseline").returncode, 1)
 
-    def test_a_benchmark_without_an_entry_is_recorded_with_a_warning(self) -> None:
+    def test_a_benchmark_without_an_entry_warns_unless_required(self) -> None:
         entry = json.loads(self.baseline.read_text())["baselines"]["x64-clang"]
         del entry["BM_OnnxRunInferenceInPlace"]
         self.baseline.write_text(json.dumps({"baselines": {"x64-clang": entry}}), encoding="utf-8")
         result = self.run_tool(1000, 100000, FAKE_BM_OnnxRunInferenceInPlace="99999")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("BM_OnnxRunInferenceInPlace 99999 has no entry yet", result.stderr)
+        # Where the key must have a baseline, so must each of its benchmarks.
+        required = self.run_tool(1000, 100000, "--require-baseline", FAKE_BM_OnnxRunInferenceInPlace="99999")
+        self.assertEqual(required.returncode, 1)
+        self.assertIn("BM_OnnxRunInferenceInPlace 99999 has no entry;", required.stderr)
 
     def test_a_failed_benchmark_run_fails(self) -> None:
         result = self.run_tool(1000, 100000, FAKE_EXIT="1")

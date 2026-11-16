@@ -2,278 +2,412 @@
   "baselines": {
     "arm64-clang": {
       "BM_DetectFrame": {
-        "instructions": 1732531587,
+        "instructions": 1732539816,
         "runs": [
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732531624,
-            "run_id": "43855284011"
+            "instructions": 1732539816,
+            "run_id": "43935268743"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732531575,
-            "run_id": "43863394853"
+            "instructions": 1732539845,
+            "run_id": "43944876583"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732531584,
-            "run_id": "43866828985"
+            "instructions": 1732539873,
+            "run_id": "43955495517"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732531587,
-            "run_id": "43869944983"
+            "instructions": 1732539763,
+            "run_id": "43960573328"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732531645,
-            "run_id": "43873251626"
+            "instructions": 1732539804,
+            "run_id": "43965775305"
           }
         ],
-        "spread": 4.0403303769606825e-08
+        "spread": 6.349060436253778e-08
+      },
+      "BM_OnnxRunInferenceInPlace": {
+        "instructions": 2475596,
+        "runs": [
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475596,
+            "run_id": "43935268743"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475566,
+            "run_id": "43944876583"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475683,
+            "run_id": "43955495517"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475734,
+            "run_id": "43960573328"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475586,
+            "run_id": "43965775305"
+          }
+        ],
+        "spread": 6.786244605339482e-05
       },
       "BM_PreprocessFrame": {
-        "instructions": 6055216,
+        "instructions": 6055174,
         "runs": [
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6055219,
-            "run_id": "43855284011"
+            "instructions": 6055174,
+            "run_id": "43935268743"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6055216,
-            "run_id": "43863394853"
+            "instructions": 6055148,
+            "run_id": "43944876583"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6055244,
-            "run_id": "43866828985"
+            "instructions": 6055206,
+            "run_id": "43955495517"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6055212,
-            "run_id": "43869944983"
+            "instructions": 6055230,
+            "run_id": "43960573328"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6055151,
-            "run_id": "43873251626"
+            "instructions": 6055148,
+            "run_id": "43965775305"
           }
         ],
-        "spread": 1.53586593773038e-05
+        "spread": 1.3542137682583523e-05
       }
     },
     "arm64-gcc": {
       "BM_DetectFrame": {
-        "instructions": 1732948510,
+        "instructions": 1732949837,
         "runs": [
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732948448,
-            "run_id": "43855284011"
+            "instructions": 1732949837,
+            "run_id": "43935268743"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732948531,
-            "run_id": "43863394853"
+            "instructions": 1732949875,
+            "run_id": "43944876583"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732948531,
-            "run_id": "43866828985"
+            "instructions": 1732949855,
+            "run_id": "43955495517"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732948510,
-            "run_id": "43869944983"
+            "instructions": 1732949817,
+            "run_id": "43960573328"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 1732948497,
-            "run_id": "43873251626"
+            "instructions": 1732949810,
+            "run_id": "43965775305"
           }
         ],
-        "spread": 4.789524877458708e-08
+        "spread": 3.750829863172779e-08
+      },
+      "BM_OnnxRunInferenceInPlace": {
+        "instructions": 2475454,
+        "runs": [
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475390,
+            "run_id": "43935268743"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2482949,
+            "run_id": "43944876583"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475454,
+            "run_id": "43955495517"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2483043,
+            "run_id": "43960573328"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 2475399,
+            "run_id": "43965775305"
+          }
+        ],
+        "spread": 0.00309155411492195
       },
       "BM_PreprocessFrame": {
-        "instructions": 6464892,
+        "instructions": 6464940,
         "runs": [
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6464850,
-            "run_id": "43855284011"
+            "instructions": 6464978,
+            "run_id": "43935268743"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6464958,
-            "run_id": "43863394853"
+            "instructions": 6464904,
+            "run_id": "43944876583"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6464892,
-            "run_id": "43866828985"
+            "instructions": 6464940,
+            "run_id": "43955495517"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6464933,
-            "run_id": "43869944983"
+            "instructions": 6464941,
+            "run_id": "43960573328"
           },
           {
             "cpu_model": "Neoverse-N2",
-            "instructions": 6464890,
-            "run_id": "43873251626"
+            "instructions": 6464854,
+            "run_id": "43965775305"
           }
         ],
-        "spread": 1.6705615499841297e-05
+        "spread": 1.9180379090911903e-05
       }
     },
     "x64-clang": {
       "BM_DetectFrame": {
-        "instructions": 1190995950,
+        "instructions": 1190992958,
         "runs": [
           {
-            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
-            "instructions": 1190998826,
-            "run_id": "43768447719"
-          },
-          {
             "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 1190991186,
-            "run_id": "43774321133"
+            "instructions": 1190992927,
+            "run_id": "43935268428"
           },
           {
             "cpu_model": "Intel(R) Xeon(R) 6975P-C",
-            "instructions": 1190995044,
-            "run_id": "43778500905"
-          },
-          {
-            "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 1190991178,
-            "run_id": "43786421611"
+            "instructions": 1190995848,
+            "run_id": "43940960408"
           },
           {
             "cpu_model": "AMD EPYC 9V74 80-Core Processor",
-            "instructions": 1191000401,
-            "run_id": "43793767283"
+            "instructions": 1190992966,
+            "run_id": "43944872518"
           },
           {
-            "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
-            "instructions": 1190996857,
-            "run_id": "43796127354"
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 1190992950,
+            "run_id": "43955490225"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 1190992943,
+            "run_id": "43960567940"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 1190992978,
+            "run_id": "43965769132"
           }
         ],
-        "spread": 7.743939008464328e-06
+        "spread": 2.452575374505279e-06
+      },
+      "BM_OnnxRunInferenceInPlace": {
+        "instructions": 2708349,
+        "runs": [
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 2708307,
+            "run_id": "43935268428"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) 6975P-C",
+            "instructions": 2708352,
+            "run_id": "43940960408"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 2708562,
+            "run_id": "43944872518"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 2708346,
+            "run_id": "43955490225"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 2695044,
+            "run_id": "43960567940"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 2708365,
+            "run_id": "43965769132"
+          }
+        ],
+        "spread": 0.0049912326661002695
       },
       "BM_PreprocessFrame": {
-        "instructions": 5625197,
+        "instructions": 5625170,
         "runs": [
           {
-            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
-            "instructions": 5625110,
-            "run_id": "43768447719"
-          },
-          {
             "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 5625286,
-            "run_id": "43774321133"
+            "instructions": 5625235,
+            "run_id": "43935268428"
           },
           {
             "cpu_model": "Intel(R) Xeon(R) 6975P-C",
-            "instructions": 5625104,
-            "run_id": "43778500905"
-          },
-          {
-            "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 5625244,
-            "run_id": "43786421611"
+            "instructions": 5625137,
+            "run_id": "43940960408"
           },
           {
             "cpu_model": "AMD EPYC 9V74 80-Core Processor",
-            "instructions": 5625158,
-            "run_id": "43793767283"
+            "instructions": 5625130,
+            "run_id": "43944872518"
           },
           {
-            "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
-            "instructions": 5625236,
-            "run_id": "43796127354"
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 5625178,
+            "run_id": "43955490225"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 5625223,
+            "run_id": "43960567940"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 5625163,
+            "run_id": "43965769132"
           }
         ],
-        "spread": 3.235442243178328e-05
+        "spread": 1.866610087640899e-05
       }
     },
     "x64-gcc": {
       "BM_DetectFrame": {
-        "instructions": 1191822841,
+        "instructions": 1191810264,
         "runs": [
           {
-            "cpu_model": "Intel(R) Xeon(R) 6975P-C",
-            "instructions": 1191797325,
-            "run_id": "43768447719"
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 1191810096,
+            "run_id": "43935268428"
           },
           {
             "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 1191831181,
-            "run_id": "43774321133"
+            "instructions": 1191810307,
+            "run_id": "43940960408"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 1191810208,
+            "run_id": "43944872518"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) 6975P-C",
+            "instructions": 1191812668,
+            "run_id": "43955490225"
           },
           {
             "cpu_model": "AMD EPYC 9V45 96-Core Processor",
-            "instructions": 1191831144,
-            "run_id": "43778500905"
+            "instructions": 1191810274,
+            "run_id": "43960567940"
           },
           {
             "cpu_model": "AMD EPYC 9V74 80-Core Processor",
-            "instructions": 1191833778,
-            "run_id": "43786421611"
+            "instructions": 1191810254,
+            "run_id": "43965769132"
+          }
+        ],
+        "spread": 2.158061629178921e-06
+      },
+      "BM_OnnxRunInferenceInPlace": {
+        "instructions": 2708115,
+        "runs": [
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 2708256,
+            "run_id": "43935268428"
           },
           {
             "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 1191810922,
-            "run_id": "43793767283"
+            "instructions": 2708170,
+            "run_id": "43940960408"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 2691791,
+            "run_id": "43944872518"
           },
           {
             "cpu_model": "Intel(R) Xeon(R) 6975P-C",
-            "instructions": 1191814539,
-            "run_id": "43796127354"
+            "instructions": 2707735,
+            "run_id": "43955490225"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+            "instructions": 2708136,
+            "run_id": "43960567940"
+          },
+          {
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 2708094,
+            "run_id": "43965769132"
           }
         ],
-        "spread": 3.0585921607376744e-05
+        "spread": 0.006079874746825744
       },
       "BM_PreprocessFrame": {
-        "instructions": 6443015,
+        "instructions": 6443202,
         "runs": [
           {
-            "cpu_model": "Intel(R) Xeon(R) 6975P-C",
-            "instructions": 6442689,
-            "run_id": "43768447719"
+            "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+            "instructions": 6443163,
+            "run_id": "43935268428"
           },
           {
             "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 6441322,
-            "run_id": "43774321133"
+            "instructions": 6443204,
+            "run_id": "43940960408"
+          },
+          {
+            "cpu_model": "AMD EPYC 7763 64-Core Processor",
+            "instructions": 6443251,
+            "run_id": "43944872518"
+          },
+          {
+            "cpu_model": "Intel(R) Xeon(R) 6975P-C",
+            "instructions": 6443513,
+            "run_id": "43955490225"
           },
           {
             "cpu_model": "AMD EPYC 9V45 96-Core Processor",
-            "instructions": 6441144,
-            "run_id": "43778500905"
+            "instructions": 6443061,
+            "run_id": "43960567940"
           },
           {
             "cpu_model": "AMD EPYC 9V74 80-Core Processor",
-            "instructions": 6443831,
-            "run_id": "43786421611"
-          },
-          {
-            "cpu_model": "AMD EPYC 7763 64-Core Processor",
-            "instructions": 6443945,
-            "run_id": "43793767283"
-          },
-          {
-            "cpu_model": "Intel(R) Xeon(R) 6975P-C",
-            "instructions": 6443341,
-            "run_id": "43796127354"
+            "instructions": 6443200,
+            "run_id": "43965769132"
           }
         ],
-        "spread": 0.00043473435961269687
+        "spread": 7.015145575134847e-05
       }
     }
   },

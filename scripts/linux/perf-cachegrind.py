@@ -94,13 +94,18 @@ def floor(baseline: dict[str, Any]) -> float:
     return int(baseline["instructions"]) * (1 - allowance(baseline))
 
 
-def check(counts: dict[str, int], entry: dict[str, dict[str, Any]]) -> int:
-    """1 when a benchmark leaves its band, over the limit or under the floor; each verdict is printed."""
+def check(counts: dict[str, int], entry: dict[str, dict[str, Any]], require: bool = False) -> int:
+    """1 when a benchmark leaves its band, over the limit or under the floor, or has no entry where one is required."""
     failed = 0
     for bench in BENCHES:
         if bench not in entry:
-            print(f"::warning title=No instruction-count baseline::{bench} {counts[bench]} has no entry yet; recorded only",
-                  file=sys.stderr)
+            if require:
+                print(f"::error title=No instruction-count baseline::{bench} {counts[bench]} has no entry; "
+                      "re-record the baseline from five runs (AGENTS.md section 5)", file=sys.stderr)
+                failed = 1
+            else:
+                print(f"::warning title=No instruction-count baseline::{bench} {counts[bench]} has no entry yet; "
+                      "recorded only", file=sys.stderr)
             continue
         ceiling = limit(entry[bench])
         lowest = floor(entry[bench])
@@ -153,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"perf-cachegrind: {args.key} has no baseline in {args.baseline}; recorded only")
         return 0
-    return check(counts, baselines[args.key])
+    return check(counts, baselines[args.key], args.require_baseline)
 
 
 if __name__ == "__main__":

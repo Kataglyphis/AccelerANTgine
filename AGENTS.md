@@ -582,11 +582,10 @@ iteration of `BM_PreprocessFrame`, `BM_DetectFrame` and `BM_OnnxRunInferenceInPl
 (`valgrind --tool=cachegrind --cache-sim=no`, 4 minus 2 iterations) and fails a key that leaves its entry in
 `perf/cachegrind-baseline.json`, over or under it, by more than max(3 %, 3 x the spread recorded there over at least 5
 hosted runs): a speed-up past the floor fails too, so the gain is kept in the baseline and cannot be lost again
-unseen. `x64-clang` and `x64-gcc` have entries, from six hosted runs on five CPU models each (re-recorded 2026-11-16
-after `preprocess_frame_into` halved `BM_PreprocessFrame`; spread under 5e-4, so the 3 % floor rules) and fail when
-missing. `arm64-clang` and `arm64-gcc` have entries from five hosted runs on Neoverse-N2 (2026-11-16, spread under
-2e-5) and fail when missing too; any other arch only records. `BM_OnnxRunInferenceInPlace` has no entry yet and is
-recorded with a warning until five runs per key re-record all four. Re-record after an intended change with
+unseen. All four keys were re-recorded on 2026-11-16 with `BM_OnnxRunInferenceInPlace`: `x64-clang` and `x64-gcc`
+from six hosted runs on four CPU models each, `arm64-clang` and `arm64-gcc` from five on Neoverse-N2; every spread
+is under 1 %, so the 3 % floor rules. On x64 and arm64 a missing key, or a benchmark its entry lacks, fails the lane;
+any other arch only records, and a benchmark added to `BENCHES` warns until it is recorded. Re-record after an intended change with
 `perf-cachegrind.py --summarize <cachegrind.json from 5+ CI runs>`; never widen an entry by hand.
 
 The whole Linux CI chain, in order:

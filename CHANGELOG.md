@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-16, all four instruction-count entries hold the in-place inference call)
+- `perf/cachegrind-baseline.json` re-records `x64-clang` and `x64-gcc` from six green runs and `arm64-clang` and
+  `arm64-gcc` from five (`--summarize`), now with `BM_OnnxRunInferenceInPlace` (2.71 M instructions on x64, 2.48 M on
+  arm64, spread at most 0.61 %). `BM_DetectFrame` and `BM_PreprocessFrame` moved under 0.01 %.
+- With `--require-baseline`, which the x64 and arm64 lanes pass, a benchmark an entry lacks now fails like a missing
+  key; without it, it still warns. The tool test covers both.
+
 ### Removed (2026-11-16, nine error values nothing returned)
 - `WebRTCError` loses `SignallingConnectionFailed`, `NegotiationFailed`, `LibcameraNotAvailable`,
   `EncoderNotAvailable` and `Timeout`, and `GStreamerError` loses `LinkFailed`, `CapsNegotiationFailed`,
