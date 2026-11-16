@@ -583,7 +583,8 @@ iteration of `BM_PreprocessFrame` and `BM_DetectFrame` at one ORT thread
 hosted runs): a speed-up past the floor fails too, so the gain is kept in the baseline and cannot be lost again
 unseen. `x64-clang` and `x64-gcc` have entries, from six hosted runs on five CPU models each (re-recorded 2026-11-16
 after `preprocess_frame_into` halved `BM_PreprocessFrame`; spread under 5e-4, so the 3 % floor rules) and fail when
-missing; an arm64 key only records. Re-record after an intended change with
+missing. `arm64-clang` and `arm64-gcc` have entries from five hosted runs on Neoverse-N2 (2026-11-16, spread under
+2e-5) and fail when missing too; any other arch only records. Re-record after an intended change with
 `perf-cachegrind.py --summarize <cachegrind.json from 5+ CI runs>`; never widen an entry by hand.
 
 The whole Linux CI chain, in order:

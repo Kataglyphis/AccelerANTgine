@@ -195,9 +195,9 @@ mkdir -p "${PERF_DIR}"
 
 # Instruction counts at one ORT thread; a key with a recorded baseline gates (AGENTS.md section 5).
 case "$(uname -m)" in x86_64) PERF_ARCH=x64 ;; aarch64) PERF_ARCH=arm64 ;; *) PERF_ARCH="$(uname -m)" ;; esac
-# x64 has recorded baselines, so a missing entry there is a broken gate, not a first run.
+# Both hosted arches have recorded baselines, so a missing entry there is a broken gate, not a first run.
 PERF_REQUIRE=()
-if [[ "${PERF_ARCH}" == x64 ]]; then
+if [[ "${PERF_ARCH}" == x64 || "${PERF_ARCH}" == arm64 ]]; then
   PERF_REQUIRE=(--require-baseline)
 fi
 KATAGLYPHIS_REQUIRE_MODEL=1 python3 "${_SCRIPT_DIR}/perf-cachegrind.py" --suite "${BUILD_DIR}/perfTestSuite" \

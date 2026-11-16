@@ -133,14 +133,12 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The instruction-count gate guards x64 only** (M, ★★). Since 2026-11-16 `check()` fails under the band as well
-  as over it, with "re-record the baseline", and both x64 entries are re-recorded from six hosted runs each
-  (`BM_PreprocessFrame` 11.8 M to 5.6 M instructions on clang, 10.6 M to 6.4 M on gcc, the uncredited speed-up of
-  `preprocess_frame_into`). Next: arm64 entries from five `[ci arm64]` runs with `--summarize`; a gated benchmark of
-  `run_inference_in_place` at 3x640x640, the path the detector takes (`BM_OnnxRunInference` times the copying one);
-  `BM_TextGenerateTiny` under the same counter if its spread stays under 1 %; `perf/baseline-<cpu>.json` for the Pi
-  from `quality-report.sh --perf-host --update-baseline`, as a `systemd-run` unit when the board is quiet (owner).
-  Done when the arm64 keys fail when missing.
+- [ ] **The instruction-count gate guards two benchmarks only** (M, ★). Both hosted arches have entries in
+  `perf/cachegrind-baseline.json` and fail when missing: x64 from six runs, arm64 from five on Neoverse-N2 (2026-11-16).
+  Next: a gated benchmark of `run_inference_in_place` at 3x640x640, the path the detector takes (`BM_OnnxRunInference`
+  times the copying one); `BM_TextGenerateTiny` under the same counter if its spread stays under 1 %;
+  `perf/baseline-<cpu>.json` for the Pi from `quality-report.sh --perf-host --update-baseline`, as a `systemd-run` unit
+  when the board is quiet (owner). Done when the detector's inference path has an entry.
 
 - [ ] **The fuzz targets run in unit mode only, with no kept corpus** (M, ★). Since 2026-11-14 eleven properties
   run in the clang Debug lane's `fuzzTestSuite`, each for a second of random inputs.

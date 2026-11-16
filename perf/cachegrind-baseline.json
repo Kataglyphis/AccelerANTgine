@@ -1,5 +1,133 @@
 {
   "baselines": {
+    "arm64-clang": {
+      "BM_DetectFrame": {
+        "instructions": 1732531587,
+        "runs": [
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732531624,
+            "run_id": "43855284011"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732531575,
+            "run_id": "43863394853"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732531584,
+            "run_id": "43866828985"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732531587,
+            "run_id": "43869944983"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732531645,
+            "run_id": "43873251626"
+          }
+        ],
+        "spread": 4.0403303769606825e-08
+      },
+      "BM_PreprocessFrame": {
+        "instructions": 6055216,
+        "runs": [
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6055219,
+            "run_id": "43855284011"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6055216,
+            "run_id": "43863394853"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6055244,
+            "run_id": "43866828985"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6055212,
+            "run_id": "43869944983"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6055151,
+            "run_id": "43873251626"
+          }
+        ],
+        "spread": 1.53586593773038e-05
+      }
+    },
+    "arm64-gcc": {
+      "BM_DetectFrame": {
+        "instructions": 1732948510,
+        "runs": [
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732948448,
+            "run_id": "43855284011"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732948531,
+            "run_id": "43863394853"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732948531,
+            "run_id": "43866828985"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732948510,
+            "run_id": "43869944983"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 1732948497,
+            "run_id": "43873251626"
+          }
+        ],
+        "spread": 4.789524877458708e-08
+      },
+      "BM_PreprocessFrame": {
+        "instructions": 6464892,
+        "runs": [
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6464850,
+            "run_id": "43855284011"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6464958,
+            "run_id": "43863394853"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6464892,
+            "run_id": "43866828985"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6464933,
+            "run_id": "43869944983"
+          },
+          {
+            "cpu_model": "Neoverse-N2",
+            "instructions": 6464890,
+            "run_id": "43873251626"
+          }
+        ],
+        "spread": 1.6705615499841297e-05
+      }
+    },
     "x64-clang": {
       "BM_DetectFrame": {
         "instructions": 1190995950,

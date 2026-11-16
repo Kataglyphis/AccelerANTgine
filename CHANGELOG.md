@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-16, the instruction-count gate guards arm64 too)
+- `perf/cachegrind-baseline.json` has `arm64-clang` and `arm64-gcc` entries, each the median of five green
+  `[ci arm64]` runs of the same commit on Neoverse-N2 (`--summarize`, spread under 2e-5), and
+  `ci-profile-bench.sh` passes `--require-baseline` on arm64 as on x64, so a lost arm64 entry fails the lane.
+
 ### Changed (2026-11-16, the detector's three jobs in three units, and a listed source set)
 - `Src/yolo_detector.cpp` (978 lines) is three implementation units of `kataglyphis.yolo_detector`, with no flag
   change: `yolo_math.cpp` (the COCO names, preprocessing, decoding, suppression), `yolo_detector.cpp` (the ORT-backed
