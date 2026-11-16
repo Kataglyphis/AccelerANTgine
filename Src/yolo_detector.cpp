@@ -627,7 +627,10 @@ auto YoloDetector::detect_from_gstreamer(gstreamer::GStreamerPipeline &pipeline,
 
     auto buffer_result = pipeline.pull_sample(timeout_ms);
     if (!buffer_result) {
-        // A late frame is worth another pull, the end is not, and a broken stream or a missing sink is neither.
+        // A late frame is worth another pull, the end is not; a broken stream and a missing sink each say which.
+        if (buffer_result.error() == gstreamer::GStreamerError::StreamError) {
+            return std::unexpected(OnnxError::StreamBroken);
+        }
         if (buffer_result.error() != gstreamer::GStreamerError::BufferAllocationFailed) {
             return std::unexpected(OnnxError::InputAllocationFailed);
         }
@@ -797,13 +800,13 @@ auto VideoDetectorPipeline::initialize(const VideoDetectionConfig &config,
     impl_->config = config;
 
     auto init_result = gstreamer::GStreamerPipeline::initialize_gstreamer();
-    if (!init_result) { return std::unexpected(OnnxError::SessionCreationFailed); }
+    if (!init_result) { return std::unexpected(OnnxError::MediaInitFailed); }
 
     auto detector_result = impl_->detector.initialize(config.yolo_config, profiling_prefix);
     if (!detector_result) { return std::unexpected(detector_result.error()); }
 
     auto pipeline_result = impl_->pipeline.create_pipeline(config.gstreamer_config);
-    if (!pipeline_result) { return std::unexpected(OnnxError::SessionCreationFailed); }
+    if (!pipeline_result) { return std::unexpected(OnnxError::PipelineParseFailed); }
 
     // The Impl, not `this`: the factories return the pipeline by move, which leaves `this` behind.
     impl_->pipeline.set_buffer_callback(

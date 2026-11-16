@@ -662,6 +662,40 @@ TEST(YoloDetectorGStreamer, APipelineWithoutAppsinkGivesNoInput)
     EXPECT_EQ(result.error(), detection::OnnxError::InputAllocationFailed);
 }
 
+// An unplugged camera is a broken stream, told apart from a pipeline without a sink (owner decision 2026-11-16).
+TEST(YoloDetectorGStreamer, ABrokenStreamIsStreamBroken)
+{
+    if (!kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "capsfilter", "identity", "appsink" })
+          .empty()) {
+        GTEST_SKIP() << "the test source or identity is missing";
+    }
+    const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    detection::YoloDetector detector;
+    ASSERT_TRUE(detector.initialize(two_class_config(model)).has_value());
+    gstreamer::GStreamerPipeline pipeline;
+    ASSERT_TRUE(pipeline
+        .create_pipeline_from_string("videotestsrc pattern=black "
+                                     "! video/x-raw,format=RGB,width=64,height=48,framerate=30/1 "
+                                     "! identity name=unplugged error-after=2 ! appsink name=sink sync=false")
+        .has_value());
+    ASSERT_TRUE(pipeline.start().has_value());
+    ASSERT_TRUE(detector.detect_from_gstreamer(pipeline, 10000).has_value());
+    EXPECT_EQ(
+      kataglyphis::test::error_of(detector.detect_from_gstreamer(pipeline, 10000)), detection::OnnxError::StreamBroken);
+    EXPECT_TRUE(pipeline.stop().has_value());
+}
+
+// A launch line that does not parse is PipelineParseFailed, no longer the engine's SessionCreationFailed.
+TEST(VideoDetectorPipeline, ALaunchLineThatDoesNotParseIsPipelineParseFailed)
+{
+    const TempFile model("kataglyphis-yolo", ".onnx", kataglyphis::test::yolo_reshape_model(kTwoClasses));
+    detection::VideoDetectionConfig config;
+    config.yolo_config = two_class_config(model);
+    config.gstreamer_config.pipeline_description = "no_such_element_anywhere ! appsink name=detector_sink";
+    detection::VideoDetectorPipeline pipeline;
+    EXPECT_EQ(kataglyphis::test::error_of(pipeline.initialize(config)), detection::OnnxError::PipelineParseFailed);
+}
+
 TEST(VideoDetectorPipeline, RunsTheDetectorOnEveryFrame)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");

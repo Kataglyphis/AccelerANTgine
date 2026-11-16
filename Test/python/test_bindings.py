@@ -75,6 +75,12 @@ def test_onnx_output_errors_are_exposed():
     assert ki.OnnxError.ProviderUnavailable.name == "ProviderUnavailable"
     # A late frame and the end of a stream, the last two values.
     assert (ki.OnnxError.FrameTimeout.value, ki.OnnxError.EndOfStream.value) == (15, 16)
+    # Appended, so the values before keep their numbers.
+    assert [ki.OnnxError.PipelineParseFailed.value, ki.OnnxError.MediaInitFailed.value, ki.OnnxError.StreamBroken.value] == [
+        17,
+        18,
+        19,
+    ]
 
 
 @needs_onnx

@@ -176,7 +176,10 @@ void bind_onnx(nb::module_ &m)
       .value("ProfilingFailed", OnnxError::ProfilingFailed)
       .value("ProviderUnavailable", OnnxError::ProviderUnavailable)
       .value("FrameTimeout", OnnxError::FrameTimeout)
-      .value("EndOfStream", OnnxError::EndOfStream);
+      .value("EndOfStream", OnnxError::EndOfStream)
+      .value("PipelineParseFailed", OnnxError::PipelineParseFailed)
+      .value("MediaInitFailed", OnnxError::MediaInitFailed)
+      .value("StreamBroken", OnnxError::StreamBroken);
 
     nb::enum_<ExecutionMode>(m, "ExecutionMode")
       .value("Sequential", ExecutionMode::Sequential)

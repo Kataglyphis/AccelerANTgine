@@ -343,6 +343,12 @@ class OnnxError(enum.Enum):
 
     EndOfStream = 16
 
+    PipelineParseFailed = 17
+
+    MediaInitFailed = 18
+
+    StreamBroken = 19
+
 class ExecutionMode(enum.Enum):
     Sequential = 0
 

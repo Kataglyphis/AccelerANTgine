@@ -36,7 +36,14 @@ enum class OnnxError {
     // No frame came in time; the stream may still deliver.
     FrameTimeout,
     // The stream has ended; no frame will come.
-    EndOfStream
+    EndOfStream,
+    // Appended from here, so every value above keeps its number (owner decision 2026-11-16).
+    // The video pipeline's launch line did not parse.
+    PipelineParseFailed,
+    // GStreamer itself did not start.
+    MediaInitFailed,
+    // An element of the stream failed; its reason is the pipeline's stream_error().
+    StreamBroken
 };
 
 // The value's own name, for a log line, a message or a binding; no default, so a new value fails the build here.
@@ -77,6 +84,12 @@ enum class OnnxError {
         return "FrameTimeout";
     case OnnxError::EndOfStream:
         return "EndOfStream";
+    case OnnxError::PipelineParseFailed:
+        return "PipelineParseFailed";
+    case OnnxError::MediaInitFailed:
+        return "MediaInitFailed";
+    case OnnxError::StreamBroken:
+        return "StreamBroken";
     }
     return "UnknownError";
 }
