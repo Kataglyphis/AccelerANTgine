@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-15, a WebRTC callback that stops its streamer no longer ends the process)
+- `WebRTCStreamer::stop()` called from a state or error callback, which run on the loop thread `stop()` joins, joined
+  itself and, with `-fno-exceptions`, ended the process; it now refuses with one log line and `StateChangeFailed`.
+  `request_stop()` is safe from any thread and sends the end of stream, after which the state turns `Disconnected` and
+  the owner's `stop()` tears down. Test `WebRtcStreamer.StopFromInsideACallbackIsRefused` on a stream that fails
+  without a signalling server; clang-tidy counts unchanged. All three classes now share the rule.
+
 ### Added (2026-11-15, the rest of the engine in Python)
 - `OnnxInferenceEngine` binds `get_custom_metadata`, `provider_error`, `applied_intra_op_num_threads` and
   `end_profiling`, which ends what `SessionConfig.profiling_prefix` started and returns the JSON file; `YoloDetector`

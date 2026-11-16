@@ -587,6 +587,11 @@ auto WebRTCStreamer::start() -> std::expected<void, WebRTCError>
 auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
 {
     if (impl_->pipeline == nullptr) { return {}; }
+    // A callback runs on the loop thread, which stop() joins: joining itself would end the process.
+    if (std::this_thread::get_id() == impl_->main_loop_thread.get_id()) {
+        log::error("WebRTCStreamer::stop called from its own callback; call request_stop() there");
+        return std::unexpected(WebRTCError::StateChangeFailed);
+    }
 
     log::info("Stopping pipeline");
 
@@ -615,6 +620,12 @@ auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
     if (ret == GST_STATE_CHANGE_FAILURE) { return std::unexpected(WebRTCError::StateChangeFailed); }
 
     return {};
+}
+
+auto WebRTCStreamer::request_stop() -> void
+{
+    // The bus brings the end back as Disconnected; the owner's stop() then tears down from its own thread.
+    if (impl_->pipeline != nullptr) { gst_element_send_event(impl_->pipeline, gst_event_new_eos()); }
 }
 
 auto WebRTCStreamer::pause() -> std::expected<void, WebRTCError>

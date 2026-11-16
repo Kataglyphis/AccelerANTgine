@@ -117,15 +117,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Ask the owner before producing or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four
   `GStreamerError`, `OnnxError::MemoryAllocationError`).
 
-- [ ] **`WebRTCStreamer` ends the process when a callback stops it** (M, ★★). Read from the lock order, not run:
-  it calls its state and error callbacks under its lock on the loop thread (`Src/webrtc_streamer.cpp`), and `stop()`
-  joins that thread: a thread that joins itself throws, and `-fno-exceptions` makes that the end of the process.
-  Nobody does it today, and Python binds none of the classes. `GStreamerPipeline` and `VideoDetectorPipeline` are done
-  (2026-11-15): `stop()` and `create_pipeline()` from inside a callback are refused with one log line, `request_stop()`
-  ends the stream after the current frame, and CI's ctest runs with `--timeout 300`. Next: `WebRTCStreamer` refuses
-  `stop()` from its loop thread and gets `request_stop()`, with its bus rework (the entry on its older copies); done
-  when its `StopFromInsideACallbackIsRefusedAndRequestStopEndsTheStream` passes, on the TSan lane too.
-
 - [ ] **`WebRTCStreamer` keeps older copies of code that `GStreamerPipeline` has since improved** (L, ★★). Each
   file owns its own "GStreamer is initialised" flag and its own `gst_deinit` (`Src/webrtc_streamer.cpp:33-35`,
   `:425-476`; `Src/gstreamer_pipeline.cpp:30-31`, `:319-346`), and the scanner failure is seen only when the

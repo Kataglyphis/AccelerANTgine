@@ -153,7 +153,10 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer
     [[nodiscard]] auto configure(const StreamConfig &config) -> std::expected<void, WebRTCError>;
 
     [[nodiscard]] auto start() -> std::expected<void, WebRTCError>;
+    // Refused from inside a state or error callback, which run on the loop thread it joins: call request_stop() there.
     [[nodiscard]] auto stop() -> std::expected<void, WebRTCError>;
+    // Safe from any thread, a callback included: sends the end of stream, after which the state turns Disconnected.
+    auto request_stop() -> void;
     [[nodiscard]] auto pause() -> std::expected<void, WebRTCError>;
     [[nodiscard]] auto resume() -> std::expected<void, WebRTCError>;
 

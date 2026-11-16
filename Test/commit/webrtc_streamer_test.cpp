@@ -3,13 +3,17 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <future>
 #include <initializer_list>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -184,6 +188,49 @@ TEST(WebRtcStreamConfig, EveryStreamSettingChangesThePipelineText)
         change(changed);
         EXPECT_NE(webrtc::webrtc_pipeline_description(base), webrtc::webrtc_pipeline_description(changed)) << field;
     }
+}
+
+namespace {
+// webrtcsink and the test source, which a streamer test needs; the same condition as the two skip macros.
+auto streams_here() -> bool
+{
+    return webrtc::WebRTCStreamer::initialize()
+           && kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "videoconvert", "webrtcsink" }).empty();
+}
+
+// An error callback that, called from the loop thread, tries stop() and then request_stop(); true when refused.
+auto stopping_from_its_error(webrtc::WebRTCStreamer &streamer) -> std::future<bool>
+{
+    const auto refused = std::make_shared<std::promise<bool>>();
+    const auto asked = std::make_shared<std::atomic<bool>>(false);
+    const auto test_thread = std::this_thread::get_id();
+    streamer.set_error_callback(
+      [&streamer, refused, asked, test_thread](webrtc::WebRTCError, const std::string &) -> void {
+          // A start() that fails at once reports on the test's thread, which is no callback of the loop.
+          if (std::this_thread::get_id() == test_thread || asked->exchange(true)) { return; }
+          const bool stop_refused = !streamer.stop().has_value();
+          streamer.request_stop();
+          refused->set_value(stop_refused);
+      });
+    return refused->get_future();
+}
+}// namespace
+
+// The error callback runs on the loop thread stop() joins: stop() there is refused, not the end of the process.
+TEST(WebRtcStreamer, StopFromInsideACallbackIsRefused)
+{
+    if (!streams_here()) { GTEST_SKIP() << "webrtcsink or the test source is not installed here"; }
+    webrtc::WebRTCStreamer streamer;
+    // No signalling server listens there, so the stream fails and the bus calls back from the loop thread.
+    auto refused = stopping_from_its_error(streamer);
+    ASSERT_TRUE(streamer.configure(test_pattern_config()).has_value());
+    // No skip, which the Linux lane refuses: a stream that failed before its loop ran has no loop to stop from.
+    if (streamer.start().has_value()) {
+        ASSERT_EQ(refused.wait_for(kataglyphis::test::kStreamTimeout), std::future_status::ready) << "no error came";
+        EXPECT_TRUE(refused.get()) << "stop() from the error callback was not refused";
+    }
+    // From the owner's thread it tears down as always.
+    EXPECT_TRUE(streamer.stop().has_value() && streamer.get_state() == webrtc::StreamState::Idle);
 }
 
 TEST(WebRtcStreamConfig, SourceNamesMapToTheirSources)
