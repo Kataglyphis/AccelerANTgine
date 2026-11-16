@@ -104,8 +104,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 - [ ] **The video pipeline's reasons stay in the log** (S, ★★). Since 2026-11-16 the engine, the detector and the text
   generator keep why their last call failed (`last_error()`), Python's errors carry those words, and the C API has
   `kataglyphis_text_last_error()`, appended. Left: in `VideoDetectorPipeline::initialize` a failed GStreamer init and a
-  pipeline that does not parse are both `SessionCreationFailed`, and `initialize_gstreamer` frees GLib's message
-  unlogged (`Src/gstreamer_pipeline.cpp`); a broken stream and a pipeline without a sink still share
+  pipeline that does not parse are both `SessionCreationFailed`, each with its reason in the log since 2026-11-16
+  (`initialize_gstreamer` logs GLib's message); a broken stream and a pipeline without a sink still share
   `InputAllocationFailed`. Ask the owner before producing or reserving the ten values nothing in `Src/` returns (five
   `WebRTCError`, four `GStreamerError`, `OnnxError::MemoryAllocationError`).
 

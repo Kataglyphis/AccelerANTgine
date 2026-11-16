@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-16, a failed GStreamer init says why)
+- `GStreamerPipeline::initialize_gstreamer` freed GLib's message unread when `gst_init_check` failed; it logs it now,
+  so both causes behind a video pipeline's `SessionCreationFailed` (the init and a launch line that does not parse)
+  name their reason in the log.
+
 ### Added (2026-11-16, the text generator says why, in C, C++ and Python)
 - `TextGenerator::last_error()` keeps GenAI's own words for the last failed initialize or generate (such as
   `config: Error opening .../genai_config.json`); Python's `RuntimeError` carries them behind the fixed sentence and

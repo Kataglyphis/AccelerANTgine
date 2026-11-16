@@ -338,6 +338,8 @@ auto GStreamerPipeline::initialize_gstreamer(int *argc, char ***argv) -> std::ex
 #endif
     GError *error = nullptr;
     if (gst_init_check(argc, argv, &error) == 0) {
+        // GLib's words are the only reason a caller gets: the code says no more than that the init failed.
+        log::error("GStreamer init failed: {}", error != nullptr ? error->message : "no reason given");
         if (error != nullptr) { g_error_free(error); }
         return std::unexpected(GStreamerError::InitializationFailed);
     }
