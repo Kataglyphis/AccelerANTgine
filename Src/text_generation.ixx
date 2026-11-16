@@ -90,6 +90,9 @@ class KATAGLYPHIS_CPP_API TextGenerator
       const GenerationOptions &options,
       const TextCallback &on_text = {}) -> std::expected<GenerationResult, TextGenError>;
 
+    /// Why the last initialize or generate failed, in GenAI's words; empty after a success or a refusal of our own.
+    [[nodiscard]] auto last_error() const -> std::string;
+
     /// Safe from any thread; a running generate() ends after its current token with FinishReason::Cancelled.
     void request_cancel() noexcept;
 

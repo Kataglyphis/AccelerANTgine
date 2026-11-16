@@ -120,8 +120,11 @@ def test_failures_raise_with_the_core_message(tiny_model):
     assert not fresh.is_initialized()
     with pytest.raises(RuntimeError, match="not initialized"):
         fresh.generate([("user", "abc")])
-    with pytest.raises(RuntimeError, match="model directory could not be loaded"):
+    with pytest.raises(RuntimeError, match="model directory could not be loaded: config: ") as raised:
         fresh.initialize(tiny_model[0] / "absent")
+    # GenAI's own words follow the fixed sentence, and the generator keeps them.
+    assert fresh.last_error().startswith("config: ")
+    assert str(raised.value).endswith(fresh.last_error())
 
 
 def test_one_generator_serves_many_threads(generator, tiny_model):

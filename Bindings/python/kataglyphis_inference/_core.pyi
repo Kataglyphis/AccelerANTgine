@@ -290,6 +290,11 @@ class TextGenerator:
 
     def is_initialized(self) -> bool: ...
 
+    def last_error(self) -> str:
+        """
+        Why the last initialize or generate failed, in GenAI's words; empty after a success.
+        """
+
     def generate(self, messages: Sequence[tuple[str, str]], options: GenerationOptions = ..., on_text: object | None = None) -> GenerationResult:
         """
         Generate a reply to (role, content) messages; on_text receives each decoded piece. Releases the GIL.

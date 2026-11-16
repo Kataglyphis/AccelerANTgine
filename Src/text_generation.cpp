@@ -18,6 +18,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #ifdef _WIN32
@@ -153,11 +154,19 @@ namespace {
         return api.get();
     }
 
+    // GenAI's words for this thread's last failed call; a generator copies them out under its lock.
+    auto last_genai_failure() -> std::string &
+    {
+        thread_local std::string message;
+        return message;
+    }
+
     auto failure(const GenaiApi &api, OgaResult *result, std::string_view what) -> std::optional<std::string>
     {
         if (result == nullptr) { return std::nullopt; }
         std::string message = api.ResultGetError(result);
         log::error("ONNX Runtime GenAI: {}: {}", what, message);
+        last_genai_failure() = std::string(what) + ": " + message;
         api.DestroyResult(result);
         return message;
     }
@@ -331,12 +340,17 @@ struct TextGenerator::Impl
         Generator live;
         std::vector<std::int32_t> live_ids;
         std::size_t live_room = 0;
+        // Why the last initialize or generate failed, in GenAI's words; empty after a success or a refusal of our own.
+        std::string failure;
     } state;
     mutable std::shared_mutex mutex;
     std::atomic<bool> cancel{ false };
     // Read without the mutex: a caller asking during a generation, from its own callback even, must not wait for it.
     std::atomic<bool> ready{ false };
 
+    auto load(const std::filesystem::path &model_dir, const char *name) -> std::expected<void, TextGenError>;
+    auto run(const std::vector<ChatMessage> &messages, const GenerationOptions &options, const TextCallback &on_text)
+      -> std::expected<GenerationResult, TextGenError>;
     auto prompt_tokens(const std::vector<ChatMessage> &messages) const -> std::expected<Sequences, TextGenError>;
     auto make_generator(const OgaSequences &prompt, std::size_t max_length, const GenerationOptions &options) const
       -> std::expected<Generator, TextGenError>;
@@ -559,6 +573,15 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
     const auto name = provider_name(provider);
     if (!name) { return std::unexpected(name.error()); }
     const std::unique_lock lock(impl_->mutex);
+    last_genai_failure().clear();
+    auto loaded = impl_->load(model_dir, *name);
+    impl_->state.failure = loaded ? std::string{} : std::exchange(last_genai_failure(), {});
+    return loaded;
+}
+
+auto TextGenerator::Impl::load(const std::filesystem::path &model_dir, const char *name)
+  -> std::expected<void, TextGenError>
+{
     const GenaiApi *api = load_api();
     if (api == nullptr) { return std::unexpected(TextGenError::LibraryUnavailable); }
     OgaConfig *raw_config = nullptr;
@@ -569,7 +592,7 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
     }
     const Config config{ raw_config, { api } };
     if (!succeeded(*api, api->ConfigClearProviders(config.get()), "providers")
-        || (*name != nullptr && !succeeded(*api, api->ConfigAppendProvider(config.get(), *name), *name))) {
+        || (name != nullptr && !succeeded(*api, api->ConfigAppendProvider(config.get(), name), name))) {
         return std::unexpected(TextGenError::ProviderUnavailable);
     }
     OgaModel *raw_model = nullptr;
@@ -588,13 +611,13 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
         return std::unexpected(TextGenError::TokenizerFailed);
     }
     const std::span<const std::int32_t> eos_ids(eos, eos_count);
-    impl_->state.eos_tokens.assign(eos_ids.begin(), eos_ids.end());
-    impl_->state.context_tokens = context_length(model_dir);
-    impl_->state.live.reset();
-    impl_->api = api;
-    impl_->tokenizer = std::move(tokenizer);
-    impl_->model = std::move(model);
-    impl_->ready.store(true);
+    state.eos_tokens.assign(eos_ids.begin(), eos_ids.end());
+    state.context_tokens = context_length(model_dir);
+    state.live.reset();
+    this->api = api;
+    this->tokenizer = std::move(tokenizer);
+    this->model = std::move(model);
+    ready.store(true);
     return {};
 }
 
@@ -605,36 +628,50 @@ auto TextGenerator::generate(const std::vector<ChatMessage> &messages,
   const TextCallback &on_text) -> std::expected<GenerationResult, TextGenError>
 {
     const std::unique_lock lock(impl_->mutex);
-    if (impl_->model == nullptr) { return std::unexpected(TextGenError::NotInitialized); }
+    last_genai_failure().clear();
+    auto generated = impl_->run(messages, options, on_text);
+    impl_->state.failure = generated ? std::string{} : std::exchange(last_genai_failure(), {});
+    return generated;
+}
+
+auto TextGenerator::last_error() const -> std::string
+{
+    const std::shared_lock lock(impl_->mutex);
+    return impl_->state.failure;
+}
+
+auto TextGenerator::Impl::run(const std::vector<ChatMessage> &messages,
+  const GenerationOptions &options,
+  const TextCallback &on_text) -> std::expected<GenerationResult, TextGenError>
+{
+    if (model == nullptr) { return std::unexpected(TextGenError::NotInitialized); }
     if (!valid_messages(messages) || !valid_options(options)) { return std::unexpected(TextGenError::InvalidOptions); }
-    impl_->cancel.store(false);
+    cancel.store(false);
     // The clock starts before the prompt goes in, so the first token's time includes the prefill.
     const auto start = Clock::now();
-    auto prompt = impl_->prompt_tokens(messages);
+    auto prompt = prompt_tokens(messages);
     if (!prompt) { return std::unexpected(prompt.error()); }
     GenerationResult result;
-    result.prompt_tokens = impl_->api->SequencesGetSequenceCount(prompt->get(), 0);
-    const std::span<const std::int32_t> ids(
-      impl_->api->SequencesGetSequenceData(prompt->get(), 0), result.prompt_tokens);
+    result.prompt_tokens = api->SequencesGetSequenceCount(prompt->get(), 0);
+    const std::span<const std::int32_t> ids(api->SequencesGetSequenceData(prompt->get(), 0), result.prompt_tokens);
     Generator fresh;
     OgaGenerator *generator = nullptr;
     if (continues(options)) {
-        auto live = impl_->greedy_generator(**prompt, ids, options);
+        auto live = greedy_generator(**prompt, ids, options);
         if (!live) { return std::unexpected(live.error()); }
         generator = *live;
     } else {
-        auto made =
-          impl_->make_generator(**prompt, ids.size() + static_cast<std::size_t>(options.max_new_tokens), options);
+        auto made = make_generator(**prompt, ids.size() + static_cast<std::size_t>(options.max_new_tokens), options);
         if (!made) { return std::unexpected(made.error()); }
         fresh = std::move(*made);
         generator = fresh.get();
     }
-    const auto decoded = impl_->decode(generator, options, on_text, result, start);
-    if (generator == impl_->state.live.get()) {
+    const auto decoded = decode(generator, options, on_text, result, start);
+    if (generator == state.live.get()) {
         if (decoded) {
-            impl_->remember(generator);
+            remember(generator);
         } else {
-            impl_->state.live.reset();
+            state.live.reset();
         }
     }
     if (!decoded) { return std::unexpected(decoded.error()); }

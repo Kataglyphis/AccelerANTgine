@@ -563,8 +563,13 @@ void bind_config(nb::module_ &m)
 
 namespace text = kataglyphis::text;
 
-[[noreturn]] void raise_text(const char *context, text::TextGenError error)
-{ throw std::runtime_error(std::format("{} failed: {}", context, text::to_string(error))); }
+// GenAI's own words behind the fixed sentence, where it gave them.
+[[noreturn]] void raise_text(const char *context, text::TextGenError error, const std::string &reason = {})
+{
+    std::string message = std::format("{} failed: {}", context, text::to_string(error));
+    if (!reason.empty()) { message += ": " + reason; }
+    throw std::runtime_error(message);
+}
 
 // Calls Python without letting an exception cross the exception-free core: a failure cancels and is raised afterwards.
 struct PythonTextSink
@@ -645,12 +650,15 @@ void bind_text(nb::module_ &m)
                 nb::gil_scoped_release release;
                 result = self.initialize(model_dir, provider);
             }
-            if (!result) { raise_text("initialize", result.error()); }
+            if (!result) { raise_text("initialize", result.error(), self.last_error()); }
         },
         "model_dir"_a,
         "provider"_a = ExecutionProvider::Cpu,
         "Load a GenAI model directory. Releases the GIL while the model loads.")
       .def("is_initialized", &TextGenerator::is_initialized)
+      .def("last_error",
+        &TextGenerator::last_error,
+        "Why the last initialize or generate failed, in GenAI's words; empty after a success.")
       .def(
         "generate",
         [](TextGenerator &self,
@@ -672,7 +680,7 @@ void bind_text(nb::module_ &m)
                 result = self.generate(chat, snapshot, forward);
             }
             sink.reraise();
-            if (!result) { raise_text("generate", result.error()); }
+            if (!result) { raise_text("generate", result.error(), self.last_error()); }
             return std::move(*result);
         },
         "messages"_a,

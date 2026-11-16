@@ -29,6 +29,13 @@ struct Handle
 
 auto handle_of(kataglyphis_text_generator *opaque) -> Handle * { return reinterpret_cast<Handle *>(opaque); }
 
+// This thread's last failure in GenAI's words, which kataglyphis_text_last_error hands out until the next call.
+auto last_error_text() -> std::string &
+{
+    thread_local std::string text;
+    return text;
+}
+
 // The C codes are the C++ enum shifted by one, so 0 stays success; api_contract_test pins every pair.
 auto status_of(text::TextGenError error) -> int { return static_cast<int>(error) + 1; }
 
@@ -147,6 +154,7 @@ extern "C" KATAGLYPHIS_C_API auto kataglyphis_text_generator_create(const char *
     auto *handle = new (std::nothrow) Handle{};
     if (handle == nullptr) { return KATAGLYPHIS_TEXT_GENERATION_FAILED; }
     const auto loaded = handle->generator.initialize(model_dir, chosen);
+    last_error_text() = handle->generator.last_error();
     if (!loaded) {
         delete handle;
         return status_of(loaded.error());
@@ -178,6 +186,7 @@ extern "C" KATAGLYPHIS_C_API auto kataglyphis_text_generator_generate(kataglyphi
                     std::string_view piece) -> void { on_text(piece.data(), piece.size(), user_data); };
     }
     const auto result = handle_of(generator)->generator.generate(chat, chosen, forward);
+    last_error_text() = handle_of(generator)->generator.last_error();
     if (!result) { return status_of(result.error()); }
     if (stats != nullptr) {
         stats->finish_reason = finish_of(result->finish_reason);
@@ -198,6 +207,8 @@ extern "C" KATAGLYPHIS_C_API void kataglyphis_text_generator_cancel(kataglyphis_
 
 extern "C" KATAGLYPHIS_C_API void kataglyphis_text_generator_destroy(kataglyphis_text_generator *generator)
 { delete handle_of(generator); }
+
+extern "C" KATAGLYPHIS_C_API auto kataglyphis_text_last_error() -> const char * { return last_error_text().c_str(); }
 
 extern "C" KATAGLYPHIS_C_API auto kataglyphis_text_status_message(int status) -> const char *
 {

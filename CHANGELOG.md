@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-16, the text generator says why, in C, C++ and Python)
+- `TextGenerator::last_error()` keeps GenAI's own words for the last failed initialize or generate (such as
+  `config: Error opening .../genai_config.json`); Python's `RuntimeError` carries them behind the fixed sentence and
+  `TextGenerator.last_error()` reads them. The C API appends `kataglyphis_text_last_error()`, the calling thread's
+  last reason, valid until its next call, since a failed create leaves no handle to ask; the functions before it keep
+  their order. The public `initialize` and `generate` keep the lock and call `Impl::load` and `Impl::run`, which hold
+  the old bodies. Tests in `c_api_test.cpp` and `test_text_generation.py`; ctest 273, both wheels green, clang-tidy
+  counts unchanged.
+
 ### Added (2026-11-16, a failed model load says why)
 - `OnnxInferenceEngine::last_error()` and `YoloDetector::last_error()` keep why the last initialize failed: ONNX
   Runtime's own words for a model that does not load, the provider's reason, or which config check refused it; the

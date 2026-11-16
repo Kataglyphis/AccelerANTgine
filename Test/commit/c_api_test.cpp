@@ -135,8 +135,12 @@ TEST(CTextApi, RejectsMissingArgumentsAndReportsLoadFailures)
     EXPECT_EQ(kataglyphis_text_generator_create("/nonexistent-genai-model", KATAGLYPHIS_TEXT_PROVIDER_CPU, &generator),
       KATAGLYPHIS_TEXT_MODEL_LOAD_FAILED);
     EXPECT_EQ(generator, nullptr);
+    // GenAI's own words, beyond the fixed sentence of the status; the handle is gone, so the thread keeps them.
+    const std::string why = kataglyphis_text_last_error();
+    EXPECT_TRUE(why.starts_with("config: ")) << why;
     auto *ready = tiny_generator();
     ASSERT_NE(ready, nullptr);
+    EXPECT_STREQ(kataglyphis_text_last_error(), "") << "a success leaves no reason behind";
     const auto options = four_tokens();
     const kataglyphis_text_message no_content{ "user", nullptr };
     EXPECT_EQ(kataglyphis_text_generator_generate(ready, &kUser, 1, nullptr, nullptr, nullptr, nullptr),

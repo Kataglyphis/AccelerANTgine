@@ -101,16 +101,13 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the NVIDIA packages' card run (two entries up) passes on that image. Until it is published, a build may
   meet either form of the module.
 
-- [ ] **The text generator's and the video pipeline's reasons stay in the log** (M, ★★). Since 2026-11-16 the engine
-  and the detector keep why their last initialize failed (`last_error()`, ONNX Runtime's words for a model that does
-  not load), and Python raises `OnnxRuntimeError`, a `RuntimeError` with `.code` and `.reason`. Left: the text
-  generator logs GenAI's message (`Src/text_generation.cpp`) while Python and the C API return one fixed text per
-  status: a `last_error()` there, bound to Python, and a C function `kataglyphis_text_generator_last_error`, appended.
-  In `VideoDetectorPipeline::initialize` a failed GStreamer init and a pipeline that does not parse are both
-  `SessionCreationFailed`, and `initialize_gstreamer` frees GLib's message unlogged (`Src/gstreamer_pipeline.cpp`).
-  A broken stream and a pipeline without a sink still share `InputAllocationFailed`. Ask the owner before producing
-  or reserving the ten values nothing in `Src/` returns (five `WebRTCError`, four `GStreamerError`,
-  `OnnxError::MemoryAllocationError`).
+- [ ] **The video pipeline's reasons stay in the log** (S, ★★). Since 2026-11-16 the engine, the detector and the text
+  generator keep why their last call failed (`last_error()`), Python's errors carry those words, and the C API has
+  `kataglyphis_text_last_error()`, appended. Left: in `VideoDetectorPipeline::initialize` a failed GStreamer init and a
+  pipeline that does not parse are both `SessionCreationFailed`, and `initialize_gstreamer` frees GLib's message
+  unlogged (`Src/gstreamer_pipeline.cpp`); a broken stream and a pipeline without a sink still share
+  `InputAllocationFailed`. Ask the owner before producing or reserving the ten values nothing in `Src/` returns (five
+  `WebRTCError`, four `GStreamerError`, `OnnxError::MemoryAllocationError`).
 
 - [ ] **`WebRTCStreamer` keeps older copies of code that `GStreamerPipeline` has since improved** (L, ★★). Each
   file owns its own "GStreamer is initialised" flag and its own `gst_deinit` (`Src/webrtc_streamer.cpp:33-35`,

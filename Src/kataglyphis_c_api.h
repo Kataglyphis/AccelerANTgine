@@ -105,6 +105,12 @@ KATAGLYPHIS_C_API void kataglyphis_text_generator_destroy(kataglyphis_text_gener
 /** A static English sentence for every status, including unknown ones. */
 KATAGLYPHIS_C_API const char *kataglyphis_text_status_message(int status);
 
+/**
+ * Why this thread's last create or generate failed, in GenAI's words; "" after a success or when GenAI said nothing.
+ * Valid until this thread's next call into the API. Appended: the functions above keep their order.
+ */
+KATAGLYPHIS_C_API const char *kataglyphis_text_last_error(void);
+
 // NOLINTEND
 
 #ifdef __cplusplus
