@@ -1,7 +1,7 @@
 [
  {
   "id": "cxx.decode-cut-to-frame-removed",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "    cut_to_frame(boxes, mapping);\n    return boxes;",
   "replace": "    return boxes;",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -9,7 +9,7 @@
  },
  {
   "id": "cxx.decode-corner-rows-suppressed",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "    if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }\n",
   "replace": "    apply_nms(boxes, config.nms_threshold);\n",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -17,7 +17,7 @@
  },
  {
   "id": "cxx.decode-cut-before-suppression",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "    if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }\n    cut_to_frame(boxes, mapping);\n",
   "replace": "    cut_to_frame(boxes, mapping);\n    if (config.output_layout != YoloOutputLayout::CornersScoreClass) { apply_nms(boxes, config.nms_threshold); }\n",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -25,7 +25,7 @@
  },
  {
   "id": "cxx.decode-corner-order-unchecked",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "        return finite && row[2] >= row[0] && row[3] >= row[1];",
   "replace": "        return finite;",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -33,7 +33,7 @@
  },
  {
   "id": "cxx.decode-frame-not-required",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "    if (mapping.frame_width == 0 || mapping.frame_height == 0) { return std::unexpected(OnnxError::InvalidInputShape); }\n",
   "replace": "",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -41,7 +41,7 @@
  },
  {
   "id": "cxx.decode-class-range-unchecked",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "        if (!(row[5] >= 0.0F) || !(row[5] < static_cast<float>(config.num_classes))) { return false; }\n",
   "replace": "",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -49,7 +49,7 @@
  },
  {
   "id": "cxx.decode-score-finiteness-unchecked",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "        if (!(row[4] >= config.confidence_threshold) || !std::isfinite(row[4])) { return false; }",
   "replace": "        if (!(row[4] >= config.confidence_threshold)) { return false; }",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -57,7 +57,7 @@
  },
  {
   "id": "cxx.decode-strict-threshold",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "        if (!(row[4] >= config.confidence_threshold) || !std::isfinite(row[4])) { return false; }",
   "replace": "        if (!(row[4] > config.confidence_threshold) || !std::isfinite(row[4])) { return false; }",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^YoloDecoder\\.'",
@@ -65,7 +65,7 @@
  },
  {
   "id": "cxx.preprocess-red-blue-swapped",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "            red[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[0])];",
   "replace": "            red[destination + x] = kNormalisedByte[std::to_integer<unsigned char>(pixel[2])];",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
@@ -73,7 +73,7 @@
  },
  {
   "id": "cxx.preprocess-letterbox-pad-dropped",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "        const auto destination = static_cast<std::size_t>(y + pad_y) * width + pad_x;",
   "replace": "        const auto destination = static_cast<std::size_t>(y) * width;",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
@@ -81,7 +81,7 @@
  },
  {
   "id": "cxx.preprocess-frame-sides-swapped",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "        static_cast<float>(content_height) / meta.height,\n",
   "replace": "        static_cast<float>(content_width) / meta.height,\n",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
@@ -89,7 +89,7 @@
  },
  {
   "id": "cxx.preprocess-height-bound-removed",
-  "target": "Src/yolo_detector.cpp",
+  "target": "Src/yolo_math.cpp",
   "find": "        || buffer.data.size() < buffer.size\n        || static_cast<std::size_t>(meta.height - 1) > (buffer.size - meta.plane_offset_bytes - row_bytes) / stride) {",
   "replace": "        || buffer.data.size() < buffer.size) {",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^PreprocessFuzz\\.'",

@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-16, the detector's three jobs in three units, and a listed source set)
+- `Src/yolo_detector.cpp` (978 lines) is three implementation units of `kataglyphis.yolo_detector`, with no flag
+  change: `yolo_math.cpp` (the COCO names, preprocessing, decoding, suppression), `yolo_detector.cpp` (the ORT-backed
+  detector and its model checks) and `video_detector_pipeline.cpp` (the pipeline, its launch lines and factories).
+  `Src/CMakeLists.txt` lists every source and module instead of globbing, so the `rusty_code/target` filter and the
+  `main()` exclusions are gone; leaving `yolo_math.cpp` out failed the link with undefined references, as wanted. The
+  twelve `cxx-mutations.json` recipes on the old file point at the unit that holds their text. ctest 275, clang-tidy
+  counts unchanged.
+
 ### Changed (2026-11-16, the instruction-count gate fails a speed-up it has not recorded)
 - `perf-cachegrind.py`'s `check()` fails a count under its baseline by more than the allowance too ("under", with
   "re-record the baseline from five runs"), so a gain is kept in `perf/cachegrind-baseline.json` and cannot be lost

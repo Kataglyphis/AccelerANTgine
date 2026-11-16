@@ -191,7 +191,7 @@ analysis gates, and their tests feed fixture reports and stub tools:
      --manifest scripts/linux/tests/lane-mutations.json
 
 The detector's own rules have recipes too: ``scripts/linux/tests/cxx-mutations.json``
-mutates ``Src/yolo_detector.cpp`` (the cut to the frame, no suppression of corner rows, the
+mutates ``Src/yolo_math.cpp`` and ``Src/yolo_detector.cpp`` (the cut to the frame, no suppression of corner rows, the
 row checks, the colour channels, the letterbox offset). Each needs a C++ build, so
 ``.github/workflows/cxx-mutations.yml`` runs them weekly and on dispatch, not on a push: it
 builds the clang Debug tree once and proves each recipe in place, where

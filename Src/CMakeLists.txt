@@ -2,21 +2,34 @@ set(PROJECT_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(PROJECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(EXTERNAL_LIB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/")
 
-file(GLOB_RECURSE KataglyphisCppProject_SOURCES "*.cpp")
-file(GLOB_RECURSE KataglyphisCppProject_MODULES "*.ixx")
-# A cargo run inside rusty_code leaves cc-rs probe sources under target/, each with a main() of its own.
-list(
-  FILTER
-  KataglyphisCppProject_SOURCES
-  EXCLUDE
-  REGEX
-  "/rusty_code/target/")
-# Programs with their own main(): the library must carry none, or every embedder links a dead one.
-list(
-  REMOVE_ITEM
-  KataglyphisCppProject_SOURCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/cli_main.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/inference_demo.cpp")
+# Listed, not globbed: a new file joins on purpose, and one left out fails the link instead of vanishing quietly.
+set(KataglyphisCppProject_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/bundled_gstreamer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/config_loader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gstreamer_pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/inference_lib.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/kataglyphis_c_api.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/onnx_inference_engine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/text_generation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/toml_config.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/video_detector_pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/webrtc_streamer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/yolo_math.cpp)
+set(KataglyphisCppProject_MODULES
+    ${CMAKE_CURRENT_SOURCE_DIR}/config_error.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/config_loader.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/execution_provider.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/gstreamer_pipeline.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/inference_lib.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/kataglyphis_c_api.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/log.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/onnx_inference_engine.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/text_generation.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/toml_config.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/webrtc_streamer.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/yolo_detector.ixx)
 
 set(KataglyphisCppProjectConfig_MODULE_IN "${CMAKE_CURRENT_SOURCE_DIR}/KataglyphisCppProjectConfig.ixx.in")
 set(KataglyphisCppProjectConfig_MODULE_OUT "${CMAKE_CURRENT_BINARY_DIR}/KataglyphisCppProjectConfig.ixx")

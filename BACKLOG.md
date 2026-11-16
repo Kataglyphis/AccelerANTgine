@@ -155,14 +155,9 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `Test/contract/text_contract_test.cpp` expects exactly one contract case on purpose, so plan it with the pin
   bump that adds one.
 
-- [ ] **`yolo_detector.cpp` does three jobs, and `Src/` is a recursive glob** (M, ★). One file of about 800 lines
-  holds the pure math (preprocess, decode, suppression), the ORT-backed detector and the video pipeline with its
-  factories. `Src/CMakeLists.txt:5-19` globs `*.cpp` and `*.ixx` without `CONFIGURE_DEPENDS`; stray cargo files
-  under `rusty_code/target` needed a filter (6219631).
-  Cheap parts only: three implementation units of the same module, with no flag change, and an explicit source
-  list. A separate static target for the math waits until coverage-guided fuzzing is wanted: its flags must match on
-  every compiler, the riscv64 cross build and the Flutter plugin.
-  Done when a source file missing from the list fails the link.
+- [ ] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
+  of `kataglyphis.yolo_detector`. A separate static target waits until coverage-guided fuzzing is wanted: its flags
+  must match on every compiler, the riscv64 cross build and the Flutter plugin.
 
 ## Recorded probes
 
