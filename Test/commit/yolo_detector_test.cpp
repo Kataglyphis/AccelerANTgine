@@ -188,8 +188,12 @@ constexpr std::uint32_t kLiveWidth = 64;
 constexpr std::uint32_t kLiveHeight = 48;
 constexpr std::uint32_t kLiveFps = 30;
 
+// How long a run lasts: a live source a few frames past the slow ones, a finite one to its end.
+enum class RunUntil : std::uint8_t { AFewMoreFrames, TheEnd };
+
 // One run of a pipeline on `description` whose detection callback takes kSlowDetection for the first `slow` frames.
-auto run_slowly(const std::string &description, const TempFile &model, int slow) -> detection::VideoDetectionStats
+auto run_slowly(const std::string &description, const TempFile &model, int slow, RunUntil until)
+  -> detection::VideoDetectionStats
 {
     detection::VideoDetectionConfig config;
     config.yolo_config = two_class_config(model);
@@ -203,7 +207,9 @@ auto run_slowly(const std::string &description, const TempFile &model, int slow)
       });
     EXPECT_TRUE(pipeline.start().has_value()) << description;
     const auto deadline = std::chrono::steady_clock::now() + kRunLimit;
-    while (seen.load() < slow + 3 && !pipeline.has_ended() && std::chrono::steady_clock::now() < deadline) {
+    // A finite source waits for its end: stopping after a count cut a slow TSan run one frame short.
+    while ((until == RunUntil::TheEnd || seen.load() < slow + 3) && !pipeline.has_ended()
+           && std::chrono::steady_clock::now() < deadline) {
         std::this_thread::sleep_for(kPollEvery);
     }
     EXPECT_TRUE(pipeline.stop().has_value());
@@ -223,7 +229,8 @@ TEST(YoloDetector, ASlowDetectorSeesTheNewestFrame)
     const auto live = run_slowly(
       "videotestsrc is-live=true ! " + detection::camera_detection_pipeline_tail(kLiveWidth, kLiveHeight, kLiveFps),
       model,
-      5);
+      5,
+      RunUntil::AFewMoreFrames);
     EXPECT_GE(live.frames, 8U);
     EXPECT_GT(live.dropped, 0U) << "five 200 ms detections at 30 fps leave gaps of several frames";
     EXPECT_EQ(live.errors, 0U);
@@ -232,7 +239,8 @@ TEST(YoloDetector, ASlowDetectorSeesTheNewestFrame)
     const auto file = run_slowly(
       "videotestsrc num-buffers=12 ! video/x-raw,framerate=30/1 ! " + detection::video_detection_pipeline_tail(64, 48),
       model,
-      5);
+      5,
+      RunUntil::TheEnd);
     EXPECT_EQ(file.frames, 12U);
     EXPECT_EQ(file.dropped, 0U);
 }

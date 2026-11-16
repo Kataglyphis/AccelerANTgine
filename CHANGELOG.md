@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-16, the slow-detector test on the TSan lane)
+- `YoloDetector.ASlowDetectorSeesTheNewestFrame` stopped its lossless file run after eight detections, which on the
+  slower TSan build came before the twelfth frame (run 43782842473: 11 of 12). A finite source now runs to its end;
+  the live source still stops a few frames past the slow ones.
+
 ### Fixed (2026-11-15, a WebRTC callback that stops its streamer no longer ends the process)
 - `WebRTCStreamer::stop()` called from a state or error callback, which run on the loop thread `stop()` joins, joined
   itself and, with `-fno-exceptions`, ended the process; it now refuses with one log line and `StateChangeFailed`.
