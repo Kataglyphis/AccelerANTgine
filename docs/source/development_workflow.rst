@@ -264,10 +264,11 @@ runs:
   staged arm64 suite writes ``results.json`` beside itself; each lane's ``bench-history`` job
   reports them ungated under ``perf-win-x64`` and ``perf-win-arm64``.
 - **Instruction counts:** ``scripts/linux/perf-cachegrind.py --suite build/perfTestSuite --key
-  x64-clang`` counts ``BM_PreprocessFrame`` and ``BM_DetectFrame`` per iteration under
+  x64-clang`` counts ``BM_PreprocessFrame``, ``BM_DetectFrame`` and ``BM_OnnxRunInferenceInPlace`` per iteration under
   ``valgrind --tool=cachegrind --cache-sim=no`` at one ORT thread, and fails over its
   ``perf/cachegrind-baseline.json`` entry by more than max(3 %, 3 x the recorded spread). It does
-  not see wall time, cache misses or threading. ``--summarize`` builds an entry from at least five
+  not see wall time, cache misses or threading. A benchmark the entry does not hold yet is recorded with a
+  warning, not checked. ``--summarize`` builds an entry from at least five
   recorded CI runs, each with its CPU model.
 - **callgrind:** ``valgrind --tool=callgrind`` is reached through
   ``bash scripts/linux/ci-release.sh --callgrind``.

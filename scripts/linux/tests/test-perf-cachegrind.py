@@ -26,7 +26,7 @@ with open(args["--cachegrind-out-file"], "w") as out:
 
 def record(run: int, preprocess: int, detect: int) -> dict[str, object]:
     return {"key": "x64-clang", "cpu_model": f"cpu {run}", "run_id": str(run),
-            "counts": {"BM_PreprocessFrame": preprocess, "BM_DetectFrame": detect}}
+            "counts": {"BM_PreprocessFrame": preprocess, "BM_DetectFrame": detect, "BM_OnnxRunInferenceInPlace": 5000}}
 
 
 class PerfCachegrind(unittest.TestCase):
@@ -38,14 +38,16 @@ class PerfCachegrind(unittest.TestCase):
         self.valgrind.chmod(0o755)
         self.baseline = self.work / "baseline.json"
         entry = {"BM_PreprocessFrame": {"instructions": 1000, "spread": 0.002},
-                 "BM_DetectFrame": {"instructions": 100000, "spread": 0.02}}
+                 "BM_DetectFrame": {"instructions": 100000, "spread": 0.02},
+                 "BM_OnnxRunInferenceInPlace": {"instructions": 5000, "spread": 0.001}}
         self.baseline.write_text(json.dumps({"baselines": {"x64-clang": entry}}), encoding="utf-8")
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
     def run_tool(self, preprocess: int, detect: int, *extra: str, **env: str) -> subprocess.CompletedProcess[str]:
-        environment = {**os.environ, "FAKE_BM_PreprocessFrame": str(preprocess), "FAKE_BM_DetectFrame": str(detect), **env}
+        environment = {**os.environ, "FAKE_BM_PreprocessFrame": str(preprocess), "FAKE_BM_DetectFrame": str(detect),
+                       "FAKE_BM_OnnxRunInferenceInPlace": "5000", **env}
         cmd = [sys.executable, str(TOOL), "--suite", "suite", "--key", "x64-clang", "--valgrind", str(self.valgrind),
                "--baseline", str(self.baseline), *extra]
         return subprocess.run(cmd, capture_output=True, text=True, check=False, env=environment)
@@ -54,7 +56,8 @@ class PerfCachegrind(unittest.TestCase):
         out = self.work / "rec.json"
         result = self.run_tool(1000, 100000, "--record", str(out))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(out.read_text())["counts"], {"BM_PreprocessFrame": 1000, "BM_DetectFrame": 100000})
+        self.assertEqual(json.loads(out.read_text())["counts"],
+                         {"BM_PreprocessFrame": 1000, "BM_DetectFrame": 100000, "BM_OnnxRunInferenceInPlace": 5000})
 
     def test_the_three_percent_floor_holds_a_small_spread(self) -> None:
         self.assertEqual(self.run_tool(1030, 100000).returncode, 0)
@@ -82,6 +85,14 @@ class PerfCachegrind(unittest.TestCase):
     def test_a_key_without_baseline_records_only_unless_required(self) -> None:
         self.assertEqual(self.run_tool(9999, 999999, "--key", "arm64-gcc").returncode, 0)
         self.assertEqual(self.run_tool(9999, 999999, "--key", "arm64-gcc", "--require-baseline").returncode, 1)
+
+    def test_a_benchmark_without_an_entry_is_recorded_with_a_warning(self) -> None:
+        entry = json.loads(self.baseline.read_text())["baselines"]["x64-clang"]
+        del entry["BM_OnnxRunInferenceInPlace"]
+        self.baseline.write_text(json.dumps({"baselines": {"x64-clang": entry}}), encoding="utf-8")
+        result = self.run_tool(1000, 100000, FAKE_BM_OnnxRunInferenceInPlace="99999")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("BM_OnnxRunInferenceInPlace 99999 has no entry yet", result.stderr)
 
     def test_a_failed_benchmark_run_fails(self) -> None:
         result = self.run_tool(1000, 100000, FAKE_EXIT="1")

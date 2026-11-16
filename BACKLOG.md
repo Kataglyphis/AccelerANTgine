@@ -135,10 +135,12 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
 - [ ] **The instruction-count gate guards two benchmarks only** (M, ★). Both hosted arches have entries in
   `perf/cachegrind-baseline.json` and fail when missing: x64 from six runs, arm64 from five on Neoverse-N2 (2026-11-16).
-  Next: a gated benchmark of `run_inference_in_place` at 3x640x640, the path the detector takes (`BM_OnnxRunInference`
-  times the copying one); `BM_TextGenerateTiny` under the same counter if its spread stays under 1 %;
-  `perf/baseline-<cpu>.json` for the Pi from `quality-report.sh --perf-host --update-baseline`, as a `systemd-run` unit
-  when the board is quiet (owner). Done when the detector's inference path has an entry.
+  Since 2026-11-16 `BM_OnnxRunInferenceInPlace` (the detector's call on one 3x640x640 frame, 2.48 M instructions on the
+  Pi) is counted too, and recorded with a warning while the entries lack it. Next: five green runs per key with it,
+  `--summarize` for all four entries, then a benchmark missing from an entry fails like a missing key;
+  `BM_TextGenerateTiny` under the same counter if its spread stays under 1 %; `perf/baseline-<cpu>.json` for the Pi
+  from `quality-report.sh --perf-host --update-baseline`, as a `systemd-run` unit when the board is quiet (owner).
+  Done when the in-place benchmark has an entry on both arches.
 
 - [ ] **The fuzz targets run in unit mode only, with no kept corpus** (M, ★). Since 2026-11-14 eleven properties
   run in the clang Debug lane's `fuzzTestSuite`, each for a second of random inputs.

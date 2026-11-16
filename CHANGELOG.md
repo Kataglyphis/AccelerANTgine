@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-16, the instruction-count gate counts the detector's inference call)
+- `BM_OnnxRunInferenceInPlace` runs `run_inference_in_place` on one 3x640x640 Relu frame at one ORT thread (2.0 ms
+  on the Pi beside 3.1 ms for the copying `BM_OnnxRunInference`), and `perf-cachegrind.py` counts it with the other
+  two. Until the baseline entries hold it, a missing benchmark is recorded with a `::warning`, which a test holds.
+  Both Relu benchmarks build their model through one helper; clang-tidy counts unchanged.
+
 ### Changed (2026-11-16, the instruction-count gate guards arm64 too)
 - `perf/cachegrind-baseline.json` has `arm64-clang` and `arm64-gcc` entries, each the median of five green
   `[ci arm64]` runs of the same commit on Neoverse-N2 (`--summarize`, spread under 2e-5), and

@@ -137,14 +137,20 @@ static void BM_ParseShippedInferenceConfig(benchmark::State &state)
 }
 BENCHMARK(BM_ParseShippedInferenceConfig);
 
+// One Relu node over a 1 x elements tensor, X to Y.
+namespace {
+auto relu_model(std::int64_t elements)
+{
+    return kataglyphis::test::build_onnx_model(
+      { { "X", { 1, elements } } }, { { "Y", { 1, elements } } }, { { "Relu", { "X" }, { "Y" } } });
+}
+}// namespace
+
 // The engine's per-call overhead around ORT: the input copy, tensor wrapping and the output copy.
 static void BM_OnnxRunInference(benchmark::State &state)
 {
     const auto elements = static_cast<std::int64_t>(state.range(0));
-    const TempFile model("kataglyphis-bench-relu",
-      ".onnx",
-      kataglyphis::test::build_onnx_model(
-        { { "X", { 1, elements } } }, { { "Y", { 1, elements } } }, { { "Relu", { "X" }, { "Y" } } }));
+    const TempFile model("kataglyphis-bench-relu", ".onnx", relu_model(elements));
     inference::OnnxInferenceEngine engine;
     auto config = inference::create_default_session_config(model.path());
     config.intra_op_num_threads = 1;
@@ -163,6 +169,36 @@ static void BM_OnnxRunInference(benchmark::State &state)
       static_cast<std::int64_t>(state.iterations()) * elements * static_cast<std::int64_t>(sizeof(float)));
 }
 BENCHMARK(BM_OnnxRunInference)->Arg(1024)->Arg(1 << 16)->Arg(3 * 640 * 640);
+
+// The detector's call: one 3x640x640 frame on the caller's buffer, without the input copy.
+namespace {
+void BM_OnnxRunInferenceInPlace(benchmark::State &state)
+{
+    constexpr std::int64_t elements = std::int64_t{ 3 } * 640 * 640;
+    const TempFile model("kataglyphis-bench-relu-in-place", ".onnx", relu_model(elements));
+    inference::OnnxInferenceEngine engine;
+    auto config = inference::create_default_session_config(model.path());
+    config.intra_op_num_threads = 1;
+    config.inter_op_num_threads = 1;
+    if (!engine.initialize(config)) {
+        state.SkipWithError("ONNX Runtime could not load the generated model");
+        return;
+    }
+    auto input = float_input(static_cast<std::size_t>(elements));
+    const inference::TensorShape shape{ { 1, static_cast<std::size_t>(elements) } };
+    for ([[maybe_unused]] const auto iteration : state) {
+        auto result = engine.run_inference_in_place(input, shape, "X");
+        if (!result) {
+            state.SkipWithError("run_inference_in_place failed");
+            break;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+    state.SetBytesProcessed(
+      static_cast<std::int64_t>(state.iterations()) * elements * static_cast<std::int64_t>(sizeof(float)));
+}
+}// namespace
+BENCHMARK(BM_OnnxRunInferenceInPlace);
 
 // Detection end to end on a YOLOv5-sized output: inference, decoding and NMS over `candidates` confident boxes.
 static void BM_YoloDetect(benchmark::State &state)

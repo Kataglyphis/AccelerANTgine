@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Instruction counts of BM_PreprocessFrame and BM_DetectFrame under cachegrind, against perf/cachegrind-baseline.json.
+"""Instruction counts of the BENCHES under cachegrind, against perf/cachegrind-baseline.json.
 It does not see wall time, cache misses, threading, GPU providers or a benchmark outside BENCHES; see docs/source/development_workflow.rst."""
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-BENCHES = ("BM_PreprocessFrame", "BM_DetectFrame")
+BENCHES = ("BM_PreprocessFrame", "BM_DetectFrame", "BM_OnnxRunInferenceInPlace")
 # Two warm iterations apart: the first iteration's allocations and the session load cancel out.
 LOW, HIGH = 2, 4
 MIN_RUNS = 5
@@ -98,6 +98,10 @@ def check(counts: dict[str, int], entry: dict[str, dict[str, Any]]) -> int:
     """1 when a benchmark leaves its band, over the limit or under the floor; each verdict is printed."""
     failed = 0
     for bench in BENCHES:
+        if bench not in entry:
+            print(f"::warning title=No instruction-count baseline::{bench} {counts[bench]} has no entry yet; recorded only",
+                  file=sys.stderr)
+            continue
         ceiling = limit(entry[bench])
         lowest = floor(entry[bench])
         base = int(entry[bench]["instructions"])
