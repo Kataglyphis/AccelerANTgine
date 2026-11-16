@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-16, each cause has its own error value)
+- `OnnxError` appends `PipelineParseFailed`, `MediaInitFailed` and `StreamBroken`, so every value before keeps its
+  number (owner decision). `VideoDetectorPipeline::initialize` answers `MediaInitFailed` when GStreamer does not start
+  and `PipelineParseFailed` for a launch line that does not parse, both `SessionCreationFailed` before;
+  `detect_from_gstreamer` answers `StreamBroken` for a failed element, which shared `InputAllocationFailed` with a
+  pipeline without a sink. Python binds the three; tests for the broken stream and the unparsable line, the names
+  test counts twenty values, `docs/source/inference_preprocessing.rst` lists them. ctest 275, both wheels green.
+
 ### Fixed (2026-11-16, a failed GStreamer init says why)
 - `GStreamerPipeline::initialize_gstreamer` freed GLib's message unread when `gst_init_check` failed; it logs it now,
   so both causes behind a video pipeline's `SessionCreationFailed` (the init and a launch line that does not parse)

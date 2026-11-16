@@ -9,8 +9,10 @@ original image for stretch coordinate mapping.
 
 When ``detect_from_gstreamer`` gets no frame, its error says which case it is:
 ``OnnxError::FrameTimeout`` when none came in time and the stream may still deliver,
-``OnnxError::EndOfStream`` when the stream has ended, and ``InputAllocationFailed`` for a
-broken stream or a pipeline without a sink. The factories that take only a model path
+``OnnxError::EndOfStream`` when the stream has ended, ``StreamBroken`` when an element failed
+(the pipeline's ``stream_error()`` names it), and ``InputAllocationFailed`` for a pipeline without a
+sink. ``VideoDetectorPipeline::initialize`` answers ``MediaInitFailed`` when GStreamer does not start and
+``PipelineParseFailed`` for a launch line that does not parse. The factories that take only a model path
 (``create_video_detection_pipeline``, ``create_camera_detection_pipeline``) read the output
 layout the model names; a model that names none is read as the default layout.
 

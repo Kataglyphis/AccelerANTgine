@@ -101,13 +101,10 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the NVIDIA packages' card run (two entries up) passes on that image. Until it is published, a build may
   meet either form of the module.
 
-- [ ] **The video pipeline's reasons stay in the log** (S, ★★). Since 2026-11-16 the engine, the detector and the text
-  generator keep why their last call failed (`last_error()`), Python's errors carry those words, and the C API has
-  `kataglyphis_text_last_error()`, appended. Left: in `VideoDetectorPipeline::initialize` a failed GStreamer init and a
-  pipeline that does not parse are both `SessionCreationFailed`, each with its reason in the log since 2026-11-16
-  (`initialize_gstreamer` logs GLib's message); a broken stream and a pipeline without a sink still share
-  `InputAllocationFailed`. Ask the owner before producing or reserving the ten values nothing in `Src/` returns (five
-  `WebRTCError`, four `GStreamerError`, `OnnxError::MemoryAllocationError`).
+- [b] **Ten error values nothing returns** (S, ★). Five `WebRTCError`, four `GStreamerError` and
+  `OnnxError::MemoryAllocationError` are declared and never returned. The shared codes are split (2026-11-16, owner
+  decision: `PipelineParseFailed`, `MediaInitFailed` and `StreamBroken`, appended); ask the owner before producing or
+  removing the ten.
 
 - [ ] **`WebRTCStreamer` keeps older copies of code that `GStreamerPipeline` has since improved** (L, ★★). Each
   file owns its own "GStreamer is initialised" flag and its own `gst_deinit` (`Src/webrtc_streamer.cpp:33-35`,
