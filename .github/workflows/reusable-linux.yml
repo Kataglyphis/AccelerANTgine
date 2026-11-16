@@ -122,6 +122,8 @@ jobs:
             "BM_SessionCreate": {"direction": "lower"},
             "BM_TextGenerateTiny": {"direction": "lower"},
             "*/tokens_per_second": {"direction": "higher"},
+            "BM_VideoPipelineKeepsUp*/frames_per_second": {"direction": "higher"},
+            "BM_VideoPipelineKeepsUp*/dropped_share": {"direction": "lower"},
             "*/bytes_per_second": {"direction": "higher"}}
 
       # ci-profile-bench.sh keeps a crash's status, core and backtrace here (the WebRTC workload's SIGSEGV, BACKLOG).

@@ -3,6 +3,7 @@
 #include <benchmark/benchmark.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -10,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "kShippedInferenceConfig.inc"
@@ -265,6 +267,48 @@ static void BM_DetectFrame(benchmark::State &state)
     }
 }
 BENCHMARK(BM_DetectFrame)->Unit(benchmark::kMillisecond);
+
+// Whether the detector keeps up with a live 30 fps camera: the frames it ran on per second and the share it dropped.
+namespace {
+void BM_VideoPipelineKeepsUp(benchmark::State &state)
+{
+    constexpr std::uint32_t width = 640;
+    constexpr std::uint32_t height = 480;
+    constexpr std::uint32_t fps = 30;
+    constexpr auto run_for = std::chrono::seconds(2);
+    detection::VideoDetectionConfig config;
+    config.yolo_config = detector_config();
+    config.gstreamer_config.pipeline_description =
+      "videotestsrc is-live=true ! " + detection::camera_detection_pipeline_tail(width, height, fps);
+    std::uint64_t frames = 0;
+    std::uint64_t dropped = 0;
+    // Between the first frame and the last, so the model's load before them does not dilute the rate.
+    double seconds = 0.0;
+    for ([[maybe_unused]] const auto iteration : state) {
+        detection::VideoDetectorPipeline pipeline;
+        if (!pipeline.initialize(config) || !pipeline.start()) {
+            skip_or_fail(state, "the DEIM model, videotestsrc or ONNX Runtime is missing");
+            return;
+        }
+        std::this_thread::sleep_for(run_for);
+        if (!pipeline.stop()) {
+            state.SkipWithError("the pipeline did not stop");
+            return;
+        }
+        const auto stats = pipeline.stats();
+        constexpr double nanoseconds_per_second = 1e9;
+        if (stats.frames > 1) {
+            frames += stats.frames - 1;
+            seconds += static_cast<double>(stats.last_timestamp_ns - stats.first_timestamp_ns) / nanoseconds_per_second;
+        }
+        dropped += stats.dropped;
+    }
+    state.counters["frames_per_second"] = seconds > 0.0 ? static_cast<double>(frames) / seconds : 0.0;
+    state.counters["dropped_share"] =
+      frames + dropped == 0 ? 0.0 : static_cast<double>(dropped) / static_cast<double>(frames + dropped);
+}
+}// namespace
+BENCHMARK(BM_VideoPipelineKeepsUp)->Unit(benchmark::kMillisecond)->Iterations(1)->UseRealTime();
 
 // Loading the DEIM model into a fresh ORT session, the cost a CLI start pays once.
 static void BM_SessionCreate(benchmark::State &state)

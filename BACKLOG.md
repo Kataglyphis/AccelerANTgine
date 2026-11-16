@@ -133,13 +133,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The pipeline's frame counts feed no benchmark** (S, ★). Since 2026-11-15 `VideoDetectorPipeline::stats()`
-  counts frames, errors, the last inference time and the frames a live source made while the detector was busy
-  (from the timestamps and the caps' rate), and `ASlowDetectorSeesTheNewestFrame` runs the exported live tail
-  (`camera_detection_pipeline_tail`) behind `videotestsrc is-live=true`: five 200 ms detections at 30 fps drop
-  frames, the lossless tail (`video_detection_pipeline_tail`) drops none. Left: a warn-only pipeline benchmark in
-  `bench-history` from those counters, and the counters in the Python bindings.
-
 - [ ] **The instruction-count gate cannot tighten and guards x64 only** (M, ★★). `check()` fails only on "over"
   (`scripts/linux/perf-cachegrind.py:88-100`), so after a speed-up the old ceiling stays and the gain can be lost
   again without a failure. Not measured: whether 6219631 moved `BM_PreprocessFrame`;

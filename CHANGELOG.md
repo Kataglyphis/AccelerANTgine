@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-16, a benchmark asks whether the detector keeps up with a camera)
+- `BM_VideoPipelineKeepsUp` runs the DEIM model behind a live 30 fps `videotestsrc` and the camera's leaky tail for two
+  seconds and reports `frames_per_second`, from the first frame's timestamp to the last so the model's load does not
+  dilute it, and `dropped_share` from `VideoDetectorPipeline::stats()`. Both go to `bench-history`, ungated like every
+  wall-time figure; the cachegrind gate keeps its two benchmarks. On a Pi 5 (profile build, 640x480): 2.5 frames per
+  second, 92 % dropped. Python binds no video pipeline, so its counters stay C++.
+
 ### Changed (2026-11-16, each cause has its own error value)
 - `OnnxError` appends `PipelineParseFailed`, `MediaInitFailed` and `StreamBroken`, so every value before keeps its
   number (owner decision). `VideoDetectorPipeline::initialize` answers `MediaInitFailed` when GStreamer does not start
