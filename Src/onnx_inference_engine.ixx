@@ -37,7 +37,7 @@ enum class OnnxError {
     FrameTimeout,
     // The stream has ended; no frame will come.
     EndOfStream,
-    // Appended from here, so every value above keeps its number (owner decision 2026-11-16).
+    // Appended from here, so every value above keeps its number (owner decision).
     // The video pipeline's launch line did not parse.
     PipelineParseFailed,
     // GStreamer itself did not start.

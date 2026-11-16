@@ -72,7 +72,7 @@ if [[ ${#CMAKE_FILES[@]} -eq 0 ]]; then
   # The root CMakeLists.txt always exists, so an empty set is a discovery bug.
   die "cmake-format discovery found no CMake files - check CODE_QUALITY_CMAKE_SEARCH_ROOT/excludes."
 fi
-# --check: in place it rewrote the CI checkout and stayed green over a drifted file (2026-10-12).
+# --check: in place it rewrote the CI checkout and stayed green over a drifted file.
 run_gate cmake-format code_quality_run_cmake_format --check "${CMAKE_FILES[@]}"
 
 # Releases format differently, so the hub picks the clang-format of its LLVM_RELEASE, or the gate fails.

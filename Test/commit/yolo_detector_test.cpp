@@ -662,7 +662,7 @@ TEST(YoloDetectorGStreamer, APipelineWithoutAppsinkGivesNoInput)
     EXPECT_EQ(result.error(), detection::OnnxError::InputAllocationFailed);
 }
 
-// An unplugged camera is a broken stream, told apart from a pipeline without a sink (owner decision 2026-11-16).
+// An unplugged camera is a broken stream, told apart from a pipeline without a sink (owner decision).
 TEST(YoloDetectorGStreamer, ABrokenStreamIsStreamBroken)
 {
     if (!kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "capsfilter", "identity", "appsink" })

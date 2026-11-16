@@ -114,7 +114,7 @@ TEST(TomlConfig, MalformedDocumentsAreParseErrors)
     }
 }
 
-// A value of the wrong type is a mistake to report, as the JSON loader does (owner decision 2026-11-15).
+// A value of the wrong type is a mistake to report, as the JSON loader does (owner decision).
 TEST(TomlConfig, AWrongTypeIsInvalidValue)
 {
     for (const auto *wrong : {

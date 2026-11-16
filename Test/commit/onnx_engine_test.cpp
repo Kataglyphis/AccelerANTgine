@@ -70,7 +70,7 @@ TEST(TensorShape, TotalElementsIsTheProductOfTheDimensions)
     EXPECT_EQ(shape({ 5, 0, 2 }).total_elements(), 0U);
 }
 
-// Owner decision 2026-11-15: on a Pi 5 three threads beat four and ORT's own default; seven doubled the time.
+// Owner decision: on a Pi 5 three threads beat four and ORT's own default; seven doubled the time.
 TEST(OnnxEngine, ShippedThreadsAreTheUsableCpusButOneFromOneToEight)
 {
     const int shipped = inference::shipped_ort_threads();
