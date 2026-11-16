@@ -452,9 +452,10 @@ TEST(GStreamerPipeline, EveryInferenceBuilderKeepsAPathWithASeparatorInOneValue)
 TEST(GStreamerError, EveryValueHasANameOfItsOwn)
 {
     const auto names = kataglyphis::test::names_of<kataglyphis::gstreamer::GStreamerError>();
-    ASSERT_EQ(names.size(), 10U);
+    ASSERT_EQ(names.size(), 6U);
     EXPECT_EQ(names.front(), "InitializationFailed");
-    EXPECT_EQ(names.back(), "ResourceNotFound");
+    EXPECT_EQ(names.back(), "StreamError");
     EXPECT_TRUE(kataglyphis::test::all_differ(names));
-    EXPECT_EQ(to_string(static_cast<kataglyphis::gstreamer::GStreamerError>(10)), "UnknownError");
+    EXPECT_EQ(to_string(static_cast<kataglyphis::gstreamer::GStreamerError>(3)), "UnknownError");
+    EXPECT_EQ(to_string(static_cast<kataglyphis::gstreamer::GStreamerError>(8)), "UnknownError");
 }

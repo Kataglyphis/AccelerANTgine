@@ -49,24 +49,14 @@ namespace {
         switch (error) {
         case WebRTCError::InitializationFailed:
             return "GStreamer initialization failed";
-        case WebRTCError::SignallingConnectionFailed:
-            return "Failed to connect to signalling server";
         case WebRTCError::PipelineCreationFailed:
             return "Failed to create GStreamer pipeline";
-        case WebRTCError::NegotiationFailed:
-            return "WebRTC negotiation failed";
         case WebRTCError::MediaError:
             return "Media error";
-        case WebRTCError::LibcameraNotAvailable:
-            return "libcamera not available";
-        case WebRTCError::EncoderNotAvailable:
-            return "Video encoder not available";
         case WebRTCError::StateChangeFailed:
             return "Pipeline state change failed";
         case WebRTCError::InvalidConfiguration:
             return "Invalid configuration";
-        case WebRTCError::Timeout:
-            return "Operation timed out";
         }
         return "Unknown error";
     }

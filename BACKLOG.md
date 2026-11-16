@@ -101,11 +101,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the NVIDIA packages' card run (two entries up) passes on that image. Until it is published, a build may
   meet either form of the module.
 
-- [b] **Ten error values nothing returns** (S, ★). Five `WebRTCError`, four `GStreamerError` and
-  `OnnxError::MemoryAllocationError` are declared and never returned. The shared codes are split (2026-11-16, owner
-  decision: `PipelineParseFailed`, `MediaInitFailed` and `StreamBroken`, appended); ask the owner before producing or
-  removing the ten.
-
 - [ ] **`WebRTCStreamer` keeps older copies of code that `GStreamerPipeline` has since improved** (L, ★★). Each
   file owns its own "GStreamer is initialised" flag and its own `gst_deinit` (`Src/webrtc_streamer.cpp:33-35`,
   `:425-476`; `Src/gstreamer_pipeline.cpp:30-31`, `:319-346`), and the scanner failure is seen only when the

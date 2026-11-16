@@ -266,7 +266,7 @@ template<typename Enum> auto names_of() -> std::vector<std::string>
     std::vector<std::string> names;
     for (int value = 0; value < 256; ++value) {
         const std::string_view name = to_string(static_cast<Enum>(value));
-        if (name == "UnknownError") { break; }
+        if (name == "UnknownError") { continue; }
         names.emplace_back(name);
     }
     return names;

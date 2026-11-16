@@ -25,6 +25,7 @@ enum class OnnxError {
     InferenceFailed,
     InvalidInputShape,
     InvalidInputType,
+    // Returned by nothing; kept so the Python binding's numbers after it stay where they are.
     MemoryAllocationError,
     SessionNotInitialized,
     OutputNotFound,

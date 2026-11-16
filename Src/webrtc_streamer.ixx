@@ -18,17 +18,13 @@ export namespace kataglyphis::webrtc {
 
 enum class ConfigOverrideMode { UseConfig, Override };
 
+// Numbered by hand: the CLI prints errors as integers, and the values nothing returned left their numbers free.
 enum class WebRTCError {
-    InitializationFailed,
-    SignallingConnectionFailed,
-    PipelineCreationFailed,
-    NegotiationFailed,
-    MediaError,
-    LibcameraNotAvailable,
-    EncoderNotAvailable,
-    StateChangeFailed,
-    InvalidConfiguration,
-    Timeout
+    InitializationFailed = 0,
+    PipelineCreationFailed = 2,
+    MediaError = 4,
+    StateChangeFailed = 7,
+    InvalidConfiguration = 8,
 };
 
 // The value's own name, for a log line, a message or a binding; no default, so a new value fails the build here.
@@ -37,24 +33,14 @@ enum class WebRTCError {
     switch (error) {
     case WebRTCError::InitializationFailed:
         return "InitializationFailed";
-    case WebRTCError::SignallingConnectionFailed:
-        return "SignallingConnectionFailed";
     case WebRTCError::PipelineCreationFailed:
         return "PipelineCreationFailed";
-    case WebRTCError::NegotiationFailed:
-        return "NegotiationFailed";
     case WebRTCError::MediaError:
         return "MediaError";
-    case WebRTCError::LibcameraNotAvailable:
-        return "LibcameraNotAvailable";
-    case WebRTCError::EncoderNotAvailable:
-        return "EncoderNotAvailable";
     case WebRTCError::StateChangeFailed:
         return "StateChangeFailed";
     case WebRTCError::InvalidConfiguration:
         return "InvalidConfiguration";
-    case WebRTCError::Timeout:
-        return "Timeout";
     }
     return "UnknownError";
 }

@@ -475,9 +475,10 @@ TEST(WebRtcStreamer, AConfigFileDrivesTheFactory)
 TEST(WebRTCError, EveryValueHasANameOfItsOwn)
 {
     const auto names = kataglyphis::test::names_of<kataglyphis::webrtc::WebRTCError>();
-    ASSERT_EQ(names.size(), 10U);
+    ASSERT_EQ(names.size(), 5U);
     EXPECT_EQ(names.front(), "InitializationFailed");
-    EXPECT_EQ(names.back(), "Timeout");
+    EXPECT_EQ(names.back(), "InvalidConfiguration");
     EXPECT_TRUE(kataglyphis::test::all_differ(names));
-    EXPECT_EQ(to_string(static_cast<kataglyphis::webrtc::WebRTCError>(10)), "UnknownError");
+    EXPECT_EQ(to_string(static_cast<kataglyphis::webrtc::WebRTCError>(1)), "UnknownError");
+    EXPECT_EQ(to_string(static_cast<kataglyphis::webrtc::WebRTCError>(9)), "UnknownError");
 }

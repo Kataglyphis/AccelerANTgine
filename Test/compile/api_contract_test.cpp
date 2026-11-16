@@ -157,10 +157,12 @@ TEST(CppApiContract, ErrorCodesKeepTheirNumbers)
     static_assert(as_int(inference::OnnxError::OutputNotFound) == 9);
     static_assert(as_int(gstreamer::GStreamerError::InitializationFailed) == 0);
     static_assert(as_int(gstreamer::GStreamerError::PipelineCreationFailed) == 1);
-    static_assert(as_int(gstreamer::GStreamerError::ResourceNotFound) == 9);
+    static_assert(as_int(gstreamer::GStreamerError::StateChangeFailed) == 4);
+    static_assert(as_int(gstreamer::GStreamerError::StreamError) == 7);
     static_assert(as_int(webrtc::WebRTCError::InitializationFailed) == 0);
     static_assert(as_int(webrtc::WebRTCError::InvalidConfiguration) == 8);
-    static_assert(as_int(webrtc::WebRTCError::Timeout) == 9);
+    static_assert(as_int(webrtc::WebRTCError::PipelineCreationFailed) == 2);
+    static_assert(as_int(webrtc::WebRTCError::StateChangeFailed) == 7);
     static_assert(as_int(cfg::ConfigError::FileNotFound) == 0);
     static_assert(as_int(cfg::ConfigError::InvalidValue) == 3);
     static_assert(as_int(cfg::ConfigError::ParseError) == 1);

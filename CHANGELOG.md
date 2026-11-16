@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Removed (2026-11-16, nine error values nothing returned)
+- `WebRTCError` loses `SignallingConnectionFailed`, `NegotiationFailed`, `LibcameraNotAvailable`,
+  `EncoderNotAvailable` and `Timeout`, and `GStreamerError` loses `LinkFailed`, `CapsNegotiationFailed`,
+  `InvalidParameter` and `ResourceNotFound` (owner decision). The values left keep their numbers, now written out,
+  because the CLI and the demo print errors as integers; `names_of` in the test support skips the gaps. The numeric
+  contract test pins the new ends. `OnnxError::MemoryAllocationError` stays, unreturned, so the Python binding's
+  codes from 8 on keep their numbers.
+
 ### Added (2026-11-16, the instruction-count gate counts the detector's inference call)
 - `BM_OnnxRunInferenceInPlace` runs `run_inference_in_place` on one 3x640x640 Relu frame at one ORT thread (2.0 ms
   on the Pi beside 3.1 ms for the copying `BM_OnnxRunInference`), and `perf-cachegrind.py` counts it with the other

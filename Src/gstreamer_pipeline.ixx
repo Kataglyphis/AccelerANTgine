@@ -16,17 +16,14 @@ export module kataglyphis.gstreamer_pipeline;
 
 export namespace kataglyphis::gstreamer {
 
+// Numbered by hand: the CLI prints errors as integers, and the values nothing returned left their numbers free.
 enum class GStreamerError {
-    InitializationFailed,
-    PipelineCreationFailed,
-    ElementCreationFailed,
-    LinkFailed,
-    StateChangeFailed,
-    BufferAllocationFailed,
-    CapsNegotiationFailed,
-    StreamError,
-    InvalidParameter,
-    ResourceNotFound
+    InitializationFailed = 0,
+    PipelineCreationFailed = 1,
+    ElementCreationFailed = 2,
+    StateChangeFailed = 4,
+    BufferAllocationFailed = 5,
+    StreamError = 7,
 };
 
 // The value's own name, for a log line, a message or a binding; no default, so a new value fails the build here.
@@ -39,20 +36,12 @@ enum class GStreamerError {
         return "PipelineCreationFailed";
     case GStreamerError::ElementCreationFailed:
         return "ElementCreationFailed";
-    case GStreamerError::LinkFailed:
-        return "LinkFailed";
     case GStreamerError::StateChangeFailed:
         return "StateChangeFailed";
     case GStreamerError::BufferAllocationFailed:
         return "BufferAllocationFailed";
-    case GStreamerError::CapsNegotiationFailed:
-        return "CapsNegotiationFailed";
     case GStreamerError::StreamError:
         return "StreamError";
-    case GStreamerError::InvalidParameter:
-        return "InvalidParameter";
-    case GStreamerError::ResourceNotFound:
-        return "ResourceNotFound";
     }
     return "UnknownError";
 }
