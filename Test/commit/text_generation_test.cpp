@@ -348,6 +348,27 @@ TEST_F(TextGeneration, IsInitializedAnswersDuringAGenerationEvenFromItsCallback)
     EXPECT_EQ(asked, 2U);
 }
 
+TEST(TextGenerationSetup, TheDecoderTakesTheOrtThreadRuleUnlessTheModelSetsItsOwn)
+{
+    const auto dir = std::filesystem::temp_directory_path() / "kataglyphis-text-threads";
+    std::filesystem::create_directories(dir);
+    const auto write = [&dir](std::string_view json) -> void {
+        std::ofstream(dir / "genai_config.json", std::ios::trunc) << json;
+    };
+    write(R"({"model": {"decoder": {"session_options": {}}}})");
+    const auto rule = text::text_intra_op_threads(dir);
+    ASSERT_TRUE(rule.has_value());
+    EXPECT_GE(*rule, 1);
+    EXPECT_LE(*rule, 8);
+    write(R"({"model": {"decoder": {"session_options": {"intra_op_num_threads": 3}}}})");
+    EXPECT_FALSE(text::text_intra_op_threads(dir).has_value());
+    // An unreadable config is GenAI's to refuse at load; the rule still holds for the count.
+    write("{");
+    EXPECT_EQ(text::text_intra_op_threads(dir), rule);
+    std::error_code ignored;
+    std::filesystem::remove_all(dir, ignored);
+}
+
 TEST(TextGenerationSetup, TheModelLiesBesideTheSuiteForAStagedOrMovedBuild)
 {
     const auto beside = kataglyphis::test::executable_dir();

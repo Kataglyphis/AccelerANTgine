@@ -103,4 +103,8 @@ class KATAGLYPHIS_CPP_API TextGenerator
 
 [[nodiscard]] KATAGLYPHIS_CPP_API auto to_string(TextGenError error) noexcept -> std::string_view;
 
+/// The decoder's intra-op threads a load sets: the ORT thread rule, or none when the model's config sets its own.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto text_intra_op_threads(const std::filesystem::path &model_dir)
+  -> std::optional<int>;
+
 }// namespace kataglyphis::text

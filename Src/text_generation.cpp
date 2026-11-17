@@ -36,6 +36,7 @@ module;
 module kataglyphis.text_generation;
 
 import kataglyphis.log;
+import kataglyphis.onnx_inference;
 import nlohmann.json;
 
 namespace kataglyphis::text {
@@ -51,6 +52,8 @@ namespace {
         decltype(&OgaCreateConfig) CreateConfig;
         decltype(&OgaConfigClearProviders) ConfigClearProviders;
         decltype(&OgaConfigAppendProvider) ConfigAppendProvider;
+        // Optional: a GenAI without it keeps its own thread default.
+        decltype(&OgaConfigOverlay) ConfigOverlay = nullptr;
         decltype(&OgaDestroyConfig) DestroyConfig;
         decltype(&OgaCreateModelFromConfig) CreateModelFromConfig;
         decltype(&OgaDestroyModel) DestroyModel;
@@ -149,6 +152,8 @@ namespace {
               && bind(library, "OgaGenerator_RewindTo", table->GeneratorRewindTo)
               && bind(library, "OgaGenerator_GetSequenceCount", table->GeneratorGetSequenceCount)
               && bind(library, "OgaGenerator_GetSequenceData", table->GeneratorGetSequenceData);
+            table->ConfigOverlay =
+              reinterpret_cast<decltype(&OgaConfigOverlay)>(library_symbol(library, "OgaConfigOverlay"));
             return complete ? std::move(table) : nullptr;
         }();
         return api.get();
@@ -579,6 +584,16 @@ auto TextGenerator::initialize(const std::filesystem::path &model_dir, Execution
     return loaded;
 }
 
+KATAGLYPHIS_CPP_API auto text_intra_op_threads(const std::filesystem::path &model_dir) -> std::optional<int>
+{
+    std::ifstream file(model_dir / "genai_config.json");
+    const auto config = nlohmann::json::parse(file, nullptr, false);
+    // GenAI's own default ignores the affinity mask (hub CON218); a count the model's config sets still wins.
+    const nlohmann::json::json_pointer set_by_model("/model/decoder/session_options/intra_op_num_threads");
+    if (!config.is_discarded() && config.contains(set_by_model)) { return std::nullopt; }
+    return inference::shipped_ort_threads();
+}
+
 auto TextGenerator::Impl::load(const std::filesystem::path &model_dir, const char *name)
   -> std::expected<void, TextGenError>
 {
@@ -594,6 +609,13 @@ auto TextGenerator::Impl::load(const std::filesystem::path &model_dir, const cha
     if (!succeeded(*api, api->ConfigClearProviders(config.get()), "providers")
         || (name != nullptr && !succeeded(*api, api->ConfigAppendProvider(config.get(), name), name))) {
         return std::unexpected(TextGenError::ProviderUnavailable);
+    }
+    if (const auto threads = text_intra_op_threads(model_dir); threads && api->ConfigOverlay != nullptr) {
+        const nlohmann::json overlay{ { "model",
+          { { "decoder", { { "session_options", { { "intra_op_num_threads", *threads } } } } } } } };
+        if (!succeeded(*api, api->ConfigOverlay(config.get(), overlay.dump().c_str()), "thread overlay")) {
+            return std::unexpected(TextGenError::ModelLoadFailed);
+        }
     }
     OgaModel *raw_model = nullptr;
     if (!succeeded(*api, api->CreateModelFromConfig(config.get(), &raw_model), "model")) {

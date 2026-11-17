@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-17, a text model's decoder follows the ORT thread rule)
+- `TextGenerator::initialize` holds the GenAI decoder to `shipped_ort_threads()` intra-op threads (the affinity
+  mask's CPUs but one, 1 to 8) through `OgaConfigOverlay`, where GenAI's own default ignored the mask (hub CON218,
+  owner decision: the detector's rule, no text rule of its own). A model whose `genai_config.json` sets its own count
+  keeps it, and a GenAI without the overlay keeps its default. `text_intra_op_threads()` says which applies; a test
+  holds both.
+
 ### Added (2026-11-17, coverage-guided fuzzing before every release)
 - `KATAGLYPHIS_FUZZING_MODE` and the preset `linux-fuzz-clang` build the fuzz suite in FuzzTest's fuzzing mode, its
   ASan and coverage over every target and the project's sanitizers off; it no longer recurses on arm64.
