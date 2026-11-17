@@ -2,6 +2,13 @@
 
 #include <benchmark/benchmark.h>
 
+#ifdef __linux__
+#include <csignal>
+#include <execinfo.h>
+#include <unistd.h>
+#endif
+
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -38,6 +45,26 @@ constexpr std::string_view kSettings =
       "video": {"defaultWidth": 1920, "defaultHeight": 1080, "defaultFramerate": 60, "defaultBitrateKbps": 8000},
       "texture": {"width": 800, "height": 600}, "android": {"width": 640, "height": 360, "fps": 24},
       "stream": {"source": "v4l2", "encoder": "vp8", "device": "/dev/video4", "producerId": "producer-7"}})";
+
+#ifdef __linux__
+// A suite that dies on a signal in CI leaves no core and the image has no gdb: the stack goes to stderr instead.
+void print_stack_and_die(int signal_number)
+{
+    constexpr int kFrames = 64;
+    std::array<void *, kFrames> frames{};
+    const int depth = backtrace(frames.data(), kFrames);
+    backtrace_symbols_fd(frames.data(), depth, STDERR_FILENO);
+    (void)std::signal(signal_number, SIG_DFL);
+    (void)std::raise(signal_number);
+}
+
+const bool kStackOnCrash = [] -> bool {
+    (void)std::signal(SIGSEGV, print_stack_and_die);
+    (void)std::signal(SIGBUS, print_stack_and_die);
+    (void)std::signal(SIGABRT, print_stack_and_die);
+    return true;
+}();
+#endif
 
 // YOLOv5-style output, 1680 rows of 4 box values, objectness and 80 class scores.
 constexpr YoloReshapeGeometry kYoloGeometry{ 560, 85, 1680, 85 };

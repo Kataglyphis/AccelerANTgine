@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-17, the perf suite prints its stack when it dies)
+- `perfTestSuite` prints a `backtrace_symbols_fd` stack on SIGSEGV, SIGBUS and SIGABRT on Linux: since d47f9d1 the gcc
+  x64 profile job dies on a signal after `BM_SessionCreate`, the image has no gdb, and the suite leaves no core,
+  so CI said nothing about where. arm64 gcc runs the whole suite cleanly.
+
 ### Fixed (2026-11-17, tomlplusplus to upstream master for a parser abort the fuzzer found)
 - `third_party/tomlplusplus` moves from 1e8829b to upstream master c38c9b9 (owner decision): the coverage-guided fuzz
   run found that the inference config `w=[[}N` makes the parser fail its own `!is_value_terminator(*cp)` assertion,
