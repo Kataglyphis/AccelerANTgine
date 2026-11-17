@@ -40,7 +40,6 @@ TEST(WebRtcConfig, DefaultsPointAtALocalSignallingServer)
 {
     const auto config = cfg::get_default_webrtc_config();
     EXPECT_EQ(config.signaling_server_url, "ws://127.0.0.1:8443");
-    EXPECT_EQ(config.reconnection_timeout_ms, 5000U);
     EXPECT_EQ(config.stun_servers, (std::vector<std::string>{ "stun://stun.l.google.com:19302" }));
     EXPECT_TRUE(config.turn_servers.empty());
     EXPECT_EQ(config.video.default_width, 1280U);
@@ -74,7 +73,6 @@ TEST(WebRtcConfig, ParsesEveryField)
     const auto config = parse(kFullSettings);
     ASSERT_TRUE(config.has_value());
     EXPECT_EQ(config->signaling_server_url, "wss://example.test/webrtc-ws");
-    EXPECT_EQ(config->reconnection_timeout_ms, 2500U);
     EXPECT_EQ(config->stun_servers, (std::vector<std::string>{ "stun:one.example:3478", "stun:two.example:3478" }));
     EXPECT_EQ(config->turn_servers, (std::vector<std::string>{ "turn:relay.example:3478" }));
     EXPECT_EQ(config->video.default_width, 1920U);
@@ -130,10 +128,15 @@ TEST(WebRtcConfig, ANonObjectRootIsInvalid)
     }
 }
 
+TEST(WebRtcConfig, AnOldReconnectionTimeoutIsReadByNothing)
+{
+    // The streamer never reconnected; the service manager restarts it, so an old config's key is ignored, not an error.
+    EXPECT_TRUE(parse(R"({"reconnectionTimeoutMs": "5000"})").has_value());
+}
+
 TEST(WebRtcConfig, WrongTypesAreInvalid)
 {
     for (const std::string_view json : { R"({"signalingServerUrl": 8443})",
-           R"({"reconnectionTimeoutMs": "5000"})",
            R"({"stunServers": "stun:one"})",
            R"({"stunServers": ["stun:one", 2]})",
            R"({"turnServers": [null]})",
@@ -155,7 +158,7 @@ TEST(WebRtcConfig, NumbersMustBeUnsigned32BitIntegers)
            R"({"texture": {"width": 1.5}})",
            R"({"texture": {"width": 1e3}})",
            R"({"texture": {"width": 4294967296}})",
-           R"({"reconnectionTimeoutMs": 18446744073709551615})" }) {
+           R"({"video": {"defaultWidth": 18446744073709551615}})" }) {
         const auto config = parse(json);
         ASSERT_FALSE(config.has_value()) << json;
         EXPECT_EQ(config.error(), cfg::ConfigError::InvalidValue) << json;

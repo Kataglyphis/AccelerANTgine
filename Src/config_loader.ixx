@@ -53,7 +53,6 @@ struct StreamSettingsConfig
 struct WebRTCConfig
 {
     std::string signaling_server_url{ "ws://127.0.0.1:8443" };
-    std::uint32_t reconnection_timeout_ms{ 5000 };
     std::vector<std::string> stun_servers;
     std::vector<std::string> turn_servers;
     VideoConfig video;

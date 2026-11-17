@@ -101,7 +101,6 @@ auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRT
     WebRTCConfig config;
     const auto read = first_error({
       assign_optional_string(j, "signalingServerUrl", config.signaling_server_url),
-      assign_optional_uint(j, "reconnectionTimeoutMs", config.reconnection_timeout_ms),
       assign_optional_string_array(j, "stunServers", config.stun_servers),
       assign_optional_string_array(j, "turnServers", config.turn_servers),
       parse_optional_object(j,

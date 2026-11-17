@@ -108,9 +108,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `configure()`, so the CLI's latch is gone. Left, once the sporadic WebRTC segfault (its own entry) has a stack,
   because it is the same code: read the bus with a sync handler or give the loop its own `GMainContext` (the watch
   sits on the caller's context, the loop on the global one), and drop the second bus reader in `stop()`.
-  `reconnection_timeout_ms` is parsed and bound and never used (`Src/config_loader.cpp`), so a restarted
-  signalling server ends the stream; ask the owner first: reconnect with a backoff, or write "exit 1 and let the
-  service manager restart" in the docs and delete the field.
 
 - [b] **The six tensor builders wait for the hub's nnstreamer decision** (S, ★). `Src/gstreamer_pipeline.cpp`'s
   tensor pipeline builders are called by tests only; hub CON185 and CON198 decide whether the image gets their

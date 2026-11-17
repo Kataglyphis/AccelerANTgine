@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Removed (2026-11-17, `reconnection_timeout_ms`, which nothing used)
+- `WebRTCConfig::reconnection_timeout_ms` and its Python property are gone: the streamer never reconnected, and a
+  restarted signalling server ends it with exit 1 for the service manager to restart (owner decision; getting
+  started says so). A config that still has `reconnectionTimeoutMs` parses, the key ignored, which a test holds.
+
 ### Changed (2026-11-17, one owner for GStreamer, and an Error that stays)
 - `GStreamerPipeline` and `WebRTCStreamer` no longer keep their own "GStreamer is initialised" flags, `gst_deinit`
   calls and `gst_parse_launch` copies: the internal module `kataglyphis.gstreamer_runtime` initialises once,

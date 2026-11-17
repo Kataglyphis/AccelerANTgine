@@ -276,7 +276,10 @@ reach ``set_error_callback``; logging only adds text.
    ACCELERANTGINE_LOG_LEVEL=debug AccelerANTgine --webrtc --source test
 
 ``--webrtc`` exits 1 when the stream fails, for example on a missing codec or a refused signalling
-connection. A stop signal and the end of a finite source exit 0.
+connection. A stop signal and the end of a finite source exit 0. It does not reconnect: a signalling
+server that restarts ends the stream with exit 1, and the service manager that runs it (a systemd unit
+with ``Restart=on-failure``, a Windows service's recovery actions) starts it again. A config's
+``reconnectionTimeoutMs`` is read by nothing and ignored.
 
 Clone The Repository
 --------------------
