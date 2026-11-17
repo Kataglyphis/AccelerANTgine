@@ -527,13 +527,9 @@ void bind_config(nb::module_ &m)
     [[maybe_unused]] const auto
       &[stream_source, stream_encoder, stream_device, stream_camera, stream_path, stream_uri, stream_producer] =
         StreamSettingsConfig{};
-    [[maybe_unused]] const auto &[webrtc_server,
-      webrtc_stun,
-      webrtc_turn,
-      webrtc_video,
-      webrtc_texture,
-      webrtc_android,
-      webrtc_stream] = WebRTCConfig{};
+    [[maybe_unused]] const auto
+      &[webrtc_server, webrtc_stun, webrtc_turn, webrtc_video, webrtc_texture, webrtc_android, webrtc_stream] =
+        WebRTCConfig{};
 
     nb::class_<WebRTCConfig>(m, "WebRTCConfig")
       .def(nb::init<>())
