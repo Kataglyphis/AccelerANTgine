@@ -18,7 +18,7 @@ setup() {
   python3 -I "${fetcher}" --lock models/models.lock
   python3 -I "${fetcher}" --lock resources/models/llm.lock --extract
   python3 -I "$(antfrastructure_path linux/scripts/lib/genai-model-threads.py)" \
-    --model resources/models/smollm2_135m_instruct-cpu --out "${LLM_MODEL}" --threads 7
+    --model resources/models/smollm2_135m_instruct-cpu --out "${LLM_MODEL}" --threads text
   cmake --preset linux-release-clang -B "${BUILD_DIR}"
   cmake --build "${BUILD_DIR}" --target AccelerANTgine_demo AccelerANTgine_cli
   rm -rf "${WHEEL_OUT}" "${VENV}"

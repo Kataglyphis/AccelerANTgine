@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-17, perf-host's text model takes the text thread rule)
+
+- `scripts/linux/perf-host.sh setup` copies the text model with `genai-model-threads.py --threads text` (half the
+  ORT pool, 1 to 4) instead of a fixed 7, so a baseline times what ships and a 4-CPU host is not oversubscribed.
+  The hub pin moves to 47eac65c for that flag. Text figures in an older baseline are not comparable until it is
+  re-recorded.
+
 ### Added (2026-11-17, the perf suite prints its stack when it dies)
 - `perfTestSuite` prints a `backtrace_symbols_fd` stack on SIGSEGV, SIGBUS and SIGABRT on Linux: since d47f9d1 the gcc
   x64 profile job dies on a signal after `BM_SessionCreate`, the image has no gdb, and the suite leaves no core,
