@@ -588,10 +588,11 @@ KATAGLYPHIS_CPP_API auto text_intra_op_threads(const std::filesystem::path &mode
 {
     std::ifstream file(model_dir / "genai_config.json");
     const auto config = nlohmann::json::parse(file, nullptr, false);
-    // GenAI's own default ignores the affinity mask (hub CON218); a count the model's config sets still wins.
+    // Decoding is memory-bound: on a Pi 5 one thread answered fastest and slowed a detector beside it least (hub CON218).
     const nlohmann::json::json_pointer set_by_model("/model/decoder/session_options/intra_op_num_threads");
     if (!config.is_discarded() && config.contains(set_by_model)) { return std::nullopt; }
-    return inference::shipped_ort_threads();
+    constexpr int kMaxTextThreads = 4;
+    return std::clamp(inference::shipped_ort_threads() / 2, 1, kMaxTextThreads);
 }
 
 auto TextGenerator::Impl::load(const std::filesystem::path &model_dir, const char *name)

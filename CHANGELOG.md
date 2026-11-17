@@ -18,12 +18,20 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
-### Changed (2026-11-17, a text model's decoder follows the ORT thread rule)
-- `TextGenerator::initialize` holds the GenAI decoder to `shipped_ort_threads()` intra-op threads (the affinity
-  mask's CPUs but one, 1 to 8) through `OgaConfigOverlay`, where GenAI's own default ignored the mask (hub CON218,
-  owner decision: the detector's rule, no text rule of its own). A model whose `genai_config.json` sets its own count
-  keeps it, and a GenAI without the overlay keeps its default. `text_intra_op_threads()` says which applies; a test
-  holds both.
+### Fixed (2026-11-17, tomlplusplus to upstream master for a parser abort the fuzzer found)
+- `third_party/tomlplusplus` moves from 1e8829b to upstream master c38c9b9 (owner decision): the coverage-guided fuzz
+  run found that the inference config `w=[[}N` makes the parser fail its own `!is_value_terminator(*cp)` assertion,
+  an abort in a debug build and an unchecked assumption under `NDEBUG`; upstream fixed it in PR #321 (2026-11-01),
+  in no release yet. `ParseInferenceConfigNeverCrashes` keeps the input as a seed; 280 tests and two minutes of
+  fuzzing that property pass on the new parser.
+
+### Changed (2026-11-17, a text model's decoder follows the text thread rule)
+- `TextGenerator::initialize` holds the GenAI decoder to half the ORT thread rule, 1 to 4 intra-op threads, through
+  `OgaConfigOverlay`, where GenAI's own default ignored the affinity mask (hub CON218). Owner decision on a Pi 5
+  measurement: beside the DEIM detector (417 ms alone) one text thread cost it 36-44 %, the detector's rule of
+  three 87 %, and one thread also answered fastest (2.7 s for 200 tokens against 3.2-3.4 s). A model whose
+  `genai_config.json` sets its own count keeps it, and a GenAI without the overlay keeps its default.
+  `text_intra_op_threads()` says which applies; a test holds both.
 
 ### Added (2026-11-17, coverage-guided fuzzing before every release)
 - `KATAGLYPHIS_FUZZING_MODE` and the preset `linux-fuzz-clang` build the fuzz suite in FuzzTest's fuzzing mode, its

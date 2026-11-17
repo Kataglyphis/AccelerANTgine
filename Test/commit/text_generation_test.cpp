@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -16,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+import kataglyphis.onnx_inference;
 import kataglyphis.text_generation;
 import nlohmann.json;
 
@@ -348,7 +350,7 @@ TEST_F(TextGeneration, IsInitializedAnswersDuringAGenerationEvenFromItsCallback)
     EXPECT_EQ(asked, 2U);
 }
 
-TEST(TextGenerationSetup, TheDecoderTakesTheOrtThreadRuleUnlessTheModelSetsItsOwn)
+TEST(TextGenerationSetup, TheDecoderTakesHalfTheOrtThreadRuleUnlessTheModelSetsItsOwn)
 {
     const auto dir = std::filesystem::temp_directory_path() / "kataglyphis-text-threads";
     std::filesystem::create_directories(dir);
@@ -358,8 +360,7 @@ TEST(TextGenerationSetup, TheDecoderTakesTheOrtThreadRuleUnlessTheModelSetsItsOw
     write(R"({"model": {"decoder": {"session_options": {}}}})");
     const auto rule = text::text_intra_op_threads(dir);
     ASSERT_TRUE(rule.has_value());
-    EXPECT_GE(*rule, 1);
-    EXPECT_LE(*rule, 8);
+    EXPECT_EQ(*rule, std::clamp(kataglyphis::inference::shipped_ort_threads() / 2, 1, 4));
     write(R"({"model": {"decoder": {"session_options": {"intra_op_num_threads": 3}}}})");
     EXPECT_FALSE(text::text_intra_op_threads(dir).has_value());
     // An unreadable config is GenAI's to refuse at load; the rule still holds for the count.
