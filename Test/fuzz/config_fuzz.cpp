@@ -73,14 +73,21 @@ void StringSettingsRoundTrip(const std::string &text)
 }
 FUZZ_TEST(ConfigFuzz, StringSettingsRoundTrip).WithDomains(fuzztest::PrintableAsciiString());
 
-// Untrusted inference configs, the same contract for the TOML parser.
+// Untrusted inference configs: broken TOML is ParseError, a value of the wrong type or range InvalidValue.
 void ParseInferenceConfigNeverCrashes(const std::string &bytes)
 {
     const auto config = cfg::parse_inference_config(bytes);
-    if (!config.has_value()) { EXPECT_EQ(config.error(), cfg::ConfigError::ParseError); }
+    if (!config.has_value()) {
+        EXPECT_TRUE(config.error() == cfg::ConfigError::ParseError || config.error() == cfg::ConfigError::InvalidValue)
+          << static_cast<int>(config.error());
+    }
 }
+// The last seed is the coverage-guided run's first finding: a float where a count belongs.
 FUZZ_TEST(ConfigFuzz, ParseInferenceConfigNeverCrashes)
-  .WithSeeds({ { std::string(kShippedInferenceConfig) }, { "[model]\ninput_width = 320\n" }, { "" } });
+  .WithSeeds({ { std::string(kShippedInferenceConfig) },
+    { "[model]\ninput_width = 320\n" },
+    { "" },
+    { "[model]\ninput_width=0.0" } });
 
 // An integer the uint32 fields cannot hold is InvalidValue, never a wrapped number or a silent default.
 void TomlUnsignedFieldsTakeOnlyTheirRange(std::int64_t value)

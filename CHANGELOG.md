@@ -33,6 +33,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 - Its first run found a wrong property: `MismatchedShapesAreInvalidOutputShape` asked corner rows for confidence
   order, which the shared ModelANT contract does not give an end-to-end model's rows. The property now asks it of
   the suppressed layouts only.
+- The first run in CI found a second wrong property: `ParseInferenceConfigNeverCrashes` allowed only `ParseError`,
+  but `input_width=0.0`, a float where a count belongs, is rightly `InvalidValue`. It allows both now and keeps the
+  input as a seed. Every target then fuzzed a minute on the Pi without a finding.
 
 ### Removed (2026-11-17, `reconnection_timeout_ms`, which nothing used)
 - `WebRTCConfig::reconnection_timeout_ms` and its Python property are gone: the streamer never reconnected, and a
