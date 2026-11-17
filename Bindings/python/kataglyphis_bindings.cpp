@@ -528,7 +528,6 @@ void bind_config(nb::module_ &m)
       &[stream_source, stream_encoder, stream_device, stream_camera, stream_path, stream_uri, stream_producer] =
         StreamSettingsConfig{};
     [[maybe_unused]] const auto &[webrtc_server,
-      webrtc_reconnect,
       webrtc_stun,
       webrtc_turn,
       webrtc_video,
