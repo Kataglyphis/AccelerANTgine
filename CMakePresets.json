@@ -90,6 +90,21 @@
       }
     },
     {
+      "name": "linux-fuzz-clang",
+      "displayName": "Linux Fuzz Clang",
+      "description": "FuzzTest's coverage-guided fuzzing mode with its own ASan; the project's sanitizers and coverage off",
+      "inherits": "linux-clang",
+      "binaryDir": "${sourceDir}/build-fuzz/",
+      "installDir": "${sourceDir}/build-fuzz/",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "KATAGLYPHIS_FUZZING_MODE": "ON",
+        "myproject_ENABLE_SANITIZER_ADDRESS": "OFF",
+        "myproject_ENABLE_SANITIZER_UNDEFINED": "OFF",
+        "myproject_ENABLE_COVERAGE": "OFF"
+      }
+    },
+    {
       "name": "linux-debug-clang-tsan",
       "displayName": "Linux Debug Clang TSan",
       "description": "Linux Debug with Thread Sanitizer",
@@ -289,6 +304,12 @@
       "name": "linux-debug-clang",
       "jobs": 0,
       "configurePreset": "linux-debug-clang",
+      "configuration": "Debug"
+    },
+    {
+      "name": "linux-fuzz-clang",
+      "jobs": 0,
+      "configurePreset": "linux-fuzz-clang",
       "configuration": "Debug"
     },
     {

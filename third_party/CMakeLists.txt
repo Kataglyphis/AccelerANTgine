@@ -85,11 +85,9 @@ if(BUILD_TESTING
    AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32))
   message(STATUS "Adding FuzzTest")
 
-  # We explicitly turn OFF FUZZTEST_FUZZING_MODE here because if it is ON,
-  # the fuzztest framework adds global coverage flags to itself in its own
-  # CMakeLists.txt, which causes infinite recursion with AddressSanitizer.
+  # Off except in the KATAGLYPHIS_FUZZING_MODE tree: beside the project's own ASan it recursed on arm64 (cab3934).
   set(FUZZTEST_FUZZING_MODE
-      OFF
+      ${KATAGLYPHIS_FUZZING_MODE}
       CACHE BOOL "" FORCE)
   set(RE2_INSTALL
       OFF
@@ -145,10 +143,8 @@ if(BUILD_TESTING
   # ANTLR's install rule references LICENSE.txt two directory levels above its
   # source (a monorepo-layout assumption) which resolves to the build root when
   # fetched standalone — stage the file where the install script looks for it.
-  if(EXISTS "${CMAKE_BINARY_DIR}/_deps/antlr_cpp-src/LICENSE.txt"
-     AND NOT EXISTS "${CMAKE_BINARY_DIR}/LICENSE.txt")
-    file(COPY_FILE "${CMAKE_BINARY_DIR}/_deps/antlr_cpp-src/LICENSE.txt"
-         "${CMAKE_BINARY_DIR}/LICENSE.txt")
+  if(EXISTS "${CMAKE_BINARY_DIR}/_deps/antlr_cpp-src/LICENSE.txt" AND NOT EXISTS "${CMAKE_BINARY_DIR}/LICENSE.txt")
+    file(COPY_FILE "${CMAKE_BINARY_DIR}/_deps/antlr_cpp-src/LICENSE.txt" "${CMAKE_BINARY_DIR}/LICENSE.txt")
   endif()
 
   # FuzzTest public headers still rely on the compatibility overlay, so expose
@@ -192,50 +188,55 @@ set(SPDLOG_FMT_EXTERNAL
 
 add_subdirectory(SPDLOG)
 # PIC and hidden: spdlog is linked into libAccelerANTgine.so, whose own symbols are hidden too (Src/CMakeLists.txt).
-set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_VISIBILITY_PRESET hidden
-                                        VISIBILITY_INLINES_HIDDEN ON)
+set_target_properties(
+  spdlog
+  PROPERTIES POSITION_INDEPENDENT_CODE ON
+             CXX_VISIBILITY_PRESET hidden
+             VISIBILITY_INLINES_HIDDEN ON)
 
-set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "" FORCE)
+set(NLOHMANN_JSON_BUILD_MODULES
+    ON
+    CACHE BOOL "" FORCE)
 add_subdirectory(NLOHMANN_JSON)
 
 if(TARGET nlohmann_json_modules)
-    # NOTE: no static-CRT override under ASAN — module BMIs re-emit their
-    # detect_mismatch directives into every importer, so a /MT BMI poisons all
-    # /MD objects. clang-cl ASAN uses the dynamic runtime (-shared-libsan).
-    # Ensure the module BMI is compiled with flags compatible with the project.
-    # myproject_options propagates exception settings (/EHs- or -fno-exceptions),
-    # sanitizer flags, etc. Without this, the BMI is built with exceptions enabled
-    # while the project disables them, causing configuration-mismatch errors.
-    if(TARGET myproject_options)
-        target_link_libraries(nlohmann_json_modules PUBLIC myproject_options)
-    endif()
-    if(myproject_DISABLE_EXCEPTIONS)
-        target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NOEXCEPTION)
-    endif()
-    # -pthread belongs in this list for exactly the reason the note above gives:
-    # a BMI records the configuration it was built with, and an importer that
-    # disagrees is rejected. Src/CMakeLists.txt adds -pthread PUBLIC to the
-    # library on Unix, but that reaches nlohmann_json_modules' CONSUMERS, not
-    # the module target itself - it is a dependency, compiled first and without
-    # the flag. The Linux lane therefore died with
-    #   error: POSIX thread support was disabled in precompiled file
-    #          '.../nlohmann.json.pcm'
-    #   error: precompiled file '...pcm' cannot be loaded due to a
-    #          configuration mismatch with the current compilation
-    # followed by a wall of "use of undeclared identifier 'nlohmann'" in
-    # config_loader.cpp. Same guard as the consumer side, so the two agree.
-    if(UNIX AND NOT APPLE)
-        target_compile_options(nlohmann_json_modules PUBLIC -pthread)
-        target_link_options(nlohmann_json_modules PUBLIC -pthread)
-    endif()
-    target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
-    # GCC 16's _mm_loadl_epi64 fails UBSan's alignment check in nlohmann's vector scan, an unaligned load by design.
-    if(myproject_ENABLE_SANITIZER_UNDEFINED AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NO_SIMD)
-    endif()
-    # PIC: GCC bakes a module-instantiated thread_local's TLS model into the CMI
-    # (AGENTS.md § 4, "Both module targets are PIC").
-    set_target_properties(nlohmann_json_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  # NOTE: no static-CRT override under ASAN — module BMIs re-emit their
+  # detect_mismatch directives into every importer, so a /MT BMI poisons all
+  # /MD objects. clang-cl ASAN uses the dynamic runtime (-shared-libsan).
+  # Ensure the module BMI is compiled with flags compatible with the project.
+  # myproject_options propagates exception settings (/EHs- or -fno-exceptions),
+  # sanitizer flags, etc. Without this, the BMI is built with exceptions enabled
+  # while the project disables them, causing configuration-mismatch errors.
+  if(TARGET myproject_options)
+    target_link_libraries(nlohmann_json_modules PUBLIC myproject_options)
+  endif()
+  if(myproject_DISABLE_EXCEPTIONS)
+    target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NOEXCEPTION)
+  endif()
+  # -pthread belongs in this list for exactly the reason the note above gives:
+  # a BMI records the configuration it was built with, and an importer that
+  # disagrees is rejected. Src/CMakeLists.txt adds -pthread PUBLIC to the
+  # library on Unix, but that reaches nlohmann_json_modules' CONSUMERS, not
+  # the module target itself - it is a dependency, compiled first and without
+  # the flag. The Linux lane therefore died with
+  #   error: POSIX thread support was disabled in precompiled file
+  #          '.../nlohmann.json.pcm'
+  #   error: precompiled file '...pcm' cannot be loaded due to a
+  #          configuration mismatch with the current compilation
+  # followed by a wall of "use of undeclared identifier 'nlohmann'" in
+  # config_loader.cpp. Same guard as the consumer side, so the two agree.
+  if(UNIX AND NOT APPLE)
+    target_compile_options(nlohmann_json_modules PUBLIC -pthread)
+    target_link_options(nlohmann_json_modules PUBLIC -pthread)
+  endif()
+  target_compile_features(nlohmann_json_modules PUBLIC cxx_std_23)
+  # GCC 16's _mm_loadl_epi64 fails UBSan's alignment check in nlohmann's vector scan, an unaligned load by design.
+  if(myproject_ENABLE_SANITIZER_UNDEFINED AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_definitions(nlohmann_json_modules PUBLIC JSON_NO_SIMD)
+  endif()
+  # PIC: GCC bakes a module-instantiated thread_local's TLS model into the CMI
+  # (AGENTS.md § 4, "Both module targets are PIC").
+  set_target_properties(nlohmann_json_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 # Src/toml_config.cpp is written against tomlplusplus' result-based
@@ -253,22 +254,22 @@ set(TOMLPLUSPLUS_BUILD_MODULES
 add_subdirectory(tomlplusplus)
 
 if(TARGET tomlplusplus_modules)
-    # NOTE: no static-CRT override under ASAN — see nlohmann_json_modules above.
-    if(TARGET myproject_options)
-        target_link_libraries(tomlplusplus_modules PUBLIC myproject_options)
-    endif()
-    target_compile_definitions(tomlplusplus_modules PUBLIC TOML_EXCEPTIONS=0)
-    # -pthread, for the same reason as nlohmann_json_modules above — a BMI
-    # records the configuration it was built with and is rejected by importers
-    # that disagree. These are the only two module targets in the tree; both
-    # need every flag the importing TUs carry.
-    if(UNIX AND NOT APPLE)
-        target_compile_options(tomlplusplus_modules PUBLIC -pthread)
-        target_link_options(tomlplusplus_modules PUBLIC -pthread)
-    endif()
-    target_compile_features(tomlplusplus_modules PUBLIC cxx_std_23)
-    # PIC, for the same reason as nlohmann_json_modules above.
-    set_target_properties(tomlplusplus_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  # NOTE: no static-CRT override under ASAN — see nlohmann_json_modules above.
+  if(TARGET myproject_options)
+    target_link_libraries(tomlplusplus_modules PUBLIC myproject_options)
+  endif()
+  target_compile_definitions(tomlplusplus_modules PUBLIC TOML_EXCEPTIONS=0)
+  # -pthread, for the same reason as nlohmann_json_modules above — a BMI
+  # records the configuration it was built with and is rejected by importers
+  # that disagree. These are the only two module targets in the tree; both
+  # need every flag the importing TUs carry.
+  if(UNIX AND NOT APPLE)
+    target_compile_options(tomlplusplus_modules PUBLIC -pthread)
+    target_link_options(tomlplusplus_modules PUBLIC -pthread)
+  endif()
+  target_compile_features(tomlplusplus_modules PUBLIC cxx_std_23)
+  # PIC, for the same reason as nlohmann_json_modules above.
+  set_target_properties(tomlplusplus_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
@@ -293,7 +294,8 @@ FetchContent_MakeAvailable(Corrosion)
 
 find_program(CXXBRIDGE cxxbridge PATHS "$ENV{HOME}/.cargo/bin/")
 if(CXXBRIDGE STREQUAL "CXXBRIDGE-NOTFOUND")
-  message("Could not find cxxbridge, trying to install with `cargo install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION}`")
+  message(
+    "Could not find cxxbridge, trying to install with `cargo install cxxbridge-cmd --version ${CXXBRIDGE_CMD_VERSION}`")
   find_program(CARGO cargo PATHS "$ENV{HOME}/.cargo/bin/")
   if(CARGO STREQUAL "CARGO-NOTFOUND")
     message(FATAL_ERROR "Requires cargo available in path, install via rustup https://rustup.rs/")

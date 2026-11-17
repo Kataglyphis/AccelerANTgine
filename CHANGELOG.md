@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-17, coverage-guided fuzzing before every release)
+- `KATAGLYPHIS_FUZZING_MODE` and the preset `linux-fuzz-clang` build the fuzz suite in FuzzTest's fuzzing mode, its
+  ASan and coverage over every target and the project's sanitizers off; it no longer recurses on arm64.
+  `scripts/linux/ci-fuzz.sh` fuzzes each target for a given time with a kept corpus per target, and `fuzz.yml` runs
+  it by hand and as a gate in `release.yml`, so a finding stops the release (owner decision).
+- Its first run found a wrong property: `MismatchedShapesAreInvalidOutputShape` asked corner rows for confidence
+  order, which the shared ModelANT contract does not give an end-to-end model's rows. The property now asks it of
+  the suppressed layouts only.
+
 ### Removed (2026-11-17, `reconnection_timeout_ms`, which nothing used)
 - `WebRTCConfig::reconnection_timeout_ms` and its Python property are gone: the streamer never reconnected, and a
   restarted signalling server ends it with exit 1 for the service manager to restart (owner decision; getting

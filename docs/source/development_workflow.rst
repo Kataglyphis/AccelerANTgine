@@ -145,6 +145,17 @@ In the family image:
    ./build/fuzzTestSuite                       # about a second per property
    FUZZTEST_FUZZ_FOR=60s ./build/fuzzTestSuite  # longer, still unit mode
 
+**Coverage-guided fuzzing** is its own tree, ``linux-fuzz-clang`` (``build-fuzz/``):
+``KATAGLYPHIS_FUZZING_MODE`` turns on FuzzTest's fuzzing mode, whose ASan and coverage flags then
+cover every target, so the preset turns the project's own sanitizers and coverage off (both together
+recursed in ASan on arm64, cab3934). ``bash scripts/linux/ci-fuzz.sh [3m] [logs/fuzz-corpus]``
+builds it and fuzzes each target for the given time, reading and growing one corpus directory per
+target (``FUZZTEST_TESTSUITE_IN_DIR`` and ``_OUT_DIR``), and fails when any target fails.
+``fuzz.yml`` runs it by hand and as a gate in ``release.yml`` before every release (owner decision),
+keeping the corpus in the Actions cache. Its first run on the Pi found that
+``MismatchedShapesAreInvalidOutputShape`` wrongly asked corner rows for confidence order: an
+end-to-end model's rows keep their own order, as the shared ModelANT contract does.
+
 Coverage
 ^^^^^^^^
 

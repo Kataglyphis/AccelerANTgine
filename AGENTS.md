@@ -628,6 +628,9 @@ every new gate. It builds no C++. **`cxx-mutations.yml`** holds the recipes agai
 (`scripts/linux/tests/cxx-mutations.json`): weekly and on dispatch, it builds the clang Debug tree once, then
 proves each recipe in place on an incremental rebuild (`scripts/linux/cxx-mutation-test.sh <ctest regex>`).
 Add a recipe with every new decode or preprocessing rule; on a small host run one recipe with `--only`.
+**`fuzz.yml`** fuzzes every FuzzTest target in fuzzing mode (`linux-fuzz-clang`, `scripts/linux/ci-fuzz.sh`) with a
+corpus per target kept in the Actions cache: by hand, and as a job `release.yml` waits for, so a finding stops the
+release (owner decision 2026-11-17).
 
 **The git hooks** are the hub's pair, once per clone: `git config core.hooksPath
 third_party/ANTfrastructure/shared/linux/templates/git-hooks`. A commit then checks what is staged in seconds, and a

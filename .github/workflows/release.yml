@@ -43,6 +43,16 @@ jobs:
     uses: ./.github/workflows/linux-x64.yml
     secrets: inherit
 
+  # A finding in FuzzTest's fuzzing mode stops the release too (owner decision).
+  fuzz:
+    needs: version
+    permissions:
+      contents: read
+      packages: read
+      actions: write
+    uses: ./.github/workflows/fuzz.yml
+    secrets: inherit
+
   linux-arm64:
     needs: version
     permissions:
@@ -92,7 +102,7 @@ jobs:
 
   # needs: every lane, so one red or cancelled lane means no tag and no release.
   release:
-    needs: [linux-x64, linux-arm64, linux-riscv64, windows-x64, windows-arm64-cross, gpu-lin, gpu-win]
+    needs: [linux-x64, fuzz, linux-arm64, linux-riscv64, windows-x64, windows-arm64-cross, gpu-lin, gpu-win]
     permissions:
       contents: write
     uses: Kataglyphis/ANTfrastructure/.github/workflows/release-publish.yml@develop

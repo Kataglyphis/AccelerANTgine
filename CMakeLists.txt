@@ -132,6 +132,18 @@ if(KATAGLYPHIS_BUILD_PYTHON_BINDINGS)
   find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module)
 endif()
 
+option(KATAGLYPHIS_FUZZING_MODE
+       "Coverage-guided FuzzTest: its ASan and coverage on every target, the project's sanitizers off" OFF)
+if(KATAGLYPHIS_FUZZING_MODE)
+  if(myproject_ENABLE_SANITIZER_ADDRESS OR myproject_ENABLE_SANITIZER_UNDEFINED)
+    message(FATAL_ERROR "KATAGLYPHIS_FUZZING_MODE brings FuzzTest's own ASan; turn myproject's sanitizers off")
+  endif()
+  # The macro reads FUZZTEST_FUZZING_MODE, which third_party sets only later.
+  set(FUZZTEST_FUZZING_MODE ON)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/FUZZTEST/cmake/FuzzTestFlagSetup.cmake)
+  fuzztest_setup_fuzzing_flags()
+endif()
+
 add_subdirectory(third_party)
 
 add_subdirectory(Src)

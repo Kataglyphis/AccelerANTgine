@@ -123,10 +123,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Left: `perf/baseline-<cpu>.json` for the Pi from `quality-report.sh --perf-host --update-baseline`, as a
   `systemd-run` unit when the board is quiet (owner). Done when that file is committed.
 
-- [ ] **The fuzz targets run in unit mode only, with no kept corpus** (M, ★). Since 2026-11-14 eleven properties
-  run in the clang Debug lane's `fuzzTestSuite`, each for a second of random inputs.
-  Next: a dispatch-only tree with fuzzing mode on and a kept corpus; `third_party/CMakeLists.txt:83-93` forces it
-  off because it clashed with ASan.
+- [ ] **The fuzz corpus only grows** (S, ★). Since 2026-11-17 `fuzz.yml` fuzzes every target in FuzzTest's fuzzing
+  mode by hand and before each release, and keeps one corpus directory per target in the Actions cache; the
+  in-process engine appends to it and never prunes (961 inputs after 10 s per target on the Pi). Next: a periodic
+  minimisation with `FUZZTEST_MINIMIZE_TESTSUITE_DIR` when the cache passes a size, measured first. Done when the
+  kept corpus has a bound.
 
 - [ ] **No shared case holds the two schema errors** (S, ★). C++ and Rust agree since 2026-11-13 (owner decision):
   a schema that is no JSON object is `InvalidOptions` before the engine, and an object the generator refuses is

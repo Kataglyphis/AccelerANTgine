@@ -129,7 +129,10 @@ void MismatchedShapesAreInvalidOutputShape(std::size_t layout_index,
         EXPECT_GE(box.class_id, 0);
         EXPECT_LT(box.class_id, std::max(classes, 1));
         EXPECT_TRUE(lies_on_the_frame(box)) << i;
-        if (i > 0) { EXPECT_GE((*result)[i - 1].confidence, box.confidence) << i; }
+        // Suppression sorts strongest first; corner rows keep the model's order, as the shared ModelANT contract does.
+        if (i > 0 && config.output_layout != detection::YoloOutputLayout::CornersScoreClass) {
+            EXPECT_GE((*result)[i - 1].confidence, box.confidence) << i;
+        }
     }
 }
 FUZZ_TEST(YoloDecoderFuzz, MismatchedShapesAreInvalidOutputShape)
