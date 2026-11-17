@@ -7,6 +7,7 @@ set(KataglyphisCppProject_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/bundled_gstreamer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/config_loader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gstreamer_pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gstreamer_runtime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/inference_lib.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/kataglyphis_c_api.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
@@ -22,6 +23,7 @@ set(KataglyphisCppProject_MODULES
     ${CMAKE_CURRENT_SOURCE_DIR}/config_loader.ixx
     ${CMAKE_CURRENT_SOURCE_DIR}/execution_provider.ixx
     ${CMAKE_CURRENT_SOURCE_DIR}/gstreamer_pipeline.ixx
+    ${CMAKE_CURRENT_SOURCE_DIR}/gstreamer_runtime.ixx
     ${CMAKE_CURRENT_SOURCE_DIR}/inference_lib.ixx
     ${CMAKE_CURRENT_SOURCE_DIR}/kataglyphis_c_api.ixx
     ${CMAKE_CURRENT_SOURCE_DIR}/log.ixx

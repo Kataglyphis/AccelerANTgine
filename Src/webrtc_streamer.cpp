@@ -26,23 +26,14 @@ module kataglyphis.webrtc_streamer;
 import kataglyphis.project_config;
 import kataglyphis.config_loader;
 import kataglyphis.gstreamer_pipeline;
+import kataglyphis.gstreamer_runtime;
 import kataglyphis.log;
 
 namespace kataglyphis::webrtc {
 
 namespace {
-    std::atomic<bool> g_gstreamer_initialized{ false };
-    std::mutex g_gstreamer_mutex;
-    std::atomic<bool> g_plugin_scanner_failed{ false };
-
-    // GStreamer falls back to an in-process scan on a broken scanner, and only this warning says so.
-    void note_plugin_scanner_failure(const gchar *domain, GLogLevelFlags level, const gchar *message, gpointer data)
-    {
-        if (message != nullptr && g_str_has_prefix(message, "External plugin loader failed")) {
-            g_plugin_scanner_failed.store(true);
-        }
-        g_log_default_handler(domain, level, message, data);
-    }
+    // Set once initialize() found webrtcsink or webrtcbin; GStreamer's own state lives in the runtime.
+    std::atomic<bool> g_webrtc_ready{ false };
 
     auto error_to_string(WebRTCError error) -> const char *
     {
@@ -251,7 +242,7 @@ struct WebRTCStreamer::Impl
                 gst_object_unref(bus);
                 bus_watch = false;
             }
-            gst_object_unref(pipeline);
+            gstreamer::runtime::release(pipeline);
             pipeline = nullptr;
         }
     }
@@ -263,9 +254,14 @@ struct WebRTCStreamer::Impl
         destroy_pipeline();
     }
 
+    // Error stays until stop() or configure() sets Idle, so a late state change cannot hide a failure.
     void set_state(StreamState new_state)
     {
-        StreamState old_state = state.exchange(new_state);
+        StreamState old_state = state.load();
+        for (;;) {
+            if (old_state == StreamState::Error && new_state != StreamState::Idle) { return; }
+            if (state.compare_exchange_weak(old_state, new_state)) { break; }
+        }
         if (old_state != new_state) {
             std::scoped_lock lock(callback_mutex);
             if (state_callback) { state_callback(old_state, new_state); }
@@ -412,29 +408,12 @@ auto WebRTCStreamer::bundled_plugin_dir() -> std::string
 #endif
 }
 
-auto WebRTCStreamer::plugin_scanner_failed() -> bool { return g_plugin_scanner_failed.load(); }
+auto WebRTCStreamer::plugin_scanner_failed() -> bool { return gstreamer::runtime::plugin_scanner_failed(); }
 
 auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, WebRTCError>
 {
-    std::scoped_lock lock(g_gstreamer_mutex);
-
-    if (g_gstreamer_initialized.load()) { return {}; }
-
-    const guint scan_log = g_log_set_handler("GStreamer", G_LOG_LEVEL_WARNING, note_plugin_scanner_failure, nullptr);
-
-#if defined(_WIN32)
-    bundled_gstreamer::configure();
-#endif
-    GError *error = nullptr;
-    if (gst_init_check(argc, argv, &error) == 0) {
-        if (error != nullptr) {
-            log::error("GStreamer init failed: {}", error->message);
-            g_error_free(error);
-        }
-        g_log_remove_handler("GStreamer", scan_log);
-        return std::unexpected(WebRTCError::InitializationFailed);
-    }
-    g_log_remove_handler("GStreamer", scan_log);
+    if (g_webrtc_ready.load()) { return {}; }
+    if (!gstreamer::runtime::initialize(argc, argv)) { return std::unexpected(WebRTCError::InitializationFailed); }
 
     // Verify webrtcsink is available
     GstElementFactory *factory = gst_element_factory_find("webrtcsink");
@@ -454,22 +433,22 @@ auto WebRTCStreamer::initialize(int *argc, char ***argv) -> std::expected<void, 
     }
     gst_object_unref(factory);
 
-    g_gstreamer_initialized.store(true);
+    g_webrtc_ready.store(true);
     return {};
 }
 
-auto WebRTCStreamer::deinitialize() -> void
+auto WebRTCStreamer::deinitialize() -> bool
 {
-    std::scoped_lock lock(g_gstreamer_mutex);
-    if (g_gstreamer_initialized.load()) {
-        gst_deinit();
-        g_gstreamer_initialized.store(false);
-    }
+    const bool done = gstreamer::runtime::deinitialize();
+    if (done) { g_webrtc_ready.store(false); }
+    return done;
 }
 
 auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void, WebRTCError>
 {
-    if (!g_gstreamer_initialized.load()) { return std::unexpected(WebRTCError::InitializationFailed); }
+    if (!g_webrtc_ready.load() || !gstreamer::runtime::is_initialized()) {
+        return std::unexpected(WebRTCError::InitializationFailed);
+    }
 
     // Validate configuration
     if (config.width == 0 || config.height == 0 || config.framerate == 0) {
@@ -504,19 +483,7 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
     std::string pipeline_desc = webrtc_pipeline_description(described);
     log::debug("Pipeline: {}", pipeline_desc);
 
-    GError *error = nullptr;
-    impl_->pipeline = gst_parse_launch(pipeline_desc.c_str(), &error);
-    // Floating on return; sinking it makes destroy_pipeline's unref the matching release.
-    if (impl_->pipeline != nullptr) { gst_object_ref_sink(impl_->pipeline); }
-
-    if (error != nullptr) {
-        std::string error_msg = error->message;
-        log::error("Pipeline creation failed: {}", error_msg);
-        g_error_free(error);
-        impl_->destroy_pipeline();
-        return std::unexpected(WebRTCError::PipelineCreationFailed);
-    }
-
+    impl_->pipeline = gstreamer::runtime::parse_launch(pipeline_desc, "Pipeline creation failed");
     if (impl_->pipeline == nullptr) { return std::unexpected(WebRTCError::PipelineCreationFailed); }
 
     // Get webrtcsink element

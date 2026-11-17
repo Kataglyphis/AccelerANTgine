@@ -94,7 +94,8 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     [[nodiscard]] static auto initialize_gstreamer(int *argc = nullptr, char ***argv = nullptr)
       -> std::expected<void, GStreamerError>;
 
-    static auto deinitialize_gstreamer() -> void;
+    // False while a pipeline lives or before initialisation; after it GStreamer cannot be initialised again.
+    static auto deinitialize_gstreamer() -> bool;
 
     [[nodiscard]] auto create_pipeline(const PipelineConfig &config) -> std::expected<void, GStreamerError>;
 

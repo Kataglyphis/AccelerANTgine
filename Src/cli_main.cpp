@@ -286,16 +286,16 @@ auto build_stream_config(const CliOverrideFlags &override_flags)
 }
 
 // Waits until a signal, an error or the end of a finite source; true when the stream failed.
-auto wait_for_stream(kataglyphis::webrtc::WebRTCStreamer &streamer, const std::atomic<bool> &stream_failed) -> bool
+auto wait_for_stream(const kataglyphis::webrtc::WebRTCStreamer &streamer) -> bool
 {
     using kataglyphis::webrtc::StreamState;
     while (g_running.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         const auto state = streamer.get_state();
-        if (stream_failed.load() || state == StreamState::Error || state == StreamState::Disconnected) { break; }
+        if (state == StreamState::Error || state == StreamState::Disconnected) { break; }
     }
-    // Read before stop(), whose EOS must not change it; a signal or a finite source's end is success.
-    return stream_failed.load() || streamer.get_state() == StreamState::Error;
+    // Read before stop(), which sets Idle; Error stays until then, so a signal or a finite source's end is success.
+    return streamer.get_state() == StreamState::Error;
 }
 
 // Streams `config` until it ends; the process exit code.
@@ -306,18 +306,14 @@ auto run_webrtc(int *argc, char ***argv, const kataglyphis::webrtc::StreamConfig
         std::cerr << "Failed to initialize GStreamer for WebRTC\n";
         return 1;
     }
-    // Latched: a later state message can overwrite Error before the loop reads it.
-    std::atomic<bool> stream_failed{ false };
     kataglyphis::webrtc::WebRTCStreamer streamer;
     streamer.set_state_callback(
       [](kataglyphis::webrtc::StreamState old_state, kataglyphis::webrtc::StreamState new_state) -> void {
           kataglyphis::log::info("State: {} -> {}", state_to_string(old_state), state_to_string(new_state));
       });
-    streamer.set_error_callback(
-      [&stream_failed](kataglyphis::webrtc::WebRTCError /*error*/, const std::string &message) -> void {
-          stream_failed.store(true);
-          std::cerr << "Error: " << message << '\n';
-      });
+    streamer.set_error_callback([](kataglyphis::webrtc::WebRTCError /*error*/, const std::string &message) -> void {
+        std::cerr << "Error: " << message << '\n';
+    });
     if (!streamer.configure(config)) {
         std::cerr << "Failed to configure WebRTC streamer\n";
         return 1;
@@ -332,7 +328,7 @@ auto run_webrtc(int *argc, char ***argv, const kataglyphis::webrtc::StreamConfig
     (void)std::signal(SIGINT, signal_handler);
     (void)std::signal(SIGTERM, signal_handler);
     std::cout << "Streaming... Press Ctrl+C to stop.\n";
-    const bool failed = wait_for_stream(streamer, stream_failed);
+    const bool failed = wait_for_stream(streamer);
     if (failed) { std::cerr << "Stream failed\n"; }
     kataglyphis::log::info("Stopping stream");
     (void)streamer.stop();

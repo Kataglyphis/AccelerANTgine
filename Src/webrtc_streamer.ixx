@@ -124,7 +124,8 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer
     [[nodiscard]] static auto initialize(int *argc = nullptr, char ***argv = nullptr)
       -> std::expected<void, WebRTCError>;
 
-    static auto deinitialize() -> void;
+    // False while a pipeline lives or before initialisation; after it GStreamer cannot be initialised again.
+    static auto deinitialize() -> bool;
 
     // Every element the pipelines here use; call after initialize().
     [[nodiscard]] static auto locate_elements() -> std::vector<ElementLocation>;

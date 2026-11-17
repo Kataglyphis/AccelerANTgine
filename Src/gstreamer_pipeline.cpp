@@ -1,9 +1,6 @@
 module;
 
 #include "kataglyphis_export.h"
-#if defined(_WIN32)
-#include "bundled_gstreamer.hpp"
-#endif
 #include <atomic>
 #include <cstddef>
 #include <expected>
@@ -24,33 +21,16 @@ module kataglyphis.gstreamer_pipeline;
 
 import kataglyphis.project_config;
 import kataglyphis.log;
+import kataglyphis.gstreamer_runtime;
 
 namespace kataglyphis::gstreamer {
 
 namespace {
-    std::atomic<bool> g_gstreamer_initialized{ false };
-    std::mutex g_gstreamer_mutex;
-
     auto parse_pipeline_description(const std::string &pipeline_description, const char *failure_context)
       -> std::expected<GstElement *, GStreamerError>
     {
-        GError *error = nullptr;
-        GstElement *pipeline = gst_parse_launch(pipeline_description.c_str(), &error);
-        // gst_parse_launch hands out a floating reference; sinking it makes the later unref the matching release.
-        if (pipeline != nullptr) { gst_object_ref_sink(pipeline); }
-
-        if (error != nullptr) {
-            log::error("{}: {}", failure_context, error->message);
-            g_error_free(error);
-            if (pipeline != nullptr) { gst_object_unref(pipeline); }
-            return std::unexpected(GStreamerError::PipelineCreationFailed);
-        }
-
-        if (pipeline == nullptr) {
-            log::error("{} returned null", failure_context);
-            return std::unexpected(GStreamerError::PipelineCreationFailed);
-        }
-
+        GstElement *pipeline = runtime::parse_launch(pipeline_description, failure_context);
+        if (pipeline == nullptr) { return std::unexpected(GStreamerError::PipelineCreationFailed); }
         return pipeline;
     }
 
@@ -215,7 +195,7 @@ struct GStreamerPipeline::Impl
         }
         callbacks_installed = false;
         if (pipeline != nullptr) {
-            gst_object_unref(pipeline);
+            runtime::release(pipeline);
             pipeline = nullptr;
         }
         is_playing.store(false);
@@ -328,39 +308,16 @@ auto GStreamerPipeline::operator=(GStreamerPipeline &&) noexcept -> GStreamerPip
 
 auto GStreamerPipeline::initialize_gstreamer(int *argc, char ***argv) -> std::expected<void, GStreamerError>
 {
-
-    std::scoped_lock lock(g_gstreamer_mutex);
-
-    if (g_gstreamer_initialized.load()) { return {}; }
-
-#if defined(_WIN32)
-    bundled_gstreamer::configure();
-#endif
-    GError *error = nullptr;
-    if (gst_init_check(argc, argv, &error) == 0) {
-        // GLib's words are the only reason a caller gets: the code says no more than that the init failed.
-        log::error("GStreamer init failed: {}", error != nullptr ? error->message : "no reason given");
-        if (error != nullptr) { g_error_free(error); }
-        return std::unexpected(GStreamerError::InitializationFailed);
-    }
-
-    g_gstreamer_initialized.store(true);
+    if (!runtime::initialize(argc, argv)) { return std::unexpected(GStreamerError::InitializationFailed); }
     return {};
 }
 
-auto GStreamerPipeline::deinitialize_gstreamer() -> void
-{
-    std::scoped_lock lock(g_gstreamer_mutex);
-    if (g_gstreamer_initialized.load()) {
-        gst_deinit();
-        g_gstreamer_initialized.store(false);
-    }
-}
+auto GStreamerPipeline::deinitialize_gstreamer() -> bool { return runtime::deinitialize(); }
 
 auto GStreamerPipeline::create_pipeline(const PipelineConfig &config) -> std::expected<void, GStreamerError>
 {
 
-    if (!g_gstreamer_initialized.load()) { return std::unexpected(GStreamerError::InitializationFailed); }
+    if (!runtime::is_initialized()) { return std::unexpected(GStreamerError::InitializationFailed); }
     if (impl_->refuse_from_callback("create_pipeline")) { return std::unexpected(GStreamerError::StateChangeFailed); }
 
     impl_->cleanup();
@@ -391,7 +348,7 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
   const std::string &output_format) -> std::expected<void, GStreamerError>
 {
 
-    if (!g_gstreamer_initialized.load()) { return std::unexpected(GStreamerError::InitializationFailed); }
+    if (!runtime::is_initialized()) { return std::unexpected(GStreamerError::InitializationFailed); }
 
     impl_->cleanup();
 

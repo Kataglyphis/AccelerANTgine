@@ -101,25 +101,15 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   Done when the NVIDIA packages' card run (two entries up) passes on that image. Until it is published, a build may
   meet either form of the module.
 
-- [ ] **`WebRTCStreamer` keeps older copies of code that `GStreamerPipeline` has since improved** (L, ★★). Each
-  file owns its own "GStreamer is initialised" flag and its own `gst_deinit` (`Src/webrtc_streamer.cpp:33-35`,
-  `:425-476`; `Src/gstreamer_pipeline.cpp:30-31`, `:319-346`), and the scanner failure is seen only when the
-  streamer initialises first (`webrtc_streamer.cpp:431-445`). Its state is a plain exchange, so a late PLAYING
-  overwrites Error (`:184-191`); the CLI keeps its own latch for that (`Src/cli_main.cpp:323-324`) and
-  `Test/commit/webrtc_streamer_test.cpp:255` tolerates it. It has its own copy of `parse_pipeline_description`
-  (`webrtc_streamer.cpp:513-526`). `reconnection_timeout_ms` is parsed and bound and never used
-  (`Src/config_loader.cpp:93`), so a restarted signalling server ends the stream. The double init is latent so far:
-  no program uses both classes in one process.
-
-  First, each small: make Error final in `set_state` until `stop()` or `configure()` and delete the CLI latch; call
-  the shared parse helper; one internal owner for GStreamer init that also holds the scanner flag. Later, once the
-  sporadic WebRTC segfault (its own entry) has a stack, because it is the same code: read the bus with a sync handler
-  or give the loop its own `GMainContext` (the watch sits on the caller's context, `webrtc_streamer.cpp:533-540`,
-  the loop on the global one, `:554-555`), and drop the second bus reader in `stop()` (`:590-599`).
-  Done when `ErrorStaysUntilStop` replaces the tolerant check and
-  `TheScannerFailureIsSeenWhicheverClassInitialisesFirst`, `DeinitialiseWithALivePipelineIsRefused` and
-  `InitialiseAfterDeinitialiseFails` pass; `Cli.StreamStatusTellsAFailureFromAStop` stays the end-to-end proof.
-  Ask the owner before touching `reconnection_timeout_ms`: reconnect with a backoff, or write "exit 1 and let the
+- [ ] **`WebRTCStreamer` reads its bus on the caller's main context** (M, ★★). The first half is done
+  (2026-11-17): GStreamer has one owner, `kataglyphis.gstreamer_runtime`, that both classes initialise, parse and
+  deinitialise through, so the scanner failure is seen whichever initialises first, a deinit with a live pipeline
+  is refused and an init after a deinit fails instead of crashing; and `Error` stays until `stop()` or
+  `configure()`, so the CLI's latch is gone. Left, once the sporadic WebRTC segfault (its own entry) has a stack,
+  because it is the same code: read the bus with a sync handler or give the loop its own `GMainContext` (the watch
+  sits on the caller's context, the loop on the global one), and drop the second bus reader in `stop()`.
+  `reconnection_timeout_ms` is parsed and bound and never used (`Src/config_loader.cpp`), so a restarted
+  signalling server ends the stream; ask the owner first: reconnect with a backoff, or write "exit 1 and let the
   service manager restart" in the docs and delete the field.
 
 - [b] **The six tensor builders wait for the hub's nnstreamer decision** (S, ★). `Src/gstreamer_pipeline.cpp`'s

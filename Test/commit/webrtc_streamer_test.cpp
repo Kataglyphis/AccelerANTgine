@@ -6,13 +6,19 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
+#include <cstdlib>
+#include <filesystem>
 #include <future>
 #include <initializer_list>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <random>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <tuple>
 #include <utility>
@@ -375,7 +381,7 @@ TEST(WebRtcStreamer, ConfiguresAFileStream)
     EXPECT_TRUE(streamer.configure(config).has_value());
 }
 
-TEST(WebRtcStreamer, AStartWithoutASignallingServerEndsInError)
+TEST(WebRtcStreamer, AStartWithoutASignallingServerEndsInAnErrorThatStaysUntilStop)
 {
     KATAGLYPHIS_REQUIRE_WEBRTC();
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "videoconvert", "webrtcsink");
@@ -405,7 +411,6 @@ TEST(WebRtcStreamer, AStartWithoutASignallingServerEndsInError)
 
     {
         std::unique_lock lock(mutex);
-        // A PLAYING state change may still land after the error, so the history is checked, not the final state.
         const bool failed = changed.wait_for(lock, kataglyphis::test::kStreamTimeout, [&] {
             if (started.has_value()) { return reported.has_value(); }
             return std::ranges::find(states, webrtc::StreamState::Error) != states.end();
@@ -416,6 +421,17 @@ TEST(WebRtcStreamer, AStartWithoutASignallingServerEndsInError)
         EXPECT_NE(std::ranges::find(states, webrtc::StreamState::Error), states.end());
         // A failure after start() returned comes through the bus, and so through the error callback.
         if (started.has_value()) { EXPECT_EQ(reported, webrtc::WebRTCError::MediaError); }
+    }
+
+    // A late PLAYING from the bus used to overwrite Error; now nothing follows it until stop().
+    constexpr auto kLateMessages = std::chrono::milliseconds(300);
+    std::this_thread::sleep_for(kLateMessages);
+    EXPECT_EQ(streamer.get_state(), webrtc::StreamState::Error);
+    {
+        const std::scoped_lock lock(mutex);
+        const auto error_at = std::ranges::find(states, webrtc::StreamState::Error);
+        ASSERT_NE(error_at, states.end());
+        EXPECT_EQ(std::next(error_at), states.end());
     }
 
     // A retry without stop() is refused: a second loop thread over the first one would end the process.
@@ -481,4 +497,80 @@ TEST(WebRTCError, EveryValueHasANameOfItsOwn)
     EXPECT_TRUE(kataglyphis::test::all_differ(names));
     EXPECT_EQ(to_string(static_cast<kataglyphis::webrtc::WebRTCError>(1)), "UnknownError");
     EXPECT_EQ(to_string(static_cast<kataglyphis::webrtc::WebRTCError>(9)), "UnknownError");
+}
+
+namespace {
+
+enum class LeakCheck : std::uint8_t { On, Off };
+
+// gst_deinit and the first gst_init are once per process, so each case runs in a child of its own.
+template<typename Case> void in_a_child(Case scenario, LeakCheck leak_check = LeakCheck::On)
+{
+    EXPECT_EXIT(
+      {
+          scenario();
+          const int code = ::testing::Test::HasFailure() ? 1 : 0;
+          // _Exit skips LeakSanitizer's exit check, which would read an in-process plugin scan's allocations as ours.
+          if (leak_check == LeakCheck::Off) { std::_Exit(code); }
+          std::exit(code);
+      },
+      ::testing::ExitedWithCode(0),
+      "");
+}
+
+void set_variable(const char *name, const std::string &value)
+{
+#ifdef _WIN32
+    ASSERT_EQ(_putenv_s(name, value.c_str()), 0);
+#else
+    ASSERT_EQ(setenv(name, value.c_str(), 1), 0);
+#endif
+}
+
+}// namespace
+
+TEST(GStreamerRuntime, DeinitialiseWithALivePipelineIsRefused)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("fakesrc", "fakesink");
+    in_a_child([] -> void {
+        ASSERT_TRUE(kataglyphis::gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+        {
+            kataglyphis::gstreamer::GStreamerPipeline pipeline;
+            ASSERT_TRUE(pipeline.create_pipeline({ "fakesrc num-buffers=1 ! fakesink" }).has_value());
+            EXPECT_FALSE(kataglyphis::gstreamer::GStreamerPipeline::deinitialize_gstreamer());
+            EXPECT_FALSE(webrtc::WebRTCStreamer::deinitialize());
+        }
+        EXPECT_TRUE(kataglyphis::gstreamer::GStreamerPipeline::deinitialize_gstreamer());
+    });
+}
+
+TEST(GStreamerRuntime, InitialiseAfterDeinitialiseFails)
+{
+    in_a_child([] -> void {
+        ASSERT_TRUE(kataglyphis::gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+        ASSERT_TRUE(kataglyphis::gstreamer::GStreamerPipeline::deinitialize_gstreamer());
+        EXPECT_FALSE(kataglyphis::gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+        EXPECT_FALSE(webrtc::WebRTCStreamer::initialize().has_value());
+        EXPECT_FALSE(kataglyphis::gstreamer::GStreamerPipeline::deinitialize_gstreamer());
+    });
+}
+
+TEST(GStreamerRuntime, TheScannerFailureIsSeenWhicheverClassInitialisesFirst)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "the bundled GStreamer names its own scanner on Windows";
+#endif
+    in_a_child(
+      [] -> void {
+          // A fresh registry makes GStreamer scan, and a scanner that is not there makes it scan in process.
+          const auto registry = std::filesystem::temp_directory_path()
+                                / ("kataglyphis-registry-" + std::to_string(std::random_device{}()) + ".bin");
+          set_variable("GST_REGISTRY", registry.string());
+          set_variable("GST_PLUGIN_SCANNER", "/nonexistent/gst-plugin-scanner");
+          ASSERT_TRUE(kataglyphis::gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
+          EXPECT_TRUE(webrtc::WebRTCStreamer::plugin_scanner_failed());
+          std::error_code ignored;
+          std::filesystem::remove(registry, ignored);
+      },
+      LeakCheck::Off);
 }

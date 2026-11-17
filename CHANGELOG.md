@@ -18,6 +18,20 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-17, one owner for GStreamer, and an Error that stays)
+- `GStreamerPipeline` and `WebRTCStreamer` no longer keep their own "GStreamer is initialised" flags, `gst_deinit`
+  calls and `gst_parse_launch` copies: the internal module `kataglyphis.gstreamer_runtime` initialises once,
+  watches the plugin scanner for both (so `WebRTCStreamer::plugin_scanner_failed()` sees a failure whichever class
+  initialised), parses every pipeline and counts the live ones.
+- **API:** `GStreamerPipeline::deinitialize_gstreamer()` and `WebRTCStreamer::deinitialize()` return `bool`: false
+  while a pipeline lives or before initialisation. After a deinit, initialising again fails with
+  `InitializationFailed` instead of running `gst_init` a second time, which GStreamer does not support.
+- `WebRTCStreamer`'s `Error` state stays until `stop()` or `configure()`; a late PLAYING from the bus no longer
+  overwrites it, so the CLI's own failure latch is deleted and `wait_for_stream` reads the state.
+- Tests: `AStartWithoutASignallingServerEndsInAnErrorThatStaysUntilStop` replaces the check that tolerated the
+  overwrite, and `GStreamerRuntime.DeinitialiseWithALivePipelineIsRefused`, `InitialiseAfterDeinitialiseFails`
+  and `TheScannerFailureIsSeenWhicheverClassInitialisesFirst` run each in a child process. ctest 278.
+
 ### Changed (2026-11-16, all four instruction-count entries hold the in-place inference call)
 - `perf/cachegrind-baseline.json` re-records `x64-clang` and `x64-gcc` from six green runs and `arm64-clang` and
   `arm64-gcc` from five (`--summarize`), now with `BM_OnnxRunInferenceInPlace` (2.71 M instructions on x64, 2.48 M on
