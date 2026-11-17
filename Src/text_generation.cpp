@@ -10,6 +10,7 @@ module;
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <memory>
 #include <mutex>
@@ -590,7 +591,7 @@ KATAGLYPHIS_CPP_API auto text_intra_op_threads(const std::filesystem::path &mode
     const auto config = nlohmann::json::parse(file, nullptr, false);
     // Decoding is memory-bound: on a Pi 5 one thread answered fastest and slowed a detector beside it least (hub CON218).
     const nlohmann::json::json_pointer set_by_model("/model/decoder/session_options/intra_op_num_threads");
-    if (!config.is_discarded() && config.contains(set_by_model)) { return std::nullopt; }
+    if (!config.is_discarded() && config.value(set_by_model, std::int64_t{ -1 }) >= 0) { return std::nullopt; }
     constexpr int kMaxTextThreads = 4;
     return std::clamp(inference::shipped_ort_threads() / 2, 1, kMaxTextThreads);
 }
@@ -612,9 +613,10 @@ auto TextGenerator::Impl::load(const std::filesystem::path &model_dir, const cha
         return std::unexpected(TextGenError::ProviderUnavailable);
     }
     if (const auto threads = text_intra_op_threads(model_dir); threads && api->ConfigOverlay != nullptr) {
-        const nlohmann::json overlay{ { "model",
-          { { "decoder", { { "session_options", { { "intra_op_num_threads", *threads } } } } } } } };
-        if (!succeeded(*api, api->ConfigOverlay(config.get(), overlay.dump().c_str()), "thread overlay")) {
+        // Plain text: gcc x64 crashed building the nested initializer-list json in this module (ff3aef3's stack).
+        const auto overlay =
+          std::format(R"({{"model":{{"decoder":{{"session_options":{{"intra_op_num_threads":{}}}}}}}}})", *threads);
+        if (!succeeded(*api, api->ConfigOverlay(config.get(), overlay.c_str()), "thread overlay")) {
             return std::unexpected(TextGenError::ModelLoadFailed);
         }
     }

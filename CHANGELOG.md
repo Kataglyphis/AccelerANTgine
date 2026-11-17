@@ -22,6 +22,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 - `perfTestSuite` prints a `backtrace_symbols_fd` stack on SIGSEGV, SIGBUS and SIGABRT on Linux: since d47f9d1 the gcc
   x64 profile job dies on a signal after `BM_SessionCreate`, the image has no gdb, and the suite leaves no core,
   so CI said nothing about where. arm64 gcc runs the whole suite cleanly.
+- Its first stack put the crash in `TextGenerator::Impl::load`, in this library's own code: d47f9d1's thread
+  overlay built a nested initializer-list `nlohmann::json`, and the gcc x64 builds (Debug with ASan and the
+  profile Release) died there in the perf suite. The overlay is formatted text now, and the model's own count is
+  read with `value(json_pointer, default)` as `context_length` reads its key.
 
 ### Fixed (2026-11-17, tomlplusplus to upstream master for a parser abort the fuzzer found)
 - `third_party/tomlplusplus` moves from 1e8829b to upstream master c38c9b9 (owner decision): the coverage-guided fuzz
