@@ -89,6 +89,16 @@ path = "logs/code-quality/clang-tidy.txt"
 artifact = "test-reports-x64-clang"
 workflow = "linux-x64.yml"
 
+# AGENTS.md: library diagnostics go through kataglyphis::log; the CLI and demo front ends print their output.
+[[metric]]
+name = "direct_stdout_diagnostics"
+kind = "pattern"
+unit = "lines"
+pattern = '\bg_print\s*\(|\bprintf\s*\(|\bstd::cout\b'
+include = ["Src/*"]
+exclude = ["Src/cli_main.cpp", "Src/inference_demo.cpp", "Src/demo_*"]
+max = 0
+
 # quality-report.sh --perf-host, inside :latest; DNNL answers not_collected while the image lacks libdnnl.so.3.
 [perf]
 setup = "bash scripts/linux/perf-host.sh setup"

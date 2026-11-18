@@ -502,5 +502,13 @@
   "replace": "        verdict = \"over\" if counts[bench] > ceiling else \"ok\"\n",
   "test": "python3 scripts/linux/tests/test-perf-cachegrind.py",
   "why": "A speed-up past the floor must be re-recorded, or the gain can be lost again without a failure."
+ },
+ {
+  "id": "lint.direct-stdout-limit",
+  "target": "quality-report.toml",
+  "find": "exclude = [\"Src/cli_main.cpp\", \"Src/inference_demo.cpp\", \"Src/demo_*\"]\nmax = 0",
+  "replace": "exclude = [\"Src/cli_main.cpp\", \"Src/inference_demo.cpp\", \"Src/demo_*\"]\nmax = 1",
+  "test": "bash scripts/linux/tests/test-pattern-limits.sh",
+  "why": "A direct g_print, printf or std::cout diagnostic in Src/ must fail the lint gates, not be counted."
  }
 ]

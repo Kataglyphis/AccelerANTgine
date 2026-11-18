@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Added (2026-11-18, a direct stdout diagnostic in `Src/` fails the lint gates)
+
+- AGENTS.md's rule "never a direct `g_print`, `printf` or `std::cout` diagnostic in `Src/`" held by habit.
+  `quality-report.toml`'s `direct_stdout_diagnostics` row carries `max = 0`, so the hub's pattern-limits gate
+  (ANTfrastructure CON245, on the hub pin `ea0ba4b3`) fails such a line and names it. The CLI and demo front ends
+  (`cli_main.cpp`, `inference_demo.cpp`, `demo_*`) print their output and are outside the row.
+  `scripts/linux/tests/test-pattern-limits.sh` plants each call; recipe `lint.direct-stdout-limit`.
+
 ### Changed (2026-11-18, the fuzz corpus is bounded by coverage)
 
 - `scripts/linux/ci-fuzz.sh` minimises each target's corpus after its run with FuzzTest's
