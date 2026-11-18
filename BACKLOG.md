@@ -115,13 +115,14 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The instruction-count gate leaves the Pi out** (S, ★). Since 2026-11-16 all four hosted keys gate
+- [x] **The instruction-count gate leaves the Pi out** (S, ★). Since 2026-11-16 all four hosted keys gate
   `BM_PreprocessFrame`, `BM_DetectFrame` and `BM_OnnxRunInferenceInPlace`, and a benchmark an entry lacks fails on
   x64 and arm64. `BM_TextGenerateTiny` stays out: on the Pi (2026-11-17, Profile build, cachegrind) two runs of 2
   and 4 iterations counted 192.7 M then 243.9 M, and 170.7 M then 127.5 M instructions, so the count is not even
   monotonic in the iterations; GenAI's threads, which `GenerationOptions` cannot pin to one, are the likely cause.
   Left: `perf/baseline-<cpu>.json` for the Pi from `quality-report.sh --perf-host --update-baseline`, as a
   `systemd-run` unit when the board is quiet (owner). Done when that file is committed.
+  **Done 2026-11-18:** `perf/baseline-cortex-a76.json` (e7cfeb8), recorded at night; `BM_TextGenerateTiny` stays out of the instruction-count gate for the reason above.
 
 - [ ] **The fuzz corpus only grows** (S, ★). Since 2026-11-17 `fuzz.yml` fuzzes every target in FuzzTest's fuzzing
   mode by hand and before each release, and keeps one corpus directory per target in the Actions cache; the
