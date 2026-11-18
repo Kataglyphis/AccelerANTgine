@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-18, the fuzz corpus is bounded by coverage)
+
+- `scripts/linux/ci-fuzz.sh` minimises each target's corpus after its run with FuzzTest's
+  `FUZZTEST_MINIMIZE_TESTSUITE_DIR`, keeping only inputs that add coverage: 470 inputs after 30 s on the Pi became 271
+  in 1 s. The cached corpus no longer grows with every run; a minimisation that fails keeps the corpus and warns.
+
 ### Added (2026-11-18, a perf-host baseline for the Raspberry Pi 5)
 
 - `perf/baseline-cortex-a76.json`: the perf-host latency baseline of a Raspberry Pi 5 (Cortex-A76, all four CPUs),

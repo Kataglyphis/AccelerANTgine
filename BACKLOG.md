@@ -124,11 +124,13 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `systemd-run` unit when the board is quiet (owner). Done when that file is committed.
   **Done 2026-11-18:** `perf/baseline-cortex-a76.json` (e7cfeb8), recorded at night; `BM_TextGenerateTiny` stays out of the instruction-count gate for the reason above.
 
-- [ ] **The fuzz corpus only grows** (S, ★). Since 2026-11-17 `fuzz.yml` fuzzes every target in FuzzTest's fuzzing
+- [x] **The fuzz corpus only grows** (S, ★). Since 2026-11-17 `fuzz.yml` fuzzes every target in FuzzTest's fuzzing
   mode by hand and before each release, and keeps one corpus directory per target in the Actions cache; the
   in-process engine appends to it and never prunes (961 inputs after 10 s per target on the Pi). Next: a periodic
   minimisation with `FUZZTEST_MINIMIZE_TESTSUITE_DIR` when the cache passes a size, measured first. Done when the
   kept corpus has a bound.
+  **Done 2026-11-18:** `ci-fuzz.sh` minimises each target's corpus after its run (measured on the Pi: 470 inputs
+  after 30 s to 271 in 1 s; 169 to 124 after 5 s); a failed minimisation keeps the corpus and warns.
 
 - [ ] **No shared case holds the two schema errors** (S, ★). C++ and Rust agree since 2026-11-13 (owner decision):
   a schema that is no JSON object is `InvalidOptions` before the engine, and an object the generator refuses is
