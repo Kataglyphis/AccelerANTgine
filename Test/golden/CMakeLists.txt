@@ -18,7 +18,8 @@ string(
           _golden_model_name
           "${_golden_model_row}")
 set(_golden_model "${PROJECT_SOURCE_DIR}/models/${_golden_model_name}")
-set(_golden_image "${PROJECT_SOURCE_DIR}/third_party/ModelANT/contracts/fixtures/two_cats.jpg")
+# ModelANT's lossless decode, so the Rust and Python golden tests read these same pixels (CON234).
+set(_golden_image "${PROJECT_SOURCE_DIR}/third_party/ModelANT/contracts/fixtures/two_cats.png")
 
 add_executable(goldenTestSuite golden_detector_test.cpp)
 kataglyphis_configure_common_test_target(goldenTestSuite "/../Resources/" "/../Src/")

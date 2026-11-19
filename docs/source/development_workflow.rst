@@ -76,7 +76,7 @@ library itself; ``Test/python`` tests the Python bindings.
      - ``goldenTestSuite``
      - The ``golden`` ctest label, native Linux Debug only: the locked model
        (``models/models.lock``, fetched by ``ci-build-and-test.sh``; missing
-       fails) with ``Auto`` layout on ModelANT's ``two_cats.jpg`` matches the
+       fails) with ``Auto`` layout on ModelANT's lossless ``two_cats.png`` matches the
        class-15 count and every cat at IoU 0.9 and score 0.05 of
        ``Test/golden/two_cats_cpu.json``, recorded by
        ``AccelerANTgine_demo --detector-image``; a black frame gives 0 boxes;

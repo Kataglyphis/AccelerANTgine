@@ -30,7 +30,7 @@ static auto write_detector_result(std::ofstream &output, const detection::Detect
     return static_cast<bool>(output);
 }
 
-// The frame jpegdec gives this image, or an empty optional after printing why.
+// The frame its decoder gives this image (jpegdec for a JPEG, pngdec for ModelANT's lossless PNG), or an empty optional after printing why.
 static auto decode_detector_image(const std::filesystem::path &image_path) -> std::optional<gstreamer::BufferInfo>
 {
     std::error_code error;
@@ -45,7 +45,7 @@ static auto decode_detector_image(const std::filesystem::path &image_path) -> st
     gstreamer::PipelineConfig pipeline_config;
     pipeline_config.pipeline_description =
       "filesrc location=" + location.str()
-      + " ! jpegdec ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink sync=false";
+      + " ! decodebin ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink sync=false";
     gstreamer::GStreamerPipeline pipeline;
     if (!pipeline.create_pipeline(pipeline_config) || !pipeline.start()) {
         std::cerr << "Could not decode the detector image\n";

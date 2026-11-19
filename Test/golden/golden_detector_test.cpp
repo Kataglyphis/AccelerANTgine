@@ -1,4 +1,4 @@
-// The locked model on ModelANT's two_cats.jpg against a recorded demo run; not covered: GPU providers, other images.
+// The locked model on ModelANT's lossless two_cats.png against a recorded demo run; not covered: GPU providers, other images.
 #include "kataglyphis_test_support.h"
 
 #include <gtest/gtest.h>
@@ -42,7 +42,7 @@ auto decoded_photo() -> gstreamer::BufferInfo
         gstreamer::PipelineConfig config;
         config.pipeline_description =
           "filesrc location=" + location.str()
-          + " ! jpegdec ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink sync=false";
+          + " ! pngdec ! videoconvert ! video/x-raw,format=RGB ! appsink name=sink sync=false";
         gstreamer::GStreamerPipeline pipeline;
         EXPECT_TRUE(pipeline.create_pipeline(config).has_value());
         EXPECT_TRUE(pipeline.start().has_value());

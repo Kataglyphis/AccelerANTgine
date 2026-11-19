@@ -334,7 +334,7 @@ written out rather than linked.
   let a test see the text a `" ! "` path produces, on a host without the elements.
 - **The `golden` ctest label needs the real model and never skips** (2026-11-01). `Test/golden`
   runs on the native Linux Debug lanes: `ci-build-and-test.sh` fetches `models/models.lock` before
-  ctest, and a missing model fails. It matches ModelANT's `two_cats.jpg` against
+  ctest, and a missing model fails. It matches ModelANT's lossless `two_cats.png` against
   `Test/golden/two_cats_cpu.json`, a file the demo's `--detector-image` wrote; re-record it with the
   demo after a model or preprocessing change, never by hand. A channel-swapped `preprocess_frame`
   drops a cat and fails it (`docs/source/development_workflow.rst` § *The Suites*).

@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-19, the golden test reads ModelANT's lossless photo)
+- `Test/golden` decodes ModelANT's `contracts/fixtures/two_cats.png` (pin `bd4094a`) with `pngdec`, the pixels
+  OxidANT's and OrchestrANT's golden tests read too (ANTfrastructure CON234). Through `jpegdec` and `videoconvert`
+  the second cat had scored 0.721; on the PNG it scores 0.564, as OrchestrANT's OpenCV run of the JPEG always did.
+  `two_cats_cpu.json` is re-recorded by the demo, whose `--detector-image` takes a PNG now (`decodebin`; a JPEG still
+  goes to `jpegdec`). All four golden tests pass on a Raspberry Pi 5.
+
 ### Fixed (2026-11-19, the docs linkcheck passes on a hosted runner)
 - `www.doxygen.nl` answers 403 to GitHub's runners and 200 to a browser, so the Linux docs linkcheck failed on 43e8182;
   `linkcheck_ignore` takes it beside sourceforge.io.

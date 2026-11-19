@@ -367,7 +367,7 @@ static void print_usage(const char *program_name)
               << "  --yolo-only        Run only YOLO detection example\n"
               << "  --video-only       Run only video detection example\n"
               << "  --video-check      Run model inference on one synthetic GStreamer video frame\n"
-              << "  --detector-image <jpg> --detector-output <json> --profile <prefix>\n"
+              << "  --detector-image <jpg|png> --detector-output <json> --profile <prefix>\n"
               << "                     Profile a JPEG detector run (new output file and profile directory)\n"
               << "  --detector-repeat-output <json>  Repeat detection in the same session\n"
               << "  --all              Run all examples\n"
