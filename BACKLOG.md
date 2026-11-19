@@ -115,23 +115,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [x] **The instruction-count gate leaves the Pi out** (S, ★). Since 2026-11-16 all four hosted keys gate
-  `BM_PreprocessFrame`, `BM_DetectFrame` and `BM_OnnxRunInferenceInPlace`, and a benchmark an entry lacks fails on
-  x64 and arm64. `BM_TextGenerateTiny` stays out: on the Pi (2026-11-17, Profile build, cachegrind) two runs of 2
-  and 4 iterations counted 192.7 M then 243.9 M, and 170.7 M then 127.5 M instructions, so the count is not even
-  monotonic in the iterations; GenAI's threads, which `GenerationOptions` cannot pin to one, are the likely cause.
-  Left: `perf/baseline-<cpu>.json` for the Pi from `quality-report.sh --perf-host --update-baseline`, as a
-  `systemd-run` unit when the board is quiet (owner). Done when that file is committed.
-  **Done 2026-11-18:** `perf/baseline-cortex-a76.json` (e7cfeb8), recorded at night; `BM_TextGenerateTiny` stays out of the instruction-count gate for the reason above.
-
-- [x] **The fuzz corpus only grows** (S, ★). Since 2026-11-17 `fuzz.yml` fuzzes every target in FuzzTest's fuzzing
-  mode by hand and before each release, and keeps one corpus directory per target in the Actions cache; the
-  in-process engine appends to it and never prunes (961 inputs after 10 s per target on the Pi). Next: a periodic
-  minimisation with `FUZZTEST_MINIMIZE_TESTSUITE_DIR` when the cache passes a size, measured first. Done when the
-  kept corpus has a bound.
-  **Done 2026-11-18:** `ci-fuzz.sh` minimises each target's corpus after its run (measured on the Pi: 470 inputs
-  after 30 s to 271 in 1 s; 169 to 124 after 5 s); a failed minimisation keeps the corpus and warns.
-
 - [ ] **No shared case holds the two schema errors** (S, ★). C++ and Rust agree since 2026-11-13 (owner decision):
   a schema that is no JSON object is `InvalidOptions` before the engine, and an object the generator refuses is
   `GenerationFailed`. Each side tests it with its own schemas. A case in the hub's tiny-model `fixture.json` would
