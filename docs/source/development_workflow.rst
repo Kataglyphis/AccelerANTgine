@@ -392,7 +392,10 @@ checks what is staged in seconds; a push runs ``scripts/linux/run-lint-gates.sh`
 
 .. code-block:: bash
 
-   git config core.hooksPath third_party/ANTfrastructure/shared/linux/templates/git-hooks
+   git config core.hooksPath "$PWD/third_party/ANTfrastructure/shared/linux/templates/git-hooks"
+
+The path is absolute, from the clone's top level: a relative one runs no hook in a linked worktree
+whose hub submodule is not checked out.
 
 The pre-commit framework cannot install beside ``core.hooksPath``, so its formatters run by hand,
 from the locked docs dependency group:
