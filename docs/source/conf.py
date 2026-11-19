@@ -50,6 +50,8 @@ linkcheck_ignore = [
     r"^coverage/index\.html$",
     # sourceforge.io answers 403 to GitHub's runners and 200 to a browser (2026-10-19).
     r"^https://[a-z]+\.sourceforge\.io/",
+    # doxygen.nl answers 403 to GitHub's runners and 200 to a browser (2026-11-19, run of 43e8182).
+    r"^https://www\.doxygen\.nl/",
 ]
 
 if _HAS_API:

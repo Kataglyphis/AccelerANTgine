@@ -18,6 +18,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-19, the docs linkcheck passes on a hosted runner)
+- `www.doxygen.nl` answers 403 to GitHub's runners and 200 to a browser, so the Linux docs linkcheck failed on 43e8182;
+  `linkcheck_ignore` takes it beside sourceforge.io.
+
 ### Added (2026-11-18, a direct stdout diagnostic in `Src/` fails the lint gates)
 
 - AGENTS.md's rule "never a direct `g_print`, `printf` or `std::cout` diagnostic in `Src/`" held by habit.
