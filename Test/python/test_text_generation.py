@@ -120,7 +120,9 @@ def test_failures_raise_with_the_core_message(tiny_model):
     assert not fresh.is_initialized()
     with pytest.raises(RuntimeError, match="not initialized"):
         fresh.generate([("user", "abc")])
-    with pytest.raises(RuntimeError, match="model directory could not be loaded: config: ") as raised:
+    with pytest.raises(
+        RuntimeError, match="model directory could not be loaded: config: "
+    ) as raised:
         fresh.initialize(tiny_model[0] / "absent")
     # GenAI's own words follow the fixed sentence, and the generator keeps them.
     assert fresh.last_error().startswith("config: ")
@@ -208,3 +210,28 @@ def test_a_stop_string_ends_generation_before_it(generator, tiny_model):
     assert "".join(pieces) == result.text
     assert result.finish_reason == ki.FinishReason.STOP
     assert options.seed is None
+
+
+# The binding raises RuntimeError with the contract's message; each kind has its own.
+MESSAGES = {"invalid_options": "invalid", "generation_failed": "generation failed"}
+
+
+def test_every_fixture_case_answers_as_the_hub_says(generator, tiny_model):
+    """The hub's fixture.json cases (ANTfrastructure CON237): each request's answer or its error kind."""
+    cases = tiny_model[1]["cases"]
+    assert len(cases) >= 7, len(cases)
+    for case in cases:
+        messages = [(m["role"], m["content"]) for m in case["messages"]]
+        options = budget(case["options"]["max_new_tokens"])
+        options.json_schema = case["options"].get("json_schema", "")
+        expect = case["expect"]
+        if "error" in expect:
+            with pytest.raises(RuntimeError, match=MESSAGES[expect["error"]]):
+                generator.generate(messages, options)
+            continue
+        result = generator.generate(messages, options)
+        assert result.text == expect["text"], case["name"]
+        finish = "length" if result.finish_reason == ki.FinishReason.LENGTH else "stop"
+        assert finish == expect["finish"], case["name"]
+        if "ids" in expect:
+            assert result.tokens == expect["ids"], case["name"]

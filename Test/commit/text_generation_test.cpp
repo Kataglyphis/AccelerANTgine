@@ -422,3 +422,37 @@ TEST(TextGenerationSetup, EveryErrorHasItsOwnMessage)
     }
     EXPECT_EQ(messages.size(), 10U);
 }
+
+// The hub's fixture.json cases (ANTfrastructure CON237): each request's answer or its error kind, as every binding replays them.
+TEST_F(TextGeneration, EveryFixtureCaseAnswersAsTheHubSays)
+{
+    std::ifstream stream(kModelDir / "fixture.json");
+    const auto cases = nlohmann::json::parse(stream).at("cases");
+    ASSERT_GE(cases.size(), 7U);
+    for (const auto &item : cases) {
+        const auto name = item.at("name").get<std::string>();
+        std::vector<text::ChatMessage> messages;
+        for (const auto &message : item.at("messages")) {
+            messages.push_back({ message.at("role").get<std::string>(), message.at("content").get<std::string>() });
+        }
+        auto options = budget(item.at("options").at("max_new_tokens").get<std::size_t>());
+        options.json_schema = item.at("options").value("json_schema", std::string{});
+        const auto result = generator.generate(messages, options);
+        const auto &expect = item.at("expect");
+        if (expect.contains("error")) {
+            const auto kind = expect.at("error").get<std::string>();
+            const auto wanted =
+              kind == "invalid_options" ? text::TextGenError::InvalidOptions : text::TextGenError::GenerationFailed;
+            ASSERT_TRUE(kind == "invalid_options" || kind == "generation_failed") << name << ": " << kind;
+            EXPECT_EQ(kataglyphis::test::error_of(result), wanted) << name;
+            continue;
+        }
+        ASSERT_TRUE(result.has_value()) << name;
+        EXPECT_EQ(result->text, expect.at("text").get<std::string>()) << name;
+        const auto finish = result->finish_reason == text::FinishReason::Length ? "length" : "stop";
+        EXPECT_EQ(finish, expect.at("finish").get<std::string>()) << name;
+        if (expect.contains("ids")) {
+            EXPECT_EQ(result->tokens, expect.at("ids").get<std::vector<std::int32_t>>()) << name;
+        }
+    }
+}

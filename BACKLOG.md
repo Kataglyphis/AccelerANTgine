@@ -115,14 +115,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **No shared case holds the two schema errors** (S, ★). C++ and Rust agree since 2026-11-13 (owner decision):
-  a schema that is no JSON object is `InvalidOptions` before the engine, and an object the generator refuses is
-  `GenerationFailed`. Each side tests it with its own schemas. A case in the hub's tiny-model `fixture.json` would
-  hold both (hub). When that fixture grows a `cases` list, `Test/commit/text_generation_test.cpp` and `Test/python`
-  read it instead of retyping; here only the 0xBF rule is retyped.
-  `Test/contract/text_contract_test.cpp` expects exactly one contract case on purpose, so plan it with the pin
-  bump that adds one.
-
 - [ ] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
   of `kataglyphis.yolo_detector`. A separate static target waits until coverage-guided fuzzing is wanted: its flags
   must match on every compiler, the riscv64 cross build and the Flutter plugin.

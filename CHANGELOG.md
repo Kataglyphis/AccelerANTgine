@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-20, the text suites replay the hub's fixture cases)
+
+- `Test/commit/text_generation_test.cpp` and `Test/python/test_text_generation.py` replay every case of the hub tiny
+  model's `fixture.json` (pin `14ea0aaf`, ANTfrastructure CON237), the list OxidANT and OrchestrANT replay too: the two
+  schemas that are no object give `InvalidOptions`, the object the grammar compiler refuses gives `GenerationFailed`.
+
 ### Changed (2026-11-19, the golden test reads ModelANT's lossless photo)
 - `Test/golden` decodes ModelANT's `contracts/fixtures/two_cats.png` (pin `bd4094a`) with `pngdec`, the pixels
   OxidANT's and OrchestrANT's golden tests read too (ANTfrastructure CON234). Through `jpegdec` and `videoconvert`
