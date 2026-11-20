@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Usage: cli_stream_status_test.sh CLI. Does not cover the codec failure path, which only a finished package reproduces, or a finite source's end.
 set -euo pipefail
+# shellcheck source=scripts/linux/lib/signalling.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/linux/lib/signalling.sh"
 
 cli=$1
 window=5
 work="$(mktemp -d "${TMPDIR:-/tmp}/accelerantgine-cli-status.XXXXXXXX")"
 signalling=""
 cleanup() {
-  [[ -z $signalling ]] || { kill "$signalling" 2>/dev/null || true; wait "$signalling" 2>/dev/null || true; }
+  stop_local_signalling "$signalling"
   rm -rf -- "$work"
 }
 trap cleanup EXIT
@@ -36,13 +38,7 @@ grep -Fq 'Stream failed' "$work/out" || die 'the failed stream did not say so; a
 
 command -v gst-webrtc-signalling-server > /dev/null || die 'gst-webrtc-signalling-server is not on PATH'
 port="$(free_port)"
-gst-webrtc-signalling-server --host 127.0.0.1 --port "$port" > "$work/signalling.log" 2>&1 &
-signalling=$!
-for ((attempt = 0; attempt < 50; attempt++)); do
-  sleep 0.2
-  kill -0 "$signalling" 2>/dev/null || die 'the signalling server exited before it listened'
-  if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then break; fi
-done
+start_local_signalling "$port" "$work/signalling.log" signalling || die 'the signalling server did not start'
 started=$SECONDS
 status=0
 stream "$port" "$window" || status=$?

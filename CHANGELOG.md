@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-20, the quality queue's real duplicates)
+
+- `scripts/linux/lib/signalling.sh` starts and stops the local WebRTC signalling server for `cli_stream_status_test.sh`,
+  `check-package-fresh-registry.sh` and `ci-profile-bench.sh`, which each carried the same start loop and stop.
+- `test-ort-chain-proof.sh` has one `verdict_of` for its ORT and GenAI cases instead of two copies.
+- `MediaRuntimeReuse.Tests.ps1`'s two image tests share their setup in one `Context`.
+- `code-dupes.allow` keeps `Build-Windows.ps1`'s two build steps, which share the step frame and no logic.
+
 ### Changed (2026-11-20, the text suites replay the hub's fixture cases)
 
 - `Test/commit/text_generation_test.cpp` and `Test/python/test_text_generation.py` replay every case of the hub tiny

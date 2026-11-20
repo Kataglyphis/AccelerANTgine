@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Runs as root in the image: each finished package streams from a fresh registry listing webrtcsink's plugin first; other scan orders stay unproved.
 set -euo pipefail
+# shellcheck source=scripts/linux/lib/signalling.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/signalling.sh"
 
 [[ $# -ge 1 && $# -le 2 ]] || { echo 'usage: check-package-fresh-registry.sh PACKAGE_DIR [SIGNALLING_PORT]' >&2; exit 2; }
 package_dir="$(realpath -e "$1")"
@@ -13,7 +15,7 @@ work="$(mktemp -d "${TMPDIR:-/tmp}/accelerantgine-registry.XXXXXXXX")"
 signalling=""
 mounted=""
 cleanup() {
-  [[ -z $signalling ]] || { kill "$signalling" 2>/dev/null || true; wait "$signalling" 2>/dev/null || true; }
+  stop_local_signalling "$signalling"
   [[ -z $mounted ]] || umount "$mounted"
   rm -rf -- "$work"
 }
@@ -38,19 +40,8 @@ fill_listing_first() {
 }
 
 start_signalling() {
-  local attempt
-  gst-webrtc-signalling-server --host 127.0.0.1 --port "$port" > "$work/signalling.log" 2>&1 &
-  signalling=$!
-  for ((attempt = 0; attempt < 50; attempt++)); do
-    sleep 0.2
-    if ! kill -0 "$signalling" 2>/dev/null; then
-      cat "$work/signalling.log" >&2
-      echo 'The signalling server exited before it listened' >&2
-      return 1
-    fi
-    if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then return 0; fi
-  done
-  echo 'The signalling server did not listen within 10 s' >&2
+  start_local_signalling "$port" "$work/signalling.log" signalling && return 0
+  cat "$work/signalling.log" >&2
   return 1
 }
 

@@ -140,8 +140,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
 The top 5 of `logs/code-quality/queue.md` (`bash scripts/linux/quality-report.sh`), leaving out `doc-dupes-hub.allow`, which the owner keeps in every AGENTS.md; re-sync when it moves.
 
+Owner decision 2026-11-20: only real code duplicates are merged; a pair that shares a parameter block or a test's setup
+frame stays, and a deliberate one gets a `code-dupes.allow` row with its reason. The rows below are of that kind.
+
+- [ ] `code-dupes.allow:2` budget 24 (allow_budget_total): `Build-Windows.ps1`'s release and MSIX steps share the build-step frame
 - [ ] `shellcheck-warnings.allow:10` budget 2 (allow_budget_total)
-- [ ] `scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:43` 39 shared shingles with scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:71 (duplicated_blocks)
-- [ ] `Test/commit/cli_stream_status_test.sh:37` 34 shared shingles with scripts/linux/check-package-fresh-registry.sh:40 (duplicated_blocks)
-- [ ] `Test/commit/cli_stream_status_test.sh:37` 30 shared shingles with scripts/linux/ci-profile-bench.sh:96 (duplicated_blocks)
-- [ ] `scripts/windows/Build-Windows.ps1:508` 24 shared shingles with scripts/windows/Build-Windows.ps1:689 (duplicated_blocks)
+- [ ] `scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:48` 20 shared shingles with scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:74 (duplicated_blocks)
+- [ ] `scripts/windows/Test-WindowsGpuImage.ps1:8` 19 shared shingles with scripts/windows/Test-WindowsGpuPackages.ps1:6 (duplicated_blocks)
+- [ ] `scripts/windows/Invoke-ContainerLane.ps1:4` 19 shared shingles with scripts/windows/Test-WindowsGpuImage.ps1:8 (duplicated_blocks)

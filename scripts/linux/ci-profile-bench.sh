@@ -5,6 +5,8 @@ set -euo pipefail
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${_SCRIPT_DIR}/ci-common.sh"
+# shellcheck source=scripts/linux/lib/signalling.sh
+source "${_SCRIPT_DIR}/lib/signalling.sh"
 
 # antfrastructure_path (via ci-common.sh) honours the ANTFRASTRUCTURE_DIR override; the directive lets shellcheck see the knobs read there.
 # shellcheck source=third_party/ANTfrastructure/linux/scripts/lib/cmake-build.sh
@@ -97,27 +99,17 @@ start_signalling_server() {
   workload_needs_signalling_server || return 0
   command -v gst-webrtc-signalling-server >/dev/null 2>&1 \
     || die "The workload needs a WebRTC signalling server and there is no gst-webrtc-signalling-server on PATH (gst-plugins-rs; the CI image has it in /opt/gstreamer/bin). Install it, or name a running server with --profile-args '... --server ws://HOST:PORT'."
-  local log="${WORKSPACE_DIR}/${LOGS_DIR}/signalling-server.log" attempt
-  gst-webrtc-signalling-server --host 127.0.0.1 --port "${SIGNALLING_PORT}" >"${log}" 2>&1 &
-  SIGNALLING_PID=$!
+  local log="${WORKSPACE_DIR}/${LOGS_DIR}/signalling-server.log"
   trap stop_signalling_server EXIT
-  for ((attempt = 0; attempt < 50; attempt++)); do
-    sleep 0.2
-    kill -0 "${SIGNALLING_PID}" 2>/dev/null \
-      || die "gst-webrtc-signalling-server exited before it listened on 127.0.0.1:${SIGNALLING_PORT} (port taken? --signalling-port picks another): $(tail -n 3 "${log}" | tr '\n' ' ')"
-    if (exec 3<>"/dev/tcp/127.0.0.1/${SIGNALLING_PORT}") 2>/dev/null; then
-      WORKLOAD_ARGS+=("--server=ws://127.0.0.1:${SIGNALLING_PORT}")
-      info "signalling server for the workload: ws://127.0.0.1:${SIGNALLING_PORT} (log: ${log})"
-      return 0
-    fi
-  done
-  die "gst-webrtc-signalling-server did not listen on 127.0.0.1:${SIGNALLING_PORT} within 10 s: $(tail -n 3 "${log}" | tr '\n' ' ')"
+  start_local_signalling "${SIGNALLING_PORT}" "${log}" SIGNALLING_PID \
+    || die "no signalling server on 127.0.0.1:${SIGNALLING_PORT} (port taken? --signalling-port picks another): $(tail -n 3 "${log}" | tr '\n' ' ')"
+  WORKLOAD_ARGS+=("--server=ws://127.0.0.1:${SIGNALLING_PORT}")
+  info "signalling server for the workload: ws://127.0.0.1:${SIGNALLING_PORT} (log: ${log})"
 }
 
 stop_signalling_server() {
   [[ -n "${SIGNALLING_PID}" ]] || return 0
-  kill "${SIGNALLING_PID}" 2>/dev/null || true
-  wait "${SIGNALLING_PID}" 2>/dev/null || true
+  stop_local_signalling "${SIGNALLING_PID}"
   SIGNALLING_PID=""
   trap - EXIT
 }

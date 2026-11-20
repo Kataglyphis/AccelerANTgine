@@ -40,47 +40,49 @@ Describe 'Windows media runtime reuse' {
         ($calls -join ',') | Should Be 'warning,bundle,ort-proof,crt'
     }
 
-    It 'stages required and present optional package plugins and rejects an incomplete image' {
+    # Both read a fake image on disk: the plugin directory resolves for real, the PE check is not under test.
+    Context 'an image on disk' {
         . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginDir')
-        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginFile')
-        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPackagePlugins')
-        . (Get-BuildFunctionBlock 'Copy-ImageGStreamerPackagePlugins')
         function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
-        $bin = Join-Path $TestDrive 'package-image\bin'
-        $plugins = Join-Path $TestDrive 'package-image\lib\gstreamer-1.0'
-        $null = New-Item -ItemType Directory -Force -Path $bin, $plugins
-        $required = @('coreelements', 'app', 'videotestsrc', 'videoconvertscale', 'playback', 'webrtc', 'nice', 'dtls', 'srtp', 'sctp', 'rtpmanager', 'rtp')
-        foreach ($name in ($required + 'vpx')) { [IO.File]::WriteAllText((Join-Path $plugins "gst$name.dll"), $name) }
-        Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $bin } -ScriptBlock {
-            $destination = Join-Path $TestDrive 'staged-plugins'
-            $selected = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
-            $files = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $selected)
-            $files.Count | Should Be 13
-            (Get-Content -LiteralPath (Join-Path $destination 'gstvpx.dll') -Raw) | Should Be 'vpx'
-            Remove-Item -LiteralPath (Join-Path $plugins 'gstvpx.dll')
-            $withoutVpx = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
-            $withoutVpx.Count | Should Be 12
-            $null = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $withoutVpx)
-            (Test-Path -LiteralPath (Join-Path $destination 'gstvpx.dll')) | Should Be $false
-            Remove-Item -LiteralPath (Join-Path $plugins 'gstwebrtc.dll')
-            $message = try { Get-ImageGStreamerPackagePlugins -Arch amd64; '' } catch { $_.Exception.Message }
-            ($message -match 'gstwebrtc.dll is missing') | Should Be $true
-        }
-    }
 
-    It 'takes the package scanner from the image and rejects an image without one' {
-        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginDir')
-        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPackageScanner')
-        function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
-        $bin = Join-Path $TestDrive 'scanner-image\bin'
-        $scanner = Join-Path $TestDrive 'scanner-image\libexec\gstreamer-1.0\gst-plugin-scanner.exe'
-        $null = New-Item -ItemType Directory -Force -Path $bin, (Split-Path -Parent $scanner)
-        [IO.File]::WriteAllText($scanner, 'scanner')
-        Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $bin } -ScriptBlock {
-            (Get-ImageGStreamerPackageScanner -Arch amd64) | Should Be $scanner
-            Remove-Item -LiteralPath $scanner
-            $message = try { Get-ImageGStreamerPackageScanner -Arch amd64; '' } catch { $_.Exception.Message }
-            ($message -match 'gst-plugin-scanner.exe is missing') | Should Be $true
+        It 'stages required and present optional package plugins and rejects an incomplete image' {
+            . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginFile')
+            . (Get-BuildFunctionBlock 'Get-ImageGStreamerPackagePlugins')
+            . (Get-BuildFunctionBlock 'Copy-ImageGStreamerPackagePlugins')
+            $bin = Join-Path $TestDrive 'package-image\bin'
+            $plugins = Join-Path $TestDrive 'package-image\lib\gstreamer-1.0'
+            $null = New-Item -ItemType Directory -Force -Path $bin, $plugins
+            $required = @('coreelements', 'app', 'videotestsrc', 'videoconvertscale', 'playback', 'webrtc', 'nice', 'dtls', 'srtp', 'sctp', 'rtpmanager', 'rtp')
+            foreach ($name in ($required + 'vpx')) { [IO.File]::WriteAllText((Join-Path $plugins "gst$name.dll"), $name) }
+            Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $bin } -ScriptBlock {
+                $destination = Join-Path $TestDrive 'staged-plugins'
+                $selected = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
+                $files = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $selected)
+                $files.Count | Should Be 13
+                (Get-Content -LiteralPath (Join-Path $destination 'gstvpx.dll') -Raw) | Should Be 'vpx'
+                Remove-Item -LiteralPath (Join-Path $plugins 'gstvpx.dll')
+                $withoutVpx = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
+                $withoutVpx.Count | Should Be 12
+                $null = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $withoutVpx)
+                (Test-Path -LiteralPath (Join-Path $destination 'gstvpx.dll')) | Should Be $false
+                Remove-Item -LiteralPath (Join-Path $plugins 'gstwebrtc.dll')
+                $message = try { Get-ImageGStreamerPackagePlugins -Arch amd64; '' } catch { $_.Exception.Message }
+                ($message -match 'gstwebrtc.dll is missing') | Should Be $true
+            }
+        }
+
+        It 'takes the package scanner from the image and rejects an image without one' {
+            . (Get-BuildFunctionBlock 'Get-ImageGStreamerPackageScanner')
+            $bin = Join-Path $TestDrive 'scanner-image\bin'
+            $scanner = Join-Path $TestDrive 'scanner-image\libexec\gstreamer-1.0\gst-plugin-scanner.exe'
+            $null = New-Item -ItemType Directory -Force -Path $bin, (Split-Path -Parent $scanner)
+            [IO.File]::WriteAllText($scanner, 'scanner')
+            Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $bin } -ScriptBlock {
+                (Get-ImageGStreamerPackageScanner -Arch amd64) | Should Be $scanner
+                Remove-Item -LiteralPath $scanner
+                $message = try { Get-ImageGStreamerPackageScanner -Arch amd64; '' } catch { $_.Exception.Message }
+                ($message -match 'gst-plugin-scanner.exe is missing') | Should Be $true
+            }
         }
     }
 
