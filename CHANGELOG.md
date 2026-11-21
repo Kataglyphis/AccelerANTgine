@@ -18,6 +18,18 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-21, deep TOML nesting and a lone GStreamer element)
+
+- tomlplusplus refuses nesting deeper than 32 levels (`TOML_MAX_NESTED_VALUES=32`, its default 128). The first
+  scheduled-length fuzz run (44905060037, 5 minutes a target) drove `ParseInferenceConfigNeverCrashes` past FuzzTest's
+  stack limit with 89 nested arrays: the parser recurses once per level, about 1.5 KiB a level instrumented, so a
+  crafted config could exhaust a small thread stack. The input is a seed now, and a commit test holds that 40 levels
+  are a `ParseError`.
+- A pipeline description of one element comes back from `gst_parse_launch` without a pipeline, and so without a bus;
+  `parse_launch` now puts it into its own pipeline. `set_bus_handler` had hung its handler on NULL: two
+  GStreamer-CRITICAL lines a time, 444 per Linux ctest pass, from the test helper that probes elements one by one, and
+  a lone element's failure was never reported. A test holds that a lone `filesrc` reports why it failed (b318e76).
+
 ### Changed (2026-11-20, the quality queue's real duplicates)
 
 - `scripts/linux/lib/signalling.sh` starts and stops the local WebRTC signalling server for `cli_stream_status_test.sh`,

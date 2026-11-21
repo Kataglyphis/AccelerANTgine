@@ -114,6 +114,15 @@ TEST(TomlConfig, MalformedDocumentsAreParseErrors)
     }
 }
 
+// The parser recurses once per level, so nesting past 32 is refused before it costs a thread's stack.
+TEST(TomlConfig, NestingDeeperThanThirtyTwoLevelsIsAParseError)
+{
+    const auto document = "w = " + std::string(40, '[') + std::string(40, ']') + "\n";
+    const auto config = cfg::parse_inference_config(document);
+    ASSERT_FALSE(config.has_value());
+    EXPECT_EQ(config.error(), cfg::ConfigError::ParseError);
+}
+
 // A value of the wrong type is a mistake to report, as the JSON loader does (owner decision).
 TEST(TomlConfig, AWrongTypeIsInvalidValue)
 {

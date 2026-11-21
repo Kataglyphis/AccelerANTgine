@@ -82,13 +82,14 @@ void ParseInferenceConfigNeverCrashes(const std::string &bytes)
           << static_cast<int>(config.error());
     }
 }
-// The last seeds are coverage-guided findings: a float where a count belongs, and tomlplusplus#321's abort.
+// Coverage-guided findings, last: a float where a count belongs, tomlplusplus#321's abort, 89 nested arrays.
 FUZZ_TEST(ConfigFuzz, ParseInferenceConfigNeverCrashes)
   .WithSeeds({ { std::string(kShippedInferenceConfig) },
     { "[model]\ninput_width = 320\n" },
     { "" },
     { "[model]\ninput_width=0.0" },
-    { "w=[[}N" } });
+    { "w=[[}N" },
+    { "w=" + std::string(89, '[') + "]\xf7.Pe_hPei" } });
 
 // An integer the uint32 fields cannot hold is InvalidValue, never a wrapped number or a silent default.
 void TomlUnsignedFieldsTakeOnlyTheirRange(std::int64_t value)
