@@ -7,6 +7,7 @@ module;
 #include <limits>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -153,7 +154,12 @@ auto parse_inference_config(const std::string &toml_content) -> std::expected<In
 
 auto load_inference_config(const std::filesystem::path &config_path) -> std::expected<InferenceConfig, ConfigError>
 {
-    if (!std::filesystem::exists(config_path)) { return std::unexpected(ConfigError::FileNotFound); }
+    // The throwing overload aborts without exceptions; a path the system refuses (ENAMETOOLONG, EACCES) is not found.
+    std::error_code unreadable;
+    if (!std::filesystem::exists(config_path, unreadable)) {
+        if (unreadable) { log::warning("config: {} cannot be read: {}", config_path.string(), unreadable.message()); }
+        return std::unexpected(ConfigError::FileNotFound);
+    }
 
     auto result = toml::parse_file(config_path.string());
     if (!result) { return std::unexpected(ConfigError::ParseError); }

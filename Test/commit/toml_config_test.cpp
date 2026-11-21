@@ -201,6 +201,15 @@ TEST(TomlConfig, MissingFileIsFileNotFound)
     EXPECT_EQ(config.error(), cfg::ConfigError::FileNotFound);
 }
 
+// A path the system refuses, ENAMETOOLONG even as root, is not found: the throwing overload would abort the test.
+TEST(TomlConfig, APathTheSystemRefusesIsFileNotFound)
+{
+    const auto refused = std::filesystem::temp_directory_path() / std::string(300, 'x') / "inference.toml";
+    const auto config = cfg::load_inference_config(refused);
+    ASSERT_FALSE(config.has_value());
+    EXPECT_EQ(config.error(), cfg::ConfigError::FileNotFound);
+}
+
 TEST(TomlConfig, MalformedFileIsAParseError)
 {
     const TempFile file("kataglyphis-inference-broken", ".toml", "[model\n");

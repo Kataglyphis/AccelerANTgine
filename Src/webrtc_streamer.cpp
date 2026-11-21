@@ -16,6 +16,7 @@ module;
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 
 #define GST_USE_UNSTABLE_API
@@ -59,7 +60,13 @@ namespace {
 
     auto to_file_uri(const std::string &path) -> std::string
     {
-        const auto absolute_path = std::filesystem::absolute(path);
+        // The throwing overload aborts without exceptions when the working directory is gone.
+        std::error_code unresolved;
+        const auto absolute_path = std::filesystem::absolute(path, unresolved);
+        if (unresolved) {
+            log::error("Cannot make {} absolute: {}", path, unresolved.message());
+            return {};
+        }
         GError *error = nullptr;
         gchar *uri = gst_filename_to_uri(absolute_path.string().c_str(), &error);
         if (uri == nullptr) {

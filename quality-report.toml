@@ -99,6 +99,15 @@ include = ["Src/*"]
 exclude = ["Src/cli_main.cpp", "Src/inference_demo.cpp", "Src/demo_*"]
 max = 0
 
+# Built without exceptions, a throwing std::filesystem overload aborts on any OS error: Src passes an error_code.
+[[metric]]
+name = "throwing_filesystem_calls"
+kind = "pattern"
+unit = "lines"
+pattern = 'std::filesystem::(exists|absolute|canonical|weakly_canonical|is_directory|is_regular_file|create_directory|create_directories|file_size|remove|remove_all|read_symlink|equivalent|status|last_write_time|current_path|temp_directory_path|copy|rename)\([^,()]*\)'
+include = ["Src/*"]
+max = 0
+
 # quality-report.sh --perf-host, inside :latest; DNNL answers not_collected while the image lacks libdnnl.so.3.
 [perf]
 setup = "bash scripts/linux/perf-host.sh setup"

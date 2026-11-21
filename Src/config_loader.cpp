@@ -7,10 +7,12 @@ module;
 #include <limits>
 #include <sstream>
 #include <string>
+#include <system_error>
 
 module kataglyphis.config_loader;
 
 import nlohmann.json;
+import kataglyphis.log;
 
 namespace kataglyphis::config {
 
@@ -152,7 +154,12 @@ auto parse_webrtc_config(const std::string &json_content) -> std::expected<WebRT
 auto load_webrtc_config(const std::filesystem::path &config_path) -> std::expected<WebRTCConfig, ConfigError>
 {
 
-    if (!std::filesystem::exists(config_path)) { return std::unexpected(ConfigError::FileNotFound); }
+    // The throwing overload aborts without exceptions; a path the system refuses (ENAMETOOLONG, EACCES) is not found.
+    std::error_code unreadable;
+    if (!std::filesystem::exists(config_path, unreadable)) {
+        if (unreadable) { log::warning("config: {} cannot be read: {}", config_path.string(), unreadable.message()); }
+        return std::unexpected(ConfigError::FileNotFound);
+    }
 
     std::ifstream file(config_path);
     if (!file.is_open()) { return std::unexpected(ConfigError::FileNotFound); }

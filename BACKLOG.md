@@ -126,12 +126,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   recommended). Each step is one commit, cheapest first; the shared pieces are hub CON290 to CON296.
   (1) **Fuzzing on a schedule before 2026-11-24** (D1): twice a week at 5 min per target (dispatches and the release
   keep 3), a concurrency group per caller, `ACCELERANTGINE_LOG_LEVEL=off`, reproducers from
-  `FUZZTEST_REPRODUCERS_OUT_DIR` uploaded; the only corpus cache entry (fuzz-corpus-44118914978) was last read on
-  2026-11-17 and expires after 7 unused days; AGENTS.md:631-633 changes with it. (2) `set_bus_handler` passes on the
-  NULL bus of a one-element pipeline (`Src/gstreamer_pipeline.cpp:209-214`): 444 GStreamer-CRITICAL lines per Linux
-  ctest pass since c2f6e5e, under 62 green runs. (3) The error_code overloads at `config_loader.cpp:155`,
-  `toml_config.cpp:156` and `webrtc_streamer.cpp:62` (FileNotFound kept, `ec.message()` logged), a 300-byte path test,
-  and a max = 0 pattern row. (4) The perf suite counts every `SkipWithError` and returns 1 above zero: ten failure
+  `FUZZTEST_REPRODUCERS_OUT_DIR` uploaded. **Done 2026-11-21** (64a7638): its first 5-minute run refreshed the corpus
+  cache and found TOML nested past the stack limit (fixed in 9df9c9b). (2) **Done** (b318e76): a lone element gets a
+  pipeline, and run 44910072889 logged 0 GStreamer-CRITICAL lines where 444 a ctest pass were. (3) **In source:** the
+  error_code overloads at the three throwing `std::filesystem` sites (FileNotFound kept, the message logged), a
+  300-byte path test in both config suites, and a `throwing_filesystem_calls` pattern row with max = 0. (4) The perf suite counts every `SkipWithError` and returns 1 above zero: ten failure
   paths exit 0 today (`Test/perf/perfSuite.cpp:186-406`), and "the DEIM model is missing" passed 9 of 12 Windows runs.
   (5) One version: the wheel reads `CMakeLists.txt`'s through the hub's project() pattern, uv.lock relocked, a
   structural test against `version_util.sh`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the

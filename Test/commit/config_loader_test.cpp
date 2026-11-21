@@ -203,6 +203,15 @@ TEST(WebRtcConfig, MissingFileIsFileNotFound)
     EXPECT_EQ(config.error(), cfg::ConfigError::FileNotFound);
 }
 
+// A path the system refuses, ENAMETOOLONG even as root, is not found: the throwing overload would abort the test.
+TEST(WebRtcConfig, APathTheSystemRefusesIsFileNotFound)
+{
+    const auto refused = std::filesystem::temp_directory_path() / std::string(300, 'x') / "webrtc_settings.json";
+    const auto config = cfg::load_webrtc_config(refused);
+    ASSERT_FALSE(config.has_value());
+    EXPECT_EQ(config.error(), cfg::ConfigError::FileNotFound);
+}
+
 TEST(WebRtcConfig, MalformedFileIsAParseError)
 {
     const TempFile file("kataglyphis-webrtc-broken", ".json", "{\"video\": ");
