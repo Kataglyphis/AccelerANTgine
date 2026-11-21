@@ -367,7 +367,6 @@ wheels = [
 
 [[package]]
 name = "kataglyphis-inference"
-version = "0.0.3"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },

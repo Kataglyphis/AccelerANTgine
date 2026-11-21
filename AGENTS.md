@@ -621,10 +621,11 @@ tests; never lower a floor. Each Linux leg uploads `test-reports-<arch>-<compile
 report, the coverage summary, the clang-tidy log), which `quality-report.toml` reads.
 
 **`mutations.yml` proves those gates can fail.** It calls the hub's `mutation-gates.yml` over
-`scripts/linux/tests/lane-mutations.json`: the skip gate, the coverage floors, the chain-only ORT
-proof (`accelerantgine_assert_ort_chain_build`), the static-analysis gates and the embedded-text include
-(`test-embed-text-file.sh`), each through fixture inputs and stub tools on a hosted runner. Add a recipe with
-every new gate. It builds no C++. **`cxx-mutations.yml`** holds the recipes against `Src/`
+`scripts/linux/tests/lane-mutations.json`: the skip gate, the coverage floors, the chain-only ORT proof
+(`accelerantgine_assert_ort_chain_build`), the static-analysis gates, the embedded-text include
+(`test-embed-text-file.sh`) and the one version (`test-version-single-source.sh`), each through fixture
+inputs and stub tools on a hosted runner. Add a recipe with every new gate. It builds no C++.
+**`cxx-mutations.yml`** holds the recipes against `Src/`
 (`scripts/linux/tests/cxx-mutations.json`): weekly and on dispatch, it builds the clang Debug tree once, then
 proves each recipe in place on an incremental rebuild (`scripts/linux/cxx-mutation-test.sh <ctest regex>`).
 Add a recipe with every new decode or preprocessing rule; on a small host run one recipe with `--only`.
@@ -695,7 +696,9 @@ submodules, while a recursive checkout follows ANTfrastructure's documentation c
   ([§ *The reusable release workflow*](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/branch-and-release-strategy.md#the-reusable-release-workflow));
   the release job's `collect:` options pick CPack's packages and the wheels, never a file from a
   `bundle/`, and the hub's collector suite runs them over uploads shaped like this repo's. The
-  version is `CMakeLists.txt`'s `project()` `VERSION`.
+  version is `CMakeLists.txt`'s `project()` `VERSION`, the one source: the wheel reads it through
+  `pyproject.toml`'s regex provider, the MSIX through `Get-PackageVersion -Required`, and
+  `scripts/linux/tests/test-version-single-source.sh` holds both to the hub's `version_util.sh`.
   `gh workflow run release.yml --ref develop -f dry-run=true` proves it on `develop`.
 - **The docs site** goes through the hub's `build-docs.yml` (2026-10-19). The clang x64 build's
   `ci-docs.sh` writes it with the coverage pages, `reusable-linux.yml` uploads `docs/build/html/`

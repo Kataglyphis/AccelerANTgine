@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-21, one version)
+
+- The wheel's version is `CMakeLists.txt`'s `project()` `VERSION`, read by scikit-build-core's regex provider with
+  the pattern of the hub's `Get-PackageVersion`; `pyproject.toml` states none of its own, and `uv.lock` is relocked.
+  The MSIX asks for its version with `-Required`, so a missing one fails instead of stamping 0.0.1.0.
+  `test-version-single-source.sh` in the lint gates holds the wheel's reading to the hub's `version_util.sh`, and two
+  lane recipes prove it fails.
+
 ### Changed (2026-11-21, least privilege in CI)
 
 - The Linux x64, arm64 and riscv64 lanes grant read only by default; their build jobs ask for their own packages and

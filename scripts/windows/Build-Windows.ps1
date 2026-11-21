@@ -715,7 +715,7 @@ function Invoke-MsixPackagingStep {
 
             Initialize-MsixStaging -StagingRoot $stagingRoot -LogoSource $logoSource
 
-            $packageVersion = Get-PackageVersion -WorkspacePath $Workspace
+            $packageVersion = Get-PackageVersion -WorkspacePath $Workspace -Required
             New-Item -ItemType Directory -Path $msixOutput -Force | Out-Null
             $msixSuffix = Get-OrtVariantSuffix
             $msixFile = Join-Path $msixOutput "AccelerANTgine_${packageVersion}_${packageArch}${msixSuffix}.msix"

@@ -133,9 +133,10 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   300-byte path test in both config suites, and a `throwing_filesystem_calls` pattern row with max = 0. (4) **In
   source:** the perf suite counts every failure `SkipWithError` (ten paths, which exited 0) and returns 1 above zero;
   a missing model still skips unless `KATAGLYPHIS_REQUIRE_MODEL=1`. No lane fails today: the last runs of every lane
-  logged only those model skips (Windows x64 three a run, which the Windows round (11) takes up). (5) One version: the
-  wheel reads `CMakeLists.txt`'s through the hub's project() pattern, uv.lock relocked, a
-  structural test against `version_util.sh`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the
+  logged only those model skips (Windows x64 three a run, which the Windows round (11) takes up). (5) **In source:**
+  one version: the wheel reads `CMakeLists.txt`'s through the hub's project() pattern (scikit-build-core's regex
+  provider), uv.lock relocked, `test-version-single-source.sh` against `version_util.sh` in the lint gates with two
+  lane recipes, the MSIX with `-Required`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the
   release, HTML only on pushes and the external link check weekly (D6), the cp315 wheel step named so. (7) **In
   source:** LOCKED on `corrosion_import_crate`; once that push stays green, `build.rs`'s duplicate `cxx_build` goes,
   Cargo.lock relocked. (8) **In source:** permissions per job in the three Linux lanes (read only by default,

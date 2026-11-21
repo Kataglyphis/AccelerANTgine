@@ -510,5 +510,21 @@
   "replace": "exclude = [\"Src/cli_main.cpp\", \"Src/inference_demo.cpp\", \"Src/demo_*\"]\nmax = 1",
   "test": "bash scripts/linux/tests/test-pattern-limits.sh",
   "why": "A direct g_print, printf or std::cout diagnostic in Src/ must fail the lint gates, not be counted."
+ },
+ {
+  "id": "version.regex-takes-project",
+  "target": "pyproject.toml",
+  "find": "(?is)\\bproject\\s*\\([^)]*?\\bVERSION\\s+",
+  "replace": "(?is)\\bVERSION\\s+",
+  "test": "bash scripts/linux/tests/test-version-single-source.sh",
+  "why": "The wheel must read project()'s VERSION, not cmake_minimum_required's, which comes first in CMakeLists.txt."
+ },
+ {
+  "id": "version.no-own-version",
+  "target": "pyproject.toml",
+  "find": "dynamic = [\"version\"]",
+  "replace": "version = \"0.0.3\"",
+  "test": "bash scripts/linux/tests/test-version-single-source.sh",
+  "why": "A version of the wheel's own drifts from CMakeLists.txt's at the next bump."
  }
 ]

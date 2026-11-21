@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "kataglyphis-inference"
-version = "0.0.3"
+dynamic = ["version"]
 description = "Python bindings for the Kataglyphis C++23 ONNX inference engine"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -47,6 +47,10 @@ Homepage = "https://jonasheinle.de/"
 [tool.scikit-build]
 minimum-version = "0.11"
 cmake.version = ">=3.31.6"
+# CMakeLists.txt's project() VERSION is the one version; the hub's Get-PackageVersion pattern, as version_util.sh reads.
+metadata.version.provider = "scikit_build_core.metadata.regex"
+metadata.version.input = "CMakeLists.txt"
+metadata.version.regex = '(?is)\bproject\s*\([^)]*?\bVERSION\s+(?P<value>[0-9]+(?:\.[0-9]+)*)'
 # The stub target too: the install rules ship _core.pyi and py.typed, which only it writes.
 build.targets = ["kataglyphis_python", "kataglyphis_python_stub"]
 install.components = ["python_bindings"]
