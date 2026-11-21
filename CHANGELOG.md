@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-21, the scanner death test on riscv64)
+
+- `GStreamerRuntime.TheScannerFailureIsSeenWhicheverClassInitialisesFirst` sets `GST_REGISTRY_FORK=yes` in its child.
+  The riscv64 lane sets it to `no` (the hub's `riscv64-cross.sh`), so GStreamer scanned in process and never started
+  the broken scanner the case needs; the first riscv64 run since the test came (44920564310) failed on it.
+
 ### Fixed (2026-11-21, the filesystem row catches the iterator declaration and leaves current_path(ec))
 
 - The `throwing_filesystem_calls` row of `quality-report.toml` read `current_path(ec)`, the non-throwing getter, as a

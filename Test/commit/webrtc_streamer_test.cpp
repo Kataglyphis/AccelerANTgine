@@ -567,6 +567,8 @@ TEST(GStreamerRuntime, TheScannerFailureIsSeenWhicheverClassInitialisesFirst)
                                 / ("kataglyphis-registry-" + std::to_string(std::random_device{}()) + ".bin");
           set_variable("GST_REGISTRY", registry.string());
           set_variable("GST_PLUGIN_SCANNER", "/nonexistent/gst-plugin-scanner");
+          // The riscv64 lane sets GST_REGISTRY_FORK=no (hub riscv64-cross.sh), which never starts a scanner to fail.
+          set_variable("GST_REGISTRY_FORK", "yes");
           ASSERT_TRUE(kataglyphis::gstreamer::GStreamerPipeline::initialize_gstreamer().has_value());
           EXPECT_TRUE(webrtc::WebRTCStreamer::plugin_scanner_failed());
           std::error_code ignored;
