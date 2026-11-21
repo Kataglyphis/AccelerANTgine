@@ -122,6 +122,31 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   (Pester 5 and 6 discover a file before they run it), the `3.4.0` pins dropped, and the suites run in the image
   as well. Done when no workflow pins 3.4.0.
 
+- [ ] **C++ gates from the BeschleunigerBallett comparison** (M in all, ★★★; owner D1 to D12, 2026-11-21, as
+  recommended). Each step is one commit, cheapest first; the shared pieces are hub CON290 to CON296.
+  (1) **Fuzzing on a schedule before 2026-11-24** (D1): twice a week at 5 min per target (dispatches and the release
+  keep 3), a concurrency group per caller, `ACCELERANTGINE_LOG_LEVEL=off`, reproducers from
+  `FUZZTEST_REPRODUCERS_OUT_DIR` uploaded; the only corpus cache entry (fuzz-corpus-44118914978) was last read on
+  2026-11-17 and expires after 7 unused days; AGENTS.md:631-633 changes with it. (2) `set_bus_handler` passes on the
+  NULL bus of a one-element pipeline (`Src/gstreamer_pipeline.cpp:209-214`): 444 GStreamer-CRITICAL lines per Linux
+  ctest pass since c2f6e5e, under 62 green runs. (3) The error_code overloads at `config_loader.cpp:155`,
+  `toml_config.cpp:156` and `webrtc_streamer.cpp:62` (FileNotFound kept, `ec.message()` logged), a 300-byte path test,
+  and a max = 0 pattern row. (4) The perf suite counts every `SkipWithError` and returns 1 above zero: ten failure
+  paths exit 0 today (`Test/perf/perfSuite.cpp:186-406`), and "the DEIM model is missing" passed 9 of 12 Windows runs.
+  (5) One version: the wheel reads `CMakeLists.txt`'s through the hub's project() pattern, uv.lock relocked, a
+  structural test against `version_util.sh`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the
+  release, HTML only on pushes and the external link check weekly (D6), the cp315 wheel step named so. (7) LOCKED on
+  `corrosion_import_crate`. (8) Permissions per job, no `--privileged` in fuzz.yml and cxx-mutations.yml,
+  `second_deadlock_stack=1`. (9) After CON291 and step 2: the log gate on every Linux ctest run and
+  `--fail-on-skipped .` on riscv64. (10) The lane split, one step per part (CON293). (11) The Windows round
+  (CON290, CON292, CON294): hardening in the clang-cl presets and a PE gate, gstplayback and gstwebrtc staged with
+  the 7-test skip list (D2; AGENTS.md:391 changes), the in-container Profile perf run deleted, the fuzz harness with
+  `-fno-sanitize=address`. (12) The GPU candidate lanes once after 11 (owner hardware). (13) With the first real
+  bridge: an unwinding `[profile.bridge]` with a configure-time check (D4), scoped cargo gates, the crate budget and
+  forbid list, a parity suite as the deletion gate. (14) After CON145: no configure-time `cargo install
+  cxxbridge-cmd`. Beyond the detector-math target the owner placed after the add demo (below), no new C++ fuzz
+  targets or mutation recipes for `yolo_math.cpp`, which moves to OxidANT later.
+
 - [b] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
   of `kataglyphis.yolo_detector`. A separate static target is wanted for coverage-guided fuzzing; its flags must match
   on every compiler, the riscv64 cross build and the Flutter plugin. Owner 2026-11-21: after OmniAccelerANT drops this

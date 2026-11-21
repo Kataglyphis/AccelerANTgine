@@ -15,6 +15,10 @@ cmake --preset linux-fuzz-clang
 cmake --build build-fuzz -j "${CMAKE_BUILD_PARALLEL_LEVEL:-$(nproc)}" --target fuzzTestSuite
 mkdir -p "${corpus}"
 corpus="$(cd "${corpus}" && pwd)"
+# A finding's input lands beside the corpus, where fuzz.yml uploads it; a caller's own directory wins.
+mkdir -p logs/fuzz-reproducers
+FUZZTEST_REPRODUCERS_OUT_DIR="${FUZZTEST_REPRODUCERS_OUT_DIR:-$(pwd)/logs/fuzz-reproducers}"
+export FUZZTEST_REPRODUCERS_OUT_DIR
 cd build-fuzz
 mapfile -t targets < <(./fuzzTestSuite --list_fuzz_tests 2>/dev/null | sed -n 's/^\[\*\] Fuzz test: //p')
 [ "${#targets[@]}" -gt 0 ] || { echo "ci-fuzz.sh: the suite lists no fuzz test" >&2; exit 1; }
