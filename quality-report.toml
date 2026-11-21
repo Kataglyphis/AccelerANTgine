@@ -104,7 +104,7 @@ max = 0
 name = "throwing_filesystem_calls"
 kind = "pattern"
 unit = "lines"
-pattern = 'std::filesystem::(exists|absolute|canonical|weakly_canonical|is_directory|is_regular_file|create_directory|create_directories|file_size|remove|remove_all|read_symlink|equivalent|status|last_write_time|current_path|temp_directory_path|copy|rename)\([^,()]*\)'
+pattern = '(std::filesystem|\bfs)::((exists|absolute|canonical|weakly_canonical|proximate|relative|is_directory|is_regular_file|is_empty|is_symlink|create_directory|create_directories|file_size|hard_link_count|last_write_time|remove|remove_all|read_symlink|status|symlink_status|space|(recursive_)?directory_iterator(\s+\w+)?)\([^,()]*\)|(current_path|temp_directory_path)\(\s*\))'
 include = ["Src/*"]
 max = 0
 

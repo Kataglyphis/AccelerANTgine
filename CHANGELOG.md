@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-21, the filesystem row catches the iterator declaration and leaves current_path(ec))
+
+- The `throwing_filesystem_calls` row of `quality-report.toml` read `current_path(ec)`, the non-throwing getter, as a
+  throwing one-argument call, and missed `recursive_directory_iterator it(root)`; it now catches the one-argument
+  throwing overloads, the iterator declaration and a bare `current_path()`, as the hub's recipe and
+  BeschleunigerBallett's row do. `test-pattern-limits.sh` plants both kinds, and a recipe proves the limit.
+
 ### Changed (2026-11-21, a failed docs build keeps the packages; the external link check weekly)
 
 - The Linux lane builds the docs after the packages, and its uploads run after a failed build when their files exist

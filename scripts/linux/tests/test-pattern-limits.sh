@@ -22,5 +22,19 @@ for call in 'g_print ("x");' 'printf("x");' 'std::cout << x;'; do
   grep -q 'Src/engine.cpp:2:' "${work}/out" || fail "the finding for ${call} does not name file and line"
 done
 
+# The filesystem row: the one-argument throwing overloads, the iterator declaration and a bare current_path() fail.
+for call in 'std::filesystem::create_directories(dir);' 'std::filesystem::recursive_directory_iterator it(root);' \
+  'auto cwd = std::filesystem::current_path();'; do
+  printf 'void load() {\n  %s\n}\n' "${call}" > "${work}/Src/engine.cpp"
+  git -C "${work}" add -A
+  suite_expect fail "a throwing ${call} in Src/ fails the lint gates" grade
+done
+for call in 'std::filesystem::create_directories(dir, ec);' 'auto cwd = std::filesystem::current_path(ec);' \
+  'const std::filesystem::directory_iterator end;'; do
+  printf 'void load() {\n  %s\n}\n' "${call}" > "${work}/Src/engine.cpp"
+  git -C "${work}" add -A
+  suite_expect pass "the non-throwing ${call} passes" grade
+done
+
 suite_finish pattern-limits
 echo 'pattern limits: all cases passed'

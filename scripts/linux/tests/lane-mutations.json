@@ -526,5 +526,13 @@
   "replace": "version = \"0.0.3\"",
   "test": "bash scripts/linux/tests/test-version-single-source.sh",
   "why": "A version of the wheel's own drifts from CMakeLists.txt's at the next bump."
+ },
+ {
+  "id": "lint.throwing-filesystem-limit",
+  "target": "quality-report.toml",
+  "find": "include = [\"Src/*\"]\nmax = 0",
+  "replace": "include = [\"Src/*\"]\nmax = 1",
+  "test": "bash scripts/linux/tests/test-pattern-limits.sh",
+  "why": "A throwing std::filesystem overload in Src/ must fail the lint gates, not be counted."
  }
 ]
