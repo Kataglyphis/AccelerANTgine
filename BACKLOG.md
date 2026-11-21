@@ -122,9 +122,26 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   (Pester 5 and 6 discover a file before they run it), the `3.4.0` pins dropped, and the suites run in the image
   as well. Done when no workflow pins 3.4.0.
 
-- [ ] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
-  of `kataglyphis.yolo_detector`. A separate static target waits until coverage-guided fuzzing is wanted: its flags
-  must match on every compiler, the riscv64 cross build and the Flutter plugin.
+- [b] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
+  of `kataglyphis.yolo_detector`. A separate static target is wanted for coverage-guided fuzzing; its flags must match
+  on every compiler, the riscv64 cross build and the Flutter plugin. Owner 2026-11-21: after OmniAccelerANT drops this
+  submodule (its add-demo item), which takes the plugin's build out of those conditions. The detector stays in C++ for
+  months (the oxidation item below), and the fuzz target then serves as an oracle against the Rust port.
+
+- [ ] **Oxidation: the text engine is the pilot** (L, ★★; owner D2 to D4, D6, D16, D17, 2026-11-21). The oxidation
+  review found one subsystem OxidANT already does in full: `kataglyphis_text` matches `text_generation.cpp` call for
+  call and checks more strictly, and no family program calls this text path. Until the pilot the C++ engine is
+  frozen: new text features go into OxidANT only. Order: (1) OmniAccelerANT drops this submodule first, or its app
+  would carry two OxidANT pins. (2) `third_party/OxidANT` and a new bridge crate in OxidANT's workspace (one area per
+  file, every call one `guarded()`, errors as values, text as bytes, imported LOCKED with the bridge profile, as
+  BeschleunigerBallett does) replace `Src/rusty_code` in the same commit, so libAccelerANTgine holds one Rust
+  staticlib (D4); licenses come from OxidANT's policy with BB's forbid list and a package budget, the audit covers
+  OxidANT's lock, and every lane runs, ASan and TSan included. (3) A pull API (`next_piece()`) with lock-step cancel
+  behind a run-time switch read once from the environment, and a differential suite over `fixture.json` and
+  text-generation-v1. (4) The flip on evidence, then about 735 lines of `text_generation.cpp` go; the `.ixx`, the C ABI
+  and the nanobind wheel stay as adapters. The detector's decode and preprocessing stay here until ModelANT holds the
+  raw-head cases (D6 keeps the layouts; `yolo_math.cpp:217` moves to `stable_sort`) and OxidANT has a crate without
+  ORT for them. D16: a usable CPU is the smaller of the affinity mask and the cgroup quota, in all three languages.
 
 ## Recorded probes
 
