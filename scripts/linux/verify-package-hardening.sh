@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks PIE, BIND_NOW, stack-protector and fortify imports in the .deb and .tar.gz; not the demo's fortify, CET/IBT, RELRO segments, static linking, bundled ELFs, AppImage or Flatpak.
+# The .deb and .tar.gz ELFs through the hub's ELF gate (PIE, RELRO, BIND_NOW, SSP, fortify); not CET/IBT or AppImage.
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
@@ -7,6 +7,7 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 package_dir="$(realpath -e "$1")"
+gate="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/third_party/ANTfrastructure/linux/scripts/06-packaging/verify-elf-hardening.sh"
 library=libAccelerANTgine.so
 # The demo calls no libc function _FORTIFY_SOURCE can bound, so it never imports a __*_chk.
 targets=("AccelerANTgine executable fortify" "AccelerANTgine_demo executable no-fortify" "$library library fortify")
@@ -28,10 +29,6 @@ fail() {
   failures=$((failures + 1))
 }
 
-undefined_imports() {
-  readelf --dyn-syms -W "$1" | awk '$7 == "UND" && $8 != "" { sub(/@.*/, "", $8); print $8 }'
-}
-
 # The only ELF of that name: the package's usr/bin entry is a launcher script, so a script never counts.
 find_elf() {
   local root="$1" name="$2" candidate
@@ -45,38 +42,14 @@ find_elf() {
   printf '%s\n' "${found[0]}"
 }
 
+# The hub's gate grades one ELF (CON294); its lines name the extracted path, which this package label replaces.
 check_elf() {
-  local label="$1" file="$2" kind="$3" fortify="$4" header program dynamic imports verdict="" before="$failures"
-  header="$(readelf -hW "$file")" || { fail "$label: readelf -h failed"; return 0; }
-  program="$(readelf -lW "$file")" || { fail "$label: readelf -l failed"; return 0; }
-  dynamic="$(readelf -dW "$file")" || { fail "$label: readelf -d failed"; return 0; }
-  imports="$(undefined_imports "$file")" || { fail "$label: readelf --dyn-syms failed"; return 0; }
-  if [[ "$kind" == executable ]]; then
-    if grep -Eq '^ *Type: +DYN ' <<< "$header" && grep -Eq '^ *INTERP ' <<< "$program"; then
-      verdict+=" PIE"
-    else
-      fail "$label: not PIE (needs ELF type DYN and an INTERP segment)"
-    fi
-  fi
-  if grep -Eq '\(FLAGS\).*\bBIND_NOW\b|\(FLAGS_1\).*\bNOW\b' <<< "$dynamic"; then
-    verdict+=" BIND_NOW"
+  local label="$1" file="$2" kind="$3" fortify="$4" out
+  if out="$(bash "${gate}" "${file}:${kind}:${fortify}" 2>&1)"; then
+    grep '^hardening ok: ' <<< "${out}" | sed "s#${file}#${label}#"
   else
-    fail "$label: no BIND_NOW (DT_FLAGS BIND_NOW or DT_FLAGS_1 NOW)"
-  fi
-  if grep -qx '__stack_chk_fail' <<< "$imports"; then
-    verdict+=" __stack_chk_fail"
-  else
-    fail "$label: no __stack_chk_fail import (stack protector)"
-  fi
-  local fortified
-  fortified="$(grep -E -m 1 '^__[A-Za-z0-9_]+_chk$' <<< "$imports" || true)"
-  if [[ -n "$fortified" ]]; then
-    verdict+=" $fortified"
-  elif [[ "$fortify" == fortify ]]; then
-    fail "$label: no __*_chk import (_FORTIFY_SOURCE)"
-  fi
-  if [[ $failures -eq $before ]]; then
-    printf 'hardening ok: %s:%s\n' "$label" "$verdict"
+    grep '^hardening FAIL: ' <<< "${out}" | sed "s#${file}#${label}#" >&2
+    failures=$((failures + $(grep -c '^hardening FAIL: ' <<< "${out}")))
   fi
 }
 

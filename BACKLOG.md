@@ -154,8 +154,10 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `-fno-sanitize=address`. (12) The GPU candidate lanes once after 11 (owner hardware). (13) With the first real
   bridge: an unwinding `[profile.bridge]` with a configure-time check (D4), scoped cargo gates, the crate budget and
   forbid list, a parity suite as the deletion gate. (14) After CON145: no configure-time `cargo install
-  cxxbridge-cmd`. Beyond the detector-math target the owner placed after the add demo (below), no new C++ fuzz
-  targets or mutation recipes for `yolo_math.cpp`, which moves to OxidANT later.
+  cxxbridge-cmd`. Beyond the detector-math target the owner placed after the add demo (below), no new C++ fuzz targets
+  or mutation recipes for `yolo_math.cpp`, which moves to OxidANT later. **In source since 2026-11-21, beside the
+  steps:** the hub pin at 8912128d, whose `Hardening.cmake` and `verify-elf-hardening.sh` (CON294) replace this repo's
+  own PIE, BIND_NOW and ELF checks.
 
 - [b] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
   of `kataglyphis.yolo_detector`. A separate static target is wanted for coverage-guided fuzzing; its flags must match

@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-21, the hub's Linux hardening and ELF gate; hub pin 8912128d)
+
+- The hub pin moves from d3661575 to 8912128d: CON293's gate annotations, CON292's exact skip list in the staged
+  runner (unused here until the Windows round), CON294's Linux flags and ELF gate, and the fixes after them.
+  `Hardening.cmake` now gives PIE and `-z relro -z now`, so `myproject_enable_linux_release_hardening` keeps only the
+  dependency flags; `verify-package-hardening.sh` grades each packaged ELF through the hub's `verify-elf-hardening.sh`,
+  which also requires a `GNU_RELRO` segment, under this repo's package labels.
+
 ### Changed (2026-11-21, the bridge's C++ is compiled once)
 
 - `Src/rusty_code/build.rs` is gone: its `cxx_build` compiled the bridge's C++ a second time, into the staticlib, while
