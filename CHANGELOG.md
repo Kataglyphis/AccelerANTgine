@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-21, the XNNPACK golden on arm64)
+
+- `Golden.XnnpackMatchesCpu` allows 2e-4 of the frame between XNNPACK and the CPU provider, up from 1e-4: on arm64
+  XNNPACK's kernels differ by 1.04e-4 on ModelANT's lossless photo, the same in the GCC and the Clang job (run
+  44944036784), the first arm64 run since the 2026-11-19 re-record. That is 0.13 px of a 1280-wide frame; 2e-4 stays
+  under a third of a pixel.
+
 ### Changed (2026-11-21, the hub's Linux hardening and ELF gate; hub pin 8912128d)
 
 - The hub pin moves from d3661575 to 8912128d: CON293's gate annotations, CON292's exact skip list in the staged

@@ -30,8 +30,8 @@ namespace {
 constexpr int kCat = 15;
 constexpr float kMinIou = 0.9F;
 constexpr float kMaxScoreDelta = 0.05F;
-// Corners are compared as fractions of the frame, so every value is on the scores' 0..1 scale.
-constexpr float kProviderTolerance = 1e-4F;
+// Fractions of the frame: XNNPACK's arm64 kernels differ by 1.04e-4 on ModelANT's photo (run 44944036784), 0.13 px.
+constexpr float kProviderTolerance = 2e-4F;
 
 auto decoded_photo() -> gstreamer::BufferInfo
 {
