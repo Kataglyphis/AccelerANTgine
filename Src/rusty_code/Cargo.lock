@@ -183,7 +183,6 @@ name = "rusty_code"
 version = "0.1.0"
 dependencies = [
  "cxx",
- "cxx-build",
 ]
 
 [[package]]

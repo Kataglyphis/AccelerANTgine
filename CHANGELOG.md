@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-21, the bridge's C++ is compiled once)
+
+- `Src/rusty_code/build.rs` is gone: its `cxx_build` compiled the bridge's C++ a second time, into the staticlib, while
+  `corrosion_add_cxxbridge` already builds `rusty_bridge`, which reaches every consumer of `rusty_code` (the commit
+  suite includes `rusty_bridge/lib.h` through it). The crate's direct `cxx-build` dependency goes with it; `cxx`
+  itself still needs it.
+
 ### Fixed (2026-11-21, the scanner death test on riscv64)
 
 - `GStreamerRuntime.TheScannerFailureIsSeenWhicheverClassInitialisesFirst` sets `GST_REGISTRY_FORK=yes` in its child.

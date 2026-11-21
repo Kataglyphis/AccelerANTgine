@@ -139,11 +139,12 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   lane recipes, the MSIX with `-Required`. (6) **In source:** an upload runs after a failed build when its files exist
   (`failure() && hashFiles(...)`; on success an empty one still fails), the docs after the release, HTML only on
   pushes and the external link check weekly in `docs-linkcheck.yml` (D6), the wheel step named without a Python
-  version. Left: a red run that still uploads its packages. (7) **In
-  source:** LOCKED on `corrosion_import_crate`; once that push stays green, `build.rs`'s duplicate `cxx_build` goes,
-  Cargo.lock relocked. (8) **In source:** permissions per job in the three Linux lanes (read only by default,
-  reusable-linux.yml too), no `--privileged` in fuzz.yml and cxx-mutations.yml (one dispatch each proves it),
-  `second_deadlock_stack=1`. (9) **Landed** (2a2a8a7); riscv64 run 44920564310 logged 0 skips and 0 criticals, and its
+  version. Left: a red run that still uploads its packages. (7) **Done** (1e63d51 and the next commit): LOCKED on
+  `corrosion_import_crate`, and `build.rs` with its duplicate `cxx_build` is gone, as Corrosion hands `rusty_bridge`
+  to every consumer of `rusty_code`. (8) **Done** (a683832): permissions per job in the three Linux lanes (read only
+  by default, reusable-linux.yml too), no `--privileged` in fuzz.yml and cxx-mutations.yml (runs 44926735719 and
+  44926738386 green without it), `second_deadlock_stack=1`. (9) **Landed** (2a2a8a7); riscv64 run 44920564310 logged 0
+  skips and 0 criticals, and its
   one failure, the scanner death test under the lane's `GST_REGISTRY_FORK=no`, is fixed: the hub pin moved to d3661575
   (CON290, CON291); `--fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*'` on every Linux ctest run (Debug, second,
   TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) The lane split, one step per part (CON293). (11) The
