@@ -26,6 +26,16 @@ namespace {
         std::atomic<std::size_t> live_pipelines{ 0 };
     };
 
+    // The new pipeline holds the element's one reference: gst_bin_add refs an element that is not floating.
+    auto wrap_in_pipeline(GstElement *element) -> GstElement *
+    {
+        GstElement *pipeline = gst_pipeline_new(nullptr);
+        gst_object_ref_sink(pipeline);
+        gst_bin_add(GST_BIN(pipeline), element);
+        gst_object_unref(element);
+        return pipeline;
+    }
+
     auto state() -> State &
     {
         static State the_state;
@@ -101,6 +111,8 @@ auto parse_launch(const std::string &description, const char *failure_context) -
         log::error("{} returned null", failure_context);
         return nullptr;
     }
+    // A lone element comes back bare and has no bus until it sits in a pipeline, so nothing could read its errors.
+    if (!GST_IS_PIPELINE(pipeline)) { pipeline = wrap_in_pipeline(pipeline); }
     state().live_pipelines.fetch_add(1);
     return pipeline;
 }

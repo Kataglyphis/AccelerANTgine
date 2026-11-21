@@ -186,6 +186,19 @@ TEST(GStreamerPipeline, AStartThatFailsSaysWhy)
     EXPECT_FALSE(pipeline.is_playing());
 }
 
+// A lone element has no bus of its own (444 GStreamer-CRITICAL lines a ctest pass); its pipeline reports for it.
+TEST(GStreamerPipeline, ALoneElementGetsAPipelineWhoseBusSaysWhyItFailed)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("filesrc");
+    gstreamer::GStreamerPipeline pipeline;
+    ASSERT_TRUE(
+      pipeline.create_pipeline_from_string("filesrc name=absent location=/kataglyphis/no/such/file").has_value());
+    EXPECT_EQ(kataglyphis::test::error_of(pipeline.start()), gstreamer::GStreamerError::StateChangeFailed);
+    const auto reason = pipeline.stream_error();
+    ASSERT_TRUE(reason.has_value());
+    EXPECT_TRUE(reason->starts_with("absent: ")) << *reason;
+}
+
 TEST(GStreamerPipeline, PullingWithoutATimeoutWaitsForTheNextFrame)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
