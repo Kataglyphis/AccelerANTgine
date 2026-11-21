@@ -136,8 +136,9 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   logged only those model skips (Windows x64 three a run, which the Windows round (11) takes up). (5) One version: the
   wheel reads `CMakeLists.txt`'s through the hub's project() pattern, uv.lock relocked, a
   structural test against `version_util.sh`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the
-  release, HTML only on pushes and the external link check weekly (D6), the cp315 wheel step named so. (7) LOCKED on
-  `corrosion_import_crate`. (8) Permissions per job, no `--privileged` in fuzz.yml and cxx-mutations.yml,
+  release, HTML only on pushes and the external link check weekly (D6), the cp315 wheel step named so. (7) **In
+  source:** LOCKED on `corrosion_import_crate`; once that push stays green, `build.rs`'s duplicate `cxx_build` goes,
+  Cargo.lock relocked. (8) Permissions per job, no `--privileged` in fuzz.yml and cxx-mutations.yml,
   `second_deadlock_stack=1`. (9) **Landed** (2a2a8a7): the hub pin
   moved to d3661575 (CON290, CON291); `--fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*'` on every Linux ctest
   run (Debug, second, TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) The lane split, one step per part (CON293). (11) The Windows round

@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-21, the Rust crate builds from its lockfile)
+
+- `corrosion_import_crate` passes `LOCKED`: a build takes `Src/rusty_code/Cargo.lock`'s versions or fails, and never
+  resolves a newer `cxx` on the day, as BeschleunigerBallett imports its bridge.
+
 ### Changed (2026-11-21, a logged critical, a skip under QEMU or a failed benchmark fails the run)
 
 - Every Linux ctest run (Debug, the second pass, TSan, riscv64) passes the hub's `--fail-on-log-pattern

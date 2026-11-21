@@ -38,7 +38,8 @@ set(KataglyphisCppProjectConfig_MODULE_OUT "${CMAKE_CURRENT_BINARY_DIR}/Kataglyp
 configure_file(${KataglyphisCppProjectConfig_MODULE_IN} ${KataglyphisCppProjectConfig_MODULE_OUT} @ONLY)
 list(APPEND KataglyphisCppProject_MODULES ${KataglyphisCppProjectConfig_MODULE_OUT})
 
-corrosion_import_crate(MANIFEST_PATH rusty_code/Cargo.toml)
+# LOCKED: Cargo.lock's versions or a failed build, never a cxx resolved on the day (BB imports its bridge so).
+corrosion_import_crate(MANIFEST_PATH rusty_code/Cargo.toml LOCKED)
 
 include(CorrosionToolchain)
 kataglyphis_configure_corrosion_target(rusty_code ADDRESS_SANITIZER ${myproject_ENABLE_SANITIZER_ADDRESS})
