@@ -107,9 +107,9 @@ if [[ "${COMPILER}" == "clang" ]]; then
     cmake_build_main --preset "${CLANG_TSAN_PRESET}" --build-dir "${TSAN_BUILD_DIR}" --mb-per-job 2000
   )
 
-  # GLib and GStreamer are uninstrumented and hand buffers between threads through futexes TSan cannot see.
+  # GLib and GStreamer pass buffers through futexes TSan cannot see; a lock-order report shows both locks' stacks.
   (
-    export TSAN_OPTIONS="ignore_noninstrumented_modules=1${TSAN_OPTIONS:+:${TSAN_OPTIONS}}"
+    export TSAN_OPTIONS="ignore_noninstrumented_modules=1:second_deadlock_stack=1${TSAN_OPTIONS:+:${TSAN_OPTIONS}}"
     ctest_with_junit "${TSAN_BUILD_DIR}" "${WORKSPACE_DIR}/docs/test_results_tsan.xml"
   )
 else

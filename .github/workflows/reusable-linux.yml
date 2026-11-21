@@ -23,6 +23,10 @@ on:
 
 # No image env: each container action's default `image:` is the family ref, gated against versions.env.
 
+# Read only for any job that names no grant of its own.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ${{ inputs.runner }}

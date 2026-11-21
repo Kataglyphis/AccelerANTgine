@@ -6,10 +6,9 @@ on:
   workflow_dispatch:
   workflow_call:
 
+# Read only by default; the build job asks for its own grant (least privilege).
 permissions:
   contents: read
-  # compiler-cache-save deletes its key's older cache entries.
-  actions: write
 
 # Per lane and caller: the literal name keeps lanes apart, github.workflow (the caller's when called) keeps callers apart.
 concurrency:
@@ -18,6 +17,10 @@ concurrency:
 
 jobs:
   build-ubuntu26_04_clang-riscv64:
+    permissions:
+      contents: read
+      # compiler-cache-save deletes its key's older cache entries.
+      actions: write
     uses: Kataglyphis/ANTfrastructure/.github/workflows/container-ci-riscv64.yml@develop
     with:
       script: bash -lc 'bash scripts/linux/ci-riscv64-test.sh'

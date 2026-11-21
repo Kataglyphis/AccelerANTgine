@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-21, least privilege in CI)
+
+- The Linux x64, arm64 and riscv64 lanes grant read only by default; their build jobs ask for their own packages and
+  cache grants, and `reusable-linux.yml` reads only for any job without one, as BeschleunigerBallett does. The fuzz
+  and C++ mutation containers run without `--privileged`; the build container keeps it until the lane split, as
+  flatpak-builder needs bubblewrap. The TSan run adds `second_deadlock_stack=1`, so a lock-order report shows both
+  locks' stacks.
+
 ### Changed (2026-11-21, the Rust crate builds from its lockfile)
 
 - `corrosion_import_crate` passes `LOCKED`: a build takes `Src/rusty_code/Cargo.lock`'s versions or fails, and never

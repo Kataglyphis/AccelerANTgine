@@ -31,7 +31,7 @@ jobs:
       - name: Build once, then prove every C++ recipe on an incremental rebuild
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
         with:
-          extra-args: --privileged -e CARGO_HOME=/tmp/cargo
+          extra-args: -e CARGO_HOME=/tmp/cargo
           script: >-
             bash -lc 'set -e;
             cmake --preset linux-debug-clang -B build;

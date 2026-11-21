@@ -63,7 +63,7 @@ jobs:
           # The library's log lines only slow the engine and bury a finding.
           ACCELERANTGINE_LOG_LEVEL: 'off'
         with:
-          extra-args: --privileged -e CARGO_HOME=/tmp/cargo -e DURATION -e ACCELERANTGINE_LOG_LEVEL
+          extra-args: -e CARGO_HOME=/tmp/cargo -e DURATION -e ACCELERANTGINE_LOG_LEVEL
           script: bash -lc 'bash scripts/linux/ci-fuzz.sh "${DURATION:-3m}" logs/fuzz-corpus'
 
       - name: Keep the corpus
