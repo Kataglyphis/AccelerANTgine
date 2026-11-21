@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <optional>
@@ -104,6 +105,15 @@ auto skip_or_fail(benchmark::State &state, const char *reason) -> void
     state.SkipWithError(reason);
 }
 
+// SkipWithError alone still exits 0: a benchmark that fails once its inputs are there fails the suite (BB's rule).
+std::atomic<int> failed_benchmarks{ 0 };
+
+auto fail_benchmark(benchmark::State &state, const char *reason) -> void
+{
+    ++failed_benchmarks;
+    state.SkipWithError(reason);
+}
+
 // KATAGLYPHIS_DETECTOR_MODEL, else the configure-time models/ path, else the copy a staged suite carries beside it.
 auto detector_model() -> std::filesystem::path
 {
@@ -183,7 +193,7 @@ static void BM_OnnxRunInference(benchmark::State &state)
     config.intra_op_num_threads = 1;
     config.inter_op_num_threads = 1;
     if (!engine.initialize(config)) {
-        state.SkipWithError("ONNX Runtime could not load the generated model");
+        fail_benchmark(state, "ONNX Runtime could not load the generated model");
         return;
     }
     const auto input = float_input(static_cast<std::size_t>(elements));
@@ -208,7 +218,7 @@ void BM_OnnxRunInferenceInPlace(benchmark::State &state)
     config.intra_op_num_threads = 1;
     config.inter_op_num_threads = 1;
     if (!engine.initialize(config)) {
-        state.SkipWithError("ONNX Runtime could not load the generated model");
+        fail_benchmark(state, "ONNX Runtime could not load the generated model");
         return;
     }
     auto input = float_input(static_cast<std::size_t>(elements));
@@ -216,7 +226,7 @@ void BM_OnnxRunInferenceInPlace(benchmark::State &state)
     for ([[maybe_unused]] const auto iteration : state) {
         auto result = engine.run_inference_in_place(input, shape, "X");
         if (!result) {
-            state.SkipWithError("run_inference_in_place failed");
+            fail_benchmark(state, "run_inference_in_place failed");
             break;
         }
         benchmark::DoNotOptimize(result);
@@ -237,7 +247,7 @@ static void BM_YoloDetect(benchmark::State &state)
     config.input_width = static_cast<std::uint32_t>(kYoloGeometry.width);
     config.input_height = static_cast<std::uint32_t>(kYoloGeometry.height);
     if (!detector.initialize(config)) {
-        state.SkipWithError("ONNX Runtime could not load the generated model");
+        fail_benchmark(state, "ONNX Runtime could not load the generated model");
         return;
     }
     const auto rows = yolo_output(static_cast<std::size_t>(state.range(0)));
@@ -270,7 +280,7 @@ static void BM_GStreamerPullSample(benchmark::State &state)
     for (auto _ : state) {
         auto sample = pipeline.pull_sample(5000);
         if (!sample) {
-            state.SkipWithError("the pipeline stopped delivering frames");
+            fail_benchmark(state, "the pipeline stopped delivering frames");
             break;
         }
         bytes += sample->size;
@@ -288,7 +298,7 @@ static void BM_PreprocessFrame(benchmark::State &state)
     for (auto _ : state) {
         auto input = detection::preprocess_frame(frame, 640, 640);
         if (!input) {
-            state.SkipWithError("preprocess_frame refused the synthetic frame");
+            fail_benchmark(state, "preprocess_frame refused the synthetic frame");
             break;
         }
         benchmark::DoNotOptimize(input);
@@ -303,7 +313,7 @@ static void BM_PreprocessFrameInto(benchmark::State &state)
     detection::PreprocessedFrame input;
     for (auto _ : state) {
         if (!detection::preprocess_frame_into(frame, 640, 640, detection::FramePreprocessMode::Stretch, input)) {
-            state.SkipWithError("preprocess_frame_into refused the synthetic frame");
+            fail_benchmark(state, "preprocess_frame_into refused the synthetic frame");
             break;
         }
         benchmark::DoNotOptimize(input.data.data());
@@ -323,7 +333,7 @@ static void BM_DetectFrame(benchmark::State &state)
     for (auto _ : state) {
         auto result = detector.detect_frame(frame);
         if (!result) {
-            state.SkipWithError("detect_frame failed");
+            fail_benchmark(state, "detect_frame failed");
             break;
         }
         benchmark::DoNotOptimize(result);
@@ -355,7 +365,7 @@ void BM_VideoPipelineKeepsUp(benchmark::State &state)
         }
         std::this_thread::sleep_for(run_for);
         if (!pipeline.stop()) {
-            state.SkipWithError("the pipeline did not stop");
+            fail_benchmark(state, "the pipeline did not stop");
             return;
         }
         const auto stats = pipeline.stats();
@@ -403,7 +413,7 @@ static void BM_TextGenerateTiny(benchmark::State &state)
     for (auto _ : state) {
         auto result = generator.generate(messages, options);
         if (!result) {
-            state.SkipWithError("generate failed");
+            fail_benchmark(state, "generate failed");
             break;
         }
         tokens += result->tokens.size();
@@ -419,5 +429,8 @@ auto main(int argc, char **argv) -> int
     if (benchmark::ReportUnrecognizedArguments(argc, argv)) { return 1; }
     benchmark::RunSpecifiedBenchmarks();
     benchmark::Shutdown();
-    return required_input_failed ? 1 : 0;
+    if (failed_benchmarks > 0) {
+        std::fprintf(stderr, "%d benchmark(s) failed: see ERROR OCCURRED\n", failed_benchmarks.load());
+    }
+    return required_input_failed || failed_benchmarks > 0 ? 1 : 0;
 }

@@ -34,7 +34,6 @@ target_link_libraries(
          myproject_options
          myproject_warnings
   PRIVATE benchmark::benchmark
-          benchmark::benchmark_main
           GSL
           spdlog
           ${PROJECT_NAME})

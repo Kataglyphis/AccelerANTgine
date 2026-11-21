@@ -128,15 +128,17 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   keep 3), a concurrency group per caller, `ACCELERANTGINE_LOG_LEVEL=off`, reproducers from
   `FUZZTEST_REPRODUCERS_OUT_DIR` uploaded. **Done 2026-11-21** (64a7638): its first 5-minute run refreshed the corpus
   cache and found TOML nested past the stack limit (fixed in 9df9c9b). (2) **Done** (b318e76): a lone element gets a
-  pipeline, and run 44910072889 logged 0 GStreamer-CRITICAL lines where 444 a ctest pass were. (3) **In source:** the
-  error_code overloads at the three throwing `std::filesystem` sites (FileNotFound kept, the message logged), a
-  300-byte path test in both config suites, and a `throwing_filesystem_calls` pattern row with max = 0. (4) The perf suite counts every `SkipWithError` and returns 1 above zero: ten failure
-  paths exit 0 today (`Test/perf/perfSuite.cpp:186-406`), and "the DEIM model is missing" passed 9 of 12 Windows runs.
-  (5) One version: the wheel reads `CMakeLists.txt`'s through the hub's project() pattern, uv.lock relocked, a
+  pipeline, and run 44910072889 logged 0 GStreamer-CRITICAL lines where 444 a ctest pass were. (3) **Done** (457b753):
+  the error_code overloads at the three throwing `std::filesystem` sites (FileNotFound kept, the message logged), a
+  300-byte path test in both config suites, and a `throwing_filesystem_calls` pattern row with max = 0. (4) **In
+  source:** the perf suite counts every failure `SkipWithError` (ten paths, which exited 0) and returns 1 above zero;
+  a missing model still skips unless `KATAGLYPHIS_REQUIRE_MODEL=1`. No lane fails today: the last runs of every lane
+  logged only those model skips (Windows x64 three a run, which the Windows round (11) takes up). (5) One version: the
+  wheel reads `CMakeLists.txt`'s through the hub's project() pattern, uv.lock relocked, a
   structural test against `version_util.sh`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the
   release, HTML only on pushes and the external link check weekly (D6), the cp315 wheel step named so. (7) LOCKED on
   `corrosion_import_crate`. (8) Permissions per job, no `--privileged` in fuzz.yml and cxx-mutations.yml,
-  `second_deadlock_stack=1`. (9) **In source:** the hub pin
+  `second_deadlock_stack=1`. (9) **Landed** (2a2a8a7): the hub pin
   moved to d3661575 (CON290, CON291); `--fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*'` on every Linux ctest
   run (Debug, second, TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) The lane split, one step per part (CON293). (11) The Windows round
   (CON290, CON292, CON294): hardening in the clang-cl presets and a PE gate, gstplayback and gstwebrtc staged with

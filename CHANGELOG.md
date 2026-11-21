@@ -18,6 +18,23 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-21, a logged critical, a skip under QEMU or a failed benchmark fails the run)
+
+- Every Linux ctest run (Debug, the second pass, TSan, riscv64) passes the hub's `--fail-on-log-pattern
+  '[A-Za-z0-9-]+-CRITICAL \*\*'` (hub d3661575): a test that passes while it logs a GLib or GStreamer critical fails
+  the run. riscv64 also refuses a skip (`--fail-on-skipped .`); none happens under QEMU today.
+- The perf suite returns 1 when a benchmark fails once its inputs are there (an inference that errors, a pipeline that
+  stops: ten paths). `SkipWithError` alone exits 0, so such a failure only dropped the benchmark from `results.json`.
+  A missing model still skips unless `KATAGLYPHIS_REQUIRE_MODEL=1`. The unused `benchmark_main` link is gone.
+
+### Fixed (2026-11-21, a path the system refuses is not found, not an abort)
+
+- The three throwing `std::filesystem` calls in `config_loader.cpp`, `toml_config.cpp` and `webrtc_streamer.cpp` take
+  their `std::error_code` overloads. Built without exceptions, an OS error other than not-found aborted the process:
+  a 300-byte path component gives ENAMETOOLONG even as root. Such a path is now not found, with the OS message
+  logged; both config suites test it, and the `throwing_filesystem_calls` pattern row (max 0) fails the lint gates on
+  a new throwing call in `Src/`.
+
 ### Fixed (2026-11-21, deep TOML nesting and a lone GStreamer element)
 
 - tomlplusplus refuses nesting deeper than 32 levels (`TOML_MAX_NESTED_VALUES=32`, its default 128). The first
