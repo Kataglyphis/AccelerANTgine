@@ -136,8 +136,10 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   logged only those model skips (Windows x64 three a run, which the Windows round (11) takes up). (5) **In source:**
   one version: the wheel reads `CMakeLists.txt`'s through the hub's project() pattern (scikit-build-core's regex
   provider), uv.lock relocked, `test-version-single-source.sh` against `version_util.sh` in the lint gates with two
-  lane recipes, the MSIX with `-Required`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the
-  release, HTML only on pushes and the external link check weekly (D6), the cp315 wheel step named so. (7) **In
+  lane recipes, the MSIX with `-Required`. (6) **In source:** an upload runs after a failed build when its files exist
+  (`failure() && hashFiles(...)`; on success an empty one still fails), the docs after the release, HTML only on
+  pushes and the external link check weekly in `docs-linkcheck.yml` (D6), the wheel step named without a Python
+  version. Left: a red run that still uploads its packages. (7) **In
   source:** LOCKED on `corrosion_import_crate`; once that push stays green, `build.rs`'s duplicate `cxx_build` goes,
   Cargo.lock relocked. (8) **In source:** permissions per job in the three Linux lanes (read only by default,
   reusable-linux.yml too), no `--privileged` in fuzz.yml and cxx-mutations.yml (one dispatch each proves it),

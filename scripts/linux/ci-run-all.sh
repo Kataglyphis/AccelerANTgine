@@ -80,12 +80,6 @@ mapfile -t JUNIT_REPORTS < <(ci_junit_reports "${COMPILER}")
 python3 scripts/linux/check-junit-skips.py "${JUNIT_REPORTS[@]}" \
 	|| die "A test skipped or a JUnit report is missing (listed above)."
 
-bash scripts/linux/ci-docs.sh \
-	--workspace-dir "$(pwd)" \
-	--compiler "${COMPILER}" \
-	--runner "${RUNNER}" \
-	--docs-out "${DOCS_OUT}"
-
 release_args=(
 	--workspace-dir "$(pwd)"
 	--compiler "${COMPILER}"
@@ -118,6 +112,13 @@ if [[ -n "${RELEASE_FLATPAK_OUT_DIR}" ]]; then
 fi
 
 bash scripts/linux/ci-release.sh "${release_args[@]}"
+
+# After the packages: a failed docs build no longer costs the run its packages and wheels (owner D6).
+bash scripts/linux/ci-docs.sh \
+	--workspace-dir "$(pwd)" \
+	--compiler "${COMPILER}" \
+	--runner "${RUNNER}" \
+	--docs-out "${DOCS_OUT}"
 bash scripts/linux/ci-finalize.sh --workspace-dir "$(pwd)"
 
 info "=== CI Run All complete ==="

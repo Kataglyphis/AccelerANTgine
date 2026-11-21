@@ -705,7 +705,9 @@ submodules, while a recursive checkout follows ANTfrastructure's documentation c
   as `accelerantgine-docs-site`, and `linux-x64.yml`'s `docs` job hands that to the hub, which adds
   its `.htaccess` and 404 page, fails on a dead internal link or anchor, and publishes only on a
   push to `develop` or `main` (`SERVER`/`USERNAME`/`PW` mapped onto its `FTP_*`). A pull request
-  builds and checks the site but publishes nothing.
+  builds and checks the site but publishes nothing. A push builds HTML only; **`docs-linkcheck.yml`**
+  runs Sphinx's external link check over the written pages every Monday and by hand (owner D6), as
+  an external 403 had held back the packages of six develop runs.
   [`docs-sites.md`](https://github.com/Kataglyphis/ANTfrastructure/blob/develop/docs/docs-sites.md#the-reusable-workflow)
   has the rest.
 - Every job that owns a runner carries `timeout-minutes`, every workflow declares `permissions:`,

@@ -50,7 +50,8 @@ if [[ "${COMPILER}" == "clang" && "${RUNNER}" == "ubuntu-26.04" ]]; then
   mkdir -p docs/source/coverage
   mkdir -p docs/source/test-results
 
-  # Library pipeline; SPHINXOPTS and targets stay at the library defaults (-W, linkcheck).
+  # HTML only, with the library's -W: docs-linkcheck.yml checks the external links once a week (owner D6).
+  DOCS_BUILD_TARGETS=(html)
   DOCS_BUILD_PROJECT_ROOT="${WORKSPACE_DIR}"
   # Anchored: the library resolves the SVG source against cwd but the destination against the project root.
   case "${DOCS_OUT}" in

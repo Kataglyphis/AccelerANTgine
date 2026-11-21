@@ -1,0 +1,39 @@
+name: Docs · external link check (weekly)
+
+# Sphinx's linkcheck over the written pages, off the push path (owner D6): an external 403 held back six runs' packages.
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-linkcheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linkcheck:
+    runs-on: ubuntu-26.04
+    # The docs venv and one pass over the external links; no C++ build.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Prepare CI host
+        uses: Kataglyphis/ANTfrastructure/.github/actions/prepare-linux-ci-host@develop
+        with:
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GHCR_PAT }}
+          submodules: recursive
+
+      - name: Check every external link of the written pages
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          # Without Doxygen's XML conf.py leaves the API pages out; their links are Doxygen's, not this repo's.
+          script: >-
+            bash -lc 'set -e;
+            UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv sync --locked --only-group docs;
+            .venv/bin/sphinx-build -b linkcheck docs/source docs/build/linkcheck'

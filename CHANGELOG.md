@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-21, a failed docs build keeps the packages; the external link check weekly)
+
+- The Linux lane builds the docs after the packages, and its uploads run after a failed build when their files exist
+  (on success an empty upload still fails), so a red docs build no longer costs a run its packages and wheels. A push
+  builds HTML only; `docs-linkcheck.yml` runs Sphinx's external link check every Monday and by hand (owner D6), as
+  external 403s had held back the packages of six develop runs. The wheel upload step names no Python version, which
+  had gone stale at cp314.
+
 ### Changed (2026-11-21, one version)
 
 - The wheel's version is `CMakeLists.txt`'s `project()` `VERSION`, read by scikit-build-core's regex provider with
