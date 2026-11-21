@@ -136,8 +136,9 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   structural test against `version_util.sh`. (6) Uploads under `!cancelled() && hashFiles(...)`, docs after the
   release, HTML only on pushes and the external link check weekly (D6), the cp315 wheel step named so. (7) LOCKED on
   `corrosion_import_crate`. (8) Permissions per job, no `--privileged` in fuzz.yml and cxx-mutations.yml,
-  `second_deadlock_stack=1`. (9) After CON291 and step 2: the log gate on every Linux ctest run and
-  `--fail-on-skipped .` on riscv64. (10) The lane split, one step per part (CON293). (11) The Windows round
+  `second_deadlock_stack=1`. (9) **In source:** the hub pin
+  moved to d3661575 (CON290, CON291); `--fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*'` on every Linux ctest
+  run (Debug, second, TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) The lane split, one step per part (CON293). (11) The Windows round
   (CON290, CON292, CON294): hardening in the clang-cl presets and a PE gate, gstplayback and gstwebrtc staged with
   the 7-test skip list (D2; AGENTS.md:391 changes), the in-container Profile perf run deleted, the fuzz harness with
   `-fno-sanitize=address`. (12) The GPU candidate lanes once after 11 (owner hardware). (13) With the first real

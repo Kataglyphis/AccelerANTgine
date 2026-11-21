@@ -21,10 +21,13 @@ riscv64_cross_env
 # No sanitizers, coverage or TSan: the cross clang has no riscv64 compiler-rt; the native lanes keep them.
 cmake_build_main --preset linux-riscv64-cross --build-dir "${BUILD_DIR}" --mb-per-job 2000
 
+# No test skips under QEMU today (run 43403278204), and a critical fails here as on the native lanes.
 (
   ctest_run_main \
     --build-dir "${BUILD_DIR}" \
     --build-type Debug \
+    --fail-on-skipped . \
+    --fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*' \
     -- --output-junit "${WORKSPACE_DIR}/docs/test_results_riscv64.xml" --no-tests=error
 )
 

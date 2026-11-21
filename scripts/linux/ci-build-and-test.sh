@@ -66,12 +66,16 @@ python3 -I "$(antfrastructure_path linux/scripts/lib/fetch-data-lock.py)" --lock
 # The Debug presets build UBSan recoverable, so without this a report prints and the test still passes.
 export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1${UBSAN_OPTIONS:+:${UBSAN_OPTIONS}}"
 
+# A passing test that logs a GLib or GStreamer critical still fails: b318e76 took the 444 a pass had to 0.
+CRITICAL_LOG_PATTERN='[A-Za-z0-9-]+-CRITICAL \*\*'
+
 # Subshell: ctest_run_execute cds in the caller's shell, and the TSan run must start from the root.
 ctest_with_junit() {
   (
     ctest_run_main \
       --build-dir "$1" \
       --build-type "${BUILD_TYPE}" \
+      --fail-on-log-pattern "${CRITICAL_LOG_PATTERN}" \
       -- --output-junit "$2" --no-tests=error --timeout 300
   )
 }
