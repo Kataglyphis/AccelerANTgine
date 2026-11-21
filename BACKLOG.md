@@ -123,18 +123,18 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   as well. Done when no workflow pins 3.4.0.
 
 - [ ] **C++ gates from the BeschleunigerBallett comparison** (M in all, ★★★; owner D1 to D12, 2026-11-21, as
-  recommended). Each step is one commit, cheapest first; the shared pieces are hub CON290 to CON296.
-  (1) **Fuzzing on a schedule before 2026-11-24** (D1): twice a week at 5 min per target (dispatches and the release
-  keep 3), a concurrency group per caller, `ACCELERANTGINE_LOG_LEVEL=off`, reproducers from
-  `FUZZTEST_REPRODUCERS_OUT_DIR` uploaded. **Done 2026-11-21** (64a7638): its first 5-minute run refreshed the corpus
-  cache and found TOML nested past the stack limit (fixed in 9df9c9b). (2) **Done** (b318e76): a lone element gets a
-  pipeline, and run 44910072889 logged 0 GStreamer-CRITICAL lines where 444 a ctest pass were. (3) **Done** (457b753):
-  the error_code overloads at the three throwing `std::filesystem` sites (FileNotFound kept, the message logged), a
-  300-byte path test in both config suites, and a `throwing_filesystem_calls` pattern row with max = 0. (4) **In
-  source:** the perf suite counts every failure `SkipWithError` (ten paths, which exited 0) and returns 1 above zero;
-  a missing model still skips unless `KATAGLYPHIS_REQUIRE_MODEL=1`. No lane fails today: the last runs of every lane
-  logged only those model skips (Windows x64 three a run, which the Windows round (11) takes up). (5) **In source:**
-  one version: the wheel reads `CMakeLists.txt`'s through the hub's project() pattern (scikit-build-core's regex
+  recommended). Each step is one commit, cheapest first; the shared pieces are hub CON290 to CON296. (1) **Fuzzing on
+  a schedule before 2026-11-24** (D1): twice a week at 5 min per target (dispatches and the release keep 3), a
+  concurrency group per caller, `ACCELERANTGINE_LOG_LEVEL=off`, reproducers from `FUZZTEST_REPRODUCERS_OUT_DIR`
+  uploaded. **Done 2026-11-21** (64a7638): its first 5-minute run refreshed the corpus cache and found TOML nested
+  past the stack limit (fixed in 9df9c9b). (2) **Done** (b318e76): a lone element gets a pipeline, and run 44910072889
+  logged 0 GStreamer-CRITICAL lines where 444 a ctest pass were. (3) **Done** (457b753): the error_code overloads at
+  the three throwing `std::filesystem` sites (FileNotFound kept, the message logged), a 300-byte path test in both
+  config suites, and a `throwing_filesystem_calls` pattern row with max = 0. (4) **Done** (66c7247): the perf suite
+  counts every failure `SkipWithError` (ten paths, which exited 0) and returns 1 above zero; a missing model still
+  skips unless `KATAGLYPHIS_REQUIRE_MODEL=1`. No lane fails today: the last runs of every lane logged only those model
+  skips (Windows x64 three a run, which the Windows round (11) takes up). (5) **Done** (6f8e70a3, lint gates and the
+  wheel green): the wheel reads `CMakeLists.txt`'s through the hub's project() pattern (scikit-build-core's regex
   provider), uv.lock relocked, `test-version-single-source.sh` against `version_util.sh` in the lint gates with two
   lane recipes, the MSIX with `-Required`. (6) **In source:** an upload runs after a failed build when its files exist
   (`failure() && hashFiles(...)`; on success an empty one still fails), the docs after the release, HTML only on
@@ -143,21 +143,19 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `corrosion_import_crate`, and `build.rs` with its duplicate `cxx_build` is gone, as Corrosion hands `rusty_bridge`
   to every consumer of `rusty_code`. (8) **Done** (a683832): permissions per job in the three Linux lanes (read only
   by default, reusable-linux.yml too), no `--privileged` in fuzz.yml and cxx-mutations.yml (runs 44926735719 and
-  44926738386 green without it), `second_deadlock_stack=1`. (9) **Landed** (2a2a8a7); riscv64 run 44920564310 logged 0
-  skips and 0 criticals, and its
-  one failure, the scanner death test under the lane's `GST_REGISTRY_FORK=no`, is fixed: the hub pin moved to d3661575
-  (CON290, CON291); `--fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*'` on every Linux ctest run (Debug, second,
-  TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) The lane split, one step per part (CON293). (11) The
-  Windows round
-  (CON290, CON292, CON294): hardening in the clang-cl presets and a PE gate, gstplayback and gstwebrtc staged with
-  the 7-test skip list (D2; AGENTS.md:391 changes), the in-container Profile perf run deleted, the fuzz harness with
-  `-fno-sanitize=address`. (12) The GPU candidate lanes once after 11 (owner hardware). (13) With the first real
-  bridge: an unwinding `[profile.bridge]` with a configure-time check (D4), scoped cargo gates, the crate budget and
-  forbid list, a parity suite as the deletion gate. (14) After CON145: no configure-time `cargo install
-  cxxbridge-cmd`. Beyond the detector-math target the owner placed after the add demo (below), no new C++ fuzz targets
-  or mutation recipes for `yolo_math.cpp`, which moves to OxidANT later. **In source since 2026-11-21, beside the
-  steps:** the hub pin at 8912128d, whose `Hardening.cmake` and `verify-elf-hardening.sh` (CON294) replace this repo's
-  own PIE, BIND_NOW and ELF checks.
+  44926738386 green without it), `second_deadlock_stack=1`. (9) **Done** (2a2a8a7, 15920f36): riscv64 run 44930240626
+  is green with 0 skips and 0 criticals after the scanner death test's fix for the lane's `GST_REGISTRY_FORK=no`; the
+  hub pin moved to d3661575 (CON290, CON291); `--fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*'` on every Linux
+  ctest run (Debug, second, TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) The lane split, one step per
+  part (CON293). (11) The Windows round (CON290, CON292, CON294): hardening in the clang-cl presets and a PE gate,
+  gstplayback and gstwebrtc staged with the 7-test skip list (D2; AGENTS.md:391 changes), the in-container Profile
+  perf run deleted, the fuzz harness with `-fno-sanitize=address`. (12) The GPU candidate lanes once after 11 (owner
+  hardware). (13) With the first real bridge: an unwinding `[profile.bridge]` with a configure-time check (D4), scoped
+  cargo gates, the crate budget and forbid list, a parity suite as the deletion gate. (14) After CON145: no
+  configure-time `cargo install cxxbridge-cmd`. Beyond the detector-math target the owner placed after the add demo
+  (below), no new C++ fuzz targets or mutation recipes for `yolo_math.cpp`, which moves to OxidANT later. **In source
+  since 2026-11-21, beside the steps:** the hub pin at 8912128d, whose `Hardening.cmake` and `verify-elf-hardening.sh`
+  (CON294) replace this repo's own PIE, BIND_NOW and ELF checks.
 
 - [b] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
   of `kataglyphis.yolo_detector`. A separate static target is wanted for coverage-guided fuzzing; its flags must match
