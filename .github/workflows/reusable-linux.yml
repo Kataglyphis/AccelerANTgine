@@ -41,6 +41,12 @@ jobs:
     defaults:
       run:
         shell: bash
+    # As -e flags, since an action's run block inherits the job's env: a Cargo home that outlasts each part, the run ID for benchmark records.
+    env:
+      LANE_CONTAINER_ARGS: >-
+        --privileged --platform ${{ inputs.platform }}
+        -e CARGO_HOME=/workspace/.cache/cargo
+        -e GITHUB_RUN_ID=${{ github.run_id }}
 
     steps:
 
@@ -59,36 +65,62 @@ jobs:
         with:
           key: ${{ inputs.arch }}-${{ inputs.compiler }}
 
-      # Env goes in extra-args: an action's run block inherits the job's env, not the calling step's.
-      - name: Run build/test/docs/package inside container
+      # One step per part (hub CON293's pattern): a red part names itself, and every part after a green build still runs.
+      - name: "Lane part: build and test"
+        id: build
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
         with:
-          # The non-root container needs a writable Cargo home; the run ID identifies benchmark records.
-          extra-args: >-
-            --privileged --platform ${{ inputs.platform }}
-            -e CARGO_HOME=/tmp/cargo
-            -e GITHUB_RUN_ID=${{ github.run_id }}
-            ${{ steps.cc.outputs.docker-args }}
-          script: >-
-            bash -lc 'set -e; bash scripts/linux/ci-run-all.sh
-            --compiler "${{ inputs.compiler }}"
-            --runner "${{ inputs.runner }}"
-            --arch "${{ inputs.arch }}"
-            --build-type "Debug"
-            --build-dir "build"
-            --build-release-dir "build-release"
-            --gcc-debug-preset "linux-debug-GNU"
-            --clang-debug-preset "linux-debug-clang"
-            --gcc-profile-preset "linux-profile-GNU"
-            --clang-profile-preset "linux-profile-clang"
-            --clang-release-preset "linux-release-clang"
-            --coverage-json "coverage.json"
-            --docs-out "build/build/html"
-            --release-callgrind "0"
-            --release-appimage "1"
-            --release-flatpak "1"
-            --release-appimage-out-dir ""
-            --release-flatpak-out-dir ""'
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part build-test --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
+
+      - name: "Lane part: coverage"
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part coverage --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
+
+      - name: "Lane part: static analysis and format"
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part static --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
+
+      - name: "Lane part: profile builds and benchmarks"
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part bench --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
+
+      - name: "Lane part: Python wheels (Clang only)"
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.compiler == 'clang' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part python --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
+
+      - name: "Lane part: the leg's skipped tests"
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part skips --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
+
+      - name: "Lane part: release packages"
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part release --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
+
+      - name: "Lane part: docs"
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: Kataglyphis/ANTfrastructure/.github/actions/run-in-linux-container@develop
+        with:
+          extra-args: ${{ env.LANE_CONTAINER_ARGS }} ${{ steps.cc.outputs.docker-args }}
+          script: bash -lc 'bash scripts/linux/ci-run-all.sh --part docs --compiler "${{ inputs.compiler }}" --runner "${{ inputs.runner }}" --arch "${{ inputs.arch }}"'
 
       # quality-report.toml reads every JUnit report, the coverage summary and the clang-tidy findings from here.
       - name: Upload the test, coverage and clang-tidy reports

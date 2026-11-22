@@ -82,7 +82,7 @@ ci_parse_value_options() {
                 [--coverage-json]=COVERAGE_JSON [--docs-out]=DOCS_OUT
                 [--release-callgrind]=RELEASE_CALLGRIND [--release-appimage]=RELEASE_APPIMAGE
                 [--release-flatpak]=RELEASE_FLATPAK [--release-appimage-out-dir]=RELEASE_APPIMAGE_OUT_DIR
-                [--release-flatpak-out-dir]=RELEASE_FLATPAK_OUT_DIR
+                [--release-flatpak-out-dir]=RELEASE_FLATPAK_OUT_DIR [--part]=PART
             ) ;;
         *) die "Unknown CI parser: ${_ci_lane}" ;;
     esac

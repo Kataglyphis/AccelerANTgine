@@ -81,13 +81,13 @@ check_options run-all \
     GCC_PROFILE_PRESET=gnu-profile-next CLANG_PROFILE_PRESET=clang-profile-next \
     CLANG_RELEASE_PRESET=clang-release-next COVERAGE_JSON=coverage-next.json DOCS_OUT=site-next \
     RELEASE_CALLGRIND=1 RELEASE_APPIMAGE=0 RELEASE_FLATPAK=0 \
-    RELEASE_APPIMAGE_OUT_DIR='app image' RELEASE_FLATPAK_OUT_DIR='flat pak' :: \
+    RELEASE_APPIMAGE_OUT_DIR='app image' RELEASE_FLATPAK_OUT_DIR='flat pak' PART=docs :: \
     --compiler gcc --runner runner-next --arch arm64 --build-type Release --build-dir build-next \
     --build-release-dir release-next --gcc-debug-preset gnu-next --clang-debug-preset clang-next \
     --gcc-profile-preset gnu-profile-next --clang-profile-preset clang-profile-next \
     --clang-release-preset clang-release-next --coverage-json coverage-next.json \
     --docs-out site-next --release-callgrind 1 --release-appimage 0 --release-flatpak 0 \
-    --release-appimage-out-dir 'app image' --release-flatpak-out-dir 'flat pak'
+    --release-appimage-out-dir 'app image' --release-flatpak-out-dir 'flat pak' --part docs
 
 COMPILER=unchanged
 ci_parse_value_options init

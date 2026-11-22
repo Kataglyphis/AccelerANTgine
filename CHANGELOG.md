@@ -18,6 +18,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-22, the Linux lane runs one step per part)
+
+- `ci-run-all.sh --part build-test|coverage|static|bench|python|skips|release|docs` runs one part through the hub's
+  `run_gate`, and `all`, the default, runs them in order and skips the rest after a failed build. The Linux lane has a
+  step per part instead of one container run, each later one under `!cancelled()` and the build step's outcome: a
+  red part names itself on GitHub (hub CON293), and coverage, static analysis, the benchmarks, the skip gate, the
+  packages and the docs still run after one of them failed. The Cargo home moves to the workspace's `.cache/cargo`, so
+  it outlasts each part's container. `perfTestSuite` runs inside `capture_crash`, which takes the command to rerun, so
+  a signal death leaves its core and backtrace as a profiled workload's does. `test-junit-skip-gate.sh` checks that the
+  lane runs the skip-gate part, and `test-ci-value-options.sh` reads `--part`. BACKLOG step 10.
+
 ### Changed (2026-11-22, the Windows suites skip exactly seven tests)
 
 - The test runs stage `gstplayback` and `gstwebrtc` beside the four plugins they had, which brings back

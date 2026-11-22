@@ -597,8 +597,12 @@ bash scripts/linux/ci-run-all.sh
 
 runs `ci-init.sh` → `ci-build-and-test.sh` → `ci-coverage.sh` →
 `run-static-analysis-format.sh` → `ci-profile-bench.sh` → `ci-python-bindings.sh`
-(clang only) → `ci-docs.sh` → `ci-release.sh` → `ci-finalize.sh`. Each runs on its own with the
-arguments `ci-run-all.sh` passes it.
+(clang only) → `check-junit-skips.py` → `ci-release.sh` → `ci-docs.sh` → `ci-finalize.sh`. Each runs on
+its own with the arguments `ci-run-all.sh` passes it. Since 2026-11-22 the Linux lane runs one part per
+step (`--part build-test`, `coverage`, `static`, `bench`, `python`, `skips`, `release`, `docs`), each
+through the hub's `run_gate`: a red part names itself, and every part after a green build still runs.
+`all`, the default, runs them in order and skips the rest after a failed build. The Cargo home lives in
+the workspace's `.cache/cargo`, so it outlasts each part's container.
 Eight entry scripts share `ci_parse_value_options` in `ci-common.sh`, backed by ANTfrastructure's
 `parse_cli_value_options`. Keep each lane's accepted flags, defaults and last-value-wins order;
 unknown flags and a missing value must fail before a product build starts. The Linux lint lane

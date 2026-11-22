@@ -114,9 +114,10 @@ stop_signalling_server() {
   trap - EXIT
 }
 
-# capture_crash <what> <status>: a signal death's status, core and gdb backtrace, for the workflow's upload.
+# capture_crash <what> <status> <argv...>: a signal death's status, core and the backtrace of argv rerun, for the workflow's upload.
 capture_crash() {
   local what="$1" status="$2" dir core
+  shift 2
   dir="${BUILD_DIR}/crash-evidence"
   mkdir -p "${dir}"
   printf '%s: exit %s, signal %s\n' "${what}" "${status}" "$((status - 128))" >"${dir}/status.txt"
@@ -127,7 +128,7 @@ capture_crash() {
   shopt -u nullglob
   if command -v gdb >/dev/null 2>&1; then
     (cd "${BUILD_DIR}" && timeout 240 gdb -batch -ex run -ex 'thread apply all bt 40' \
-      --args "./${PROFILE_BINARY}" "${WORKLOAD_ARGS[@]}") >"${dir}/backtrace.txt" 2>&1 || true
+      --args "$@") >"${dir}/backtrace.txt" 2>&1 || true
     grep -q '^Thread ' "${dir}/backtrace.txt" \
       || echo "the rerun did not crash within 240 s: no backtrace (a core, if any, is in this directory)" >>"${dir}/backtrace.txt"
   else
@@ -154,7 +155,7 @@ run_workload() {
   elif [[ "${status}" -eq 0 ]]; then
     die "profiled workload exited cleanly before the ${window}s window closed - under '${PROFILE_ARGS}' the CLI streams until stopped, so an early exit 0 means nothing was profiled"
   elif [[ "${status}" -gt 128 ]]; then
-    capture_crash "${what}" "${status}"
+    capture_crash "${what}" "${status}" "./${PROFILE_BINARY}" "${WORKLOAD_ARGS[@]}"
     die "${what} died on signal $((status - 128)) (exit ${status}); its evidence is in ${BUILD_DIR}/crash-evidence"
   else
     die "${what} failed with exit code ${status}"
@@ -183,7 +184,16 @@ model_fetcher="$(antfrastructure_path linux/scripts/lib/fetch-data-lock.py)"
 python3 -I "${model_fetcher}" --lock "${WORKSPACE_DIR}/models/models.lock"
 PERF_DIR="${WORKSPACE_DIR}/${LOGS_DIR}/perf"
 mkdir -p "${PERF_DIR}"
-(cd "${BUILD_DIR}" && KATAGLYPHIS_REQUIRE_MODEL=1 ./perfTestSuite --benchmark_out="${PERF_DIR}/results.json" --benchmark_out_format=json)
+PERF_ARGS=(--benchmark_out="${PERF_DIR}/results.json" --benchmark_out_format=json)
+perf_status=0
+# Inside capture_crash's reach, as the profiled workloads are: a signal death keeps its core and a backtrace.
+(cd "${BUILD_DIR}" || exit 1; ulimit -c unlimited 2>/dev/null || true; KATAGLYPHIS_REQUIRE_MODEL=1 ./perfTestSuite "${PERF_ARGS[@]}") || perf_status=$?
+if [[ "${perf_status}" -gt 128 ]]; then
+  capture_crash perfTestSuite "${perf_status}" ./perfTestSuite "${PERF_ARGS[@]}"
+  die "perfTestSuite died on signal $((perf_status - 128)) (exit ${perf_status}); its evidence is in ${BUILD_DIR}/crash-evidence"
+elif [[ "${perf_status}" -ne 0 ]]; then
+  die "perfTestSuite failed with exit code ${perf_status}"
+fi
 
 # Instruction counts at one ORT thread; a key with a recorded baseline gates (AGENTS.md section 5).
 case "$(uname -m)" in x86_64) PERF_ARCH=x64 ;; aarch64) PERF_ARCH=arm64 ;; *) PERF_ARCH="$(uname -m)" ;; esac

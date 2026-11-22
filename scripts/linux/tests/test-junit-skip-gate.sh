@@ -51,6 +51,9 @@ done < <(grep -ohE '(--junitxml=|--output-junit |ctest_with_junit "[^"]+" )"\$\{
   | sed -E 's#.*WORKSPACE_DIR\}/([^"]+)"#\1#' | sort -u)
 grep -q 'check-junit-skips.py "${JUNIT_REPORTS\[@\]}"' "${root}/scripts/linux/ci-run-all.sh" \
   || fail 'ci-run-all.sh no longer gates every report of the leg'
+# The lane runs one part per step (BACKLOG step 10): the skip gate must be one of them.
+grep -q 'ci-run-all.sh --part skips ' "${root}/.github/workflows/reusable-linux.yml" \
+  || fail 'the Linux lane runs no skip-gate part'
 
 suite_finish skip-gate
 echo 'JUnit skip gate: all cases passed'

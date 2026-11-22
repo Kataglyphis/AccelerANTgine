@@ -388,7 +388,9 @@ A direct debug build with presets:
 
 ``scripts/linux/ci-run-all.sh`` runs the whole CI path: initialization and dependency checks,
 the debug build and tests, coverage, static analysis and formatting checks, profile benchmark
-builds, the Sphinx docs and release packaging (the chain in order: ``AGENTS.md`` § 5). For
+builds, the Sphinx docs and release packaging (the chain in order: ``AGENTS.md`` § 5).
+``--part`` runs one part of it, as each step of the Linux lane does: ``build-test``,
+``coverage``, ``static``, ``bench``, ``python``, ``skips``, ``release`` or ``docs``. For
 example:
 
 .. code-block:: bash
