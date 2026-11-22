@@ -110,7 +110,8 @@ The CLI check, run from ``build-clangcl-release\bin`` (the build tree, not the `
 bundle), then the Release suites ``Build-Windows.ps1 -StageTests`` staged in
 ``dist\windows-x64-tests``, through their ``Invoke-StagedTests.ps1`` with
 ``KATAGLYPHIS_REQUIRE_MODEL=1`` (``perfTestSuite`` is its one reader); a failed or an empty
-verdict fails the run. Without staged suites it is the CLI check alone.
+verdict fails the run, and so does a skip off the manifest's exact ``allowed_skips`` (seven in
+the commit suite, none in the compile and fuzz suites). Without staged suites it is the CLI check alone.
 
 Build Script Responsibilities
 -----------------------------

@@ -97,7 +97,9 @@ fetched model and ModelANT's fixture):
 the GStreamer tests use ``videotestsrc`` and ``fakesrc``. A test that needs a
 GStreamer element the install lacks skips and names it; the WebRTC ones need
 ``webrtcsink`` (gst-plugins-rs), which the Linux image has and the Windows image
-has not.
+has not. On Windows the staged suites allow exactly those six skips and the
+bundled scanner's case (``allowed_skips`` in ``Build-Windows.ps1``): any other
+skip, or a listed test that runs, fails the lane.
 
 Top-level CMake selects the suites by build type: commit, compile and fuzz in Debug; perf in
 RelWithDebInfo; none in Release unless ``-DKATAGLYPHIS_RELEASE_TESTS=ON``, which builds all four

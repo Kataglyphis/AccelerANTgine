@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-22, the Windows suites skip exactly seven tests)
+
+- The test runs stage `gstplayback` and `gstwebrtc` beside the four plugins they had, which brings back
+  `VideoDetectorPipeline.AFactoryWithOnlyAPathTakesTheLayoutTheModelNames` (decodebin) and
+  `WebRtcStreamer.ConfigureRejectsIncompleteSettings` (webrtcbin). The staged manifest gives the commit
+  suites, Release and arm64's Debug, the hub's `allowed_skips` (CON292) with the seven tests left: six need
+  `webrtcsink`, which the Windows image lacks, and the bundled GStreamer names its own scanner. The compile
+  and fuzz suites allow none. A skip off the list, or a listed test that runs, now fails the lane (owner D2);
+  before, nine tests skipped unremarked in every Windows run.
+
 ### Changed (2026-11-22, the clang-cl fuzz harness keeps UBSan)
 
 - On clang-cl the fuzz suite drops only ASan (`-fno-sanitize=address`), no longer UBSan as well. absl's

@@ -162,15 +162,15 @@ function Copy-ImageGStreamerTestPlugins {
     $pluginDir = Get-ImageGStreamerPluginDir
     $destination = Join-Path $BuildRoot 'lib\gstreamer-1.0'
     New-Item -ItemType Directory -Force -Path $destination | Out-Null
-    # The elements the GStreamer tests and benchmarks build pipelines from; their DLL closure is already in bin\.
-    $wanted = @('gstcoreelements', 'gstapp', 'gstvideotestsrc', 'gstvideoconvertscale')
+    # The elements the GStreamer tests and benchmarks build pipelines from, decodebin and webrtcbin among them.
+    $wanted = @('gstcoreelements', 'gstapp', 'gstvideotestsrc', 'gstvideoconvertscale', 'gstplayback', 'gstwebrtc')
     $copied = @(Get-ImageGStreamerPluginFile -PluginDir $pluginDir -Name $wanted | ForEach-Object {
             Copy-Item -LiteralPath $_ -Destination $destination -Force
             [IO.Path]::GetFileNameWithoutExtension($_)
         })
     $missing = @($wanted | Where-Object { $_ -notin $copied })
     if ($missing.Count) {
-        Write-BuildLogWarning -Context $Context -Message "GStreamer test plugins missing from ${pluginDir}: $($missing -join ', '); the tests that need them skip."
+        Write-BuildLogWarning -Context $Context -Message "GStreamer test plugins missing from ${pluginDir}: $($missing -join ', '); the tests that need them skip, which allowed_skips refuses."
     }
     Write-BuildLog -Context $Context -Message "GStreamer test plugins: $($copied -join ', ') -> $destination"
 }
@@ -582,11 +582,21 @@ function Invoke-StageTestsStep {
         Invoke-BuildStep -Context $Context -StepName "Stage Tests ($TargetArch)" -Critical -Script {
             $tests = Join-Path $Workspace "dist\windows-$packageArch-tests"
             Initialize-BuildDirectory -Path $tests -Empty
+            # Exact skips (owner D2): the Windows image has no webrtcsink, and the bundled GStreamer names its own scanner.
+            $commitSkips = @(
+                'WebRtcStreamer.StopFromInsideACallbackIsRefused'
+                'WebRtcStreamer.ConfiguresATestPatternStream'
+                'WebRtcStreamer.ConfiguresAFileStream'
+                'WebRtcStreamer.AStartWithoutASignallingServerEndsInAnErrorThatStaysUntilStop'
+                'WebRtcStreamer.FactoriesConfigureTheirSources'
+                'WebRtcStreamer.AConfigFileDrivesTheFactory'
+                'GStreamerRuntime.TheScannerFailureIsSeenWhicheverClassInitialisesFirst'
+            )
             # The fuzz suite runs in FuzzTest's unit mode (a gtest binary); the benchmarks count by exit code, kept short.
             $manifest = @(
-                @{ exe = 'commitTestSuite.exe'; kind = 'gtest' }
-                @{ exe = 'compileTestSuite.exe'; kind = 'gtest' }
-                @{ exe = 'fuzzTestSuite.exe'; kind = 'gtest' }
+                @{ exe = 'commitTestSuite.exe'; kind = 'gtest'; allowed_skips = $commitSkips }
+                @{ exe = 'compileTestSuite.exe'; kind = 'gtest'; allowed_skips = @() }
+                @{ exe = 'fuzzTestSuite.exe'; kind = 'gtest'; allowed_skips = @() }
                 @{ exe = 'perfTestSuite.exe'; kind = 'exitcode'; args = @('--benchmark_min_time=0.05s', '--benchmark_out=results.json', '--benchmark_out_format=json') }
             )
             $suites = $manifest | ForEach-Object { Join-Path $fastBuildReleaseDirFull $_.exe }
@@ -615,7 +625,7 @@ function Invoke-StageTestsStep {
                 $debugSuite = Join-Path $fastBuildClangFull 'commitTestSuite.exe'
                 if (-not (Test-Path -LiteralPath $debugSuite -PathType Leaf)) { throw "The Debug build made no $debugSuite" }
                 Copy-Item -LiteralPath $debugSuite -Destination (Join-Path $tests 'commitTestSuite-debug.exe')
-                $manifest += @{ exe = 'commitTestSuite-debug.exe'; kind = 'gtest' }
+                $manifest += @{ exe = 'commitTestSuite-debug.exe'; kind = 'gtest'; allowed_skips = $commitSkips }
                 & (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Copy-Arm64VsRuntime.ps1') -InstallDir $tests -Flat
             }
             Copy-Item -LiteralPath (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Invoke-StagedTests.ps1') -Destination $tests

@@ -388,7 +388,7 @@ written out rather than linked.
   lane on any `<skipped>` in its JUnit file and names the tests: the image carries every element,
   so a skip there means one went missing. `ci-run-all.sh` then runs `check-junit-skips.py` over
   every report of the leg (`ci_junit_reports`: ctest, and on clang also the TSan ctest and all four
-  pytest reports, the wheel tests and the text contract per ABI); a skipped, not-run or missing report fails. Windows keeps its skips (`webrtcsink`). The Debug
+  pytest reports, the wheel tests and the text contract per ABI); a skipped, not-run or missing report fails. Windows allows exactly seven skips since 2026-11-22 (owner D2): its staged manifest lists the six `webrtcsink` tests and the bundled scanner case as the commit suite's `allowed_skips` (hub CON292), the compile and fuzz suites allow none, and a skip off the list or a listed test that runs fails the lane. The Debug
   presets build UBSan recoverable, so the same script exports `UBSAN_OPTIONS=halt_on_error=1`; a
   report used to print and the test still passed.
 - **On clang-cl the fuzz suite is built without ASan, and keeps UBSan** (since 2026-11-22). absl's
