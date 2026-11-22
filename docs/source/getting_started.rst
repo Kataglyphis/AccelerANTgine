@@ -330,8 +330,11 @@ Release Hardening
   ships inside the CLI;
 - PIE executables and ``-z relro -z now`` links (``cmake/ProjectOptions.cmake``).
 
-The Windows presets leave it off: the hub's MSVC flag set is not proved under clang-cl. Android
-builds configure without these presets and stay off too.
+The clang-cl presets set it too since 2026-11-22 (the hidden ``windows-clangcl``): ``/sdl`` and
+``/guard:cf`` on the compile, ``/NXCOMPAT /DYNAMICBASE /guard:cf`` (plus ``/CETCOMPAT`` on x64) on
+the link, and ``Build-Windows.ps1`` grades the CLI, the demo and the DLL with the hub's
+``Assert-PeHardening`` (ASLR, high-entropy ASLR, DEP and the CFG bit). The MSVC presets leave it
+off, and Android builds configure without these presets and stay off too.
 
 ``scripts/linux/ci-release.sh`` checks the result with ``scripts/linux/verify-package-hardening.sh``
 inside both the ``.deb`` and the ``.tar.gz``:

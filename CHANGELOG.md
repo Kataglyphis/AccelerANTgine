@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-22, the clang-cl presets harden, and a PE gate proves it)
+
+- The hidden `windows-clangcl` preset sets `myproject_ENABLE_HARDENING`, so every clang-cl build compiles with `/sdl
+  /guard:cf` and links with `/NXCOMPAT /DYNAMICBASE /guard:cf` (`/CETCOMPAT` on x64), the hub's MSVC flags since
+  CON290. `Build-Windows.ps1` grades `AccelerANTgine.exe`, `AccelerANTgine_demo.exe` and `AccelerANTgine.dll` with the
+  hub's `Assert-PeHardening` (CON294's PE twin): each must carry DYNAMIC_BASE, NX_COMPAT, HIGH_ENTROPY_VA and the CFG
+  bit. The hub pin moves to 747e7b9a for it.
+
 ### Fixed (2026-11-21, the XNNPACK golden on arm64)
 
 - `Golden.XnnpackMatchesCpu` allows 2e-4 of the frame between XNNPACK and the CPU provider, up from 1e-4: on arm64

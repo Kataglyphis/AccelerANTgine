@@ -45,6 +45,7 @@
       "hidden": true,
       "generator": "Ninja",
       "cacheVariables": {
+        "myproject_ENABLE_HARDENING": "ON",
         "CMAKE_VERBOSE_MAKEFILE": "ON",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl",

@@ -55,6 +55,7 @@ Import-BuildModule @(
     'WindowsOnnx.Common'
     'WindowsMediaRuntime.Common'
     'WindowsTargetArch.Common'  # the target: accepted spellings, cross or not, the MSVC lib dir
+    'WindowsPeHardening.Common'  # ASLR, DEP and the CFG bit in this repo's own binaries (hub CON294)
 )
 # Cross arguments, package arch, the DLL closure and the portable bundle; an older hub pin lacks New-PortableBundle.
 try {
@@ -534,6 +535,8 @@ function Invoke-ReleaseBuildStep {
         # Everything the engine imports transitively that a clean machine lacks.
         New-Item -ItemType Directory -Force -Path $packageDlls | Out-Null
         $engine = @('AccelerANTgine.exe', 'AccelerANTgine_demo.exe', 'AccelerANTgine.dll') | ForEach-Object { Join-Path $fastBuildReleaseDirFull "bin\$_" }
+        # The clang-cl presets harden (/guard:cf on the link, CON290); the chain's DLLs are not this repo's to grade.
+        Assert-PeHardening -Path $engine
         $plugins = @(if ($OrtVariant -ne 'cpu') { Copy-ImageGStreamerPackagePlugins -Destination (Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -Plugins $imagePlugins })
         $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
         $search = @(Get-ProductDllSearchPath -Arch $TargetArch -RuntimeBin $gstBin)

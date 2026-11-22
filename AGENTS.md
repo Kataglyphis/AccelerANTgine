@@ -605,10 +605,13 @@ runs `scripts/linux/tests/test-ci-value-options.sh` over all eight modes and bro
 The same lane tests locked docs installation and both wheel ABI sequences with
 `test-ci-docs-uv.sh` and `test-ci-python-lock.sh`; neither compiles the native wheels.
 
-**Linux release presets harden, and the packages prove it.** Only `linux-release-clang` and
-`linux-release-GNU` set `myproject_ENABLE_HARDENING`: the hub's `Hardening.cmake` flags on project
-targets and statically linked dependencies, plus PIE and `-z relro -z now`
-(`cmake/ProjectOptions.cmake`). Windows presets and Android builds leave it off. `ci-release.sh`
+**Release presets harden, and the packages prove it.** `linux-release-clang`, `linux-release-GNU`
+and, since 2026-11-22, every clang-cl preset (the hidden `windows-clangcl`) set
+`myproject_ENABLE_HARDENING`: the hub's `Hardening.cmake` flags on project targets and statically
+linked dependencies, PIE and `-z relro -z now` on Linux, `/sdl /guard:cf` and the link's
+`/NXCOMPAT /DYNAMICBASE /guard:cf` (`/CETCOMPAT` on x64) on Windows. `Build-Windows.ps1` then runs
+the hub's `Assert-PeHardening` over `AccelerANTgine.exe`, `AccelerANTgine_demo.exe` and
+`AccelerANTgine.dll`. The MSVC presets and Android builds leave it off. `ci-release.sh`
 then runs `verify-package-hardening.sh`, which fails unless the `.deb` and the `.tar.gz` ship a
 PIE, BIND_NOW, stack-protected CLI and demo and a BIND_NOW, stack-protected library, with a
 `__*_chk` import in the CLI and the library. Never drop a check to pass a package;
