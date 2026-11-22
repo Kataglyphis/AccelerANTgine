@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-22, the clang-cl fuzz harness keeps UBSan)
+
+- On clang-cl the fuzz suite drops only ASan (`-fno-sanitize=address`), no longer UBSan as well. absl's
+  swisstable layout follows ASan alone, which clang-cl leaves off absl and FuzzTest; the Debug product code
+  is built with `/fsanitize=address -fsanitize=undefined`, so the harness now shares its UBSan checks.
+
 ### Changed (2026-11-22, one Windows perf run per configuration, with its model required)
 
 - `Build-Windows.ps1` no longer runs the perf suite inside the build container: no model is fetched there

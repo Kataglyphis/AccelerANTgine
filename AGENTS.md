@@ -391,8 +391,8 @@ written out rather than linked.
   pytest reports, the wheel tests and the text contract per ABI); a skipped, not-run or missing report fails. Windows keeps its skips (`webrtcsink`). The Debug
   presets build UBSan recoverable, so the same script exports `UBSAN_OPTIONS=halt_on_error=1`; a
   report used to print and the test still passed.
-- **On clang-cl the fuzz suite is built without sanitizers.** absl's swisstable layout depends on
-  ASan (`ABSL_SWISSTABLE_ENABLE_GENERATIONS`), and clang-cl applies ASan only through
+- **On clang-cl the fuzz suite is built without ASan, and keeps UBSan** (since 2026-11-22). absl's
+  swisstable layout depends on ASan alone (`ABSL_SWISSTABLE_ENABLE_GENERATIONS`), and clang-cl applies ASan only through
   `myproject_options`, so absl and FuzzTest were not instrumented there while the suite was. Its
   absl COMDATs then won over absl's own and crashed a static initialiser (`FLAGS_nofuzz`, run
   36913668933); a Linux probe with the mismatch the other way round crashed in
