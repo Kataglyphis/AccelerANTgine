@@ -576,7 +576,8 @@ keys **`perf-x64-gcc`, `perf-x64-clang`, `perf-arm64-gcc` and `perf-arm64-clang`
 `bench-history-perf-<arch>-<compiler>`), which warns and never gates: hosted CPUs differ up to twofold
 in wall time (run 41271221703 doubled `BM_DetectFrame` at an unchanged instruction count). The Windows lanes report under **`perf-win-x64`**
 (the host Profile run's `dist/windows-x64/perf/results.json`) and **`perf-win-arm64`** (the staged
-suite's `results.json` on windows-11-arm, with the model staged beside it). `perf-cachegrind.py` then counts the instructions per
+suite's `results.json` on windows-11-arm, with the model staged beside it); since 2026-11-22 both set `KATAGLYPHIS_REQUIRE_MODEL=1` around the
+perf run alone, and the build container runs no perf suite, as it has no model. `perf-cachegrind.py` then counts the instructions per
 iteration of `BM_PreprocessFrame`, `BM_DetectFrame` and `BM_OnnxRunInferenceInPlace` (the detector's call on one
 3x640x640 frame, without the input copy) at one ORT thread
 (`valgrind --tool=cachegrind --cache-sim=no`, 4 minus 2 iterations) and fails a key that leaves its entry in

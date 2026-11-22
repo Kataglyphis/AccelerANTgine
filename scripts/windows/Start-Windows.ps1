@@ -91,6 +91,14 @@ function Invoke-BuiltArtifact {
     }
 }
 
+# Around a perf run alone, never the lane: CMake reads it too, for an llm.lock Windows never fetches.
+function Invoke-WithModelRequired {
+    param([Parameter(Mandatory)][scriptblock]$Script)
+    $priorRequire = $env:KATAGLYPHIS_REQUIRE_MODEL
+    $env:KATAGLYPHIS_REQUIRE_MODEL = '1'
+    try { & $Script } finally { $env:KATAGLYPHIS_REQUIRE_MODEL = $priorRequire }
+}
+
 # results.json lands in the product dir, which the lane uploads after this host command for its bench-history job.
 function Invoke-PerfSuite {
     $perfDir = Join-Path $ProjectRoot "dist\windows-$(Get-WindowsPackageArch -Arch '')\perf"
@@ -99,8 +107,11 @@ function Invoke-PerfSuite {
     $previous = $env:KATAGLYPHIS_DETECTOR_MODEL
     if (Test-Path -LiteralPath $model -PathType Leaf) { $env:KATAGLYPHIS_DETECTOR_MODEL = $model }
     try {
-        Invoke-BuiltArtifact -ExecutableName 'perfTestSuite.exe' -RelativeDirectory @('', 'bin') `
-            -Arguments @("--benchmark_out=$(Join-Path $perfDir 'results.json')", '--benchmark_out_format=json')
+        # A missing model, GenAI or ORT load fails the run instead of skipping three benchmarks.
+        Invoke-WithModelRequired {
+            Invoke-BuiltArtifact -ExecutableName 'perfTestSuite.exe' -RelativeDirectory @('', 'bin') `
+                -Arguments @("--benchmark_out=$(Join-Path $perfDir 'results.json')", '--benchmark_out_format=json')
+        }
     } finally { $env:KATAGLYPHIS_DETECTOR_MODEL = $previous }
 }
 
@@ -185,7 +196,9 @@ try {
         $manifest = Join-Path $staged 'tests.json'
         if (Test-Path -LiteralPath $manifest) {
             Write-BuildLog -Context $ctx -Message "--- Release suites staged in $staged ---"
-            $verdict = Assert-StagedTestVerdict -Lines @(& (Join-Path $staged 'Invoke-StagedTests.ps1') -Manifest $manifest) -Label 'The staged Release suites'
+            # perfTestSuite is its one reader at run time: a missing model, GenAI or ORT load fails it.
+            $lines = @(Invoke-WithModelRequired { & (Join-Path $staged 'Invoke-StagedTests.ps1') -Manifest $manifest })
+            $verdict = Assert-StagedTestVerdict -Lines $lines -Label 'The staged Release suites'
             Write-BuildLog -Context $ctx -Message "Release suites: passed $($verdict.Passed), failed $($verdict.Failed), skipped $($verdict.Skipped)"
         } else {
             Write-BuildLog -Context $ctx -Message "No staged Release suites in $staged; build with -StageTests to run them"

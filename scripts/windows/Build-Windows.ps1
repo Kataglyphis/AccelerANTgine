@@ -472,20 +472,7 @@ function Invoke-ClangDebugAnalysisStep {
 function Invoke-ProfileStep {
     Invoke-ConfiguredBuildStep -StepName "Profile Build Configure" -BuildPath $fastBuildProfileFull -Configuration $cfgProfile
 
-    Invoke-BuildStep -Context $Context -StepName "Performance Benchmarks" -Script {
-        Push-Location $fastBuildProfileFull
-        try {
-            $perfExe = Join-Path $fastBuildProfileFull "perfTestSuite.exe"
-            $benchmarkOutPath = Join-Path $logDirPath "results.json"
-            if (Test-Path $perfExe) {
-                # The suite imports AccelerANTgine.dll and its closure, which sit in bin\, not beside the exe.
-                Invoke-WithRuntimePath -RuntimeDirs @((Join-Path $fastBuildProfileFull 'bin')) -AsanOptions '' -Script {
-                    Invoke-BuildExternal -Context $Context -File $perfExe -Parameters @("--benchmark_out=$benchmarkOutPath", "--benchmark_out_format=json")
-                }
-            }
-        } finally { Pop-Location }
-    }
-
+    # The host runs the benchmarks (Start-Windows.ps1 -Config Profile): this container has no model.
     if (-not $SkipPGO) {
         Invoke-BuildStep -Context $Context -StepName "PGO (Profile-Guided Optimization)" -Script {
             Push-Location $fastBuildProfileFull

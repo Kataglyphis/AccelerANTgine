@@ -150,7 +150,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   part (CON293). (11) The Windows round (CON290, CON292, CON294): hardening in the clang-cl presets and a PE gate
   (**in source since 2026-11-22**: `myproject_ENABLE_HARDENING` in `windows-clangcl`, `Assert-PeHardening` over the
   engine's three binaries, hub pin 747e7b9a), gstplayback and gstwebrtc staged with the 7-test skip list (D2;
-  AGENTS.md:391 changes), the in-container Profile perf run deleted, the fuzz harness with `-fno-sanitize=address`.
+  AGENTS.md:391 changes), the in-container Profile perf run deleted (**in source since 2026-11-22**,
+  `KATAGLYPHIS_REQUIRE_MODEL=1` around the host and staged perf runs), the fuzz harness with `-fno-sanitize=address`.
   (12) The GPU candidate lanes once after 11 (owner hardware). (13) With the first real bridge: an unwinding
   `[profile.bridge]` with a configure-time check (D4), scoped cargo gates, the crate budget and forbid list, a parity
   suite as the deletion gate. (14) After CON145: no configure-time `cargo install cxxbridge-cmd`. Beyond the

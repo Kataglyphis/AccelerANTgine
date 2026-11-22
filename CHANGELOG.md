@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-22, one Windows perf run per configuration, with its model required)
+
+- `Build-Windows.ps1` no longer runs the perf suite inside the build container: no model is fetched there
+  before the Release step, so `BM_DetectFrame`, `BM_VideoPipelineKeepsUp` and `BM_SessionCreate` skipped
+  on every run (x64 job 136175616225). The host Profile run in `Start-Windows.ps1` and the staged Release
+  suites, on the x64 host and on windows-11-arm, set `KATAGLYPHIS_REQUIRE_MODEL=1` around the run alone,
+  so a missing model, GenAI or ORT load fails them instead of skipping; CMake reads the same variable for
+  an `llm.lock` Windows never fetches, so the lane never sets it for longer.
+
 ### Changed (2026-11-22, the clang-cl presets harden, and a PE gate proves it)
 
 - The hidden `windows-clangcl` preset sets `myproject_ENABLE_HARDENING`, so every clang-cl build compiles with `/sdl

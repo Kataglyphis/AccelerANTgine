@@ -51,6 +51,8 @@ jobs:
         $ucrt = @(Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\arm64\ucrt\ucrtbased.dll' -File -ErrorAction SilentlyContinue | Select-Object -First 1)
         if ($ucrt.Count -eq 0) { throw 'no arm64 ucrtbased.dll under the Windows SDK' }
         $env:PATH = "$($crt[0].FullName);$($ucrt[0].DirectoryName);$env:PATH"
+        # perfTestSuite is its one reader at run time: a missing model, GenAI or ORT load fails it instead of skipping.
+        $env:KATAGLYPHIS_REQUIRE_MODEL = '1'
         & ./Invoke-StagedTests.ps1
       # The staged perfTestSuite writes results.json beside itself; the bench-history job reads it.
       test-results-path: results.json

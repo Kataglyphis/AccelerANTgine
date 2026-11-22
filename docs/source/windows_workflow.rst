@@ -96,7 +96,8 @@ Profile Run
 
    .\scripts\windows\Start-Windows.ps1 -Config Profile
 
-Runs the profile build executable, then ``perfTestSuite.exe``; a missing suite fails the run.
+Runs the profile build executable, then ``perfTestSuite.exe`` with ``KATAGLYPHIS_REQUIRE_MODEL=1``
+around it alone; a missing suite, model or GenAI fails the run.
 
 Release Run
 ^^^^^^^^^^^
@@ -107,7 +108,8 @@ Release Run
 
 The CLI check, run from ``build-clangcl-release\bin`` (the build tree, not the ``dist``
 bundle), then the Release suites ``Build-Windows.ps1 -StageTests`` staged in
-``dist\windows-x64-tests``, through their ``Invoke-StagedTests.ps1``; a failed or an empty
+``dist\windows-x64-tests``, through their ``Invoke-StagedTests.ps1`` with
+``KATAGLYPHIS_REQUIRE_MODEL=1`` (``perfTestSuite`` is its one reader); a failed or an empty
 verdict fails the run. Without staged suites it is the CLI check alone.
 
 Build Script Responsibilities
@@ -125,7 +127,7 @@ Build Script Responsibilities
   nothing today: the ``x64-ClangCL-Windows-Debug`` preset leaves
   ``myproject_ENABLE_COVERAGE`` off
 - runs ``clang-tidy`` as a report, without ``-fix``
-- runs profile benchmarks
+- builds the Profile configuration, whose benchmarks run on the host: the container has no model
 - builds release packages and the portable bundle in ``dist\windows-x64``
 - optionally creates MSIX output (``-SkipMSIX`` skips it), signed with the first
   ``*.pfx`` at the repository root and ``MSIX_PFX_PASSWORD`` when there is one,
