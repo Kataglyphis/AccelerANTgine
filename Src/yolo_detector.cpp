@@ -212,8 +212,8 @@ auto YoloDetector::detect(std::span<const float> image_data, std::uint32_t width
 
     if (!result) { return std::unexpected(result.error()); }
 
-    const FrameMapping mapping{ static_cast<float>(impl_->config.input_width) / width,
-        static_cast<float>(impl_->config.input_height) / height,
+    const FrameMapping mapping{ static_cast<float>(impl_->config.input_width) / static_cast<float>(width),
+        static_cast<float>(impl_->config.input_height) / static_cast<float>(height),
         0.0F,
         0.0F,
         width,

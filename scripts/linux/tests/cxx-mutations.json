@@ -82,8 +82,8 @@
  {
   "id": "cxx.preprocess-frame-sides-swapped",
   "target": "Src/yolo_math.cpp",
-  "find": "        static_cast<float>(content_height) / meta.height,\n",
-  "replace": "        static_cast<float>(content_width) / meta.height,\n",
+  "find": "        static_cast<float>(content_height) / static_cast<float>(meta.height),\n",
+  "replace": "        static_cast<float>(content_width) / static_cast<float>(meta.height),\n",
   "test": "bash scripts/linux/cxx-mutation-test.sh '^(FramePreprocessing|YoloDetector)\\.'",
   "why": "Each axis of the mapping uses its own side; a square test picture would hide the swap."
  },

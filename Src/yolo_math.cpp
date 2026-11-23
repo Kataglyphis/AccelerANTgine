@@ -62,7 +62,9 @@ namespace {
     auto class_label(int class_id, const YoloConfig &config) -> std::string
     {
         if (config.labels.empty()) { return std::string(YoloDetector::get_coco_class_name(class_id)); }
-        if (class_id >= 0 && std::cmp_less(class_id, config.labels.size())) { return config.labels[class_id]; }
+        if (class_id >= 0 && std::cmp_less(class_id, config.labels.size())) {
+            return config.labels[static_cast<std::size_t>(class_id)];
+        }
         return "unknown";
     }
 
@@ -243,10 +245,10 @@ namespace {
         const auto right = static_cast<double>(mapping.frame_width);
         const auto bottom = static_cast<double>(mapping.frame_height);
         for (auto &box : boxes) {
-            const float x1 = edge(box.x, right);
-            const float y1 = edge(box.y, bottom);
-            box.width = edge(static_cast<double>(box.x) + box.width, right) - x1;
-            box.height = edge(static_cast<double>(box.y) + box.height, bottom) - y1;
+            const float x1 = edge(static_cast<double>(box.x), right);
+            const float y1 = edge(static_cast<double>(box.y), bottom);
+            box.width = edge(static_cast<double>(box.x) + static_cast<double>(box.width), right) - x1;
+            box.height = edge(static_cast<double>(box.y) + static_cast<double>(box.height), bottom) - y1;
             box.x = x1;
             box.y = y1;
         }
@@ -355,8 +357,8 @@ auto preprocess_frame_into(const gstreamer::BufferInfo &buffer,
     const auto pad_x = (width - content_width) / 2;
     const auto pad_y = (height - content_height) / 2;
     const auto plane = static_cast<std::size_t>(width) * height;
-    result.mapping = { static_cast<float>(content_width) / meta.width,
-        static_cast<float>(content_height) / meta.height,
+    result.mapping = { static_cast<float>(content_width) / static_cast<float>(meta.width),
+        static_cast<float>(content_height) / static_cast<float>(meta.height),
         static_cast<float>(pad_x),
         static_cast<float>(pad_y),
         meta.width,
@@ -367,8 +369,7 @@ auto preprocess_frame_into(const gstreamer::BufferInfo &buffer,
     // Every row samples the same columns, so their byte offsets are divided out once per frame.
     std::vector<std::size_t> column_offsets(content_width);
     for (std::uint32_t x = 0; x < content_width; ++x) {
-        column_offsets[x] =
-          static_cast<std::size_t>(static_cast<std::uint64_t>(x) * meta.width / content_width) * channels;
+        column_offsets[x] = std::size_t{ x } * meta.width / content_width * channels;
     }
     const std::span<const std::byte> source(buffer.data);
     const std::span<float> red(result.data.data(), plane);
@@ -391,7 +392,9 @@ auto preprocess_frame_into(const gstreamer::BufferInfo &buffer,
 
 auto YoloDetector::get_coco_class_name(int class_id) -> std::string_view
 {
-    if (class_id >= 0 && std::cmp_less(class_id, COCO_CLASSES.size())) { return COCO_CLASSES[class_id]; }
+    if (class_id >= 0 && std::cmp_less(class_id, COCO_CLASSES.size())) {
+        return COCO_CLASSES[static_cast<std::size_t>(class_id)];
+    }
     return "unknown";
 }
 

@@ -11,6 +11,12 @@
 #undef ReaderMutexLock
 #undef MutexLock
 
+// The pinned Abseil deprecates its pointer guards, which these reference guards wrap on purpose.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
@@ -82,5 +88,9 @@ class ABSL_SCOPED_LOCKABLE WriterMutexLock
 
 ABSL_NAMESPACE_END
 }// namespace absl
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 #endif// KATAGLYPHIS_FUZZTEST_COMPAT_ABSL_SYNCHRONIZATION_MUTEX_H_

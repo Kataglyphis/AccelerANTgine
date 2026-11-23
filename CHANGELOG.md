@@ -18,6 +18,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-23, the own compiler warnings, before warnings become errors)
+
+- The warnings the census held are fixed, as the owner chose for ANTfrastructure CON295 (c) step 3 (fix first, then
+  `-Werror` for the product targets): explicit float and size casts in `yolo_math.cpp` and `yolo_detector.cpp` (the
+  values are unchanged), `TextGenerator::Impl::load`'s locals no longer shadow its members, `cli_main.cpp` spells a
+  UTF-8 path as `std::u8string` instead of the deprecated `u8path`, every `ElementLocation` field is initialised,
+  and `gstreamer_runtime.ixx` takes GStreamer's element type from `gstreamer_element_fwd.h`, as a global module
+  fragment may only hold what it includes. Abseil's `ABSL_FLAG` (`__COUNTER__`, a C2y extension to clang) and the
+  fuzz build's Abseil lock shim (deprecated pointer guards it wraps on purpose) are silenced where they are used.
+  The census keeps one row per lane: a doxygen note on `Test/fuzz/config_fuzz.cpp`.
+
 ### Changed (2026-11-23, the x64 lanes hold their compiler warnings)
 
 - The x64 gcc and clang lanes run the hub's warning census (ANTfrastructure CON295 (c) step 2): `ci-build-and-test.sh`

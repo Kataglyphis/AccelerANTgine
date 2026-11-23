@@ -2,8 +2,7 @@ module;
 
 #include <string>
 
-// GStreamer's element type without its headers in this interface.
-struct _GstElement;
+#include "gstreamer_element_fwd.h"
 
 export module kataglyphis.gstreamer_runtime;
 

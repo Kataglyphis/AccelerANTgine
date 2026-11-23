@@ -3,19 +3,4 @@
 # Rewrite a lane: python3 third_party/ANTfrastructure/linux/scripts/verify_warning_census.py --lane x64-gcc
 #   --census scripts/linux/warning-census.txt --write <build log>
 x64-clang | -W(unnamed) | 1
-x64-clang | -Wc2y-extensions | 22
-x64-clang | -Wdeprecated-declarations | 13
-x64-clang | -Wdouble-promotion | 4
-x64-clang | -Wimplicit-int-float-conversion | 2
-x64-clang | -Wmissing-designated-field-initializers | 1
-x64-clang | -Wshadow | 3
-x64-clang | -Wsign-conversion | 2
 x64-gcc | -W(unnamed) | 1
-x64-gcc | -Wconversion | 4
-x64-gcc | -Wdeprecated-declarations | 1
-x64-gcc | -Wdouble-promotion | 2
-x64-gcc | -Wglobal-module | 1
-x64-gcc | -Wmissing-field-initializers | 1
-x64-gcc | -Wshadow | 3
-x64-gcc | -Wsign-conversion | 2
-x64-gcc | -Wuseless-cast | 1

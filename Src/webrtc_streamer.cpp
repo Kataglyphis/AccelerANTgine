@@ -390,7 +390,7 @@ auto WebRTCStreamer::locate_elements() -> std::vector<ElementLocation>
     std::vector<ElementLocation> located;
     located.reserve(names.size());
     for (const char *name : names) {
-        ElementLocation location{ .element = name };
+        ElementLocation location{ .element = name, .found = false, .plugin_file = {} };
         if (GstElementFactory *factory = gst_element_factory_find(name); factory != nullptr) {
             location.found = true;
             if (GstPlugin *plugin = gst_plugin_feature_get_plugin(GST_PLUGIN_FEATURE(factory)); plugin != nullptr) {

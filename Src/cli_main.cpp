@@ -22,6 +22,17 @@ import kataglyphis.project_config;
 import kataglyphis.log;
 import kataglyphis.text_generation;
 
+namespace {
+// u8path is deprecated in C++20; a char8_t string is how a UTF-8 path is spelled now.
+auto utf8_path(const std::string &text) -> std::filesystem::path
+{ return std::filesystem::path(std::u8string(text.begin(), text.end())); }
+}// namespace
+
+#if defined(__clang__)
+// ABSL_FLAG names each flag through __COUNTER__, which clang calls a C2y extension; the macro is Abseil's.
+#pragma clang diagnostic ignored "-Wc2y-extensions"
+#endif
+
 ABSL_FLAG(bool, webrtc, false, "Start WebRTC streaming");
 ABSL_FLAG(std::string, config, "", "Load settings from JSON config file");
 ABSL_FLAG(std::string, server, "", "Signalling server URI (overrides config file default)");
@@ -131,8 +142,7 @@ auto check_gstreamer(int *argc, char ***argv) -> int
         std::error_code error;
         const bool outside =
           location.found && !bundled.empty()
-          && !std::filesystem::equivalent(
-            std::filesystem::u8path(location.plugin_file).parent_path(), std::filesystem::u8path(bundled), error);
+          && !std::filesystem::equivalent(utf8_path(location.plugin_file).parent_path(), utf8_path(bundled), error);
         const char *verdict = location.found ? (outside ? "OUTSIDE" : "ok") : (optional ? "absent" : "MISSING");
         std::cout << verdict << ' ' << location.element << ' ' << location.plugin_file << '\n';
         if ((!location.found && !optional) || outside) { ++failures; }

@@ -605,49 +605,50 @@ KATAGLYPHIS_CPP_API auto text_intra_op_threads(const std::filesystem::path &mode
 auto TextGenerator::Impl::load(const std::filesystem::path &model_dir, const char *name)
   -> std::expected<void, TextGenError>
 {
-    const GenaiApi *api = load_api();
-    if (api == nullptr) { return std::unexpected(TextGenError::LibraryUnavailable); }
+    const GenaiApi *genai = load_api();
+    if (genai == nullptr) { return std::unexpected(TextGenError::LibraryUnavailable); }
     OgaConfig *raw_config = nullptr;
     // GenAI reads the path as UTF-8; string() is the ANSI code page on Windows, which a user folder like "Jörg" breaks.
     const auto utf8_dir = model_dir.u8string();
-    if (!succeeded(*api, api->CreateConfig(reinterpret_cast<const char *>(utf8_dir.c_str()), &raw_config), "config")) {
+    if (!succeeded(
+          *genai, genai->CreateConfig(reinterpret_cast<const char *>(utf8_dir.c_str()), &raw_config), "config")) {
         return std::unexpected(TextGenError::ModelLoadFailed);
     }
-    const Config config{ raw_config, { api } };
-    if (!succeeded(*api, api->ConfigClearProviders(config.get()), "providers")
-        || (name != nullptr && !succeeded(*api, api->ConfigAppendProvider(config.get(), name), name))) {
+    const Config config{ raw_config, { genai } };
+    if (!succeeded(*genai, genai->ConfigClearProviders(config.get()), "providers")
+        || (name != nullptr && !succeeded(*genai, genai->ConfigAppendProvider(config.get(), name), name))) {
         return std::unexpected(TextGenError::ProviderUnavailable);
     }
-    if (const auto threads = text_intra_op_threads(model_dir); threads && api->ConfigOverlay != nullptr) {
+    if (const auto threads = text_intra_op_threads(model_dir); threads && genai->ConfigOverlay != nullptr) {
         // Plain text: gcc x64 crashed building the nested initializer-list json in this module (ff3aef3's stack).
         const auto overlay =
           std::format(R"({{"model":{{"decoder":{{"session_options":{{"intra_op_num_threads":{}}}}}}}}})", *threads);
-        if (!succeeded(*api, api->ConfigOverlay(config.get(), overlay.c_str()), "thread overlay")) {
+        if (!succeeded(*genai, genai->ConfigOverlay(config.get(), overlay.c_str()), "thread overlay")) {
             return std::unexpected(TextGenError::ModelLoadFailed);
         }
     }
     OgaModel *raw_model = nullptr;
-    if (!succeeded(*api, api->CreateModelFromConfig(config.get(), &raw_model), "model")) {
+    if (!succeeded(*genai, genai->CreateModelFromConfig(config.get(), &raw_model), "model")) {
         return std::unexpected(TextGenError::ModelLoadFailed);
     }
-    Model model{ raw_model, { api } };
+    Model loaded_model{ raw_model, { genai } };
     OgaTokenizer *raw_tokenizer = nullptr;
-    if (!succeeded(*api, api->CreateTokenizer(model.get(), &raw_tokenizer), "tokenizer")) {
+    if (!succeeded(*genai, genai->CreateTokenizer(loaded_model.get(), &raw_tokenizer), "tokenizer")) {
         return std::unexpected(TextGenError::TokenizerFailed);
     }
-    Tokenizer tokenizer{ raw_tokenizer, { api } };
+    Tokenizer loaded_tokenizer{ raw_tokenizer, { genai } };
     const std::int32_t *eos = nullptr;
     std::size_t eos_count = 0;
-    if (!succeeded(*api, api->TokenizerGetEosTokenIds(tokenizer.get(), &eos, &eos_count), "eos tokens")) {
+    if (!succeeded(*genai, genai->TokenizerGetEosTokenIds(loaded_tokenizer.get(), &eos, &eos_count), "eos tokens")) {
         return std::unexpected(TextGenError::TokenizerFailed);
     }
     const std::span<const std::int32_t> eos_ids(eos, eos_count);
     state.eos_tokens.assign(eos_ids.begin(), eos_ids.end());
     state.context_tokens = context_length(model_dir);
     state.live.reset();
-    this->api = api;
-    this->tokenizer = std::move(tokenizer);
-    this->model = std::move(model);
+    this->api = genai;
+    this->tokenizer = std::move(loaded_tokenizer);
+    this->model = std::move(loaded_model);
     ready.store(true);
     return {};
 }
