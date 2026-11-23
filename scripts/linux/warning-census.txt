@@ -2,13 +2,12 @@
 # CON295 (c)). A new warning fails its lane; a fixed one fails it too until its row is lowered here.
 # Rewrite a lane: python3 third_party/ANTfrastructure/linux/scripts/verify_warning_census.py --lane x64-gcc
 #   --census scripts/linux/warning-census.txt --write <build log>
-x64-clang | -W(unnamed) | 2
+x64-clang | -W(unnamed) | 1
 x64-clang | -Wc2y-extensions | 22
 x64-clang | -Wdeprecated-declarations | 13
 x64-clang | -Wdouble-promotion | 4
 x64-clang | -Wimplicit-int-float-conversion | 2
 x64-clang | -Wmissing-designated-field-initializers | 1
-x64-clang | -Wold-style-cast | 3
 x64-clang | -Wshadow | 3
 x64-clang | -Wsign-conversion | 2
 x64-gcc | -W(unnamed) | 1
