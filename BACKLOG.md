@@ -146,23 +146,22 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   44926738386 green without it), `second_deadlock_stack=1`. (9) **Done** (2a2a8a7, 15920f36): riscv64 run 44930240626
   is green with 0 skips and 0 criticals after the scanner death test's fix for the lane's `GST_REGISTRY_FORK=no`; the
   hub pin moved to d3661575 (CON290, CON291); `--fail-on-log-pattern '[A-Za-z0-9-]+-CRITICAL \*\*'` on every Linux
-  ctest run (Debug, second, TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) The lane split, one step per
-  part (CON293) (**in source since 2026-11-22**: `ci-run-all.sh --part` through `run_gate`, eight lane steps under
-  `!cancelled()` and the build's outcome, the Cargo home in `.cache/cargo`, `perfTestSuite` inside `capture_crash`).
-  (11) The Windows round (CON290, CON292, CON294): hardening in the clang-cl presets and a PE gate (**in source since
-  2026-11-22**: `myproject_ENABLE_HARDENING` in `windows-clangcl`, `Assert-PeHardening` over the engine's three
-  binaries, hub pin 747e7b9a), gstplayback and gstwebrtc staged with the 7-test skip list (D2; **in source since
-  2026-11-22**: `allowed_skips` in the staged manifest, none for the compile and fuzz suites), the in-container
-  Profile perf run deleted (**in source since 2026-11-22**, `KATAGLYPHIS_REQUIRE_MODEL=1` around the host and staged
-  perf runs), the fuzz harness with `-fno-sanitize=address` (**in source since 2026-11-22**; it traps on undefined
-  behaviour since 2026-11-23, as arm64 has no UBSan runtime to link). Run 44976751830 proved (a) to (c) on x64: 228
-  staged tests passed, the seven listed skips and no other, the PE gate and the required model. (12) The GPU candidate
-  lanes once after 11 (owner hardware). (13) With the first real bridge: an unwinding `[profile.bridge]` with a
-  configure-time check (D4), scoped cargo gates, the crate budget and forbid list, a parity suite as the deletion
-  gate. (14) After CON145: no configure-time `cargo install cxxbridge-cmd`. Beyond the detector-math target the owner
-  placed after the add demo (below), no new C++ fuzz targets or mutation recipes for `yolo_math.cpp`, which moves to
-  OxidANT later. **In source since 2026-11-21, beside the steps:** the hub pin at 8912128d, whose `Hardening.cmake`
-  and `verify-elf-hardening.sh` (CON294) replace this repo's own PIE, BIND_NOW and ELF checks.
+  ctest run (Debug, second, TSan, riscv64) and `--fail-on-skipped .` on riscv64. (10) **Done** (63d6c58; run
+  45130047779 green on both x64 legs, every part its own step): the lane split, one step per part (CON293),
+  `ci-run-all.sh --part` through `run_gate`, later parts under `!cancelled()` and the build's outcome, the Cargo home
+  in `.cache/cargo`, `perfTestSuite` inside `capture_crash`. (11) **Done** (0fbfbc2, 1040b94, ae2c92b, 4ca414e,
+  3a16c0b; run 45130048154): the Windows round (CON290, CON292, CON294), with hardening in the clang-cl presets and
+  the PE gate over the engine's three binaries, gstplayback and gstwebrtc staged with the exact seven-test skip list
+  (none in the compile and fuzz suites), no perf run in the container and `KATAGLYPHIS_REQUIRE_MODEL=1` around the
+  host and staged ones, and the clang-cl fuzz harness without ASan, trapping on undefined behaviour. x64: 228 staged
+  tests passed with exactly the seven listed skips; windows-11-arm: 434 passed, the seven skips in each commit suite,
+  the fuzz suite 11 of 11. (12) The GPU candidate lanes once after 11 (owner hardware). (13) With the first real
+  bridge: an unwinding `[profile.bridge]` with a configure-time check (D4), scoped cargo gates, the crate budget and
+  forbid list, a parity suite as the deletion gate. (14) After CON145: no configure-time `cargo install
+  cxxbridge-cmd`. Beyond the detector-math target the owner placed after the add demo (below), no new C++ fuzz targets
+  or mutation recipes for `yolo_math.cpp`, which moves to OxidANT later. **In source since 2026-11-21, beside the
+  steps:** the hub pin at 8912128d, whose `Hardening.cmake` and `verify-elf-hardening.sh` (CON294) replace this repo's
+  own PIE, BIND_NOW and ELF checks.
 
 - [b] **The detector's math has no target of its own** (S, ★). Since 2026-11-16 `Src/yolo_math.cpp` holds it as a unit
   of `kataglyphis.yolo_detector`. A separate static target is wanted for coverage-guided fuzzing; its flags must match
