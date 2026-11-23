@@ -37,6 +37,8 @@ SH
 cat > "${work}/bin/iwyu_tool" <<'SH'
 #!/usr/bin/env bash
 echo "iwyu_tool $*" >> "${STUB_LOG}"
+# A real driver reports every unit it read; the hub's verdict is red for a requested unit missing from the log.
+for unit in "$@"; do case "${unit}" in *.cpp) echo "(${unit} has correct #includes/fwd-decls)" ;; esac; done
 echo "$(pwd)/Src/engine.cpp should remove these lines:"
 echo "The full include-list for $(pwd)/Src/engine.cpp:"
 if [[ "${STUB_IWYU_UNREAD:-0}" == 1 ]]; then echo "$(pwd)/Src/engine.cpp:1:1: error: PCH file uses a newer PCH format"; fi

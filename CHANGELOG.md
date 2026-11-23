@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-23, the x64 lanes hold their compiler warnings)
+
+- The x64 gcc and clang lanes run the hub's warning census (ANTfrastructure CON295 (c) step 2): `ci-build-and-test.sh`
+  tees both builds (the TSan one too) into `build/build.log`, and `ci-run-all.sh --part build-test` grades it against
+  `scripts/linux/warning-census.txt`. Its rows come from run 45205683084: 16 own warnings over nine flags with GCC, 52
+  with clang, `-Wc2y-extensions` (22) and `-Wdeprecated-declarations` (13) the largest. A new warning fails the lane,
+  and so does a fixed one until its row is lowered. The ANTfrastructure pin moves to the hub commit with the census.
+
 ### Changed (2026-11-23, the static lane reports IWYU on the plain units)
 
 - `run-static-analysis-format.sh` runs the hub's IWYU report (ANTfrastructure CON295 (a)): the image's

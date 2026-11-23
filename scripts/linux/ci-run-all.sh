@@ -52,6 +52,11 @@ part_build_test() {
 		--clang-debug-preset "${CLANG_DEBUG_PRESET}" \
 		--profraw-dir "${PROFRAW_DIR}"
 	touch "${BUILD_DIR}/.lane-built"
+	# The x64 lanes run on every push and own census rows; arm64 runs on request and gets its rows later.
+	if [[ "${MATRIX_ARCH}" == "x64" ]]; then
+		python3 "$(antfrastructure_path linux/scripts/verify_warning_census.py)" --lane "${MATRIX_ARCH}-${COMPILER}" \
+			--census scripts/linux/warning-census.txt "${BUILD_DIR}/build.log"
+	fi
 }
 
 part_coverage() {

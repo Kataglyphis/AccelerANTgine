@@ -48,8 +48,12 @@ export KATAGLYPHIS_REQUIRE_MODEL=1
 
 # `cmake -B` overrides the preset's binaryDir, so ctest always runs the tree just built.
 info "Using preset: ${PRESET}"
+# The warning census reads this log (ci-run-all.sh); tee keeps the compiler's output in the job log too.
+BUILD_LOG="${BUILD_DIR}/build.log"
+mkdir -p "${BUILD_DIR}"
+: > "${BUILD_LOG}"
 # About 2 GB per TU; the 4000 MB default would halve the job count on memory-capped runners.
-cmake_build_main --preset "${PRESET}" --build-dir "${BUILD_DIR}" --mb-per-job 2000
+cmake_build_main --preset "${PRESET}" --build-dir "${BUILD_DIR}" --mb-per-job 2000 2>&1 | tee -a "${BUILD_LOG}"
 
 # %p gives every instrumented test process its own profile instead of one overwritten default.profraw (AGENTS.md section 4).
 if [[ "${COMPILER}" == "clang" ]]; then
@@ -104,7 +108,7 @@ if [[ "${COMPILER}" == "clang" ]]; then
   info "Using preset: ${CLANG_TSAN_PRESET}"
   # Subshell: cmake_build_parse_args overwrites the globals BUILD_DIR, PRESET and PARALLEL_JOBS.
   (
-    cmake_build_main --preset "${CLANG_TSAN_PRESET}" --build-dir "${TSAN_BUILD_DIR}" --mb-per-job 2000
+    cmake_build_main --preset "${CLANG_TSAN_PRESET}" --build-dir "${TSAN_BUILD_DIR}" --mb-per-job 2000 2>&1 | tee -a "${BUILD_LOG}"
   )
 
   # GLib and GStreamer pass buffers through futexes TSan cannot see; a lock-order report shows both locks' stacks.
