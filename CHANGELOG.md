@@ -22,7 +22,7 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 - `run-static-analysis-format.sh` runs the hub's IWYU report (ANTfrastructure CON295 (a)): the image's
   include-what-you-use reads no unit that declares or imports a module, so `code_quality_find_iwyu_files` lists the
-  plain units of `Src` and `Test` (5 of 37 today) and `code_quality_run_iwyu` writes `logs/code-quality/iwyu.txt`.
+  plain units of `Src` and `Test` (7 today: five C++ and two C units) and `code_quality_run_iwyu` writes `logs/code-quality/iwyu.txt`.
   Suggestions stay green; a unit IWYU could not read fails the `iwyu` gate. The ANTfrastructure pin moves to the hub
   commit with the two helpers.
 
