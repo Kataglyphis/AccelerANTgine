@@ -213,17 +213,24 @@ def test_a_stop_string_ends_generation_before_it(generator, tiny_model):
 
 
 # The binding raises RuntimeError with the contract's message; each kind has its own.
-MESSAGES = {"invalid_options": "invalid", "generation_failed": "generation failed"}
+MESSAGES = {
+    "invalid_options": "invalid",
+    "generation_failed": "generation failed",
+    "context_length_exceeded": "context",
+}
 
 
 def test_every_fixture_case_answers_as_the_hub_says(generator, tiny_model):
     """The hub's fixture.json cases (ANTfrastructure CON237): each request's answer or its error kind."""
     cases = tiny_model[1]["cases"]
-    assert len(cases) >= 7, len(cases)
+    assert len(cases) >= 12, len(cases)
     for case in cases:
         messages = [(m["role"], m["content"]) for m in case["messages"]]
         options = budget(case["options"]["max_new_tokens"])
         options.json_schema = case["options"].get("json_schema", "")
+        # JSON holds no NaN: the hub writes the string "NaN" for one (ANTfrastructure CON288 (c)).
+        options.temperature = float(case["options"].get("temperature", 0.0))
+        options.stop = case["options"].get("stop", [])
         expect = case["expect"]
         if "error" in expect:
             with pytest.raises(RuntimeError, match=MESSAGES[expect["error"]]):

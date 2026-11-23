@@ -213,7 +213,7 @@ extern "C" KATAGLYPHIS_C_API auto kataglyphis_text_last_error() -> const char * 
 extern "C" KATAGLYPHIS_C_API auto kataglyphis_text_status_message(int status) -> const char *
 {
     if (status == KATAGLYPHIS_TEXT_OK) { return "success"; }
-    if (status < KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE || status > KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED) {
+    if (status < KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE || status > KATAGLYPHIS_TEXT_CONTEXT_LENGTH_EXCEEDED) {
         return "unknown status";
     }
     return text::to_string(static_cast<text::TextGenError>(status - 1)).data();

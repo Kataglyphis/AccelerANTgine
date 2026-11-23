@@ -4,8 +4,10 @@ module;
 #include <ort_genai_c.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -251,16 +253,20 @@ namespace {
 
     auto valid_options(const GenerationOptions &options) -> bool
     {
-        return options.max_new_tokens > 0 && (!options.seed || *options.seed >= 0)
-               && (options.json_schema.empty() || is_json_object(options.json_schema))
+        return options.max_new_tokens > 0 && (!options.seed || *options.seed >= 0) && std::isfinite(options.temperature)
+               && std::isfinite(options.top_p) && (options.json_schema.empty() || is_json_object(options.json_schema))
                && std::ranges::none_of(
                  options.stop, [](const std::string &stop) { return stop.empty() || !is_plain_utf8(stop); });
     }
 
+    // The roles every binding's chat template knows (ANTfrastructure CON288 (c)); GenAI would pass another one on.
+    constexpr std::array<std::string_view, 4> kRoles{ "system", "user", "assistant", "tool" };
+
     auto valid_messages(const std::vector<ChatMessage> &messages) -> bool
     {
         return !messages.empty() && std::ranges::all_of(messages, [](const ChatMessage &message) {
-            return is_plain_utf8(message.role) && is_plain_utf8(message.content);
+            return is_plain_utf8(message.role) && is_plain_utf8(message.content)
+                   && std::ranges::find(kRoles, message.role) != kRoles.end();
         });
     }
 
@@ -679,6 +685,11 @@ auto TextGenerator::Impl::run(const std::vector<ChatMessage> &messages,
     GenerationResult result;
     result.prompt_tokens = api->SequencesGetSequenceCount(prompt->get(), 0);
     const std::span<const std::int32_t> ids(api->SequencesGetSequenceData(prompt->get(), 0), result.prompt_tokens);
+    // Refused on every path, greedy or sampled (owner D7, ANTfrastructure CON288).
+    if (state.context_tokens > 0
+        && ids.size() + static_cast<std::size_t>(options.max_new_tokens) > state.context_tokens) {
+        return std::unexpected(TextGenError::ContextLengthExceeded);
+    }
     Generator fresh;
     OgaGenerator *generator = nullptr;
     if (continues(options)) {
@@ -728,6 +739,8 @@ auto to_string(TextGenError error) noexcept -> std::string_view
         return "the generator is not initialized";
     case TextGenError::JsonSchemaUnsupported:
         return "this ONNX Runtime GenAI build has no JSON schema support";
+    case TextGenError::ContextLengthExceeded:
+        return "the prompt and the budget exceed the model's context";
     }
     return "unknown error";
 }

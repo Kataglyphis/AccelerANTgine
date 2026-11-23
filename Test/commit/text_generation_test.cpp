@@ -5,10 +5,12 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -428,7 +430,7 @@ TEST_F(TextGeneration, EveryFixtureCaseAnswersAsTheHubSays)
 {
     std::ifstream stream(kModelDir / "fixture.json");
     const auto cases = nlohmann::json::parse(stream).at("cases");
-    ASSERT_GE(cases.size(), 7U);
+    ASSERT_GE(cases.size(), 12U);
     for (const auto &item : cases) {
         const auto name = item.at("name").get<std::string>();
         std::vector<text::ChatMessage> messages;
@@ -437,13 +439,20 @@ TEST_F(TextGeneration, EveryFixtureCaseAnswersAsTheHubSays)
         }
         auto options = budget(item.at("options").at("max_new_tokens").get<std::size_t>());
         options.json_schema = item.at("options").value("json_schema", std::string{});
+        // JSON holds no NaN: the hub writes the string "NaN" for one (ANTfrastructure CON288 (c)).
+        const auto &temperature = item.at("options").value("temperature", nlohmann::json(0.0));
+        options.temperature = temperature.is_string() ? std::nan("") : temperature.get<double>();
+        options.stop = item.at("options").value("stop", std::vector<std::string>{});
         const auto result = generator.generate(messages, options);
         const auto &expect = item.at("expect");
         if (expect.contains("error")) {
             const auto kind = expect.at("error").get<std::string>();
-            const auto wanted =
-              kind == "invalid_options" ? text::TextGenError::InvalidOptions : text::TextGenError::GenerationFailed;
-            ASSERT_TRUE(kind == "invalid_options" || kind == "generation_failed") << name << ": " << kind;
+            const std::map<std::string, text::TextGenError> kinds{ { "invalid_options",
+                                                                     text::TextGenError::InvalidOptions },
+                { "generation_failed", text::TextGenError::GenerationFailed },
+                { "context_length_exceeded", text::TextGenError::ContextLengthExceeded } };
+            ASSERT_TRUE(kinds.contains(kind)) << name << ": " << kind;
+            const auto wanted = kinds.at(kind);
             EXPECT_EQ(kataglyphis::test::error_of(result), wanted) << name;
             continue;
         }

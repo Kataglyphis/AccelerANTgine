@@ -76,7 +76,8 @@ TEST(CApiContract, TextStatusesAreTheCppErrorsShiftedByOne)
     static_assert(as_int(text::TextGenError::GenerationFailed) + 1 == KATAGLYPHIS_TEXT_GENERATION_FAILED);
     static_assert(as_int(text::TextGenError::NotInitialized) + 1 == KATAGLYPHIS_TEXT_NOT_INITIALIZED);
     static_assert(as_int(text::TextGenError::JsonSchemaUnsupported) + 1 == KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED);
-    for (int status = KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE; status <= KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED;
+    static_assert(as_int(text::TextGenError::ContextLengthExceeded) + 1 == KATAGLYPHIS_TEXT_CONTEXT_LENGTH_EXCEEDED);
+    for (int status = KATAGLYPHIS_TEXT_LIBRARY_UNAVAILABLE; status <= KATAGLYPHIS_TEXT_CONTEXT_LENGTH_EXCEEDED;
       ++status) {
         EXPECT_EQ(std::string(kataglyphis_text_status_message(status)),
           std::string(text::to_string(static_cast<text::TextGenError>(status - 1))));
@@ -84,7 +85,7 @@ TEST(CApiContract, TextStatusesAreTheCppErrorsShiftedByOne)
     EXPECT_EQ(std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_OK)), "success");
     EXPECT_EQ(std::string(kataglyphis_text_status_message(-1)), "unknown status");
     EXPECT_EQ(
-      std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED + 1)), "unknown status");
+      std::string(kataglyphis_text_status_message(KATAGLYPHIS_TEXT_CONTEXT_LENGTH_EXCEEDED + 1)), "unknown status");
 }
 
 TEST(CApiContract, TextOptionDefaultsAreTheCppDefaults)

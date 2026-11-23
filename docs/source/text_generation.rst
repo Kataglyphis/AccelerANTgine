@@ -90,7 +90,9 @@ lacks. ``KATAGLYPHIS_TEXT_OPTIONS_V1_SIZE`` is the first sized layout, ``struct_
 - ``seed``: ``KATAGLYPHIS_TEXT_NO_SEED`` (any negative value) lets GenAI draw one; above
   ``INT32_MAX`` is an invalid argument.
 - ``json_schema``: ``NULL`` or empty for none. Without llguidance ``_generate`` returns
-  ``KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED`` (10), its own status.
+  ``KATAGLYPHIS_TEXT_JSON_SCHEMA_UNSUPPORTED`` (10), its own status, and a prompt whose tokens plus
+  ``max_new_tokens`` pass the model's ``context_length`` is ``KATAGLYPHIS_TEXT_CONTEXT_LENGTH_EXCEEDED``
+  (11), refused before decoding starts (ANTfrastructure CON288).
 - ``stop`` and ``stop_count``: an array of non-empty strings; a count with a ``NULL`` array is an
   invalid argument.
 - ``token_ids`` and ``token_id_capacity``: an optional buffer that receives the first generated

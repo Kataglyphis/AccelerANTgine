@@ -29,6 +29,7 @@ enum class TextGenError {
     GenerationFailed,
     NotInitialized,
     JsonSchemaUnsupported,
+    ContextLengthExceeded,
 };
 
 using inference::ExecutionProvider;

@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-23, the fixture's refusals before GenAI runs)
+
+- The hub pin moves to 7b1e32d2 (ANTfrastructure CON288 (c), owner D7). `valid_messages` refuses a role outside system,
+  user, assistant and tool and `valid_options` a NaN or infinite `temperature` or `top_p` (a NUL byte was refused
+  already); `generate` refuses a prompt plus budget past the model's `context_length` as the new
+  `TextGenError::ContextLengthExceeded`, C status `KATAGLYPHIS_TEXT_CONTEXT_LENGTH_EXCEEDED` (11), before decoding on
+  either path. The C++ and Python fixture replays pass `temperature`, the hub's `"NaN"` as a NaN, and `stop`, and know
+  the new kind.
+
 ### Fixed (2026-11-23, the clang-cl fuzz harness traps on undefined behaviour)
 
 - The arm64 cross build of run 44976751830 failed to link `fuzzTestSuite.exe`: without ASan, a UBSan object asks for
