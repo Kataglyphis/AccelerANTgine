@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <chrono>
 #include <climits>
 #include <condition_variable>
@@ -17,6 +18,7 @@
 #include <iterator>
 #include <limits>
 #include <mutex>
+#include <span>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -27,6 +29,7 @@
 #include "kCocoClasses.inc"
 #include "kInferenceContract.inc"
 #include "kShippedInferenceConfig.inc"
+#include "kataglyphis_sha256.h"
 
 import nlohmann.json;
 import kataglyphis.onnx_inference;
@@ -861,6 +864,28 @@ TEST(FramePreprocessing, MatchesTheSharedModelAntContract)
 
 namespace {
 
+// A contract case's expected detections in order: class, score and x1, y1, x2, y2 within the tolerances.
+void expect_contract_boxes(const std::vector<detection::BoundingBox> &found,
+  const nlohmann::json &expected,
+  double score_tolerance,
+  double coordinate_tolerance)
+{
+    ASSERT_EQ(found.size(), expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        const auto &box = found[i];
+        EXPECT_EQ(box.class_id, expected[i]["class"].get<int>()) << i;
+        EXPECT_NEAR(box.confidence, expected[i]["score"].get<double>(), score_tolerance) << i;
+        // The contract's box is x1, y1, x2, y2; this one is the near corner and a size.
+        const std::array<double, 4> corners{
+            box.x, box.y, static_cast<double>(box.x) + box.width, static_cast<double>(box.y) + box.height
+        };
+        for (std::size_t corner = 0; corner < corners.size(); ++corner) {
+            EXPECT_NEAR(corners[corner], expected[i]["box"][corner].get<double>(), coordinate_tolerance)
+              << i << " corner " << corner;
+        }
+    }
+}
+
 // JSON has no NaN and no infinity, so the contract spells them as strings that strtof reads.
 auto contract_number(const nlohmann::json &value) -> float
 {
@@ -912,22 +937,109 @@ TEST(YoloDecoder, MatchesTheDecodeCasesOfTheSharedModelAntContract)
         }
         const auto found = detection::decode_detections(tensor, config, mapping);
         ASSERT_TRUE(found.has_value());
-        const auto &expected = item["expected"];
-        ASSERT_EQ(found->size(), expected.size());
-        for (std::size_t i = 0; i < expected.size(); ++i) {
-            const auto &box = (*found)[i];
-            EXPECT_EQ(box.class_id, expected[i]["class"].get<int>()) << i;
-            EXPECT_NEAR(box.confidence, expected[i]["score"].get<double>(), score_tolerance) << i;
-            // The contract's box is x1, y1, x2, y2; this one is the near corner and a size.
-            const std::array<double, 4> corners{
-                box.x, box.y, static_cast<double>(box.x) + box.width, static_cast<double>(box.y) + box.height
-            };
-            for (std::size_t corner = 0; corner < corners.size(); ++corner) {
-                EXPECT_NEAR(corners[corner], expected[i]["box"][corner].get<double>(), coordinate_tolerance)
-                  << i << " corner " << corner;
+        expect_contract_boxes(*found, item["expected"], score_tolerance, coordinate_tolerance);
+    }
+}
+
+// ModelANT's raw heads (owner D6, ANTfrastructure CON288 (e)): scored, suppressed and mapped, in score order.
+TEST(YoloDecoder, MatchesTheRawHeadCasesOfTheSharedModelAntContract)
+{
+    const auto contract = nlohmann::json::parse(kInferenceContract, nullptr, false);
+    ASSERT_FALSE(contract.is_discarded());
+    ASSERT_TRUE(contract.contains("raw_decode"));
+    const auto &raw = contract["raw_decode"];
+    ASSERT_EQ(raw["order"], "score");
+    detection::YoloConfig config;
+    ASSERT_FLOAT_EQ(config.nms_threshold, raw["iou_threshold"].get<float>());
+    ASSERT_FALSE(raw["cases"].empty());
+    for (const auto &item : raw["cases"]) {
+        SCOPED_TRACE(item["name"].get<std::string>());
+        const auto layout = detection::layout_from_metadata(item["layout"].get<std::string>());
+        ASSERT_TRUE(layout.has_value());
+        config.output_layout = *layout;
+        const auto &output = item["output"];
+        const auto rows = output.size();
+        const auto columns = output[0].size();
+        // The anchor layout's rows are its channels: four box values, then one per class.
+        config.num_classes =
+          static_cast<int>(*layout == detection::YoloOutputLayout::CenterScoresByAnchor ? rows - 4 : columns - 5);
+        config.confidence_threshold = item["score_threshold"].get<float>();
+        config.input_width = item["input_width"].get<std::uint32_t>();
+        config.input_height = item["input_height"].get<std::uint32_t>();
+        const detection::FrameMapping mapping{ item["mapping"]["scale_x"].get<float>(),
+            item["mapping"]["scale_y"].get<float>(),
+            item["mapping"]["pad_x"].get<float>(),
+            item["mapping"]["pad_y"].get<float>(),
+            item["width"].get<std::uint32_t>(),
+            item["height"].get<std::uint32_t>() };
+        kataglyphis::inference::TensorData tensor;
+        tensor.shape.dimensions = { 1, rows, columns };
+        for (const auto &row : output) {
+            for (const auto &value : row) { tensor.data.push_back(value.get<float>()); }
+        }
+        const auto found = detection::decode_detections(tensor, config, mapping);
+        ASSERT_TRUE(found.has_value());
+        expect_contract_boxes(
+          *found, item["expected"], raw["score_tolerance"].get<double>(), raw["coordinate_tolerance"].get<double>());
+    }
+}
+
+// ModelANT's full-size frames (ANTfrastructure CON288 (e)): the production tensor bit for bit, by samples and digest.
+TEST(FramePreprocessing, MatchesTheFullSizeFramesOfTheSharedModelAntContract)
+{
+    static_assert(std::endian::native == std::endian::little, "the digest is over little-endian float bytes");
+    const auto contract = nlohmann::json::parse(kInferenceContract, nullptr, false);
+    ASSERT_FALSE(contract.is_discarded());
+    ASSERT_TRUE(contract.contains("digest_cases"));
+    for (const auto &item : contract["digest_cases"]["cases"]) {
+        SCOPED_TRACE(item["name"].get<std::string>());
+        const auto width = item["width"].get<std::size_t>();
+        const auto height = item["height"].get<std::size_t>();
+        const auto channels = item["pixel_format"].get<std::string>().size();
+        const auto stride = item["row_stride_bytes"].get<std::size_t>();
+        const auto offset = item["plane_offset_bytes"].get<std::size_t>();
+        gstreamer::BufferInfo frame;
+        frame.metadata.width = static_cast<std::uint32_t>(width);
+        frame.metadata.height = static_cast<std::uint32_t>(height);
+        frame.metadata.format = item["pixel_format"].get<std::string>();
+        frame.metadata.row_stride_bytes = static_cast<std::int64_t>(stride);
+        frame.metadata.plane_offset_bytes = offset;
+        // digest_cases.frame: each byte from x, y and the channel, 171 in every padding and offset byte.
+        frame.data.assign(offset + (stride * height), std::byte{ 171 });
+        for (std::size_t y = 0; y < height; ++y) {
+            for (std::size_t x = 0; x < width; ++x) {
+                for (std::size_t c = 0; c < channels; ++c) {
+                    frame.data[offset + (y * stride) + (x * channels) + c] =
+                      static_cast<std::byte>(((7 * x) + (13 * y) + (61 * c)) % 256);
+                }
             }
         }
+        frame.size = frame.data.size();
+        const auto mode = item["mode"] == "letterbox" ? detection::FramePreprocessMode::Letterbox
+                                                      : detection::FramePreprocessMode::Stretch;
+        const auto input_width = item["input_width"].get<std::uint32_t>();
+        const auto input_height = item["input_height"].get<std::uint32_t>();
+        const auto result = detection::preprocess_frame(frame, input_width, input_height, mode);
+        ASSERT_TRUE(result.has_value());
+        for (const auto &sample : item["samples"]) {
+            const auto at = (sample[0].get<std::size_t>() * input_width * input_height)
+                            + (sample[1].get<std::size_t>() * input_width) + sample[2].get<std::size_t>();
+            EXPECT_EQ(
+              std::bit_cast<std::uint32_t>(result->data.at(at)), std::bit_cast<std::uint32_t>(sample[3].get<float>()))
+              << sample.dump();
+        }
+        const std::span<const unsigned char> bytes(
+          reinterpret_cast<const unsigned char *>(result->data.data()), result->data.size() * sizeof(float));
+        EXPECT_EQ(kataglyphis::test::sha256_hex(bytes), item["expected_sha256"].get<std::string>());
     }
+}
+
+TEST(TestSupport, Sha256GivesTheFipsExampleDigest)
+{
+    const std::string abc = "abc";
+    EXPECT_EQ(kataglyphis::test::sha256_hex(std::span(reinterpret_cast<const unsigned char *>(abc.data()), abc.size())),
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    EXPECT_EQ(kataglyphis::test::sha256_hex({}), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 }
 
 namespace {

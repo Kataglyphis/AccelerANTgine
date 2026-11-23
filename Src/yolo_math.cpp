@@ -214,7 +214,8 @@ namespace {
 
     auto apply_nms(std::vector<BoundingBox> &boxes, float nms_threshold) -> void
     {
-        std::ranges::sort(
+        // Stable: an equal score keeps the lower candidate first (owner D6, ModelANT raw_decode rule 4).
+        std::ranges::stable_sort(
           boxes, [](const BoundingBox &a, const BoundingBox &b) -> bool { return a.confidence > b.confidence; });
         std::vector<bool> suppressed(boxes.size(), false);
         for (std::size_t i = 0; i < boxes.size(); ++i) {

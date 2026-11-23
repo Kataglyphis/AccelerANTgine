@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-23, ModelANT's full-size frames and raw heads replay here)
+
+- The ModelANT pin moves to f845b60, whose `inference-v1.json` adds `digest_cases` and `raw_decode` (ANTfrastructure
+  CON288 (e)). `MatchesTheFullSizeFramesOfTheSharedModelAntContract` builds each frame as its strided buffer, padding
+  and offset included, runs `preprocess_frame` and matches the tensor's samples and SHA-256 bit for bit
+  (`Test/common/kataglyphis_sha256.h`, checked against the FIPS examples). `MatchesTheRawHeadCasesOfTheSharedModelAntContract`
+  feeds each raw-head case to `decode_detections` and matches classes, scores and boxes in score order.
+- `apply_nms` sorts stably, so of two boxes with one score the lower candidate stays first, as owner decision D6
+  fixes; `std::ranges::sort` gave no such order.
+
 ### Changed (2026-11-23, the fixture's refusals before GenAI runs)
 
 - The hub pin moves to 7b1e32d2 (ANTfrastructure CON288 (c), owner D7). `valid_messages` refuses a role outside system,
