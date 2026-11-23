@@ -16,9 +16,9 @@ if(COMMAND link_fuzztest)
   # myproject_options carries the sanitizer and exception flags the library's module BMIs were built with.
   target_link_libraries(${FUZZ_TEST_SUITE} PRIVATE myproject_options ${PROJECT_NAME})
   if(MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # absl's swisstable layout follows ASan alone, which clang-cl leaves off absl and FuzzTest; UBSan stays on.
+    # absl's layout follows ASan, which clang-cl leaves off absl and FuzzTest; UBSan traps: /MD has no runtime for it.
     add_library(kataglyphis_fuzz_unsanitized INTERFACE)
-    target_compile_options(kataglyphis_fuzz_unsanitized INTERFACE -fno-sanitize=address)
+    target_compile_options(kataglyphis_fuzz_unsanitized INTERFACE -fno-sanitize=address -fsanitize-trap=undefined)
     target_link_libraries(${FUZZ_TEST_SUITE} PRIVATE kataglyphis_fuzz_unsanitized)
   endif()
 

@@ -154,7 +154,9 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   binaries, hub pin 747e7b9a), gstplayback and gstwebrtc staged with the 7-test skip list (D2; **in source since
   2026-11-22**: `allowed_skips` in the staged manifest, none for the compile and fuzz suites), the in-container
   Profile perf run deleted (**in source since 2026-11-22**, `KATAGLYPHIS_REQUIRE_MODEL=1` around the host and staged
-  perf runs), the fuzz harness with `-fno-sanitize=address` (**in source since 2026-11-22**). (12) The GPU candidate
+  perf runs), the fuzz harness with `-fno-sanitize=address` (**in source since 2026-11-22**; it traps on undefined
+  behaviour since 2026-11-23, as arm64 has no UBSan runtime to link). Run 44976751830 proved (a) to (c) on x64: 228
+  staged tests passed, the seven listed skips and no other, the PE gate and the required model. (12) The GPU candidate
   lanes once after 11 (owner hardware). (13) With the first real bridge: an unwinding `[profile.bridge]` with a
   configure-time check (D4), scoped cargo gates, the crate budget and forbid list, a parity suite as the deletion
   gate. (14) After CON145: no configure-time `cargo install cxxbridge-cmd`. Beyond the detector-math target the owner

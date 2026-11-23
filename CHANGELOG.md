@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-23, the clang-cl fuzz harness traps on undefined behaviour)
+
+- The arm64 cross build of run 44976751830 failed to link `fuzzTestSuite.exe`: without ASan, a UBSan object asks for
+  `clang_rt.ubsan_standalone.lib`, which arm64's LLVM does not ship, and /MD has no UBSan runtime of its own. The
+  harness now compiles with `-fsanitize-trap=undefined` beside `-fno-sanitize=address`, the hub's rule for clang-cl
+  without ASan: every UBSan check stays on and ends the run on a trap, with no runtime to link.
+
 ### Changed (2026-11-22, the Linux lane runs one step per part)
 
 - `ci-run-all.sh --part build-test|coverage|static|bench|python|skips|release|docs` runs one part through the hub's

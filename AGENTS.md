@@ -391,7 +391,9 @@ written out rather than linked.
   pytest reports, the wheel tests and the text contract per ABI); a skipped, not-run or missing report fails. Windows allows exactly seven skips since 2026-11-22 (owner D2): its staged manifest lists the six `webrtcsink` tests and the bundled scanner case as the commit suite's `allowed_skips` (hub CON292), the compile and fuzz suites allow none, and a skip off the list or a listed test that runs fails the lane. The Debug
   presets build UBSan recoverable, so the same script exports `UBSAN_OPTIONS=halt_on_error=1`; a
   report used to print and the test still passed.
-- **On clang-cl the fuzz suite is built without ASan, and keeps UBSan** (since 2026-11-22). absl's
+- **On clang-cl the fuzz suite is built without ASan, and keeps UBSan as traps** (since 2026-11-22;
+  `-fsanitize-trap=undefined` since 2026-11-23, as /MD has no UBSan runtime without ASan and arm64's LLVM
+  ships no standalone one: run 44976751830 failed to link it). absl's
   swisstable layout depends on ASan alone (`ABSL_SWISSTABLE_ENABLE_GENERATIONS`), and clang-cl applies ASan only through
   `myproject_options`, so absl and FuzzTest were not instrumented there while the suite was. Its
   absl COMDATs then won over absl's own and crashed a static initialiser (`FLAGS_nofuzz`, run
