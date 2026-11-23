@@ -144,6 +144,30 @@
   "why": "The clang-tidy findings must reach the quality-report artifact."
  },
  {
+  "id": "static.iwyu-runs",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "  run_gate iwyu run_iwyu\n",
+  "replace": "",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "The static lane must run the hub's IWYU report, or the plain units go unchecked."
+ },
+ {
+  "id": "static.iwyu-log",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "\"${CODE_QUALITY_COMPILE_DB_DIR}\" \"${IWYU_LOG}\" \"${abs_files[@]}\"",
+  "replace": "\"${CODE_QUALITY_COMPILE_DB_DIR}\" /dev/null \"${abs_files[@]}\"",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "The IWYU report must reach the logs CI keeps."
+ },
+ {
+  "id": "static.iwyu-plain-units",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "mapfile -t IWYU_FILES   < <(code_quality_find_iwyu_files Src Test)",
+  "replace": "mapfile -t IWYU_FILES   < <(code_quality_find_clang_tidy_files Src Test)",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "A module unit handed to the image's IWYU fails on the newer module format."
+ },
+ {
   "id": "static.sources-unchanged",
   "target": "scripts/linux/run-static-analysis-format.sh",
   "find": "run_gate sources-unchanged check_sources_unchanged\n",

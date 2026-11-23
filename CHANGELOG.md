@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-23, the static lane reports IWYU on the plain units)
+
+- `run-static-analysis-format.sh` runs the hub's IWYU report (ANTfrastructure CON295 (a)): the image's
+  include-what-you-use reads no unit that declares or imports a module, so `code_quality_find_iwyu_files` lists the
+  plain units of `Src` and `Test` (5 of 37 today) and `code_quality_run_iwyu` writes `logs/code-quality/iwyu.txt`.
+  Suggestions stay green; a unit IWYU could not read fails the `iwyu` gate. The ANTfrastructure pin moves to the hub
+  commit with the two helpers.
+
 ### Changed (2026-11-23, ModelANT's full-size frames and raw heads replay here)
 
 - The ModelANT pin moves to f845b60, whose `inference-v1.json` adds `digest_cases` and `raw_decode` (ANTfrastructure

@@ -34,6 +34,14 @@ if [[ "${STUB_TIDY_REWRITES:-0}" == 1 ]]; then echo '// rewritten' >> Src/engine
 echo "$(pwd)/Src/engine.cpp:3:5: warning: suspicious division [bugprone-integer-division]"
 echo '1 warning generated.' >&2
 SH
+cat > "${work}/bin/iwyu_tool" <<'SH'
+#!/usr/bin/env bash
+echo "iwyu_tool $*" >> "${STUB_LOG}"
+echo "$(pwd)/Src/engine.cpp should remove these lines:"
+echo "The full include-list for $(pwd)/Src/engine.cpp:"
+if [[ "${STUB_IWYU_UNREAD:-0}" == 1 ]]; then echo "$(pwd)/Src/engine.cpp:1:1: error: PCH file uses a newer PCH format"; fi
+exit 0
+SH
 cat > "${work}/bin/scan-build" <<'SH'
 #!/usr/bin/env bash
 echo "scan-build $*" >> "${STUB_LOG}"
@@ -69,6 +77,7 @@ make_tree() {
   mkdir -p "${work}/tree/Src" "${work}/tree/Test" "${work}/tree/build" "${work}/tree/build-scan-build"
   : > "${work}/tree/build-scan-build/CMakeCache.txt"
   printf 'int engine() { return 1; }\n' > "${work}/tree/Src/engine.cpp"
+  printf 'module;\nexport module kataglyphis.engine;\n' > "${work}/tree/Src/engine_module.cpp"
   printf 'int test() { return 0; }\n' > "${work}/tree/Test/engine_test.cpp"
   printf 'cmake_minimum_required(VERSION 3.30)\n' > "${work}/tree/CMakeLists.txt"
   printf '[]\n' > "${work}/tree/build/compile_commands.json"
@@ -96,6 +105,13 @@ grep -qxF "cmake --preset linux-debug-clang -B build-scan-build -D COMPILER_CACH
 grep '^scan-build ' "${work}/calls" | grep -v -- '--use-c++=clang++' && fail 'a scan-build call lets ccc-analyzer fall back to g++'
 grep -q '^cmake --build build-scan-build --target AccelerANTgine$' "${work}/calls" || fail 'scan-build does not build the library target'
 
+grep '^iwyu_tool ' "${work}/calls" | grep -q 'Src/engine.cpp' || fail 'IWYU did not read the plain unit'
+grep '^iwyu_tool ' "${work}/calls" | grep -q 'engine_module.cpp' && fail 'IWYU was handed a module unit it cannot read'
+grep -q 'IWYU: 1 file(s) with include suggestions' "${work}/out" || fail 'the IWYU suggestions are not reported'
+grep -q 'should remove these lines' "${work}/tree/logs/code-quality/iwyu.txt" 2>/dev/null \
+  || fail 'the IWYU report did not reach logs/code-quality/iwyu.txt'
+
+expect fail 'a unit IWYU could not read fails' STUB_IWYU_UNREAD=1
 expect fail 'scan-build analysing no unit fails' STUB_SCAN_UNITS=0
 expect fail 'a scan-build finding fails' STUB_SCAN_BUG=1
 expect fail 'a unit the analyzer could not parse fails' STUB_SCAN_FAILURES=1

@@ -49,6 +49,8 @@ FORMAT_ROOTS=(Src Test Bindings cmake)
 
 mapfile -t FORMAT_FILES < <(code_quality_find_cpp_files "${FORMAT_ROOTS[@]}")
 mapfile -t SRC_FILES    < <(code_quality_find_clang_tidy_files Src)
+# The image's IWYU reads no module unit, so the hub lists the plain ones (CON295 (a)).
+mapfile -t IWYU_FILES   < <(code_quality_find_iwyu_files Src Test)
 
 if [[ ${#SRC_FILES[@]} -eq 0 ]]; then
   # Src/ exists and is full of modules, so an empty set is a discovery bug.
@@ -62,7 +64,7 @@ fi
 code_quality_ensure_cmake_format
 
 # Every tool up front, the missing ones named together.
-require_tools cmake cmake-format clang-format clang-tidy scan-build clang++
+require_tools cmake cmake-format clang-format clang-tidy scan-build clang++ iwyu_tool
 
 # Every analysis runs, failures are recorded, and assert_gates decides once.
 gate_reset "static-analysis"
@@ -87,6 +89,7 @@ run_gate clang-format check_clang_format
 
 # quality-report.toml declares this file as the clang-tidy artifact metric.
 TIDY_LOG="logs/code-quality/clang-tidy.txt"
+IWYU_LOG="logs/code-quality/iwyu.txt"
 SCAN_BUILD_DIR="${BUILD_DIR}-scan-build"
 SCAN_BUILD_REPORTS="scan-build-reports"
 SCAN_BUILD_TARGET="AccelerANTgine"
@@ -143,12 +146,23 @@ run_clang_tidy() {
   return "${status}"
 }
 
+# Report only (owner, hub CON295 (a)): suggestions stay green, a unit IWYU could not read is red.
+run_iwyu() {
+  local abs_files=() status=0
+  code_quality_prepare_compile_db "${BUILD_DIR}"
+  mapfile -t abs_files < <(printf '%s\n' "${IWYU_FILES[@]}" | sed "s#^#$(pwd)/#")
+  code_quality_run_iwyu "${CODE_QUALITY_COMPILE_DB_DIR}" "${IWYU_LOG}" "${abs_files[@]}" || status=$?
+  code_quality_cleanup_compile_db
+  return "${status}"
+}
+
 if [[ "${COMPILER}" == "clang" ]]; then
   if [[ "${DIRECT_ANALYZE}" == "1" ]]; then
     run_gate clang-analyze clang++ --analyze -Xanalyzer -analyzer-output=html "${SRC_FILES[@]}"
   fi
   run_gate scan-build run_scan_build
   run_gate clang-tidy run_clang_tidy
+  run_gate iwyu run_iwyu
 else
   # A GCC compile_commands.json carries module flags clang-tidy cannot parse (AGENTS.md section 4).
   info "Skipping clang-tidy and scan-build for compiler='${COMPILER}' (clang-only analyses)."
