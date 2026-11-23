@@ -90,6 +90,14 @@ if(TARGET ${PROJECT_NAME}_demo)
   target_compile_features(${PROJECT_NAME}_demo PRIVATE cxx_std_23)
 endif()
 
+# The product targets stop on a warning (hub CON295 (c) step 3); tests, fuzzers and dependencies stay with the census.
+foreach(_product ${PROJECT_NAME} ${PROJECT_NAME}_cli ${PROJECT_NAME}_demo)
+  if(TARGET ${_product})
+    target_compile_options(${_product}
+                           PRIVATE $<IF:$<STREQUAL:${CMAKE_CXX_COMPILER_FRONTEND_VARIANT},MSVC>,/WX,-Werror>)
+  endif()
+endforeach()
+
 # Define export macro for building the DLL
 target_compile_definitions(${PROJECT_NAME} PRIVATE KATAGLYPHIS_EXPORTS)
 

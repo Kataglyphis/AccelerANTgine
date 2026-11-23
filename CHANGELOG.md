@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-24, a warning in a product target is an error)
+
+- The library, `AccelerANTgine_cli` and `AccelerANTgine_demo` compile with `-Werror` (`/WX` under clang-cl), the last
+  of ANTfrastructure CON295 (c)'s three steps: their own warnings went to zero in b96099a4, as the census proved on
+  both x64 lanes. Abseil joins as a SYSTEM dependency, as clang's `-Wnullability-extension` in its headers would
+  otherwise stop the CLI. Tests, fuzzers and dependencies keep their warnings and the census; nlohmann's module,
+  abseil, FUZZTEST and nanobind warn in their own targets, which this does not touch.
+
 ### Fixed (2026-11-23, the own compiler warnings, before warnings become errors)
 
 - The warnings the census held are fixed, as the owner chose for ANTfrastructure CON295 (c) step 3 (fix first, then
