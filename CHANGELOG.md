@@ -22,8 +22,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 - The library, `AccelerANTgine_cli` and `AccelerANTgine_demo` compile with `-Werror` (`/WX` under clang-cl), the last
   of ANTfrastructure CON295 (c)'s three steps: their own warnings went to zero in b96099a4, as the census proved on
-  both x64 lanes. Abseil joins as a SYSTEM dependency, as clang's `-Wnullability-extension` in its headers would
-  otherwise stop the CLI. Tests, fuzzers and dependencies keep their warnings and the census; nlohmann's module,
+  both x64 lanes. CMake builds an imported module's BMI with the importing target's flags, so two warnings that are
+  the dependencies' own stay warnings: GCC's `-Wexpose-global-module-tu-local` in nlohmann's module and clang's
+  `-Wnullability-extension` in Abseil's headers (Abseil as a SYSTEM dependency broke clang-cl's parse of its
+  `function_ref.h`, so it is not one). Tests, fuzzers and dependencies keep their warnings and the census; nlohmann's module,
   abseil, FUZZTEST and nanobind warn in their own targets, which this does not touch.
 
 ### Fixed (2026-11-23, the own compiler warnings, before warnings become errors)

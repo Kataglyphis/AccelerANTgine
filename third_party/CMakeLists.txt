@@ -17,9 +17,7 @@ FetchContent_Declare(
   # Must stay >= the absl_TAG in FUZZTEST/cmake/BuildDependencies.cmake: this
   # declaration wins, and an older Abseil lacks e.g. absl::random_mocking_access.
   # renovate: datasource=github-tags depName=abseil/abseil-cpp versioning=loose
-  GIT_TAG 20260817.0
-  # SYSTEM: its headers' warnings (clang's -Wnullability-extension) are not ours, and the product targets use -Werror.
-  SYSTEM)
+  GIT_TAG 20260817.0)
 
 set(ABSL_USE_CXX_EXCEPTIONS
     OFF
