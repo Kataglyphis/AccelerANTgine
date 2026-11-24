@@ -11,13 +11,20 @@ if(TARGET myproject_dependency_hardening)
   add_compile_definitions(${_dependency_hardening_definitions})
 endif()
 
+# SYSTEM for GCC and clang (its pedantic and conversion warnings are not ours); clang-cl misparses function_ref.h so.
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  set(_absl_system "")
+else()
+  set(_absl_system SYSTEM)
+endif()
 FetchContent_Declare(
   abseil-cpp
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
   # Must stay >= the absl_TAG in FUZZTEST/cmake/BuildDependencies.cmake: this
   # declaration wins, and an older Abseil lacks e.g. absl::random_mocking_access.
   # renovate: datasource=github-tags depName=abseil/abseil-cpp versioning=loose
-  GIT_TAG 20260817.0)
+  GIT_TAG 20260817.0
+  ${_absl_system})
 
 set(ABSL_USE_CXX_EXCEPTIONS
     OFF

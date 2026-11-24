@@ -91,8 +91,10 @@ if(TARGET ${PROJECT_NAME}_demo)
 endif()
 
 # Products stop on a warning (CON295 (c)); an imported module's BMI takes these flags, so nlohmann's and abseil's stay.
-set(_foreign_warnings $<$<CXX_COMPILER_ID:GNU>:-Wno-error=expose-global-module-tu-local>
-                      $<$<CXX_COMPILER_ID:Clang>:-Wno-error=nullability-extension>)
+set(_foreign_warnings
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-error=expose-global-module-tu-local>
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-error=template-names-tu-local>
+    $<$<CXX_COMPILER_ID:Clang>:-Wno-error=nullability-extension>)
 foreach(_product ${PROJECT_NAME} ${PROJECT_NAME}_cli ${PROJECT_NAME}_demo)
   if(TARGET ${_product})
     target_compile_options(${_product} PRIVATE $<IF:$<STREQUAL:${CMAKE_CXX_COMPILER_FRONTEND_VARIANT},MSVC>,/WX,-Werror>
