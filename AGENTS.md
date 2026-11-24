@@ -37,11 +37,11 @@ and **C++23 named modules** (`.ixx`) shape most of its tooling.
 
 | Path | What lives there |
 | --- | --- |
-| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `text_generation`, `execution_provider`, `config_error`, `log`, `kataglyphis_c_api` (the embedder-facing ABI) and `Src/rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
+| `Src/` | The library: `onnx_inference_engine`, `yolo_detector`, `gstreamer_pipeline`, `gstreamer_runtime`, `webrtc_streamer`, `toml_config`, `config_loader`, `inference_lib`, `text_generation`, `execution_provider`, `config_error`, `log`, `kataglyphis_c_api` (the embedder-facing ABI) and `Src/rusty_code/`. The CLI (`cli_main.cpp`) and the demo (`inference_demo.cpp`, `AccelerANTgine_demo`) are programs of their own, built only when this is the top-level project, so the library carries no `main()` |
 | `Bindings/` | Python bindings (`Bindings/python`, tests in `Test/python`) |
 | `Test/` | The five C++ suites `commit`, `compile`, `fuzz`, `golden` and `perf` (`docs/source/development_workflow.rst` § *The Suites*); `common/`, the helpers that generate their ONNX models; `contract/`, the text contract sources the commit suite builds; `cmake/`, the discovery helpers; `Test/python` tests the bindings |
 | `scripts/linux/` | The `ci-*.sh` chain, run end to end by `ci-run-all.sh`; the lint, static-analysis and Renovate wrappers; `junit_to_markdown.py` (the docs' test-result pages); the `lib/antfrastructure.sh` bootstrap |
-| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the Pester suite in `tests/` and `generated-artifacts.txt`, the pathspecs the hub's generated-artifacts suite reads. No project-local `modules/`: `WindowsOrtBundle.Common`, the ONNX Runtime proof of a staged bundle, became the hub's `WindowsOrtPayload.Common` on 2026-09-25 |
+| `scripts/windows/` | `Build-Windows.ps1` + its `Build-Windows.config.psd1` table, `Build-PythonBindings.ps1`, the entry points (`Start-Windows.ps1`, `Invoke-Container*.ps1`, `Show-BuildHelp.ps1`), the `Resolve-BuildModule.ps1` bootstrap, the Pester suite in `tests/` and `generated-artifacts.txt`, the pathspecs the hub's generated-artifacts suite reads. `modules/` holds only `WindowsGpuCandidate.Common` (§ 2); the ONNX Runtime proof of a staged bundle is the hub's `WindowsOrtPayload.Common` |
 | `third_party/ANTfrastructure` | The submodule owning every reusable script, module and doc |
 | `third_party/ModelANT` | The pinned, data-only inference contract used by the C++ regression suite; model weights remain release downloads |
 
@@ -295,8 +295,9 @@ written out rather than linked.
   stage test plugins and ORT beside their root suites; Release does neither. Warn when the
   selected GStreamer bin is missing. DirectML must come from the chain ONNX Runtime install.
 - **Presets are per-compiler and per-sanitizer**, not a single matrix:
-  `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`, `linux-debug-clang-tsan`, and on
-  Windows `x64-ClangCL-Windows-{Debug,RelWithDebInfo,Profile,Release}` plus
+  `linux-{debug,profile,RelWithDebInfo,release}-{clang,GNU}`, `linux-debug-clang-tsan`,
+  `linux-fuzz-clang`, `linux-riscv64-cross`, and on Windows
+  `x64-ClangCL-Windows-{Debug,RelWithDebInfo,Profile,Release}` plus
   `x64-MSVC-Windows-{Debug,Release}`. Coverage requires a matching compiler: gcovr only reads GCC
   output, llvm-cov only clang.
 - **Rust is in every build, with no switch** (owner, 2026-10-20). `Src/rusty_code` is imported,
@@ -373,16 +374,16 @@ written out rather than linked.
   real-model contract (`Test/contract/`, `Test/python/contract_text_generation.py`) needs
   `resources/models/llm.lock` fetched; CI sets `KATAGLYPHIS_REQUIRE_MODEL=1` so CMake fails
   without it.
-- **A GStreamer test skips when an element is missing; Windows stages four plugins.**
+- **A GStreamer test skips when an element is missing; Windows stages six plugins.**
   `KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS` probes through the library and names the missing
   element in its `GTEST_SKIP`. GStreamer looks for plugins in the directory of
   `gstreamer-1.0-0.dll`, minus a trailing `bin`, plus `lib\gstreamer-1.0`. That DLL sits in
-  `build-*\bin`, so `Copy-ImageGStreamerTestPlugins` copies coreelements, app, videotestsrc and
-  videoconvertscale from the image into `build-*\lib\gstreamer-1.0` for the Debug and Profile
-  trees. The staged Release suites (`dist\windows-<arch>-tests`, a flat directory) get them in
-  their own `lib\gstreamer-1.0`, with the plugins' imports beside the suites; the hub's import
-  walk resolves a name anywhere in the tree. The WebRTC tests need `webrtcsink`
-  (gst-plugins-rs), which only the Linux image has.
+  `build-*\bin`, so `Copy-ImageGStreamerTestPlugins` copies coreelements, app, videotestsrc,
+  videoconvertscale, playback and webrtc from the image into `build-*\lib\gstreamer-1.0` for the
+  Debug and Profile trees. The staged Release suites (`dist\windows-<arch>-tests`, a flat
+  directory) get them in their own `lib\gstreamer-1.0`, with the plugins' imports beside the
+  suites; the hub's import walk resolves a name anywhere in the tree. The WebRTC tests need
+  `webrtcsink` (gst-plugins-rs), which only the Linux image has.
 - **On Linux no test may skip, and UBSan is fatal** (2026-10-15). ctest counts a gtest
   `[  SKIPPED ]` as passed in its "100% tests passed" line, so `ci-build-and-test.sh` fails the
   lane on any `<skipped>` in its JUnit file and names the tests: the image carries every element,
@@ -536,8 +537,11 @@ written out rather than linked.
   `libAccelerANTgine.so` sits in `lib/`). `AccelerANTgine --gst_check` prints each element's
   plugin file and fails on a missing one, or in a package on one loaded from outside it; the
   clean-host jobs run it on a bare Ubuntu. A new element in a pipeline goes into
-  `locate_elements()`, its plugin into the list. Embedded in OmniAccelerANT's plugin, none of this
-  installs: that bundle carries its own.
+  `locate_elements()` (`Src/webrtc_streamer.cpp`). Its plugin goes into `_gst_plugins`
+  (`cmake/CPackOptions.cmake`) and, for the Windows GPU packages, into
+  `Get-ImageGStreamerPackagePlugins` (`Build-Windows.ps1`). When a test needs the element, add it to
+  `Copy-ImageGStreamerTestPlugins` too. Embedded in OmniAccelerANT's plugin, none of this installs:
+  that bundle carries its own.
 - **A package with plugins scans its registry through its own `gst-plugin-scanner`; never set
   `GST_REGISTRY_FORK=no` for one.** An in-process scan of a fresh registry can register webrtcsink
   before its encoders, and the stream dies with `No codec available` on a filesystem that lists that
@@ -623,6 +627,13 @@ then runs `verify-package-hardening.sh`, which fails unless the `.deb` and the `
 PIE, BIND_NOW, stack-protected CLI and demo and a BIND_NOW, stack-protected library, with a
 `__*_chk` import in the CLI and the library. Never drop a check to pass a package;
 `test-verify-package-hardening.sh` holds each case.
+
+**A warning in a product target is an error.** The library, CLI and demo build with `-Werror` (`/WX` on
+clang-cl and MSVC, `Src/CMakeLists.txt`). Three `-Wno-error` keep only the warnings of nlohmann's module
+and Abseil's headers as warnings. Tests and fuzzers may warn. On x64, `ci-run-all.sh --part build-test`
+grades `build/build.log` against `scripts/linux/warning-census.txt`: a new warning fails, and so does a
+fixed one until its row is lowered. Lower it in the same commit, by hand or with the file's `--write`
+command. Fix a new warning; never raise its row (hub `docs/code-quality-tooling.md` § *The warning census*).
 
 **Coverage has a floor per compiler.** `ci-coverage.sh` fails below 83 % lines / 68 % branches with
 clang (llvm-cov over `libAccelerANTgine.so`) and below 69 % / 50 % with GCC (gcovr over `Src/`,

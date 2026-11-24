@@ -196,10 +196,8 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   decodes the prompt `abc` to `{"a":"#$%"}`, then the end token 256. SmolLM2-135M accepts the same
   schema (`{"a":"par"}`). At temperature 1.0 with `top_k` 0 the tiny model gives seed 1 a sequence
   that leaves the successor chain within 24 tokens and seeds 2 to 4 the chain itself, so four
-  seeds give two distinct sequences. The Windows chain builds GenAI with `USE_GUIDANCE=OFF`, so
-  there a schema fails with `JsonSchemaUnsupported` (LAI-H2 in the hub). Out of date since
-  2026-11-12: the Windows chain builds GenAI with llguidance now, and the schema tests expect an
-  answer there (2fb3ab7).
+  seeds give two distinct sequences. The Windows chain builds GenAI with llguidance too, so the
+  schema tests expect an answer there (2fb3ab7).
 
 ## Quality queue
 

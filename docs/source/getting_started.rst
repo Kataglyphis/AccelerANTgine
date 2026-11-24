@@ -203,8 +203,7 @@ DirectML. The NVIDIA
 machine needs a compatible NVIDIA driver and CUDA/cuDNN runtime. Both GPU packages let an
 embedder explicitly select CPU as well. The image inputs can be checked without building with
 ``pwsh -File scripts/windows/Test-WindowsGpuImage.ps1 -Variant nvidia -OnnxRoot $env:ONNX_ROOT -WheelDir $env:PYTHON_WHEELS``
-or ``-Variant amd`` in the matching registry image. GPU packaging needs a newer hub pin
-with provider-aware wheel verification. The NVIDIA check requires x64 core, shared and CUDA
+or ``-Variant amd`` in the matching registry image. The NVIDIA check requires x64 core, shared and CUDA
 provider DLLs matching the same wheel. The AMD check also requires x64 DirectML matching
 that wheel, as does the NVIDIA check when the image includes DirectML.
 The DirectML DLL is checked against the image copy and covered by the existing vendor-license
@@ -238,8 +237,8 @@ scope validation. A later ordinary dispatch therefore queues or cancels matching
 not an entire earlier workflow; jobs in other phases may still finish.
 
 Linux GPU packaging requires the shared ANTfrastructure staging and external-runtime closure APIs.
-The currently recorded hub pin does not contain them, so an opt-in build fails during configure
-until a published hub revision with those APIs is adopted. The manually dispatched
+The recorded hub pin has them, and configure checks for them (``cmake/OrtPackageVariant.cmake``);
+what still stops a candidate is in ``BACKLOG.md``. The manually dispatched
 ``Linux GPU package candidates`` workflow is separate from releases and labels its artifacts
 unverified by default; its clean-host job checks CPU inference, not GPU inference. Its optional
 ``gpu-tuple`` input defaults to ``all`` and also accepts ``nvidia-x64``, ``nvidia-arm64`` or
@@ -301,14 +300,20 @@ Available Build Presets
 
 - Linux debug: ``linux-debug-clang``, ``linux-debug-GNU``
 - Linux thread sanitizer: ``linux-debug-clang-tsan``
+- Linux fuzzing: ``linux-fuzz-clang``
 - Linux profile: ``linux-profile-clang``, ``linux-profile-GNU``
+- Linux RelWithDebInfo: ``linux-RelWithDebInfo-clang``, ``linux-RelWithDebInfo-GNU``
 - Linux release: ``linux-release-clang``, ``linux-release-GNU``
+- Linux riscv64 cross build: ``linux-riscv64-cross``
 - Windows debug: ``x64-ClangCL-Windows-Debug``, ``x64-MSVC-Windows-Debug``
 - Windows profile: ``x64-ClangCL-Windows-Profile``
+- Windows RelWithDebInfo: ``x64-ClangCL-Windows-RelWithDebInfo``
 - Windows release: ``x64-ClangCL-Windows-Release``, ``x64-MSVC-Windows-Release``
 
-Each preset names its own build directory, e.g. ``build/`` for
-``linux-debug-clang``. From the directory you cloned the repo into:
+Most Linux presets share ``build/``; ``linux-debug-clang-tsan``, ``linux-fuzz-clang``,
+``linux-release-clang``, ``linux-riscv64-cross`` and every Windows preset have their own
+(``binaryDir`` in ``CMakePresets.json``). When you switch compilers in ``build/``, configure with
+``cmake --preset <name> --fresh``. From the directory you cloned the repo into:
 
 .. code-block:: bash
 
@@ -320,7 +325,7 @@ Each preset names its own build directory, e.g. ``build/`` for
 Release Hardening
 ^^^^^^^^^^^^^^^^^
 
-``linux-release-clang`` and ``linux-release-GNU`` are the only presets that set
+``linux-release-clang``, ``linux-release-GNU`` and every clang-cl preset set
 ``myproject_ENABLE_HARDENING``. With GCC or Clang on Linux it adds:
 
 - ANTfrastructure's ``Hardening.cmake`` flags: ``-D_FORTIFY_SOURCE=3``,
@@ -330,11 +335,11 @@ Release Hardening
   ships inside the CLI;
 - PIE executables and ``-z relro -z now`` links (``cmake/ProjectOptions.cmake``).
 
-The clang-cl presets set it too since 2026-11-22 (the hidden ``windows-clangcl``): ``/sdl`` and
-``/guard:cf`` on the compile, ``/NXCOMPAT /DYNAMICBASE /guard:cf`` (plus ``/CETCOMPAT`` on x64) on
-the link, and ``Build-Windows.ps1`` grades the CLI, the demo and the DLL with the hub's
-``Assert-PeHardening`` (ASLR, high-entropy ASLR, DEP and the CFG bit). The MSVC presets leave it
-off, and Android builds configure without these presets and stay off too.
+On clang-cl (through the hidden ``windows-clangcl``) it adds ``/sdl`` and ``/guard:cf`` on the
+compile, ``/NXCOMPAT /DYNAMICBASE /guard:cf`` (plus ``/CETCOMPAT`` on x64) on the link, and
+``Build-Windows.ps1`` grades the CLI, the demo and the DLL with the hub's ``Assert-PeHardening``
+(ASLR, high-entropy ASLR, DEP and the CFG bit). The MSVC presets leave it off, and Android builds
+configure without these presets and stay off too.
 
 ``scripts/linux/ci-release.sh`` checks the result with ``scripts/linux/verify-package-hardening.sh``
 inside both the ``.deb`` and the ``.tar.gz``:
@@ -378,17 +383,21 @@ cargo (``corrosion_set_env_vars``), which is clang-cl under the ClangCL presets.
 Linux Build And Test
 --------------------
 
-A direct debug build with presets:
+A direct debug build with presets, in the family image:
 
 .. code-block:: bash
 
    cmake --preset linux-debug-clang
    cmake --build --preset linux-debug-clang
-   cd build && ctest -C Debug --output-on-failure
+   python3 -I third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py --lock models/models.lock
+   ctest --test-dir build --no-tests=error --output-on-failure
+
+The golden suite reads the locked model and fails without it, so fetch it before ctest.
+``ci-run-all.sh --part build-test`` (below) does all of this the way CI does, with UBSan made fatal.
 
 ``scripts/linux/ci-run-all.sh`` runs the whole CI path: initialization and dependency checks,
 the debug build and tests, coverage, static analysis and formatting checks, profile benchmark
-builds, the Sphinx docs and release packaging (the chain in order: ``AGENTS.md`` § 5).
+builds, release packaging and the Sphinx docs (the chain in order: ``AGENTS.md`` § 5).
 ``--part`` runs one part of it, as each step of the Linux lane does: ``build-test``,
 ``coverage``, ``static``, ``bench``, ``python``, ``skips``, ``release`` or ``docs``. For
 example:

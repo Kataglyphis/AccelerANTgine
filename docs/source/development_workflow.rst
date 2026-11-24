@@ -101,10 +101,11 @@ has not. On Windows the staged suites allow exactly those six skips and the
 bundled scanner's case (``allowed_skips`` in ``Build-Windows.ps1``): any other
 skip, or a listed test that runs, fails the lane.
 
-Top-level CMake selects the suites by build type: commit, compile and fuzz in Debug; perf in
-RelWithDebInfo; none in Release unless ``-DKATAGLYPHIS_RELEASE_TESTS=ON``, which builds all four
-and which both Windows lanes set (``Build-Windows.ps1 -StageTests``). FuzzTest needs Clang or
-clang-cl. Every lane runs them:
+Top-level CMake selects the suites by build type. Debug builds commit, compile and fuzz, plus
+golden on native Linux; a TSan build drops fuzz and golden. RelWithDebInfo builds perf. Release
+builds none unless ``-DKATAGLYPHIS_RELEASE_TESTS=ON``, which builds commit, compile, fuzz and perf;
+both Windows lanes set it (``Build-Windows.ps1 -StageTests``). FuzzTest needs Clang or clang-cl.
+Every lane runs them:
 
 .. list-table::
    :header-rows: 1
@@ -143,6 +144,7 @@ In the family image:
 .. code-block:: sh
 
    cmake --preset linux-debug-clang && cmake --build build -j
+   python3 -I third_party/ANTfrastructure/linux/scripts/lib/fetch-data-lock.py --lock models/models.lock  # golden
    ctest --test-dir build --no-tests=error --output-on-failure
    ./build/fuzzTestSuite                       # about a second per property
    FUZZTEST_FUZZ_FOR=60s ./build/fuzzTestSuite  # longer, still unit mode
@@ -374,7 +376,7 @@ malformed build script before checking its build steps.
   ``Test/``, ``Bindings/`` and ``cmake/``, and fails the lane when one of them deviates from
   ``.clang-format``.
 - **One clang-format release:** the Linux gate grades with the clang-format of the hub's
-  ``LLVM_RELEASE`` (23.1.3), because each release formats differently. The hub's
+  ``LLVM_RELEASE``, because each release formats differently. The hub's
   ``code_quality_require_pinned_clang_format`` looks in ``/usr/local/llvm-target/bin``, then on
   ``PATH``, and fails the gate when neither has that release. To fix a file, run the
   ``clang-format -i`` the gate's error names; the image's ``clang-format`` is that release.

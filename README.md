@@ -40,7 +40,7 @@ Python dependencies are declared in `pyproject.toml` and locked in `uv.lock`; th
 - **ONNX Runtime on GStreamer media:** YOLO detection on pipeline frames, WebRTC out through `webrtcsink`.
 - **C++23 named modules**, with Rust called from C++ through corrosion and cxx.
 - **Five CI lanes:** Linux x64, arm64 and riscv64, Windows x64 and arm64.
-- **Tested without a model file:** four C++ suites and the Python tests, the Debug ones under ASan, UBSan and TSan.
+- **Five C++ suites and the Python tests,** the Debug ones under ASan, UBSan and TSan. Most write their test models in code; the golden suite runs the released model.
 - **Releases that start outside the image:** `.deb`, tarball, AppImage, setup `.exe`, MSI, MSIX, zip and Python wheels.
 
 ## GPU package candidates
@@ -51,7 +51,7 @@ Candidates are unverified, separate from releases and need matching host GPU dri
 Both workflows accept `workflow_call`; GPU hardware profiling remains opt-in.
 Linux `gpu-tuple` selects all combinations or one of `nvidia-x64`, `nvidia-arm64`, `amd-x64`.
 Linux `promote-verified` requires `verify-gpu`, clean-host checks and CPU/GPU detector parity; it stages run-bound packages and receipts without publishing a release.
-The infrastructure pin and missing Windows image inputs currently block builds; CPU lanes remain available.
+Missing Windows image inputs and open hub fixes still stop some candidates ([BACKLOG.md](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/BACKLOG.md)); CPU lanes remain available.
 See [getting started](https://github.com/Kataglyphis/AccelerANTgine/blob/develop/docs/source/getting_started.rst) for formats, verification and the local AMD diagnostic.
 
 ## Quick start

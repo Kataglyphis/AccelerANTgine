@@ -18,8 +18,8 @@ Project Layout
 --------------
 
 - ``Src/``: core library, CLI entry point, and platform/runtime integration code
-- ``Test/commit``, ``Test/compile``, ``Test/fuzz``, ``Test/perf``: the four C++ suites
-  (:ref:`the-suites`)
+- ``Test/commit``, ``Test/compile``, ``Test/fuzz``, ``Test/golden``, ``Test/perf``: the five C++
+  suites (:ref:`the-suites`)
 - ``Test/common``: the helpers the suites share, including the ONNX model writer that keeps
   test models out of the repository
 - ``Bindings/python``: the ``kataglyphis_inference`` Python module, tested by ``Test/python``
@@ -31,32 +31,37 @@ Project Layout
 Dependencies
 ------------
 
-Submodules included:
+Submodules (``.gitmodules``):
 
 - `ANTfrastructure <https://github.com/Kataglyphis/ANTfrastructure>`_ — the
   build hub: every reusable script, CMake module, PowerShell module and CI action
   this repo runs comes from ``third_party/ANTfrastructure``, and its gitlink
   decides what the lanes actually execute
-- `ONNX Runtime <https://onnxruntime.ai/>`_ — inference
-- `GStreamer <https://gstreamer.freedesktop.org/>`_ — media pipelines
-- `WebRTC <https://webrtc.org/>`_ — realtime transport, through GStreamer's
-  ``webrtcsink``
-- `abseil <https://github.com/abseil/abseil-cpp>`_ — pinned at or above the
-  version FUZZTEST pins (``AGENTS.md`` § 3)
-- `GSL <https://github.com/microsoft/GSL>`_
+- `ModelANT <https://github.com/Kataglyphis/ModelANT>`_ — the data-only inference
+  contract the regression tests read
 - `nlohmann_json <https://github.com/nlohmann/json>`_
 - `tomlplusplus <https://github.com/marzer/tomlplusplus>`_
 - `SPDLOG <https://github.com/gabime/spdlog>`_
 - `nanobind <https://github.com/wjakob/nanobind>`_ — the Python bindings
-- `gtest <https://github.com/google/googletest>`_
 - `gbenchmark <https://github.com/google/benchmark>`_
 - `google fuzztest <https://github.com/google/fuzztest>`_
 
-Optional:
+Fetched at configure (``third_party/CMakeLists.txt``):
 
-- `Rust <https://www.rust-lang.org/>`_
+- `abseil <https://github.com/abseil/abseil-cpp>`_ — pinned at or above the
+  version FUZZTEST pins (``AGENTS.md`` § 3)
+- `GSL <https://github.com/microsoft/GSL>`_
+- `gtest <https://github.com/google/googletest>`_
 - `corrosion-rs <https://github.com/corrosion-rs/corrosion>`_
-- `cxx <https://cxx.rs/>`_
+
+From the family image:
+
+- `ONNX Runtime <https://onnxruntime.ai/>`_ — inference
+- `GStreamer <https://gstreamer.freedesktop.org/>`_ — media pipelines
+- `WebRTC <https://webrtc.org/>`_ — realtime transport, through GStreamer's
+  ``webrtcsink``
+- `Rust <https://www.rust-lang.org/>`_ — builds ``Src/rusty_code``; its
+  `cxx <https://cxx.rs/>`_ bridge comes from ``Src/rusty_code/Cargo.lock``
 
 .. _build-matrix:
 
@@ -69,7 +74,7 @@ in ``AGENTS.md`` § 5.
 - Linux x64 and arm64: ``.github/workflows/linux-x64.yml`` and
   ``.github/workflows/linux-arm64.yml``, both calling the reusable
   ``.github/workflows/reusable-linux.yml``, run the whole ``ci-run-all.sh`` chain (build, tests,
-  coverage, static analysis, docs, benchmarks and release packaging; :ref:`linux-build-and-test`)
+  coverage, static analysis, benchmarks, release packaging and docs; :ref:`linux-build-and-test`)
   inside the container image
 - Windows x64: ``.github/workflows/windows-x64.yml``, and the arm64 cross build:
   ``.github/workflows/windows-arm64-cross.yml``, both thin callers of ANTfrastructure's reusable

@@ -18,6 +18,14 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-24, the docs match the tree)
+
+- README, AGENTS.md, BACKLOG and the Sphinx pages say what the tree does: five C++ suites, the real submodule
+  list, Rust in every build, six Windows test plugins, the module list, the shared `build/` directory, the hardened
+  presets, the part order and the recorded hub pin's GPU packaging APIs. The local build-and-test recipes fetch the
+  model before ctest. AGENTS.md states the `-Werror` rule and how to lower a warning-census row. The changelog no
+  longer names the test host.
+
 ### Changed (2026-11-24, a warning in a product target is an error)
 
 - The library, `AccelerANTgine_cli` and `AccelerANTgine_demo` compile with `-Werror` (`/WX` under clang-cl), the last
@@ -1315,7 +1323,7 @@ belongs in the **Changed** list below with that consequence spelled out.
   the library points GStreamer at them alone when it finds them there. `AccelerANTgine --gst_check`
   lists every element's plugin file and fails on a missing or foreign one; the clean-host jobs run
   it instead of `--version`, on runners with no GStreamer at all.
-  Proven on himbeere2 (Debian 13, glibc 2.41): the arm64 `.deb`, tarball and AppImage list all 15
+  Proven on a Raspberry Pi 5 (Debian 13, glibc 2.41): the arm64 `.deb`, tarball and AppImage list all 15
   elements from their own `lib/accelerantgine/gstreamer-1.0`, and `--webrtc --source test` reaches
   `PLAYING`.
 - **The Linux packages take the host's glibc when it is new enough** (2026-10-17, hub b9e451da ->
