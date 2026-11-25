@@ -606,7 +606,7 @@ auto read_file(const std::filesystem::path &path) -> std::string
     return { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
 }
 
-// Where the loader took ONNX Runtime from, read from its list of objects and not the way the engine asks.
+// The loaded ONNX Runtime file's real directory from the loader's list; the image loads it through /opt/opencv5/lib links.
 auto loaded_runtime_directory() -> std::filesystem::path
 {
     std::filesystem::path found;
@@ -615,7 +615,7 @@ auto loaded_runtime_directory() -> std::filesystem::path
           const std::filesystem::path name = object->dlpi_name;
           if (!name.filename().string().starts_with("libonnxruntime.so")) { return 0; }
           std::error_code ignored;
-          const auto directory = std::filesystem::canonical(std::filesystem::absolute(name).parent_path(), ignored);
+          const auto directory = std::filesystem::canonical(std::filesystem::absolute(name), ignored).parent_path();
           *static_cast<std::filesystem::path *>(out) = directory;
           return 1;
       },
@@ -685,9 +685,9 @@ TEST(OrtPlugin, MigraphXIsThePluginRowAndRegistersAsMIGraphX)
 {
     const auto *row = plugin::plugin_for(inference::ExecutionProvider::MigraphX);
     ASSERT_NE(row, nullptr);
-    EXPECT_STREQ(row->name, "MIGraphX");
-    EXPECT_STREQ(row->root_variable, "ORT_AMDGPU_EP_ROOT");
-    EXPECT_STREQ(row->module_file, "libmigraphx-ep.so");
+    EXPECT_EQ(row->name, "MIGraphX");
+    EXPECT_EQ(row->root_variable, "ORT_AMDGPU_EP_ROOT");
+    EXPECT_EQ(row->linux_filename, "libmigraphx-ep.so");
     // A registration name that ends in .virtual switches ONNX Runtime's virtual devices on.
     EXPECT_FALSE(std::string_view(row->name).ends_with(".virtual"));
     for (const auto provider : { inference::ExecutionProvider::Cpu,
@@ -699,90 +699,31 @@ TEST(OrtPlugin, MigraphXIsThePluginRowAndRegistersAsMIGraphX)
     }
 }
 
-TEST(OrtPlugin, TheRootComesBeforeTheRuntimeDirectoryAndAnEmptyRootIsNoPlace)
-{
-    EXPECT_EQ(plugin::module_candidates(migraphx_row(), "/root", "/ort/lib"),
-      (Paths{ "/root/lib/libmigraphx-ep.so", "/ort/lib/libmigraphx-ep.so" }));
-    EXPECT_EQ(plugin::module_candidates(migraphx_row(), "", "/ort/lib"), (Paths{ "/ort/lib/libmigraphx-ep.so" }));
-    EXPECT_TRUE(plugin::module_candidates(migraphx_row(), "", "").empty());
-}
-
-TEST(OrtPlugin, TheFirstCandidateThatIsAFileIsTheModule)
-{
-    const PluginRoot root;
-    const PluginRoot runtime;
-    const auto beside = runtime.path() / "libmigraphx-ep.so";
-    const auto candidates = plugin::module_candidates(migraphx_row(), root.path().string(), runtime.path());
-    // The image's root exists and is empty where it ships no module.
-    EXPECT_TRUE(plugin::first_file(candidates).empty());
-    write_file(beside, "beside the runtime");
-    EXPECT_EQ(plugin::first_file(candidates), beside);
-    std::filesystem::create_directory(root.module_path());
-    EXPECT_EQ(plugin::first_file(candidates), beside);
-    std::filesystem::remove(root.module_path());
-    write_file(root.module_path(), "under the root");
-    EXPECT_EQ(plugin::first_file(candidates), root.module_path());
-}
-
-TEST(OrtPlugin, AMissingModuleNamesEveryPathAndTheRule)
-{
-    const auto candidates = plugin::module_candidates(migraphx_row(), "/root", "/ort/lib");
-    const auto reason = plugin::missing_module_reason(migraphx_row(), "/root", candidates);
-    for (const std::string text : { "MIGraphX is not available: no libmigraphx-ep.so at /root/lib/libmigraphx-ep.so or "
-                                    "/ort/lib/libmigraphx-ep.so.",
-           "$ORT_AMDGPU_EP_ROOT/lib when that variable is not empty (it is /root)",
-           "then beside the loaded ONNX Runtime library",
-           "The cpu device runs on the CPU" }) {
-        EXPECT_NE(reason.find(text), std::string::npos) << reason;
-    }
-    const auto unset =
-      plugin::missing_module_reason(migraphx_row(), "", plugin::module_candidates(migraphx_row(), "", "/ort/lib"));
-    EXPECT_NE(unset.find("no libmigraphx-ep.so at /ort/lib/libmigraphx-ep.so."), std::string::npos) << unset;
-    EXPECT_NE(unset.find("(it is empty)"), std::string::npos) << unset;
-}
-
-TEST(OrtPlugin, TheOnlyOptionIsTheDeviceId)
-{ EXPECT_EQ(plugin::device_options(3), (std::vector<std::pair<std::string, std::string>>{ { "device_id", "3" } })); }
-
-TEST(OrtPlugin, ANameIsRegisteredOnceAndAFailureIsNotRemembered)
-{
-    plugin::Registered registered;
-    int calls = 0;
-    const auto fails = [&calls] {
-        ++calls;
-        return false;
-    };
-    const auto succeeds = [&calls] {
-        ++calls;
-        return true;
-    };
-    EXPECT_FALSE(registered.ensure("MIGraphX", fails));
-    EXPECT_FALSE(registered.ensure("MIGraphX", fails));
-    EXPECT_EQ(calls, 2);
-    EXPECT_TRUE(registered.ensure("MIGraphX", succeeds));
-    EXPECT_TRUE(registered.ensure("MIGraphX", fails));
-    EXPECT_EQ(calls, 3);
-    EXPECT_TRUE(registered.ensure("Another", succeeds));
-    EXPECT_EQ(calls, 4);
-}
-
 TEST(OrtPlugin, WithoutAModuleMigraphXFailsAndTheCpuStillRuns)
 {
     in_a_child([] {
         const TempFile model("kataglyphis-relu", ".onnx", kataglyphis::test::relu_model());
         const PluginRoot root;
         // A package carries the module beside the runtime, so that place must be the one the loader used.
-        const auto beside = loaded_runtime_directory() / "libmigraphx-ep.so";
+        const auto beside = loaded_runtime_directory();
         ASSERT_TRUE(beside.is_absolute()) << beside;
-        // Every image but the rocm one sets the variable to nothing and keeps an empty directory.
-        for (const std::string &value : { std::string{}, root.path().string() }) {
-            ASSERT_EQ(setenv("ORT_AMDGPU_EP_ROOT", value.c_str(), 1), 0);
-            EXPECT_FALSE(inference::provider_available(inference::ExecutionProvider::MigraphX));
-            expect_unavailable(migraphx_config(model),
-              { "MIGraphX is not available: no libmigraphx-ep.so at ",
-                value.empty() ? std::string("(it is empty)") : root.module_path().string(),
-                beside.string(),
-                "beside the loaded ONNX Runtime library" });
+        // Every image but the rocm one sets the variable to nothing.
+        ASSERT_EQ(setenv("ORT_AMDGPU_EP_ROOT", "", 1), 0);
+        EXPECT_FALSE(inference::provider_available(inference::ExecutionProvider::MigraphX));
+        expect_unavailable(migraphx_config(model),
+          { "MIGraphX is not available: $ORT_AMDGPU_EP_ROOT is empty and there is no libmigraphx-ep.so beside the "
+            "loaded ONNX Runtime library in "
+              + beside.string(),
+            "The cpu device runs on the CPU" });
+        // A root that names no module is an error, never a fallback to one beside the runtime.
+        ASSERT_EQ(setenv("ORT_AMDGPU_EP_ROOT", root.path().c_str(), 1), 0);
+        EXPECT_FALSE(inference::provider_available(inference::ExecutionProvider::MigraphX));
+        expect_unavailable(migraphx_config(model),
+          { "MIGraphX is not available: Cannot resolve plugin module " + root.module_path().string() });
+        {
+            inference::OnnxInferenceEngine engine;
+            EXPECT_FALSE(engine.initialize(migraphx_config(model)).has_value());
+            EXPECT_EQ(engine.provider_error().find(beside.string()), std::string::npos) << engine.provider_error();
         }
         expect_relu_runs(inference::create_default_session_config(model.path()));
     });
@@ -799,8 +740,8 @@ TEST(OrtPlugin, AModuleThatCannotLoadFailsTheSameWayEachTime)
         EXPECT_TRUE(inference::provider_available(inference::ExecutionProvider::MigraphX));
         // ONNX Runtime rolls a failed registration back, so the second request fails as the first did.
         for (int attempt = 0; attempt < 2; ++attempt) {
-            expect_unavailable(
-              migraphx_config(model), { "MIGraphX failed to register " + root.module_path().string() + ": " });
+            expect_unavailable(migraphx_config(model),
+              { "MIGraphX from " + std::filesystem::canonical(root.module_path()).string() + " cannot run: " });
         }
         expect_relu_runs(inference::create_default_session_config(model.path()));
     });
@@ -817,7 +758,7 @@ TEST(OrtPlugin, ARegisteredPluginGetsOneDeviceAndOnlyTheDeviceId)
         expect_relu_runs(migraphx_config(model, 1));
         // No engine is left here: the registration must outlive them, and a second one would be refused.
         expect_relu_runs(migraphx_config(model, 0));
-        expect_unavailable(migraphx_config(model, 2), { "which offers 2 device(s), so device 2 does not exist" });
+        expect_unavailable(migraphx_config(model, 2), { "MIGraphX device index 2 is unavailable; found 2" });
         EXPECT_EQ(read_file(log.path()), "devices=1 device_id=1\ndevices=1 device_id=0\n");
     });
 }
@@ -832,8 +773,8 @@ TEST(OrtPlugin, APluginThatOffersNoDeviceIsProviderUnavailable)
         ASSERT_EQ(setenv("KATAGLYPHIS_STUB_EP_LOG", log.path().c_str(), 1), 0);
         for (int attempt = 0; attempt < 2; ++attempt) {
             expect_unavailable(migraphx_config(model),
-              { "MIGraphX registered " + stub_module().string(),
-                "which offers 0 device(s), so device 0 does not exist" });
+              { "MIGraphX from " + std::filesystem::canonical(stub_module()).string() + " cannot run: ",
+                "MIGraphX device index 0 is unavailable; found 0" });
         }
         EXPECT_TRUE(read_file(log.path()).empty());
         expect_relu_runs(inference::create_default_session_config(model.path()));
@@ -881,7 +822,9 @@ TEST(OrtPlugin, ANameAnotherLibraryRegisteredIsUsedAndNotRegisteredAgain)
         ASSERT_NE(api, nullptr);
         OrtEnv *other = nullptr;
         ASSERT_EQ(api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "another-library", &other), nullptr);
-        ASSERT_EQ(api->RegisterExecutionProviderLibrary(other, migraphx_row().name, stub_module().c_str()), nullptr);
+        ASSERT_EQ(
+          api->RegisterExecutionProviderLibrary(other, std::string(migraphx_row().name).c_str(), stub_module().c_str()),
+          nullptr);
         expect_relu_runs(migraphx_config(model));
         // The engine keeps its own reference, so the registration outlives the library that made it.
         api->ReleaseEnv(other);

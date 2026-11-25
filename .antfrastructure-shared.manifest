@@ -35,3 +35,4 @@ coco-classes
 antfrastructure-sh
 renovate-git-mode-sh
 resolve-build-module
+ort-plugin-registration-native Src/ort_plugin_eps.hpp

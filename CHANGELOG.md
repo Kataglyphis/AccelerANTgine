@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **AMD's MIGraphX plugin registers through the hub's shared policy** (ANTfrastructure CON231). The exact
+  `Src/ort_plugin_eps.hpp` decides the module path and owns the registration in one `PluginRegistry` on the
+  engine's kept environment; a registration another library of the process made is still used
+  (`reuse_existing`). Changed: an `ORT_AMDGPU_EP_ROOT` without the module now fails instead of falling back,
+  and the bundled module is looked for beside the real ONNX Runtime file. On the RX 9070 XT the demo
+  detector runs on `MIGraphX` with detector parity against the CPU.
+
 ### Fixed (2026-11-24, the docs match the tree)
 
 - README, AGENTS.md, BACKLOG and the Sphinx pages say what the tree does: five C++ suites, the real submodule

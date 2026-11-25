@@ -343,17 +343,20 @@ written out rather than linked.
   non-CPU request checks `provider_available()` first, and a listed CPU provider that fails to
   register (DNNL without `libdnnl.so.3`) is `ProviderUnavailable` too, with ORT's reason in
   `provider_error()` (`docs/source/getting_started.rst` § *ONNX execution providers*).
-- **MIGraphX is AMD's plugin module, reached by registration alone.** `Src/ort_plugin.hpp` has one row per plugin
-  provider (registration name, root variable, module file); `MigraphX` is the only row, and CUDA keeps its in-tree
+- **MIGraphX is AMD's plugin module, reached by registration alone.** Its path and registration policy is the
+  hub's exact `Src/ort_plugin_eps.hpp` (`ort-plugin-registration-native`); never edit that copy, change the hub.
+  `Src/ort_plugin.hpp` only maps a provider to its hub row; `MigraphX` is the only row, and CUDA keeps its in-tree
   loading until the hub publishes its new NVIDIA image (`BACKLOG.md`).
-  - The engine looks for `libmigraphx-ep.so` in `$ORT_AMDGPU_EP_ROOT/lib` when that variable is not empty, then
-    beside the loaded `libonnxruntime.so.1`, where a package carries it. Every image but `:latest-rocm` sets the
-    variable to nothing and keeps an empty directory, so test the value and the file, never "is set".
+  - The module is `$ORT_AMDGPU_EP_ROOT/lib/libmigraphx-ep.so` when that variable is not empty; a root without it
+    is an error, never a fallback. With the variable empty it is beside the loaded ONNX Runtime file, resolved
+    through links such as `/opt/opencv5/lib`, where a package carries it. Every image but `:latest-rocm` sets the
+    variable to nothing, so test the value, never "is set".
   - It registers the module once per process as `MIGraphX`. AMD's module takes that name as its own, so devices,
     sessions and ONNX Runtime profiles say `MIGraphX`, no longer `MIGraphXExecutionProvider`. A registration ends
     with the process's last `Ort::Env`; the engine keeps one reference for good after the first one and never
-    unregisters. A name another library of the process registered first is used as it is: one loaded ONNX Runtime
-    has one environment for all of them, and it refuses a name a second time.
+    unregisters; that reference owns the one `PluginRegistry`. A name another library of the process registered
+    first is used as it is (`reuse_existing`): one loaded ONNX Runtime has one environment for all of them, and
+    it refuses a name a second time.
   - It appends exactly one device, with `device_id` alone. The plugin fails on an option it does not list
     (`migraphx_mem_limit` is gone) and on an `ep.*` entry a failed by-name append leaves behind.
   - `GetAvailableProviders` never lists a plugin: `provider_available()` answers with the module on disk, which

@@ -150,8 +150,9 @@ MIGraphX on Linux is AMD's plugin execution provider
 built into ONNX Runtime; the ``:latest-rocm`` image carries no other since November 2026.
 
 - **Where the module is looked for:** ``$ORT_AMDGPU_EP_ROOT/lib/libmigraphx-ep.so`` when that variable
-  is not empty (``:latest-rocm`` sets it; every other image sets it to nothing), then beside the loaded
-  ``libonnxruntime.so.1``, where a package carries it.
+  is not empty (``:latest-rocm`` sets it; every other image sets it to nothing); a root without the module
+  is an error, never a fallback. With the variable empty: beside the loaded ONNX Runtime file, where a
+  package carries it. The policy is the hub's ``ort_plugin_eps.hpp``.
 - **Registration:** once per process, under the name ``MIGraphX``. AMD's module takes that name as its
   own, so a session and its profile say ``MIGraphX``, no longer ``MIGraphXExecutionProvider``. The
   registration stays until the process ends. When another library of the process has registered that

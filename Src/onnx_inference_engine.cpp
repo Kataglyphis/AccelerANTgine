@@ -294,11 +294,12 @@ namespace {
         return {};
     }
 
-    // One lock for register, list and append: ONNX Runtime hands out its own device array, which a registration grows.
+    // One registry for the process's one environment; the hub's registry locks register, list and append itself.
     struct PluginState
     {
         std::mutex mutex;
-        ort_plugin::Registered registered;
+        OrtEnv *kept{ nullptr };
+        std::unique_ptr<antfrastructure::ort_plugins::PluginRegistry<OrtApi>> registry;
     };
 
     auto plugin_state() -> PluginState &
@@ -307,77 +308,50 @@ namespace {
         return state;
     }
 
-    // The plugin's module, or what was looked for.
+    // The registration ends with the process's last environment, so the registry's reference is never released.
+    auto plugin_registry(OrtEnv *env, std::string &reason) -> antfrastructure::ort_plugins::PluginRegistry<OrtApi> *
+    {
+        auto &state = plugin_state();
+        const std::scoped_lock lock(state.mutex);
+        if (state.registry) { return state.registry.get(); }
+        const OrtApi &api = Ort::GetApi();
+        if (!ort_succeeded(api.CreateEnv(ORT_LOGGING_LEVEL_WARNING, "KataglyphisOnnxRuntime", &state.kept), &reason)) {
+            return nullptr;
+        }
+        // One loaded ONNX Runtime has one environment, whichever library of the process asks for it.
+        if (state.kept != env) {
+            api.ReleaseEnv(state.kept);
+            state.kept = nullptr;
+            reason = "the plugin registry's ONNX Runtime environment differs from the session's";
+            return nullptr;
+        }
+        state.registry = std::make_unique<antfrastructure::ort_plugins::PluginRegistry<OrtApi>>(api, state.kept);
+        return state.registry.get();
+    }
+
+    // The plugin's module, or what was looked for: the image's root when it names one, else beside the loaded runtime.
     auto plugin_module(const ort_plugin::Plugin &plugin) -> std::expected<std::filesystem::path, std::string>
     {
+        const std::string name(plugin.name);
 #ifdef _WIN32
-        return std::unexpected(std::string(plugin.name) + " is loaded as a plugin on Linux only");
+        return std::unexpected(name + " is loaded as a plugin on Linux only");
 #else
-        const char *root = std::getenv(plugin.root_variable);
-        const std::string_view root_value = root == nullptr ? std::string_view{} : std::string_view{ root };
-        Dl_info ort{};
-        std::filesystem::path ort_directory;
-        // ONNX Runtime's own API table lies inside its library, wherever the loader took that from.
-        if (::dladdr(&Ort::GetApi(), &ort) != 0 && ort.dli_fname != nullptr) {
-            const auto loaded_from = std::filesystem::path(ort.dli_fname).parent_path();
-            std::error_code unresolved;
-            ort_directory = std::filesystem::canonical(loaded_from, unresolved);
-            if (unresolved) { ort_directory = loaded_from; }
+        const OrtApi &api = Ort::GetApi();
+        std::string error;
+        if (auto library = antfrastructure::ort_plugins::plugin_library_path(api, plugin, error)) {
+            return *std::move(library);
         }
-        const auto candidates = ort_plugin::module_candidates(plugin, root_value, ort_directory);
-        auto library = ort_plugin::first_file(candidates);
-        if (library.empty()) {
-            return std::unexpected(ort_plugin::missing_module_reason(plugin, root_value, candidates));
+        if (!error.empty()) {
+            return std::unexpected(name + " is not available: " + error + ". The cpu device runs on the CPU");
         }
-        return library;
+        std::string ignored;
+        const auto beside = antfrastructure::ort_plugins::owning_library_directory(
+          reinterpret_cast<const void *>(api.GetErrorMessage), ignored);
+        return std::unexpected(
+          name + " is not available: $" + std::string(plugin.root_variable) + " is empty and there is no "
+          + std::string(plugin.linux_filename) + " beside the loaded " + "ONNX Runtime library"
+          + (beside ? " in " + beside->string() : std::string{}) + ". The cpu device runs on the CPU");
 #endif
-    }
-
-    struct OfferedDevices
-    {
-        const OrtEpDevice *chosen{ nullptr };
-        std::size_t count{ 0 };
-    };
-
-    // The devices listed under a provider name, with the one at index; the caller holds the plugin lock.
-    auto offered_devices(OrtEnv *env, std::string_view name, int index) -> std::expected<OfferedDevices, std::string>
-    {
-        const OrtApi &api = Ort::GetApi();
-        const OrtEpDevice *const *devices = nullptr;
-        std::size_t count = 0;
-        std::string reason;
-        if (!ort_succeeded(api.GetEpDevices(env, &devices, &count), &reason)) { return std::unexpected(reason); }
-        OfferedDevices offered;
-        for (const OrtEpDevice *device : std::span(devices, count)) {
-            const char *ep_name = api.EpDevice_EpName(device);
-            if (ep_name == nullptr || name != ep_name) { continue; }
-            if (std::cmp_equal(offered.count, index)) { offered.chosen = device; }
-            ++offered.count;
-        }
-        return offered;
-    }
-
-    // The registration ends with the process's last environment, so one reference is never released.
-    auto register_plugin(OrtEnv *env,
-      const ort_plugin::Plugin &plugin,
-      const std::filesystem::path &library,
-      std::string &reason) -> bool
-    {
-        const OrtApi &api = Ort::GetApi();
-        return plugin_state().registered.ensure(plugin.name, [&] {
-            OrtEnv *kept = nullptr;
-            if (!ort_succeeded(api.CreateEnv(ORT_LOGGING_LEVEL_WARNING, "KataglyphisOnnxRuntime", &kept), &reason)) {
-                return false;
-            }
-            // Another library of this process may hold the name already, and ONNX Runtime refuses it a second time.
-            const auto held = offered_devices(env, plugin.name, 0);
-            if ((held && held->count > 0)
-                || ort_succeeded(api.RegisterExecutionProviderLibrary(env, plugin.name, library.c_str()), &reason)) {
-                return true;
-            }
-            api.ReleaseEnv(kept);
-            return false;
-        });
     }
 
     // Empty when the plugin's device is on options; else what was looked for and why it could not be had.
@@ -387,7 +361,7 @@ namespace {
       const ort_plugin::Plugin &plugin,
       int device_id) -> std::string
     {
-        const std::string name = plugin.name;
+        const std::string name(plugin.name);
         const auto library = plugin_module(plugin);
         if (!library) { return library.error(); }
 #ifndef _WIN32
@@ -397,32 +371,15 @@ namespace {
             return name + " cannot run: a copy to the AMD GPU took over 30 seconds. The cpu device runs on the CPU";
         }
 #endif
-        const OrtApi &api = Ort::GetApi();
-        const std::scoped_lock lock(plugin_state().mutex);
         std::string reason;
-        if (!register_plugin(env, plugin, *library, reason)) {
-            return name + " failed to register " + library->string() + ": " + reason;
-        }
-        const auto offered = offered_devices(env, name, device_id);
-        if (!offered) {
-            return name + " registered " + library->string() + ", but its devices cannot be listed: " + offered.error();
-        }
-        if (offered->chosen == nullptr) {
-            return name + " registered " + library->string() + ", which offers " + std::to_string(offered->count)
-                   + " device(s), so device " + std::to_string(device_id) + " does not exist";
-        }
-        const auto settings = ort_plugin::device_options(device_id);
-        std::vector<const char *> keys;
-        std::vector<const char *> values;
-        for (const auto &[key, value] : settings) {
-            keys.push_back(key.c_str());
-            values.push_back(value.c_str());
-        }
-        // AMD's module refuses more than one device and takes the card from the option, so both name the same card.
-        if (!ort_succeeded(api.SessionOptionsAppendExecutionProvider_V2(
-                             options, env, &offered->chosen, 1, keys.data(), values.data(), keys.size()),
-              &reason)) {
-            return name + " from " + library->string() + " was refused: " + reason;
+        auto *registry = plugin_registry(env, reason);
+        if (registry == nullptr) { return name + " cannot register " + library->string() + ": " + reason; }
+        // The plugin fails on an option it does not list; AMD's module takes the card from it, not from the device.
+        const antfrastructure::ort_plugins::PluginRegistry<OrtApi>::ProviderOptions settings{ { "device_id",
+          std::to_string(device_id) } };
+        // Another library of this process may hold the name already, and ONNX Runtime refuses it a second time.
+        if (!registry->append_provider(options, plugin, device_id, {}, settings, reason, true)) {
+            return name + " from " + library->string() + " cannot run: " + reason;
         }
         return {};
     }
