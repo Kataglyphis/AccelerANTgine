@@ -20,6 +20,8 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [0.0.4] - 2026-11-26
 
+- **The GPU candidates' ORT profile suite runs again** (ANTfrastructure 2a27d96f): the hub's `test_verify_ort_profile.py`
+  imports its fixture under `python3 -I`, which this repo's GPU lanes use.
 - **The Windows lanes build again, and the setups compress with zlib** (ANTfrastructure CON302). The hub's
   `ort_plugin_eps.hpp` reads the environment with `GetEnvironmentVariableW`, since clang-cl's `-Werror` failed on
   the deprecated `_wgetenv`; the hub's CPack rule sets `CPACK_NSIS_COMPRESSOR` to zlib, so the setup no longer
