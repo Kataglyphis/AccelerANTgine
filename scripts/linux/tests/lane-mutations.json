@@ -558,5 +558,29 @@
   "replace": "include = [\"Src/*\"]\nmax = 1",
   "test": "bash scripts/linux/tests/test-pattern-limits.sh",
   "why": "A throwing std::filesystem overload in Src/ must fail the lint gates, not be counted."
+ },
+ {
+  "id": "run-all.build-step-status",
+  "target": "scripts/linux/ci-run-all.sh",
+  "find": "\t\t--profraw-dir \"${PROFRAW_DIR}\" || return\n",
+  "replace": "\t\t--profraw-dir \"${PROFRAW_DIR}\"\n",
+  "test": "bash scripts/linux/tests/test-ci-run-all-parts.sh",
+  "why": "run_gate runs a part with errexit off; a failed build and test then reports ok and the coverage reads no data."
+ },
+ {
+  "id": "run-all.init-step-status",
+  "target": "scripts/linux/ci-run-all.sh",
+  "find": "\t\t--arch \"${MATRIX_ARCH}\" || return\n",
+  "replace": "\t\t--arch \"${MATRIX_ARCH}\"\n",
+  "test": "bash scripts/linux/tests/test-ci-run-all-parts.sh",
+  "why": "A failed init must stop the part before the build runs on a half-prepared workspace."
+ },
+ {
+  "id": "run-all.docs-step-status",
+  "target": "scripts/linux/ci-run-all.sh",
+  "find": "\t\t--docs-out \"${DOCS_OUT}\" || return\n",
+  "replace": "\t\t--docs-out \"${DOCS_OUT}\"\n",
+  "test": "bash scripts/linux/tests/test-ci-run-all-parts.sh",
+  "why": "A failed docs build would otherwise pass on the finalize step's status."
  }
 ]

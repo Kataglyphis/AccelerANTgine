@@ -38,11 +38,12 @@ PROFRAW_DIR="${BUILD_DIR}/profraw"
 # No --gcc-toolchain: the image's clang finds its GCC through the <native-triple>-clang++.cfg.
 part_build_test() {
 	rm -f "${BUILD_DIR}/.lane-built"
+	# run_gate calls a part inside `||`, where errexit is off: each step of a part needs its own `|| return`.
 	bash scripts/linux/ci-init.sh \
 		--workspace-dir "$(pwd)" \
 		--compiler "${COMPILER}" \
 		--runner "${RUNNER}" \
-		--arch "${MATRIX_ARCH}"
+		--arch "${MATRIX_ARCH}" || return
 	bash scripts/linux/ci-build-and-test.sh \
 		--workspace-dir "$(pwd)" \
 		--compiler "${COMPILER}" \
@@ -50,8 +51,8 @@ part_build_test() {
 		--build-type "${BUILD_TYPE}" \
 		--gcc-debug-preset "${GCC_DEBUG_PRESET}" \
 		--clang-debug-preset "${CLANG_DEBUG_PRESET}" \
-		--profraw-dir "${PROFRAW_DIR}"
-	touch "${BUILD_DIR}/.lane-built"
+		--profraw-dir "${PROFRAW_DIR}" || return
+	touch "${BUILD_DIR}/.lane-built" || return
 	# The x64 lanes run on every push and own census rows; arm64 runs on request and gets its rows later.
 	if [[ "${MATRIX_ARCH}" == "x64" ]]; then
 		python3 "$(antfrastructure_path linux/scripts/verify_warning_census.py)" --lane "${MATRIX_ARCH}-${COMPILER}" \
@@ -132,7 +133,7 @@ part_docs() {
 		--workspace-dir "$(pwd)" \
 		--compiler "${COMPILER}" \
 		--runner "${RUNNER}" \
-		--docs-out "${DOCS_OUT}"
+		--docs-out "${DOCS_OUT}" || return
 	bash scripts/linux/ci-finalize.sh --workspace-dir "$(pwd)"
 }
 

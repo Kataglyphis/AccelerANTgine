@@ -20,6 +20,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [0.0.4] - 2026-11-26
 
+- **A lane part fails when one of its steps fails.** `run_gate` runs a part inside `||`, where Bash's errexit is
+  off, so a failed `ci-build-and-test.sh` (a model download that timed out, release dry run 45875725132) reported
+  `build-test: ok` without running ctest; coverage then read 0 % and the skip gate found no report. Every step of
+  `part_build_test` and `part_docs` now returns its status, held by `test-ci-run-all-parts.sh`.
 - **The GPU candidates' ORT profile suite runs again** (ANTfrastructure 2a27d96f): the hub's `test_verify_ort_profile.py`
   imports its fixture under `python3 -I`, which this repo's GPU lanes use.
 - **The Windows lanes build again, and the setups compress with zlib** (ANTfrastructure CON302). The hub's
