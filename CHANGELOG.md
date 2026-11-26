@@ -18,6 +18,13 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-11-26
+
+- **The Windows lanes build again, and the setups compress with zlib** (ANTfrastructure CON302). The hub's
+  `ort_plugin_eps.hpp` reads the environment with `GetEnvironmentVariableW`, since clang-cl's `-Werror` failed on
+  the deprecated `_wgetenv`; the hub's CPack rule sets `CPACK_NSIS_COMPRESSOR` to zlib, so the setup no longer
+  carries NSIS's CPL-1.0 LZMA stub (the x64 setup of run 45809448365 reads `Method = Deflate`).
+
 - **AMD's MIGraphX plugin registers through the hub's shared policy** (ANTfrastructure CON231). The exact
   `Src/ort_plugin_eps.hpp` decides the module path and owns the registration in one `PluginRegistry` on the
   engine's kept environment; a registration another library of the process made is still used
@@ -2127,7 +2134,8 @@ a measurement belongs in a changelog rather than in `AGENTS.md`.
   `--platform=local` is `GITHUB_COM_TOKEN`, not `RENOVATE_TOKEN`.
 
 <!-- Links -->
-[Unreleased]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/Kataglyphis/AccelerANTgine/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/Kataglyphis/AccelerANTgine/releases/tag/v0.0.1
