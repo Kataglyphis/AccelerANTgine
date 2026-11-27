@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **The GPU candidate waits for its upload to be listed before it downloads it by ID**: the AMD candidate's ~320 MB
+  archive was finalized, yet the download right after it found only the run's other artifacts, in two of three runs
+  (`None of the provided artifact IDs were found`, hub develop-red #275). A 90 s wait sits before the download; the
+  producer-proof wiring test and `gpu-candidate.upload-listing-wait` pin it. The check after it still fails on a
+  missing archive.
+
 ## [0.0.4] - 2026-11-26
 
 - **The AMD clean-host check reads the engine's current refusal**: since 783eff5 the engine reports `MIGraphX from

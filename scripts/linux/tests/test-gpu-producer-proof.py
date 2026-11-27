@@ -241,6 +241,9 @@ def safe_wiring(build: str, workflow: str) -> bool:
         "python3 scripts/linux/tests/test-gpu-producer-proof.py",
         "gpu-producer-proof.py select",
         "path: ${{ steps.proof.outputs.paths }}",
+        # The listing lags a fresh upload, so the download by ID waits for it.
+        "      - name: Wait for the artifact listing to show the upload\n        run: sleep 90\n"
+        "      - name: Download the just-uploaded archive by ID\n",
         "artifact-ids: ${{ inputs.promote-verified && steps.promotion_upload.outputs.artifact-id || steps.candidate_upload.outputs.artifact-id }}",
         "skip-decompress: true",
         "digest-mismatch: error",

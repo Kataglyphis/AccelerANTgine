@@ -582,5 +582,13 @@
   "replace": "\t\t--docs-out \"${DOCS_OUT}\"\n",
   "test": "bash scripts/linux/tests/test-ci-run-all-parts.sh",
   "why": "A failed docs build would otherwise pass on the finalize step's status."
+ },
+ {
+  "id": "gpu-candidate.upload-listing-wait",
+  "target": ".github/workflows/linux-gpu-candidate.yml",
+  "find": "      - name: Wait for the artifact listing to show the upload\n        run: sleep 90\n",
+  "replace": "",
+  "test": "python3 scripts/linux/tests/test-gpu-producer-proof.py",
+  "why": "The download by ID right after a large upload found the run's other artifacts but not this one in two of three runs."
  }
 ]
