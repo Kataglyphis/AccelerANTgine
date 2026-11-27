@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **`Build-Windows.ps1` gives each copied block one owner (hub #364)**: the three workspace CMake builds go through
+  `Invoke-WorkspaceCmakeBuild`, the four syncs through `Sync-WorkspaceBuildDir`, coverage and PGO through
+  `Invoke-BuildTreeStep`, and the image and package GPU checks through `Invoke-GpuCandidateCheck`. One function each now
+  decides the cross build dir, the GStreamer bin default, a path refusal, CPack's installers of one kind and the chain
+  wheel the ORT license texts come from. The ASAN_OPTIONS and clang-tidy PATH scopes use the hub's
+  `Invoke-WithProcessEnvironment`. Steps, order, arguments and refusal texts are unchanged: a stub run of every step over
+  CPU, GPU, cross and refusal cases logs the same 229 calls before and after. The file's duplicate self-pair falls from 24
+  to 19 shingles, all of them the Release and MSIX step openings. The suites now pin one CMake call behind the helper,
+  the chain wheel for ORT licenses and the installer refusal by running it; `BuildStepHelpers.Tests.ps1` covers the GPU
+  package forwarding and the build-tree step's directory.
 - **`Src/rusty_code/Cargo.lock` at its newest in-range releases**: lock file maintenance moved cc 1.12.0, find-msvc-tools
   0.1.16, syn 3.0.10, hashbrown 0.17.2 and clap 4.6.10. The crate builds on Linux and on the Windows MSVC host, `cargo
   audit` and `cargo deny` advisories, bans and sources stay clean, and the staged license files keep their texts.

@@ -42,7 +42,9 @@ Describe 'Windows media runtime reuse' {
 
     # Both read a fake image on disk: the plugin directory resolves for real, the PE check is not under test.
     Context 'an image on disk' {
+        . (Get-BuildFunctionBlock 'Get-ImageGStreamerBin')
         . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginDir')
+        . (Get-BuildFunctionBlock 'Assert-BuildPath')
         function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
 
         It 'stages required and present optional package plugins and rejects an incomplete image' {
@@ -101,6 +103,7 @@ Describe 'Windows media runtime reuse' {
     }
 
     It 'warns when the selected GStreamer bin is missing' {
+        . (Get-BuildFunctionBlock 'Get-ImageGStreamerBin')
         . (Get-BuildFunctionBlock 'Write-MissingGStreamerBinWarning')
         $warnings = [Collections.Generic.List[string]]::new()
         function Write-BuildLogWarning { param($Context, $Message) $warnings.Add($Message) }

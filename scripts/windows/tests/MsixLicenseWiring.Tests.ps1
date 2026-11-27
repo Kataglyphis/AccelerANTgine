@@ -10,7 +10,8 @@ function Get-MsixScriptModel([string]$Source) {
     Step = Get-UniqueBuildAstNode -Ast $ast -StepName 'MSIX Packaging'
     Copies = @(Get-TestAstCommands -Ast $ast -Name 'Copy-PackageLicense')
     Checks = @(Get-TestAstCommands -Ast $ast -Name 'Invoke-BuildExternal' | Where-Object { $_.Extent.Text.Contains('$licenseVerifier') })
-    OrtCopies = @(Get-TestAstCommands -Ast $ast -Name 'Copy-OrtWheelLicenses')
+    OrtCopies = @(Get-TestAstCommands -Ast $ast -Name 'Copy-ChainOrtWheelLicenses')
+    OrtStore = @(Get-TestAstCommands -Ast $ast -Name 'Copy-OrtWheelLicenses')
     OrtChecks = @(Get-TestAstCommands -Ast $ast -Name 'Assert-OrtWheelLicensesInPackage')
   }
 }
@@ -22,7 +23,9 @@ function Assert-MsixLicenseWiring([string]$Source) {
   $checks = $model.Checks
   if ($checks.Count -ne 1 -or -not $checks[0].Extent.Text.Contains('$msixFile')) { throw 'Expected the completed MSIX license check' }
   $ortCopies = $model.OrtCopies
+  $ortStore = $model.OrtStore
   $ortChecks = $model.OrtChecks
+  if ($ortStore.Count -ne 1 -or -not $ortStore[0].Extent.Text.Contains('-WheelDir (Get-OrtChainWheelStore)')) { throw 'Expected ONNX license staging from the chain wheel' }
   if ($ortCopies.Count -ne 2 -or $ortChecks.Count -ne 3 -or @($ortChecks | Where-Object { $_.Extent.Text.Contains('$msixFile') }).Count -ne 1) { throw 'Expected ONNX license staging and checks for the install tree, ZIP and MSIX' }
 }
 
@@ -112,11 +115,15 @@ Describe 'MSIX project license wiring' {
     $check = $model.Checks[0]
     $ortCopies = $model.OrtCopies
     $ortChecks = $model.OrtChecks
-    foreach ($call in @($copy, $check) + $ortCopies + $ortChecks) {
+    foreach ($call in @($copy, $check) + $ortCopies + $model.OrtStore + $ortChecks) {
       $mutant = $source.Replace($call.Extent.Text, "Write-Output 'removed'")
       $mutant | Should Not Be $source
       Assert-Throws -Body { Assert-MsixLicenseWiring $mutant } -MessagePattern 'license'
     }
+    $store = $model.OrtStore[0].Extent.Text
+    $otherStore = $source.Replace($store, $store.Replace('(Get-OrtChainWheelStore)', "'C:\wheels'"))
+    $otherStore | Should Not Be $source
+    Assert-Throws -Body { Assert-MsixLicenseWiring $otherStore } -MessagePattern 'chain wheel'
   }
 
   It 'installs both ONNX texts from the matched package build' {

@@ -77,6 +77,18 @@ function Assert-CrossBuildTarget {
     }
 }
 
+# Every GPU candidate check reads the variant, the chain ORT and its wheel store.
+function Invoke-GpuCandidateCheck {
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][System.Collections.IDictionary]$Arguments)
+    & (Join-Path $PSScriptRoot $Name) -Variant $OrtVariant -OnnxRoot $env:ONNX_ROOT -WheelDir (Get-OrtChainWheelStore) @Arguments
+}
+
+# A CPU build ships no GPU closure, so only a GPU candidate's finished packages are checked.
+function Assert-GpuCandidatePackage {
+    param([Parameter(Mandatory)][string]$Bundle, [Parameter(Mandatory)][string]$PackageDir, [string]$MsixPath)
+    if ($OrtVariant -ne 'cpu') { Invoke-GpuCandidateCheck -Name 'Test-WindowsGpuPackages.ps1' -Arguments $PSBoundParameters }
+}
+
 function Assert-GpuBuildRequest {
     if ($OrtVariant -eq 'cpu') { return }
     if ($TargetArch -ne 'amd64') { throw 'Windows GPU packages require x64; Windows ARM GPU packages are excluded.' }
@@ -84,7 +96,7 @@ function Assert-GpuBuildRequest {
         throw 'Windows GPU candidates require only -BuildTargets clangcl-release without -StageTests.'
     }
     & (Join-Path $PSScriptRoot 'Test-WindowsGpuHub.ps1')
-    & (Join-Path $PSScriptRoot 'Test-WindowsGpuImage.ps1') -Variant $OrtVariant -OnnxRoot $env:ONNX_ROOT -WheelDir (Get-OrtChainWheelStore) -TargetArch $TargetArch
+    Invoke-GpuCandidateCheck -Name 'Test-WindowsGpuImage.ps1' -Arguments @{ TargetArch = $TargetArch }
 }
 
 function Get-OrtVariantSuffix {
@@ -106,6 +118,16 @@ function Import-BuildConfigTable {
         throw "Build config not found: $Path"
     }
     return Import-PowerShellDataFile -Path $Path
+}
+
+# Failure is the whole refusal, so each caller keeps its own message.
+function Assert-BuildPath {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][ValidateSet('Leaf', 'Container')][string]$PathType,
+        [Parameter(Mandatory)][string]$Failure
+    )
+    if (-not (Test-Path -LiteralPath $Path -PathType $PathType)) { throw $Failure }
 }
 
 # The build table: a preset rename is a data edit, and every row carries its own environment override.
@@ -132,10 +154,15 @@ function Copy-AppLocalVcRuntime {
     Write-BuildLog -Context $Context -Message "App-local VC++ runtime: $($crt.Count) DLL(s) from $($crt[0].DirectoryName) -> $($Destination -join ', ')"
 }
 
+function Get-ImageGStreamerBin {
+    if ($env:GSTREAMER_BIN) { return $env:GSTREAMER_BIN }
+    return 'C:\runtime\bin'
+}
+
 # The shared bundler permits ORT-only builds, so this consumer keeps its missing-GStreamer hint.
 function Write-MissingGStreamerBinWarning {
     param([Parameter(Mandatory)][pscustomobject]$Context)
-    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
+    $gstBin = Get-ImageGStreamerBin
     if (-not (Test-Path -LiteralPath $gstBin -PathType Container)) {
         Write-BuildLogWarning -Context $Context -Message "GStreamer bin not found ($gstBin); host runs of this tree lack GStreamer."
     }
@@ -143,8 +170,7 @@ function Write-MissingGStreamerBinWarning {
 
 # GStreamer looks for plugins in <dir of gstreamer-1.0-0.dll, minus a trailing bin>\lib\gstreamer-1.0; build\bin holds that DLL.
 function Get-ImageGStreamerPluginDir {
-    $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
-    return Join-Path (Split-Path -Parent $gstBin) 'lib\gstreamer-1.0'
+    return Join-Path (Split-Path -Parent (Get-ImageGStreamerBin)) 'lib\gstreamer-1.0'
 }
 
 function Get-ImageGStreamerPluginFile([string]$PluginDir, [string[]]$Name) {
@@ -214,7 +240,7 @@ function Get-ImageGStreamerPackageScanner {
     param([Parameter(Mandatory)][string]$Arch)
     $root = Split-Path -Parent (Split-Path -Parent (Get-ImageGStreamerPluginDir))
     $file = Join-Path $root 'libexec\gstreamer-1.0\gst-plugin-scanner.exe'
-    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "gst-plugin-scanner.exe is missing from the image: $file" }
+    Assert-BuildPath -Path $file -PathType Leaf -Failure "gst-plugin-scanner.exe is missing from the image: $file"
     $null = Assert-PeTargetMachine -Path $file -Arch $Arch -Context 'GStreamer plugin scanner'
     $file
 }
@@ -235,6 +261,12 @@ function Copy-ImageGStreamerPackagePlugins {
     }
 }
 
+# ORT has one source, so every package's ORT license texts come from the chain's wheel.
+function Copy-ChainOrtWheelLicenses {
+    param([Parameter(Mandatory)][string]$OrtDll, [Parameter(Mandatory)][string]$Destination)
+    Copy-OrtWheelLicenses -OrtDll $OrtDll -WheelDir (Get-OrtChainWheelStore) -Destination $Destination
+}
+
 # GenAI loads at run time, so no import closure finds it; a staged suite needs the chain DLL beside it.
 function Copy-ChainGenaiBeside {
     param([Parameter(Mandatory)][string]$Destination)
@@ -246,6 +278,19 @@ function Copy-ChainGenaiBeside {
     return (Join-Path $Destination 'onnxruntime-genai.dll')
 }
 
+# CPack names each installer relative to its package directory; a kind it did not produce is refused with Failure.
+function Get-InstallerPackagePath {
+    param(
+        [Parameter(Mandatory)][string]$PackageDir,
+        [string[]]$Installer = @(),
+        [Parameter(Mandatory)][string]$Like,
+        [Parameter(Mandatory)][string]$Failure
+    )
+    $names = @($Installer | Where-Object { $_ -like $Like })
+    if ($names.Count -eq 0) { throw $Failure }
+    foreach ($name in $names) { Join-Path $PackageDir $name }
+}
+
 # The install-time notices list every DLL the closure added; each ZIP and MSI must carry that exact list.
 function Assert-InstallerNotice {
     param(
@@ -254,15 +299,15 @@ function Assert-InstallerNotice {
         [string[]]$Installer = @()
     )
     $notices = Join-Path $Bundle 'licenses\THIRD-PARTY-NOTICES.txt'
-    if (-not (Test-Path -LiteralPath $notices -PathType Leaf)) { throw "The install tree lacks $notices" }
-    $zips = @($Installer | Where-Object { $_ -like '*.zip' })
-    $msis = @($Installer | Where-Object { $_ -like '*.msi' })
-    if ($zips.Count -eq 0 -or $msis.Count -eq 0) { throw 'CPack produced no ZIP or no MSI for third-party notice verification' }
+    Assert-BuildPath -Path $notices -PathType Leaf -Failure "The install tree lacks $notices"
+    $refusal = 'CPack produced no ZIP or no MSI for third-party notice verification'
+    $zips = @(Get-InstallerPackagePath -PackageDir $PackageDir -Installer $Installer -Like '*.zip' -Failure $refusal)
+    $msis = @(Get-InstallerPackagePath -PackageDir $PackageDir -Installer $Installer -Like '*.msi' -Failure $refusal)
     foreach ($zip in $zips) {
-        Assert-PackageLicense -Path (Join-Path $PackageDir $zip) -Pattern '*/licenses/THIRD-PARTY-NOTICES.txt' -LicensePath $notices
+        Assert-PackageLicense -Path $zip -Pattern '*/licenses/THIRD-PARTY-NOTICES.txt' -LicensePath $notices
     }
     foreach ($msi in $msis) {
-        Assert-MsiPackageLicense -Path (Join-Path $PackageDir $msi) -FileName 'THIRD-PARTY-NOTICES.txt' -LicensePath $notices
+        Assert-MsiPackageLicense -Path $msi -FileName 'THIRD-PARTY-NOTICES.txt' -LicensePath $notices
     }
 }
 
@@ -273,10 +318,15 @@ function Get-FastBuildRoot {
     return $Path
 }
 
+# A cross build keeps its own tree beside the host's, so neither clobbers the other.
+function Get-TargetBuildDir {
+    param([Parameter(Mandatory)]$Configuration)
+    if ($isCross) { return "$($Configuration.BuildDir)-$TargetArch" }
+    return $Configuration.BuildDir
+}
+
 function Get-ReleaseBuildDir {
-    # A cross build keeps its own tree beside the host's, so neither clobbers the other.
-    $releaseBuildDir = if ($isCross) { "$($cfgRelease.BuildDir)-$TargetArch" } else { $cfgRelease.BuildDir }
-    return "$releaseBuildDir$(Get-OrtVariantSuffix)"
+    return "$(Get-TargetBuildDir -Configuration $cfgRelease)$(Get-OrtVariantSuffix)"
 }
 
 function Resolve-BuildWorkspace {
@@ -340,16 +390,45 @@ function Invoke-FormatStep {
     }
 }
 
+# No -S is passed, so the preset's sourceDir applies and cwd must be the workspace.
+function Invoke-WorkspaceCmakeBuild {
+    param(
+        [Parameter(Mandatory)][string]$BuildPath,
+        [Parameter(Mandatory)]$Configuration,
+        [string[]]$ConfigureExtraArgs = @(),
+        [switch]$CleanBuildRoot
+    )
+    Push-Location $Workspace
+    try {
+        Invoke-CmakeConfigureAndBuild -Context $Context `
+            -BuildPath $BuildPath `
+            -Preset $Configuration.Preset `
+            -Configuration $Configuration.Configuration -ParallelJobs $ParallelJobs `
+            -CleanBuildRoot:$CleanBuildRoot -ConfigureExtraArgs $ConfigureExtraArgs
+    } finally { Pop-Location }
+}
+
+function Sync-WorkspaceBuildDir {
+    param([Parameter(Mandatory)][string]$Source, [Parameter(Mandatory)][string]$BuildDir)
+    Sync-BuildArtifacts -Context $Context -Source $Source -Destination (Join-Path $Workspace $BuildDir) -ExcludeCommonRustAndCppCache
+}
+
+# llvm-cov names its suite relative to the build tree, so the steps that read a tree run from inside it.
+function Invoke-BuildTreeStep {
+    param(
+        [Parameter(Mandatory)][string]$StepName,
+        [Parameter(Mandatory)][string]$BuildRoot,
+        [Parameter(Mandatory)][scriptblock]$Script
+    )
+    Invoke-BuildStep -Context $Context -StepName $StepName -Script {
+        Push-Location $BuildRoot
+        try { & $Script } finally { Pop-Location }
+    }
+}
+
 function Invoke-MsvcDebugStep {
     Invoke-BuildStep -Context $Context -StepName "MSVC Debug Build" -Script {
-        # No -S is passed, so the preset's sourceDir applies and cwd must be the workspace.
-        Push-Location $Workspace
-        try {
-            Invoke-CmakeConfigureAndBuild -Context $Context `
-                -BuildPath $fastBuildMsvcFull `
-                -Preset $cfgMsvc.Preset `
-                -Configuration $cfgMsvc.Configuration -ParallelJobs $ParallelJobs
-        } finally { Pop-Location }
+        Invoke-WorkspaceCmakeBuild -BuildPath $fastBuildMsvcFull -Configuration $cfgMsvc
 
         # This lane links Microsoft's ASan runtime, which is not interchangeable with LLVM's.
         Invoke-CtestDiscoveredTests -Context $Context `
@@ -357,7 +436,7 @@ function Invoke-MsvcDebugStep {
             -Configuration $cfgMsvc.Configuration `
             -RuntimeFlavor Msvc
 
-        Sync-BuildArtifacts -Context $Context -Source $fastBuildMsvcFull -Destination (Join-Path $Workspace $cfgMsvc.BuildDir) -ExcludeCommonRustAndCppCache
+        Sync-WorkspaceBuildDir -Source $fastBuildMsvcFull -BuildDir $cfgMsvc.BuildDir
     }
 }
 
@@ -371,14 +450,8 @@ function Invoke-ConfiguredBuildStep {
         [switch]$Critical
     )
     Invoke-BuildStep -Context $Context -StepName $StepName -Critical:$Critical -Script {
-        Push-Location $Workspace
-        try {
-            Invoke-CmakeConfigureAndBuild -Context $Context `
-                -BuildPath $BuildPath `
-                -Preset $Configuration.Preset `
-                -Configuration $Configuration.Configuration -ParallelJobs $ParallelJobs `
-                -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON') + $CrossConfigureArgs)
-        } finally { Pop-Location }
+        Invoke-WorkspaceCmakeBuild -BuildPath $BuildPath -Configuration $Configuration `
+            -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON') + $CrossConfigureArgs)
 
         Copy-BuildMediaRuntime -Context $Context -BuildRoot $BuildPath -StageTestPlugins -CopyOrtBeside
     }
@@ -392,37 +465,30 @@ function Invoke-ClangDebugBuildStep {
     if (-not $isCross) {
         Invoke-BuildStep -Context $Context -StepName "ClangCL Debug Tests" -Script {
             # The hub logs sanitizer reports to files beside the tests; a later log_path wins, so they reach ctest's output.
-            $savedAsanOptions = $env:ASAN_OPTIONS
-            $env:ASAN_OPTIONS = 'log_path=stderr'
-            try {
+            Invoke-WithProcessEnvironment -Environment @{ ASAN_OPTIONS = 'log_path=stderr' } -ScriptBlock {
                 Invoke-CtestDiscoveredTests -Context $Context `
                     -BuildRoot $fastBuildClangFull `
                     -Configuration $cfgClang.Configuration `
                     -RuntimeFlavor Clang
-            } finally {
-                $env:ASAN_OPTIONS = $savedAsanOptions
             }
         }
     }
 
     # Code Coverage
-    Invoke-BuildStep -Context $Context -StepName "Code Coverage (llvm-cov)" -Script {
-        Push-Location $fastBuildClangFull
-        try {
-            $profrawPath = Join-Path $fastBuildClangFull "Test\compile\default.profraw"
-            if (Test-Path $profrawPath) {
-                $profrawCopyPath = Join-Path $logDirPath "default.profraw"
-                $profdataPath = Join-Path $logDirPath "compileTestSuite.profdata"
-                $coverageJsonPath = Join-Path $logDirPath "coverage.json"
-                
-                Copy-Item -Path $profrawPath -Destination $profrawCopyPath -Force
-                Invoke-BuildExternal -Context $Context -File "llvm-profdata.exe" -Parameters @("merge", "-sparse", $profrawPath, "-o", $profdataPath)
-                Invoke-BuildExternal -Context $Context -File "llvm-cov.exe" -Parameters @("report", "compileTestSuite.exe", "-instr-profile=$profdataPath")
-                
-                $coverageOutput = & llvm-cov.exe export "compileTestSuite.exe" -format=text "-instr-profile=$profdataPath" 2>&1
-                $coverageOutput | Out-File -FilePath $coverageJsonPath -Encoding UTF8
-            }
-        } finally { Pop-Location }
+    Invoke-BuildTreeStep -StepName "Code Coverage (llvm-cov)" -BuildRoot $fastBuildClangFull -Script {
+        $profrawPath = Join-Path $fastBuildClangFull "Test\compile\default.profraw"
+        if (Test-Path $profrawPath) {
+            $profrawCopyPath = Join-Path $logDirPath "default.profraw"
+            $profdataPath = Join-Path $logDirPath "compileTestSuite.profdata"
+            $coverageJsonPath = Join-Path $logDirPath "coverage.json"
+
+            Copy-Item -Path $profrawPath -Destination $profrawCopyPath -Force
+            Invoke-BuildExternal -Context $Context -File "llvm-profdata.exe" -Parameters @("merge", "-sparse", $profrawPath, "-o", $profdataPath)
+            Invoke-BuildExternal -Context $Context -File "llvm-cov.exe" -Parameters @("report", "compileTestSuite.exe", "-instr-profile=$profdataPath")
+
+            $coverageOutput = & llvm-cov.exe export "compileTestSuite.exe" -format=text "-instr-profile=$profdataPath" 2>&1
+            $coverageOutput | Out-File -FilePath $coverageJsonPath -Encoding UTF8
+        }
     }
 }
 
@@ -443,29 +509,23 @@ function Invoke-ClangDebugAnalysisStep {
             $compilerLine = Select-String -Path $cache -Pattern '^CMAKE_CXX_COMPILER:[A-Z]+=(.+)$' -ErrorAction SilentlyContinue |
                 Select-Object -First 1
             $ownTidy = if ($compilerLine) { Join-Path (Split-Path -Parent $compilerLine.Matches[0].Groups[1].Value) 'clang-tidy.exe' }
-            $savedPath = $env:PATH
-            try {
-                if ($ownTidy -and (Test-Path $ownTidy)) {
-                    $env:PATH = "$(Split-Path -Parent $ownTidy);$env:PATH"
-                    # The compiler's own tidy reads the BMIs it built (hub CON10), so no TU needs the BMI skip.
-                    $tidyArgs.ModuleImportPattern = '(?!)'
-                    Write-BuildLog -Context $Context -Message "clang-tidy: the compiler's own, $ownTidy; every Src/ TU analysed"
-                } else {
-                    $tidyArgs.ModuleImportPattern = '(?m)^\s*((export\s+)?import\s+[\w.:<>"/]+|module\s+[\w.:]+)\s*;'
-                    Write-BuildLog -Context $Context -Message "clang-tidy: none beside the compiler ($(if ($compilerLine) { $compilerLine.Matches[0].Groups[1].Value } else { "no CMAKE_CXX_COMPILER in $cache" })); every TU that needs a BMI is skipped"
-                }
-                Invoke-ClangTidyFixStep @tidyArgs
-            } finally {
-                $env:PATH = $savedPath
+            $tidyPath = $env:PATH
+            if ($ownTidy -and (Test-Path $ownTidy)) {
+                $tidyPath = "$(Split-Path -Parent $ownTidy);$env:PATH"
+                # The compiler's own tidy reads the BMIs it built (hub CON10), so no TU needs the BMI skip.
+                $tidyArgs.ModuleImportPattern = '(?!)'
+                Write-BuildLog -Context $Context -Message "clang-tidy: the compiler's own, $ownTidy; every Src/ TU analysed"
+            } else {
+                $tidyArgs.ModuleImportPattern = '(?m)^\s*((export\s+)?import\s+[\w.:<>"/]+|module\s+[\w.:]+)\s*;'
+                Write-BuildLog -Context $Context -Message "clang-tidy: none beside the compiler ($(if ($compilerLine) { $compilerLine.Matches[0].Groups[1].Value } else { "no CMAKE_CXX_COMPILER in $cache" })); every TU that needs a BMI is skipped"
             }
+            Invoke-WithProcessEnvironment -Environment @{ PATH = $tidyPath } -ScriptBlock { Invoke-ClangTidyFixStep @tidyArgs }
         }
     }
     
     # Sync Debug Artifacts
     Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Debug Artifacts" -Script {
-        # A cross build keeps its own tree beside the host's, so neither clobbers the other.
-        $debugBuildDir = if ($isCross) { "$($cfgClang.BuildDir)-$TargetArch" } else { $cfgClang.BuildDir }
-        Sync-BuildArtifacts -Context $Context -Source $fastBuildClangFull -Destination (Join-Path $Workspace $debugBuildDir) -ExcludeCommonRustAndCppCache
+        Sync-WorkspaceBuildDir -Source $fastBuildClangFull -BuildDir (Get-TargetBuildDir -Configuration $cfgClang)
     }
 }
 
@@ -474,22 +534,19 @@ function Invoke-ProfileStep {
 
     # The host runs the benchmarks (Start-Windows.ps1 -Config Profile): this container has no model.
     if (-not $SkipPGO) {
-        Invoke-BuildStep -Context $Context -StepName "PGO (Profile-Guided Optimization)" -Script {
-            Push-Location $fastBuildProfileFull
-            try {
-                $mainExe = Join-Path $fastBuildProfileFull "bin\AccelerANTgine.exe"
-                $dummyProfrawPath = Join-Path $logDirPath "dummy.profraw"
-                if (Test-Path $mainExe) {
-                    $env:LLVM_PROFILE_FILE = $dummyProfrawPath
-                    Invoke-BuildExternal -Context $Context -File $mainExe -Parameters @() -IgnoreExitCode
-                }
-            } finally { Pop-Location }
+        Invoke-BuildTreeStep -StepName "PGO (Profile-Guided Optimization)" -BuildRoot $fastBuildProfileFull -Script {
+            $mainExe = Join-Path $fastBuildProfileFull "bin\AccelerANTgine.exe"
+            $dummyProfrawPath = Join-Path $logDirPath "dummy.profraw"
+            if (Test-Path $mainExe) {
+                $env:LLVM_PROFILE_FILE = $dummyProfrawPath
+                Invoke-BuildExternal -Context $Context -File $mainExe -Parameters @() -IgnoreExitCode
+            }
         }
     }
     
     # Sync Profile Artifacts
     Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Profile Artifacts" -Script {
-        Sync-BuildArtifacts -Context $Context -Source $fastBuildProfileFull -Destination (Join-Path $Workspace $cfgProfile.BuildDir) -ExcludeCommonRustAndCppCache
+        Sync-WorkspaceBuildDir -Source $fastBuildProfileFull -BuildDir $cfgProfile.BuildDir
     }
 }
 
@@ -502,21 +559,14 @@ function Invoke-ReleaseBuildStep {
         $packageDlls = Join-Path $fastBuildReleaseDirFull 'package-dlls'
         $imagePlugins = @(if ($OrtVariant -ne 'cpu') { Get-ImageGStreamerPackagePlugins -Arch $TargetArch })
         $imageScanner = @(if ($OrtVariant -ne 'cpu') { Get-ImageGStreamerPackageScanner -Arch $TargetArch })
-        Push-Location $Workspace
-        try {
-            Invoke-CmakeConfigureAndBuild -Context $Context `
-                -BuildPath $fastBuildReleaseDirFull `
-                -Preset $cfgRelease.Preset `
-                -Configuration $cfgRelease.Configuration -ParallelJobs $ParallelJobs `
-                -CleanBuildRoot `
-                -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON',
-                        '-DKATAGLYPHIS_PACKAGE_DEMO_MODEL=ON',
-                        "-DKATAGLYPHIS_PACKAGE_DLL_DIR=$($packageDlls -replace '\\', '/')",
-                        "-DKATAGLYPHIS_ORT_VARIANT=$OrtVariant") +
-                    @(if ($OrtVariant -ne 'cpu') { "-DKATAGLYPHIS_GST_PLUGIN_DIR=$((Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -replace '\\', '/')", "-DKATAGLYPHIS_GST_PLUGIN_SCANNER=$($imageScanner[0] -replace '\\', '/')" }) +
-                    @(if ($StageTests) { '-DBUILD_TESTING=ON', '-DKATAGLYPHIS_RELEASE_TESTS=ON' }) +
-                    @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
-        } finally { Pop-Location }
+        Invoke-WorkspaceCmakeBuild -BuildPath $fastBuildReleaseDirFull -Configuration $cfgRelease -CleanBuildRoot `
+            -ConfigureExtraArgs (@('-Dmyproject_ENABLE_CPPCHECK=OFF', '-DENABLE_WIX_PACKAGING=ON',
+                    '-DKATAGLYPHIS_PACKAGE_DEMO_MODEL=ON',
+                    "-DKATAGLYPHIS_PACKAGE_DLL_DIR=$($packageDlls -replace '\\', '/')",
+                    "-DKATAGLYPHIS_ORT_VARIANT=$OrtVariant") +
+                @(if ($OrtVariant -ne 'cpu') { "-DKATAGLYPHIS_GST_PLUGIN_DIR=$((Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -replace '\\', '/')", "-DKATAGLYPHIS_GST_PLUGIN_SCANNER=$($imageScanner[0] -replace '\\', '/')" }) +
+                @(if ($StageTests) { '-DBUILD_TESTING=ON', '-DKATAGLYPHIS_RELEASE_TESTS=ON' }) +
+                @(Get-CrossConfigureArgs -Arch $TargetArch -Corrosion))
 
         Copy-BuildMediaRuntime -Context $Context -BuildRoot $fastBuildReleaseDirFull
         # Everything the engine imports transitively that a clean machine lacks.
@@ -525,7 +575,7 @@ function Invoke-ReleaseBuildStep {
         # The clang-cl presets harden (/guard:cf on the link, CON290); the chain's DLLs are not this repo's to grade.
         Assert-PeHardening -Path $engine
         $plugins = @(if ($OrtVariant -ne 'cpu') { Copy-ImageGStreamerPackagePlugins -Destination (Join-Path $fastBuildReleaseDirFull 'package-gst-plugins') -Plugins $imagePlugins })
-        $gstBin = if ($env:GSTREAMER_BIN) { $env:GSTREAMER_BIN } else { 'C:\runtime\bin' }
+        $gstBin = Get-ImageGStreamerBin
         $search = @(Get-ProductDllSearchPath -Arch $TargetArch -RuntimeBin $gstBin)
         if (@($plugins | Where-Object { (Split-Path -Leaf $_) -ieq 'gstlibav.dll' }).Count) {
             $ffmpegRoot = if ($env:FFMPEG_ROOT) { $env:FFMPEG_ROOT } else { Join-Path (Split-Path -Parent $gstBin) 'ffmpeg' }
@@ -538,7 +588,7 @@ function Invoke-ReleaseBuildStep {
             $search += $ffmpegBin
         }
         $closure = @(Copy-PeImportClosure -Path @($engine + $plugins + $imageScanner) -SearchDirectory $search -Destination $packageDlls -Arch $TargetArch)
-        $null = Copy-OrtWheelLicenses -OrtDll (Join-Path $env:ONNX_ROOT 'bin\onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $packageDlls
+        $null = Copy-ChainOrtWheelLicenses -OrtDll (Join-Path $env:ONNX_ROOT 'bin\onnxruntime.dll') -Destination $packageDlls
         Write-BuildLog -Context $Context -Message "Package DLL closure ($TargetArch): $(@($closure | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
         # The NSIS/WiX/ZIP installers pack the install tree, not bin\: G6 proves that tree first.
         $installProof = Join-Path ([System.IO.Path]::GetTempPath()) "accelerantgine-install-$([guid]::NewGuid().ToString('N'))"
@@ -561,17 +611,14 @@ function Invoke-PortableBundleStep {
         $null = Assert-ChainOrtTree -Root $portable.Bundle -OrtDirectory (Join-Path $portable.Bundle 'bin')
         $ortLicenses = Join-Path $fastBuildReleaseDirFull 'package-dlls\licenses\onnxruntime'
         Assert-OrtWheelLicensesInPackage -Path $portable.Bundle -LicenseDirectory $ortLicenses -Format archive
-        $zipFiles = @($portable.Installers | Where-Object { $_ -like '*.zip' })
-        if ($zipFiles.Count -eq 0) { throw 'CPack produced no ZIP for ONNX license verification' }
+        $zipFiles = @(Get-InstallerPackagePath -PackageDir $portable.Packages -Installer $portable.Installers -Like '*.zip' `
+                -Failure 'CPack produced no ZIP for ONNX license verification')
         foreach ($zip in $zipFiles) {
-            Assert-OrtWheelLicensesInPackage -Path (Join-Path $portable.Packages $zip) -LicenseDirectory $ortLicenses `
+            Assert-OrtWheelLicensesInPackage -Path $zip -LicenseDirectory $ortLicenses `
                 -Format archive -ArchivePrefix ([IO.Path]::GetFileNameWithoutExtension($zip))
         }
         Assert-InstallerNotice -Bundle $portable.Bundle -PackageDir $portable.Packages -Installer $portable.Installers
-        if ($OrtVariant -ne 'cpu') {
-            & (Join-Path $PSScriptRoot 'Test-WindowsGpuPackages.ps1') -Variant $OrtVariant -OnnxRoot $env:ONNX_ROOT `
-                -WheelDir (Get-OrtChainWheelStore) -Bundle $portable.Bundle -PackageDir $portable.Packages
-        }
+        Assert-GpuCandidatePackage -Bundle $portable.Bundle -PackageDir $portable.Packages
         Write-BuildLog -Context $Context -Message "Portable bundle $($portable.Bundle), complete as installed; packages: $($portable.Installers -join ', ')"
     }
 }
@@ -623,7 +670,7 @@ function Invoke-StageTestsStep {
             # The Debug (ASan) suite cannot run in the container on a cross build; it rides along, runtime DLLs beside it.
             if ($isCross -and $doClang) {
                 $debugSuite = Join-Path $fastBuildClangFull 'commitTestSuite.exe'
-                if (-not (Test-Path -LiteralPath $debugSuite -PathType Leaf)) { throw "The Debug build made no $debugSuite" }
+                Assert-BuildPath -Path $debugSuite -PathType Leaf -Failure "The Debug build made no $debugSuite"
                 Copy-Item -LiteralPath $debugSuite -Destination (Join-Path $tests 'commitTestSuite-debug.exe')
                 $manifest += @{ exe = 'commitTestSuite-debug.exe'; kind = 'gtest'; allowed_skips = $commitSkips }
                 & (Join-Path $Workspace 'third_party\ANTfrastructure\windows\scripts\build\Copy-Arm64VsRuntime.ps1') -InstallDir $tests -Flat
@@ -642,7 +689,7 @@ function Initialize-MsixStaging {
     if (Test-Path $stagingRoot) { Remove-Item $stagingRoot -Recurse -Force }
     if ($OrtVariant -ne 'cpu') {
         $bundlePlugins = Join-Path $Workspace "dist\$distName\bundle\lib\gstreamer-1.0"
-        if (-not (Test-Path -LiteralPath $bundlePlugins -PathType Container)) { throw "Missing bundled GStreamer plugins: $bundlePlugins" }
+        Assert-BuildPath -Path $bundlePlugins -PathType Container -Failure "Missing bundled GStreamer plugins: $bundlePlugins"
         $stagingLib = Join-Path $stagingRoot 'lib'
         New-Item -ItemType Directory -Path $stagingLib -Force | Out-Null
         Copy-Item -LiteralPath $bundlePlugins -Destination $stagingLib -Recurse -Force
@@ -737,7 +784,7 @@ function Invoke-MsixPackagingStep {
             $payloadExtra += $bundleModels
             $licenseSource = Join-Path $Workspace 'LICENSE'
             $payloadExtra += Copy-PackageLicense -Path $licenseSource -Destination $payloadDir
-            $ortLicenses = Copy-OrtWheelLicenses -OrtDll (Join-Path $payloadDir 'onnxruntime.dll') -WheelDir (Get-OrtChainWheelStore) -Destination $payloadDir
+            $ortLicenses = Copy-ChainOrtWheelLicenses -OrtDll (Join-Path $payloadDir 'onnxruntime.dll') -Destination $payloadDir
             # The payload is the bundle's bin\, so the bundle's notices describe it.
             $bundleLicenses = Join-Path $Workspace "dist\$distName\bundle\licenses"
             $bundleNotices = Join-Path $bundleLicenses 'THIRD-PARTY-NOTICES.txt'
@@ -752,11 +799,8 @@ function Invoke-MsixPackagingStep {
             Invoke-BuildExternal -Context $Context -File 'python' -Parameters @($licenseVerifier, $msixFile, '--require', "LICENSE=$licenseSource") | Out-Null
             Assert-OrtWheelLicensesInPackage -Path $msixFile -LicenseDirectory $ortLicenses -Format archive
             Assert-PackageLicense -Path $msixFile -Pattern 'licenses/THIRD-PARTY-NOTICES.txt' -LicensePath $bundleNotices
-            if ($OrtVariant -ne 'cpu') {
-                & (Join-Path $PSScriptRoot 'Test-WindowsGpuPackages.ps1') -Variant $OrtVariant -OnnxRoot $env:ONNX_ROOT `
-                    -WheelDir (Get-OrtChainWheelStore) -Bundle (Join-Path $Workspace "dist\$distName\bundle") `
-                    -PackageDir (Join-Path $Workspace "dist\$distName\packages") -MsixPath $msixFile
-            }
+            Assert-GpuCandidatePackage -Bundle (Join-Path $Workspace "dist\$distName\bundle") `
+                -PackageDir (Join-Path $Workspace "dist\$distName\packages") -MsixPath $msixFile
 
             Write-BuildLog -Context $Context -Message "MSIX package created: $msixFile"
         }
@@ -803,13 +847,11 @@ try {
     $releaseBuildDir = Get-ReleaseBuildDir
     $fastBuildReleaseDirFull = Join-Path $fastLocalCache $releaseBuildDir
 
-    $BuildTargets = $BuildTargets -join ',' -split ',' | ForEach-Object { $_.Trim() }
-
     # Define targets
-    $doMsvc    = -not $SkipMSVC -and ($BuildTargets -contains "msvc-debug")
-    $doClang   = $BuildTargets -contains "clangcl-debug"
-    $doProfile = $BuildTargets -contains "clangcl-profile"
-    $doRelease = $BuildTargets -contains "clangcl-release"
+    $doMsvc    = -not $SkipMSVC -and ($requestedTargets -contains "msvc-debug")
+    $doClang   = $requestedTargets -contains "clangcl-debug"
+    $doProfile = $requestedTargets -contains "clangcl-profile"
+    $doRelease = $requestedTargets -contains "clangcl-release"
 
     Invoke-EnvironmentStep
 
@@ -836,7 +878,7 @@ try {
 
         # Sync Release Artifacts
         Invoke-BuildStep -Context $Context -StepName "Sync ClangCL Release Artifacts" -Script {
-            Sync-BuildArtifacts -Context $Context -Source $fastBuildReleaseDirFull -Destination (Join-Path $Workspace $releaseBuildDir) -ExcludeCommonRustAndCppCache
+            Sync-WorkspaceBuildDir -Source $fastBuildReleaseDirFull -BuildDir $releaseBuildDir
         }
 
         Invoke-MsixPackagingStep

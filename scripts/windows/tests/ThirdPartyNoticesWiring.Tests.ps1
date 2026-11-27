@@ -14,7 +14,20 @@ function Get-InstallerNoticeCommands([System.Management.Automation.Language.Ast]
   return [pscustomobject]@{
     Zip = @(Get-TestAstCommands -Ast $function -Name 'Assert-PackageLicense')
     Msi = @(Get-TestAstCommands -Ast $function -Name 'Assert-MsiPackageLicense')
+    Kinds = @(Get-TestAstCommands -Ast $function -Name 'Get-InstallerPackagePath')
   }
+}
+
+function Assert-InstallerRefusal([System.Management.Automation.Language.Ast]$Ast, [object[]]$Kinds, [string]$Source) {
+  $failure = 'A run without a ZIP or an MSI must fail the notice check'
+  foreach ($like in "'*.zip'", "'*.msi'") {
+    Assert-SingleCommandArguments -Commands @($Kinds | Where-Object { (Get-TestCommandArguments -Command $_).Like -eq $like }) -Expected @{ Failure = '$refusal' } `
+      -CountFailure $failure -ValueFailure $failure
+  }
+  if (-not $Source.Contains("`$refusal = 'CPack produced no ZIP or no MSI for third-party notice verification'")) { throw $failure }
+  . ([scriptblock]::Create((Get-BuildFunctionSource -Ast $Ast -Name 'Get-InstallerPackagePath')))
+  $message = try { $null = Get-InstallerPackagePath -PackageDir 'packages' -Installer @('app.zip') -Like '*.msi' -Failure 'no msi'; '' } catch { $_.Exception.Message }
+  if ($message -ne 'no msi') { throw $failure }
 }
 
 function Assert-WindowsNoticeWiring([string]$Source) {
@@ -27,9 +40,7 @@ function Assert-WindowsNoticeWiring([string]$Source) {
     -CountFailure 'Expected one notice check over the ZIP packages' -ValueFailure 'The ZIP notice check reads the wrong member or reference'
   $msiFailure = 'Expected one notice check over the MSI packages'
   Assert-SingleCommandArguments -Commands $installer.Msi -Expected @{ FileName = "'THIRD-PARTY-NOTICES.txt'" } -CountFailure $msiFailure -ValueFailure $msiFailure
-  if (-not $Source.Contains("throw 'CPack produced no ZIP or no MSI for third-party notice verification'")) {
-    throw 'A run without a ZIP or an MSI must fail the notice check'
-  }
+  Assert-InstallerRefusal -Ast $ast -Kinds $installer.Kinds -Source $Source
   Assert-SingleCommandArguments -Commands @(Get-StepCommand $ast 'MSIX Packaging' 'Assert-PackageLicense') -Expected @{ Path = '$msixFile'; Pattern = "'licenses/THIRD-PARTY-NOTICES.txt'" } `
     -CountFailure 'Expected one notice check over the MSIX' -ValueFailure 'The MSIX notice check reads the wrong package or member'
   $copies = @(Get-StepCommand $ast 'MSIX Packaging' 'Copy-Item' | Where-Object { $_.Extent.Text.Contains('$bundleLicenses') })
@@ -60,18 +71,21 @@ Describe 'Third-party notice wiring' {
   It 'rejects removing any notice check or the MSIX copy' {
     $ast = ConvertTo-TestScriptAst -Text $source
     $installer = Get-InstallerNoticeCommands $ast
-    $calls = @(Get-StepCommand $ast 'Portable Bundle ($TargetArch)' 'Assert-InstallerNotice') + $installer.Zip + $installer.Msi +
+    $calls = @(Get-StepCommand $ast 'Portable Bundle ($TargetArch)' 'Assert-InstallerNotice') + $installer.Zip + $installer.Msi + $installer.Kinds +
       @(Get-StepCommand $ast 'MSIX Packaging' 'Assert-PackageLicense') +
       @(Get-StepCommand $ast 'MSIX Packaging' 'Copy-Item' | Where-Object { $_.Extent.Text.Contains('$bundleLicenses') })
-    $calls.Count | Should Be 5
+    $calls.Count | Should Be 7
     foreach ($call in $calls) {
       $mutant = $source.Replace($call.Extent.Text, "Write-Output 'removed'")
       $mutant | Should Not Be $source
       Assert-Throws -Body { Assert-WindowsNoticeWiring $mutant } -MessagePattern 'notice'
     }
-    $lenient = $source.Replace("throw 'CPack produced no ZIP or no MSI for third-party notice verification'", "Write-Output 'no MSI'")
+    $lenient = $source.Replace('if ($names.Count -eq 0) { throw $Failure }', "if (`$names.Count -eq 0) { Write-Output 'no MSI' }")
     $lenient | Should Not Be $source
     Assert-Throws -Body { Assert-WindowsNoticeWiring $lenient } -MessagePattern 'MSI'
+    $reworded = $source.Replace("`$refusal = 'CPack produced no ZIP or no MSI for third-party notice verification'", "`$refusal = 'no installers'")
+    $reworded | Should Not Be $source
+    Assert-Throws -Body { Assert-WindowsNoticeWiring $reworded } -MessagePattern 'MSI'
   }
 
   It 'installs the notices after the closure, before CPack, and into the wheel' {
