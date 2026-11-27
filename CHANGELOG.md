@@ -18,6 +18,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **`Src/rusty_code/Cargo.lock` at its newest in-range releases**: lock file maintenance moved cc 1.12.0, find-msvc-tools
+  0.1.16, syn 3.0.10, hashbrown 0.17.2 and clap 4.6.10. The crate builds on Linux and on the Windows MSVC host, `cargo
+  audit` and `cargo deny` advisories, bans and sources stay clean, and the staged license files keep their texts.
+  `unicode-ident` did not move, so its `cargo-license-policy.json` key stands.
 - **The docs group takes sphinx-design 0.8.0, myst-parser 5.2.0 and pyyaml 6.0.4, and `uv.lock` its newest in-range
   releases**: `renovate-local.sh --managers pep621,cargo --apply` moved the three pins (myst-parser brings
   mdit-py-plugins 0.7.0) and 15 locked entries, docutils 0.23 and markdown-it-py 4.3.0 among them. lxml 6.2.0, published
