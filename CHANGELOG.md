@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **soupsieve 4.1.3 in `uv.lock`**: the docs group reaches soupsieve through beautifulsoup4, and 3.0.4 is in the range of
+  GHSA-mmhr-3c5m-f64f (high, polynomial-time denial of service in the descendant combinator, fixed in 4.0.0; Dependabot
+  alert #7). `renovate-local.sh --managers pep621 --apply` moved it by lock file maintenance, together with 15 other
+  locked entries and three docs pins; only soupsieve's block is kept, the same bytes `uv lock --upgrade-package
+  soupsieve` writes. The docs HTML is identical under both versions; the rest waits for the next full Renovate run.
 - **`shellcheck-warnings.allow` holds no row**: `run-static-analysis-format.sh` sets the two extension lists the hub's
   `lib/code-quality.sh` reads through a nameref, which shellcheck cannot follow (SC2034). Its empty-set refusals now name
   the list they searched, so shellcheck sees both reads. `test-static-analysis-gates.sh` pins that a header-only `Src/`
