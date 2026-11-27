@@ -22,10 +22,10 @@ if [[ $device == migraphx ]]; then
   printf '%s migraphx\n' "${KATAGLYPHIS_BUNDLED_GLIBC:-host}" >>"$PROOF_DIR/modes"
   case "${BAD_PLUGIN:-}" in
     cpu) echo 'Output 0 shape: [1, 300, 6] (1800 elements)'; exit 0 ;;
-    fallback) echo "[accelerantgine:error] MIGraphX failed to register $module: no card" >&2; exit 0 ;;
-    image) echo '[accelerantgine:error] MIGraphX failed to register /image/lib/libmigraphx-ep.so: no card' >&2 ;;
+    fallback) echo "[accelerantgine:error] MIGraphX from $module cannot run: no card" >&2; exit 0 ;;
+    image) echo '[accelerantgine:error] MIGraphX from /image/lib/libmigraphx-ep.so cannot run: no card' >&2 ;;
     silent) ;;
-    *) echo "[accelerantgine:error] MIGraphX failed to register $module: libmigraphx_c.so.3: cannot open shared object file" >&2 ;;
+    *) echo "[accelerantgine:error] MIGraphX from $module cannot run: Failed to load library $module with error: libmigraphx_c.so.3: cannot open shared object file" >&2 ;;
   esac
   exit 1
 fi

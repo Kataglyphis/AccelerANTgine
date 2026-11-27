@@ -370,7 +370,7 @@
  {
   "id": "amd-plugin.clean-host-refusal",
   "target": "scripts/linux/check-clean-host-inference.sh",
-  "find": "    ! grep -Fq \"MIGraphX failed to register $plugin: \" \"$work/$mode-migraphx.log\"; then",
+  "find": "    ! grep -Fq \"MIGraphX from $plugin cannot run: \" \"$work/$mode-migraphx.log\"; then",
   "replace": "    false; then",
   "test": "bash scripts/linux/tests/test-check-clean-host-inference.sh",
   "why": "A failure that names another module, or none, does not show that the package's own module was tried."

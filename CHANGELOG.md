@@ -20,6 +20,9 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [0.0.4] - 2026-11-26
 
+- **The AMD clean-host check reads the engine's current refusal**: since 783eff5 the engine reports `MIGraphX from
+  <module> cannot run: ...`, while `check-clean-host-inference.sh` still waited for `failed to register`, so the AMD
+  package's startup job failed although the package refused MIGraphX correctly on a host without an AMD runtime.
 - **A lane part fails when one of its steps fails.** `run_gate` runs a part inside `||`, where Bash's errexit is
   off, so a failed `ci-build-and-test.sh` (a model download that timed out, release dry run 45875725132) reported
   `build-test: ok` without running ctest; coverage then read 0 % and the skip gate found no report. Every step of

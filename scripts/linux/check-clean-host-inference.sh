@@ -62,7 +62,7 @@ for mode in host bundled; do
   [[ -n "$plugin" ]] || continue
   # A clean host has no AMD runtime: the named device must fail on the packaged module and never run on the CPU.
   if (cd "$work" && "${args[@]}" "$demo" --onnx-only "${model_args[@]}" --device migraphx) >"$work/$mode-migraphx.log" 2>&1 ||
-    ! grep -Fq "MIGraphX failed to register $plugin: " "$work/$mode-migraphx.log"; then
+    ! grep -Fq "MIGraphX from $plugin cannot run: " "$work/$mode-migraphx.log"; then
     cat "$work/$mode-migraphx.log" >&2
     echo "The $mode runtime did not refuse migraphx on its packaged plugin module" >&2
     exit 1
