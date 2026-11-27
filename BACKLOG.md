@@ -115,10 +115,10 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [b] **The Pester suites still speak Pester 3.4** (M, ★). 14 suites under `scripts/windows/tests` hold
+- [ ] **The Pester suites still speak Pester 3.4** (M, ★). 14 suites under `scripts/windows/tests` hold
   106 dash-less `Should Be` lines, so `windows-x64.yml`'s steps pin Pester 3.4.0, the runner's inbox copy, and nothing runs
-  them on Linux. The hub's next image carries Pester 6.2.0 in `pwsh` (hub CON273, CON283), which refuses that
-  dialect. Blocked on that chain. Then: `Should -Be` and its kin, setup moved into `BeforeAll` or `BeforeEach`
+  them on Linux. Since 2026-11-27 the hub's `:latest` (`abb3030d…`) carries Pester 6.2.0 in `pwsh` (hub CON283;
+  the owner keeps 6.2), which refuses that dialect. Now: `Should -Be` and its kin, setup moved into `BeforeAll` or `BeforeEach`
   (Pester 5 and 6 discover a file before they run it), the `3.4.0` pins dropped, and the suites run in the image
   as well. Done when no workflow pins 3.4.0.
 
