@@ -18,6 +18,11 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **The docs group takes sphinx-design 0.8.0, myst-parser 5.2.0 and pyyaml 6.0.4, and `uv.lock` its newest in-range
+  releases**: `renovate-local.sh --managers pep621,cargo --apply` moved the three pins (myst-parser brings
+  mdit-py-plugins 0.7.0) and 15 locked entries, docutils 0.23 and markdown-it-py 4.3.0 among them. lxml 6.2.0, published
+  within the hour of the run, waits for the next one. Every rendered page is unchanged; only sphinx-design's stylesheet
+  and tab script moved, adding keyboard focus outlines, and the cards and dropdown draw the same pixels.
 - **soupsieve 4.1.3 in `uv.lock`**: the docs group reaches soupsieve through beautifulsoup4, and 3.0.4 is in the range of
   GHSA-mmhr-3c5m-f64f (high, polynomial-time denial of service in the descendant combinator, fixed in 4.0.0; Dependabot
   alert #7). `renovate-local.sh --managers pep621 --apply` moved it by lock file maintenance, together with 15 other

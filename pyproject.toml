@@ -20,9 +20,9 @@ test = ["pytest"]
 docs = [
     "sphinx==9.2.0",
     "sphinx-book-theme==1.4.0",
-    "sphinx-design==0.7.0",
-    "myst-parser==5.1.0",
-    "pyyaml==6.0.3",
+    "sphinx-design==0.8.0",
+    "myst-parser==5.2.0",
+    "pyyaml==6.0.4",
     "cmake-format==0.6.13",
     "breathe==5.1.0",
     "exhale==0.3.7",
