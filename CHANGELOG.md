@@ -18,6 +18,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **The GPU package check uses the hub's provider-set assert (hub #364)**: `Test-WindowsGpuPackages.ps1` checks the
+  ZIP, MSI and MSIX ORT providers with `Assert-PackageOrtProviderSet` instead of three hand comparisons, and
+  `Test-WindowsGpuHub.ps1` asks the pinned hub for it. The hub pin moves to 5f8bc07ae.
+
 - **`Build-Windows.ps1` gives each copied block one owner (hub #364)**: the three workspace CMake builds go through
   `Invoke-WorkspaceCmakeBuild`, the four syncs through `Sync-WorkspaceBuildDir`, coverage and PGO through
   `Invoke-BuildTreeStep`, and the image and package GPU checks through `Invoke-GpuCandidateCheck`. One function each now

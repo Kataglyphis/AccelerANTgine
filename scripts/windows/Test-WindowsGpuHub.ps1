@@ -19,7 +19,7 @@ if ($fetcher -cnotmatch '(?m)^def read_lock\(' -or $fetcher -cnotmatch '(?m)^def
 }
 Assert-OrtWheelVerifierParameter -Name 'ProviderDll' -Message 'Windows GPU candidates need provider-aware ORT wheel verification.'
 Assert-OrtWheelVerifierParameter -Name 'DirectMlDll' -Message 'Windows GPU candidates need same-wheel DirectML verification.'
-foreach ($command in 'Assert-PackageBinary', 'Get-PackageOrtProviderNames', 'Assert-PackageOrtFamily', 'Get-MsiInstalledFileId', 'Assert-PackageLicense', 'Get-ChainOrtRuntimeFile') {
+foreach ($command in 'Assert-PackageBinary', 'Assert-PackageOrtProviderSet', 'Assert-PackageOrtFamily', 'Get-MsiInstalledFileId', 'Assert-PackageLicense', 'Get-ChainOrtRuntimeFile') {
     $null = Get-Command -Name $command -ErrorAction Stop
 }
 if (-not (Get-Command Get-MsiInstalledFileId).Parameters.ContainsKey('RootDirectoryId') -or

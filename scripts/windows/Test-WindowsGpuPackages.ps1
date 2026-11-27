@@ -59,17 +59,14 @@ $modelSources = [string[]]@($modelNames | ForEach-Object { Join-Path $Bundle "bi
 $bundleMembers = [string[]]@(@($packageNames | ForEach-Object { "bin/$_" }) + $pluginMembers + @($modelNames | ForEach-Object { "bin/models/$_" }))
 $msixMembers = [string[]]@($packageNames + $pluginMembers + @($modelNames | ForEach-Object { "models/$_" }))
 $packageSources = [string[]]@($sources + $appSources + @($plugins | ForEach-Object FullName) + $modelSources)
-$providers = @($names | Where-Object { $_ -clike 'onnxruntime_providers_*.dll' } | Sort-Object)
 $prefix = [IO.Path]::GetFileNameWithoutExtension($zips[0].Name)
 Assert-PackageOrtFamily -Path $zips[0].FullName -Directory "$prefix/bin" -Name $names
 Assert-PackageBinary -Path $zips[0].FullName -Member @($bundleMembers | ForEach-Object { "$prefix/$_" }) -SourcePath $packageSources
-$zipProviders = @(Get-PackageOrtProviderNames -Path $zips[0].FullName -Directory "$prefix/bin")
-if (($providers -join ',') -cne ($zipProviders -join ',')) { throw 'ZIP ORT provider set differs from the proven inputs.' }
+Assert-PackageOrtProviderSet -Path $zips[0].FullName -Directory "$prefix/bin" -Expected $names -Label 'ZIP'
 $ids = [string[]]@($bundleMembers | ForEach-Object { Get-MsiInstalledFileId -Path $msis[0].FullName -RelativePath $_ -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine' })
 Assert-PackageOrtFamily -Path $msis[0].FullName -Directory 'bin' -Name $names -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine'
 Assert-PackageBinary -Path $msis[0].FullName -Member $ids -SourcePath $packageSources
-$msiProviders = @(Get-PackageOrtProviderNames -Path $msis[0].FullName -Directory 'bin' -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine')
-if (($providers -join ',') -cne ($msiProviders -join ',')) { throw 'MSI ORT provider set differs from the proven inputs.' }
+Assert-PackageOrtProviderSet -Path $msis[0].FullName -Directory 'bin' -Expected $names -Label 'MSI' -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine'
 $licenses = Join-Path $Bundle 'licenses\onnxruntime'
 foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') {
     $id = Get-MsiInstalledFileId -Path $msis[0].FullName -RelativePath "licenses/onnxruntime/$name" -RootDirectoryId 'INSTALL_ROOT' -RootDirectoryName 'AccelerANTgine'
@@ -78,8 +75,7 @@ foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') {
 if ($MsixPath) {
     Assert-PackageOrtFamily -Path $MsixPath -Name $names
     Assert-PackageBinary -Path $MsixPath -Member $msixMembers -SourcePath $packageSources
-    $msixProviders = @(Get-PackageOrtProviderNames -Path $MsixPath -Directory '')
-    if (($providers -join ',') -cne ($msixProviders -join ',')) { throw 'MSIX ORT provider set differs from the proven inputs.' }
+    Assert-PackageOrtProviderSet -Path $MsixPath -Expected $names -Label 'MSIX'
 }
 # The source wheel might have changed while packages were being checked.
 & (Join-Path $PSScriptRoot 'Test-WindowsGpuImage.ps1') -Variant $Variant -OnnxRoot $OnnxRoot -WheelDir $WheelDir
