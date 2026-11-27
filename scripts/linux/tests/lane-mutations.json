@@ -224,6 +224,14 @@
   "why": "A unit the analyzer could not parse was never analysed."
  },
  {
+  "id": "static.empty-src-extensions",
+  "target": "scripts/linux/run-static-analysis-format.sh",
+  "find": "file (${CODE_QUALITY_CLANG_TIDY_EXTENSIONS[*]}) found under Src/",
+  "replace": "files found under Src/",
+  "test": "bash scripts/linux/tests/test-static-analysis-gates.sh",
+  "why": "An empty Src must be refused naming the list it searched, the read shellcheck needs to see."
+ },
+ {
   "id": "scan-cxx.modmap",
   "target": "scripts/linux/scan-build-cxx.sh",
   "find": "  if [[ \"${arg}\" == @* && -f \"${arg#@}\" ]]; then",

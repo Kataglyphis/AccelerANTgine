@@ -18,6 +18,10 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **`shellcheck-warnings.allow` holds no row**: `run-static-analysis-format.sh` sets the two extension lists the hub's
+  `lib/code-quality.sh` reads through a nameref, which shellcheck cannot follow (SC2034). Its empty-set refusals now name
+  the list they searched, so shellcheck sees both reads. `test-static-analysis-gates.sh` pins that a header-only `Src/`
+  fails naming this project's clang-tidy list, not the hub's default.
 - **The x64 cachegrind baseline is re-recorded for the x86-64-v3 CI image**: the hub's `:latest` now builds its ONNX
   Runtime for x86-64-v3 (hub 735c1c36, CON241), so on both x64 keys `BM_OnnxRunInferenceInPlace` runs 45 % fewer
   instructions and `BM_DetectFrame` 4.7 % fewer, and the gate fails a move in either direction (hub develop-red #409).

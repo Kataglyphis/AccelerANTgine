@@ -207,7 +207,7 @@ Owner decision 2026-11-20: only real code duplicates are merged; a pair that sha
 frame stays, and a deliberate one gets a `code-dupes.allow` row with its reason. The rows below are of that kind.
 
 - [ ] `code-dupes.allow:2` budget 24 (allow_budget_total): `Build-Windows.ps1`'s release and MSIX steps share the build-step frame
-- [ ] `shellcheck-warnings.allow:10` budget 2 (allow_budget_total)
+- [x] `shellcheck-warnings.allow:10` budget 2 (allow_budget_total): the wrapper's empty-set refusals read both extension lists
 - [ ] `scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:48` 20 shared shingles with scripts/windows/tests/MediaRuntimeReuse.Tests.ps1:74 (duplicated_blocks)
 - [ ] `scripts/windows/Test-WindowsGpuImage.ps1:8` 19 shared shingles with scripts/windows/Test-WindowsGpuPackages.ps1:6 (duplicated_blocks)
 - [ ] `scripts/windows/Invoke-ContainerLane.ps1:4` 19 shared shingles with scripts/windows/Test-WindowsGpuImage.ps1:8 (duplicated_blocks)

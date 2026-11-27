@@ -54,10 +54,10 @@ mapfile -t IWYU_FILES   < <(code_quality_find_iwyu_files Src Test)
 
 if [[ ${#SRC_FILES[@]} -eq 0 ]]; then
   # Src/ exists and is full of modules, so an empty set is a discovery bug.
-  die "No C++ source/module files found under Src/ - check the extension lists above."
+  die "No C++ source/module file (${CODE_QUALITY_CLANG_TIDY_EXTENSIONS[*]}) found under Src/ - check CODE_QUALITY_CLANG_TIDY_EXTENSIONS above."
 fi
 if [[ ${#FORMAT_FILES[@]} -eq 0 ]]; then
-  die "No C/C++ files found under ${FORMAT_ROOTS[*]} - the format gate would grade nothing."
+  die "No C/C++ file (${CODE_QUALITY_CPP_FORMAT_EXTENSIONS[*]}) found under ${FORMAT_ROOTS[*]} - the format gate would grade nothing."
 fi
 
 # The library's default bootstrap pins the cmake-format version, so a verdict cannot move under a new release.

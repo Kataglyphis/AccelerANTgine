@@ -88,11 +88,14 @@ make_tree() {
   git -C "${work}/tree" add -A
   git -C "${work}/tree" -c user.name=t -c user.email=t@example.invalid commit -qm fixture
 }
-analyse() {
-  make_tree
+analyse_tree() {
   : > "${work}/calls"
   (cd "${work}/tree" && env PATH="${work}/bin:${PATH}" ANTFRASTRUCTURE_DIR="${work}/hub" STUB_LOG="${work}/calls" "$@" \
     bash "${root}/scripts/linux/run-static-analysis-format.sh" --build-dir build) >"${work}/out" 2>&1
+}
+analyse() {
+  make_tree
+  analyse_tree "$@"
 }
 expect() { SUITE_OUTPUT_LINES=30 suite_expect "$1" "$2" analyse "${@:3}"; }
 
@@ -119,6 +122,14 @@ expect fail 'a scan-build finding fails' STUB_SCAN_BUG=1
 expect fail 'a unit the analyzer could not parse fails' STUB_SCAN_FAILURES=1
 expect fail 'a tool rewriting Src fails' STUB_TIDY_REWRITES=1
 grep -q 'sources-unchanged: FAILED' "${work}/out" || fail 'the rewrite was not caught by sources-unchanged'
+
+# A header-only Src is a discovery bug; the refusal must name this project's list, not the hub's default.
+make_tree
+rm -- "${work}/tree/Src/"*.cpp
+printf 'int engine();\n' > "${work}/tree/Src/engine.hpp"
+SUITE_OUTPUT_LINES=30 suite_expect fail 'a Src without a C++ unit fails' analyse_tree
+grep -qF 'file (cpp cc cxx ixx cppm mxx) found under Src/' "${work}/out" \
+  || fail 'the empty-Src refusal does not name the configured clang-tidy extensions'
 
 make_tree
 printf 'int engine() { return 2; }\n' > "${work}/tree/Src/engine.cpp"

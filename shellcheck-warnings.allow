@@ -7,4 +7,3 @@
 #
 # Wrappers name the hub library they configure in a source directive, so shellcheck sees
 # its reads; a row here is a read that directive cannot show.
-scripts/linux/run-static-analysis-format.sh | SC2034 | 2 | CODE_QUALITY_CPP_FORMAT_EXTENSIONS and CODE_QUALITY_CLANG_TIDY_EXTENSIONS: the hub's lib/code-quality.sh reads these two through a name it passes to _code_quality_find_extension_sources, which shellcheck cannot follow even with the source directive.
