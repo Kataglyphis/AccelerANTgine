@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+- **The x64 cachegrind baseline is re-recorded for the x86-64-v3 CI image**: the hub's `:latest` now builds its ONNX
+  Runtime for x86-64-v3 (hub 735c1c36, CON241), so on both x64 keys `BM_OnnxRunInferenceInPlace` runs 45 % fewer
+  instructions and `BM_DetectFrame` 4.7 % fewer, and the gate fails a move in either direction (hub develop-red #409).
+  `BM_PreprocessFrame`, which is this repo's own code, is unchanged. `x64-clang` and `x64-gcc` come from five develop
+  runs each, every spread under 0.5 %; the arm64 keys are unchanged. Fewer instructions is not that much less time,
+  because each AVX2 instruction does more work.
 - **The GPU candidate waits for its upload to be listed before it downloads it by ID**: the AMD candidate's ~320 MB
   archive was finalized, yet the download right after it found only the run's other artifacts, in two of three runs
   (`None of the provided artifact IDs were found`, hub develop-red #275). A 90 s wait sits before the download; the
