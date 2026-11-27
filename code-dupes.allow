@@ -1,2 +1,2 @@
 # a | b | budget | reason -- pairs the duplicate-block scan keeps on purpose (hub docs/scripts/verify_code_dupes.py).
-scripts/windows/Build-Windows.ps1 | scripts/windows/Build-Windows.ps1 | 24 | two build steps share the Invoke-BuildStep and Join-Path frame, not logic
+scripts/windows/Build-Windows.ps1 | scripts/windows/Build-Windows.ps1 | 19 | the release and MSIX steps open with the same two Join-Path lines and call python alike; any further fold would only reorder for the scanner
