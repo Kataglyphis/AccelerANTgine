@@ -1,57 +1,58 @@
 #requires -Version 7.0
 
-# Synthetic PE files and wheels test image inputs; they do not establish GPU execution.
-Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function New-TestPeFile -ErrorAction Stop
-
-function Invoke-GpuPreflight([hashtable]$Fixture, [string]$Variant, [string]$Script = $scriptPath, [hashtable]$Extra = @{}) {
-    & $Script -Variant $Variant -OnnxRoot $Fixture.Ort -WheelDir $Fixture.Wheels -ScratchRoot $Fixture.Scratch @Extra
-}
-
-function Assert-FixtureScratchEmpty([hashtable]$Fixture) {
-    @(Get-ChildItem -LiteralPath $Fixture.Scratch -Force).Count | Should Be 0
-}
-
-function Write-FixtureAlteredInput([hashtable]$Fixture, [string]$Name, [string]$Tag = 'different bytes') {
-    New-TestPeFile -Path (Join-Path $Fixture.Bin $Name) -Tag $Tag
-}
-
-function Assert-FixtureRejected {
-    param([hashtable]$Fixture, [string]$Variant, [string]$Pattern, [string]$Script = $scriptPath, [string]$TargetArch = 'amd64')
-    $message = ''
-    try { Invoke-GpuPreflight $Fixture $Variant $Script @{ TargetArch = $TargetArch } } catch { $message = $_.Exception.Message }
-    if ($message -notmatch $Pattern) { throw "Expected '$Pattern', got '$message'" }
-}
-
-function New-GpuImageFixture {
-    $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
-    $bin = Join-Path $root 'ort\bin'
-    $lib = Join-Path $root 'ort\lib'
-    $wheels = Join-Path $root 'wheels'
-    $scratch = Join-Path $root 'scratch'
-    $null = New-Item -ItemType Directory -Path $bin, $lib, $wheels, $scratch -Force
-    foreach ($name in 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll', 'DirectML.dll') {
-        New-TestPeFile -Path (Join-Path $bin $name) -Tag $name
+BeforeAll {
+    # Synthetic PE files and wheels test image inputs; they do not establish GPU execution.
+    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\tests\TestHarness.psm1') -Function New-TestPeFile -ErrorAction Stop
+    function Invoke-GpuPreflight([hashtable]$Fixture, [string]$Variant, [string]$Script = $script:scriptPath, [hashtable]$Extra = @{}) {
+        & $Script -Variant $Variant -OnnxRoot $Fixture.Ort -WheelDir $Fixture.Wheels -ScratchRoot $Fixture.Scratch @Extra
     }
-    $wheel = Join-Path $wheels 'onnxruntime_gpu-1.0.0-cp315-cp315-win_amd64.whl'
-    $zip = [IO.Compression.ZipFile]::Open($wheel, [IO.Compression.ZipArchiveMode]::Create)
-    try {
+    function Assert-FixtureScratchEmpty([hashtable]$Fixture) {
+        @(Get-ChildItem -LiteralPath $Fixture.Scratch -Force).Count | Should -Be 0
+    }
+    function Write-FixtureAlteredInput([hashtable]$Fixture, [string]$Name, [string]$Tag = 'different bytes') {
+        New-TestPeFile -Path (Join-Path $Fixture.Bin $Name) -Tag $Tag
+    }
+    function Assert-FixtureRejected {
+        param([hashtable]$Fixture, [string]$Variant, [string]$Pattern, [string]$Script = $script:scriptPath, [string]$TargetArch = 'amd64')
+        $message = ''
+        try { Invoke-GpuPreflight $Fixture $Variant $Script @{ TargetArch = $TargetArch } } catch { $message = $_.Exception.Message }
+        if ($message -notmatch $Pattern) { throw "Expected '$Pattern', got '$message'" }
+    }
+    function New-GpuImageFixture {
+        $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $bin = Join-Path $root 'ort\bin'
+        $lib = Join-Path $root 'ort\lib'
+        $wheels = Join-Path $root 'wheels'
+        $scratch = Join-Path $root 'scratch'
+        $null = New-Item -ItemType Directory -Path $bin, $lib, $wheels, $scratch -Force
         foreach ($name in 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll', 'DirectML.dll') {
-            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $bin $name), "onnxruntime/capi/$name") | Out-Null
+            New-TestPeFile -Path (Join-Path $bin $name) -Tag $name
         }
-        foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') {
-            $entry = $zip.CreateEntry("onnxruntime/$name")
-            $writer = [IO.StreamWriter]::new($entry.Open())
-            try { $writer.Write('fixture text') } finally { $writer.Dispose() }
-        }
-    } finally { $zip.Dispose() }
-    return @{ Ort = (Join-Path $root 'ort'); Bin = $bin; Lib = $lib; Wheels = $wheels; Scratch = $scratch }
+        $wheel = Join-Path $wheels 'onnxruntime_gpu-1.0.0-cp315-cp315-win_amd64.whl'
+        $zip = [IO.Compression.ZipFile]::Open($wheel, [IO.Compression.ZipArchiveMode]::Create)
+        try {
+            foreach ($name in 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll', 'DirectML.dll') {
+                [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $bin $name), "onnxruntime/capi/$name") | Out-Null
+            }
+            foreach ($name in 'LICENSE', 'ThirdPartyNotices.txt') {
+                $entry = $zip.CreateEntry("onnxruntime/$name")
+                $writer = [IO.StreamWriter]::new($entry.Open())
+                try { $writer.Write('fixture text') } finally { $writer.Dispose() }
+            }
+        } finally { $zip.Dispose() }
+        return @{ Ort = (Join-Path $root 'ort'); Bin = $bin; Lib = $lib; Wheels = $wheels; Scratch = $scratch }
+    }
 }
+
+# File level, so Pester's discovery reads it: which tests exist depends on the pinned hub's verifier.
+Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\modules\WindowsOrtLicense.Common.psm1') -DisableNameChecking -ErrorAction Stop
+$providerAware = (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('ProviderDll') -and
+    (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('DirectMlDll')
 
 Describe 'Windows GPU image preflight' {
-    $scriptPath = Join-Path $PSScriptRoot '..\Test-WindowsGpuImage.ps1'
-    Import-Module (Join-Path $PSScriptRoot '..\..\..\third_party\ANTfrastructure\windows\scripts\modules\WindowsOrtLicense.Common.psm1') -DisableNameChecking -ErrorAction Stop
-    $providerAware = (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('ProviderDll') -and
-        (Get-Command Copy-OrtWheelLicenses).Parameters.ContainsKey('DirectMlDll')
+    BeforeAll {
+        $script:scriptPath = Join-Path $PSScriptRoot '..\Test-WindowsGpuImage.ps1'
+    }
 
     It 'rejects ARM targets' {
         $f = New-GpuImageFixture
@@ -114,7 +115,7 @@ Describe 'Windows GPU image preflight' {
         $scripts = Join-Path $repo 'scripts\windows'
         $modules = Join-Path $repo 'third_party\ANTfrastructure\windows\scripts\modules'
         $null = New-Item -ItemType Directory -Force -Path $scripts, $modules
-        Copy-Item -LiteralPath $scriptPath, (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1') -Destination $scripts
+        Copy-Item -LiteralPath $script:scriptPath, (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1') -Destination $scripts
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\modules\WindowsGpuCandidate.Common.psm1') -Destination $modules
         $stubs = @{
             'WindowsOrtLicense.Common' = 'function Copy-OrtWheelLicenses { param($OrtDll, $WheelDir, $Destination) }; Export-ModuleMember -Function Copy-OrtWheelLicenses'

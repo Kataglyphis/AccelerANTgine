@@ -2,10 +2,12 @@
 # Checks the refusal wiring with a stubbed path helper; the hub's suites own that helper and no verifier runs here.
 
 Describe 'Windows GPU hub requirements' {
-    $check = Join-Path $PSScriptRoot '..\Test-WindowsGpuHub.ps1'
+    BeforeAll {
+        $script:check = Join-Path $PSScriptRoot '..\Test-WindowsGpuHub.ps1'
+    }
 
     It 'accepts the pinned checkout' {
-        { & $check } | Should Not Throw
+        { & $script:check } | Should -Not -Throw
     }
 
     It 'asks for real hub leaves and names the missing ones (mutation)' {
@@ -14,6 +16,6 @@ Describe 'Windows GPU hub requirements' {
             if ($PathType -ne 'Leaf' -or -not (Test-Path -LiteralPath (Join-Path $Root $RelativePath[0]) -PathType Leaf)) { throw "Unexpected request: $Root $PathType" }
             $RelativePath[0], 'second'
         }
-        { & $check } | Should Throw "ANTfrastructure's shared/python/verify_ort_profile.py, second."
+        { & $script:check } | Should -Throw -ExpectedMessage "*ANTfrastructure's shared/python/verify_ort_profile.py, second.*"
     }
 }

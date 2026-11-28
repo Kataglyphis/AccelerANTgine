@@ -116,8 +116,21 @@ function Add-FixtureZipMember([Collections.IDictionary]$Member, [string]$Directo
     foreach ($name in $Names) { $Member["$Prefix$name"] = Join-Path $Directory $name }
 }
 
+function Open-FixtureArchive([string]$Path) {
+    for ($attempt = 1; ; $attempt++) {
+        try { return [IO.Compression.ZipFile]::Open($Path, [IO.Compression.ZipArchiveMode]::Update) }
+        catch {
+            # A virus scanner may hold a freshly written archive for a moment; only a sharing or lock violation waits.
+            $io = @($_.Exception, $_.Exception.InnerException) | Where-Object { $_ -is [IO.IOException] } | Select-Object -First 1
+            $held = $io -and (($io.HResult -band 0xFFFF) -in 32, 33)
+            if (-not $held -or $attempt -ge 20) { throw }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
+
 function Invoke-FixtureArchiveUpdate([string]$Path, [scriptblock]$Body) {
-    $archive = [IO.Compression.ZipFile]::Open($Path, [IO.Compression.ZipArchiveMode]::Update)
+    $archive = Open-FixtureArchive $Path
     try { & $Body $archive } finally { $archive.Dispose() }
 }
 

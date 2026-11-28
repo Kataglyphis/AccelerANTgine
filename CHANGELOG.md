@@ -18,6 +18,20 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-28, the Pester suites speak Pester 6)
+
+- **The 14 suites under `scripts/windows/tests` run under Pester 6.2.0**, the hub's `:latest` copy, and
+  `windows-x64.yml` and `submodule-pins.yml` pin it instead of 3.4.0. `Should Be` and its kin take their dashed
+  forms. A `Throw` message is a `-like` pattern now, so each keeps its substring match as `*message*`. Block- and
+  file-level setup moved into `BeforeAll`, which Pester 5 and 6 run after discovering a file, and what it sets for
+  the tests is a `$script:` variable, as in the hub's suites. The two values that decide which tests exist, the
+  package verifier's presence and the hub's provider-aware ORT verifier, stay at file level, which discovery runs.
+  Locally all 51 tests pass under 6.2.0, six runs in a row; under 3.4.0 the same 51 ran before. The hub's lint
+  gate finds no trap and no analyzer warning in the 15 changed files, as before.
+- **The package fixture retries an archive a virus scanner still holds.** One run in two failed on
+  `candidate.msix ... being used by another process` right after writing it, under either Pester. Opening the
+  archive retries a sharing or lock violation for up to 5 s, and nothing else.
+
 - **The GPU package check uses the hub's provider-set assert (hub #364)**: `Test-WindowsGpuPackages.ps1` checks the
   ZIP, MSI and MSIX ORT providers with `Assert-PackageOrtProviderSet` instead of three hand comparisons, and
   `Test-WindowsGpuHub.ps1` asks the pinned hub for it. The hub pin moves to 5f8bc07ae.

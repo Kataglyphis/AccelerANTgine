@@ -798,7 +798,7 @@ stays unsigned.
 
 `lint-gates.yml` and `submodule-pins.yml` are one `uses:` line each onto ANTfrastructure's
 reusable workflows; only this repo's `on:` filters and their inputs (`ratchets: true` for the
-lint gates, `pester-version: '3.4.0'` for the pins) stay local.
+lint gates, `pester-version: '6.2.0'` for the pins) stay local.
 `lint-gates.yml` runs the same aggregator a dev box runs with
 `bash scripts/linux/run-lint-gates.sh` (which adds `--ratchets` itself), against the same
 explicit root, but reaches it from the hub checkout rather than through the wrapper, because the

@@ -58,19 +58,19 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File third_party/ANTfrastructure/shared/windows/tests/Test-CmakeUvProjectWiring.ps1 -ScriptPath "$PWD/scripts/windows/Build-Windows.ps1" -CommandName Invoke-CmakeFormatStep
 
-      # Pinned: the suites use Pester 3.4's dash-less `Should Be`, which the runner's Pester 5 cannot parse.
-      - name: Run Pester suites (pinned 3.4.0)
+      # The image's Pester (the hub's PESTER_VERSION); the suites keep their setup in BeforeAll for its discovery pass.
+      - name: Run Pester suites (Pester 6.2.0)
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@develop
         with:
           path: scripts/windows/tests
-          version: '3.4.0'
+          version: '6.2.0'
 
       # The hub's suite, never a copy; this repo's pathspecs are scripts/windows/generated-artifacts.txt.
       - name: No generated artifact is tracked (the hub's suite)
         uses: Kataglyphis/ANTfrastructure/.github/actions/run-pester-suite@develop
         with:
           path: third_party/ANTfrastructure/shared/windows/tests/Repo.GeneratedArtifacts.Tests.ps1
-          version: '3.4.0'
+          version: '6.2.0'
 
   # Ungated until Windows runners have a history to judge against; the Linux keys gate.
   bench-history:

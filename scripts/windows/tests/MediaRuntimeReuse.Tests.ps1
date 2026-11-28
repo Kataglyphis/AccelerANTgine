@@ -2,22 +2,24 @@
 
 # This guards the shared runtime call and fixture bytes; it does not run a container build or load the staged DLLs.
 Describe 'Windows media runtime reuse' {
-    . (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1')
-    Import-BuildModule 'WindowsMediaRuntime.Common'
-    Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
+    BeforeAll {
+        . (Join-Path $PSScriptRoot '..\Resolve-BuildModule.ps1')
+        Import-BuildModule 'WindowsMediaRuntime.Common'
+        Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
+    }
 
     It 'stages the shared runtime through one helper for all three build roots' {
         $ast = Get-BuildScriptAst
         $calls = @(Get-TestAstCommands -Ast $ast -Name 'Copy-MediaRuntimeBundle')
-        $calls.Count | Should Be 1
-        ($calls[0].Extent.Text -match "-GStreamerRoot 'C:\\runtime\\bin'") | Should Be $true
+        $calls.Count | Should -Be 1
+        ($calls[0].Extent.Text -match "-GStreamerRoot 'C:\\runtime\\bin'") | Should -Be $true
         $buildCalls = @(Get-TestAstCommands -Ast $ast -Name 'Copy-BuildMediaRuntime')
-        $buildCalls.Count | Should Be 2
-        @($buildCalls | Where-Object { $_.Extent.Text -match '-StageTestPlugins\s+-CopyOrtBeside' }).Count | Should Be 1
-        @(Get-TestAstCommands -Ast $ast -Name 'Invoke-ConfiguredBuildStep').Count | Should Be 2
-        @($buildCalls | Where-Object { $_.Extent.Text -match '\$fastBuildReleaseDirFull' -and $_.Extent.Text -notmatch '-StageTestPlugins|-CopyOrtBeside' }).Count | Should Be 1
-        @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Copy-ImageGStreamerRuntime' }, $true)).Count | Should Be 0
-        @(Get-TestAstCommands -Ast $ast -Name 'Write-MissingGStreamerBinWarning').Count | Should Be 1
+        $buildCalls.Count | Should -Be 2
+        @($buildCalls | Where-Object { $_.Extent.Text -match '-StageTestPlugins\s+-CopyOrtBeside' }).Count | Should -Be 1
+        @(Get-TestAstCommands -Ast $ast -Name 'Invoke-ConfiguredBuildStep').Count | Should -Be 2
+        @($buildCalls | Where-Object { $_.Extent.Text -match '\$fastBuildReleaseDirFull' -and $_.Extent.Text -notmatch '-StageTestPlugins|-CopyOrtBeside' }).Count | Should -Be 1
+        @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Copy-ImageGStreamerRuntime' }, $true)).Count | Should -Be 0
+        @(Get-TestAstCommands -Ast $ast -Name 'Write-MissingGStreamerBinWarning').Count | Should -Be 1
     }
 
     It 'keeps debug-only plugin and ORT staging out of Release while preserving call order' {
@@ -32,20 +34,22 @@ Describe 'Windows media runtime reuse' {
         $context = [pscustomobject]@{}
         $root = Join-Path $TestDrive 'runtime'
         $output = @(Copy-BuildMediaRuntime -Context $context -BuildRoot $root -StageTestPlugins -CopyOrtBeside)
-        $output.Count | Should Be 0
-        ($calls -join ',') | Should Be 'warning,bundle,plugins,ort-proof,crt,ort-beside'
+        $output.Count | Should -Be 0
+        ($calls -join ',') | Should -Be 'warning,bundle,plugins,ort-proof,crt,ort-beside'
         $calls.Clear()
         $output = @(Copy-BuildMediaRuntime -Context $context -BuildRoot $root)
-        $output.Count | Should Be 0
-        ($calls -join ',') | Should Be 'warning,bundle,ort-proof,crt'
+        $output.Count | Should -Be 0
+        ($calls -join ',') | Should -Be 'warning,bundle,ort-proof,crt'
     }
 
     # Both read a fake image on disk: the plugin directory resolves for real, the PE check is not under test.
     Context 'an image on disk' {
-        . (Get-BuildFunctionBlock 'Get-ImageGStreamerBin')
-        . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginDir')
-        . (Get-BuildFunctionBlock 'Assert-BuildPath')
-        function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
+        BeforeAll {
+            . (Get-BuildFunctionBlock 'Get-ImageGStreamerBin')
+            . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginDir')
+            . (Get-BuildFunctionBlock 'Assert-BuildPath')
+            function Assert-PeTargetMachine { param($Path, $Arch, $Context) }
+        }
 
         It 'stages required and present optional package plugins and rejects an incomplete image' {
             . (Get-BuildFunctionBlock 'Get-ImageGStreamerPluginFile')
@@ -60,16 +64,16 @@ Describe 'Windows media runtime reuse' {
                 $destination = Join-Path $TestDrive 'staged-plugins'
                 $selected = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
                 $files = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $selected)
-                $files.Count | Should Be 13
-                (Get-Content -LiteralPath (Join-Path $destination 'gstvpx.dll') -Raw) | Should Be 'vpx'
+                $files.Count | Should -Be 13
+                (Get-Content -LiteralPath (Join-Path $destination 'gstvpx.dll') -Raw) | Should -Be 'vpx'
                 Remove-Item -LiteralPath (Join-Path $plugins 'gstvpx.dll')
                 $withoutVpx = @(Get-ImageGStreamerPackagePlugins -Arch amd64)
-                $withoutVpx.Count | Should Be 12
+                $withoutVpx.Count | Should -Be 12
                 $null = @(Copy-ImageGStreamerPackagePlugins -Destination $destination -Plugins $withoutVpx)
-                (Test-Path -LiteralPath (Join-Path $destination 'gstvpx.dll')) | Should Be $false
+                (Test-Path -LiteralPath (Join-Path $destination 'gstvpx.dll')) | Should -Be $false
                 Remove-Item -LiteralPath (Join-Path $plugins 'gstwebrtc.dll')
                 $message = try { Get-ImageGStreamerPackagePlugins -Arch amd64; '' } catch { $_.Exception.Message }
-                ($message -match 'gstwebrtc.dll is missing') | Should Be $true
+                ($message -match 'gstwebrtc.dll is missing') | Should -Be $true
             }
         }
 
@@ -80,26 +84,26 @@ Describe 'Windows media runtime reuse' {
             $null = New-Item -ItemType Directory -Force -Path $bin, (Split-Path -Parent $scanner)
             [IO.File]::WriteAllText($scanner, 'scanner')
             Invoke-WithProcessEnvironment -Environment @{ GSTREAMER_BIN = $bin } -ScriptBlock {
-                (Get-ImageGStreamerPackageScanner -Arch amd64) | Should Be $scanner
+                (Get-ImageGStreamerPackageScanner -Arch amd64) | Should -Be $scanner
                 Remove-Item -LiteralPath $scanner
                 $message = try { Get-ImageGStreamerPackageScanner -Arch amd64; '' } catch { $_.Exception.Message }
-                ($message -match 'gst-plugin-scanner.exe is missing') | Should Be $true
+                ($message -match 'gst-plugin-scanner.exe is missing') | Should -Be $true
             }
         }
     }
 
     It 'seeds the closure with plugins and installs them into each package layout' {
         $ast = Get-BuildScriptAst
-        @((Get-TestAstCommands -Ast $ast -Name 'Copy-PeImportClosure') | Where-Object { $_.Extent.Text -match '\$engine \+ \$plugins \+ \$imageScanner' }).Count | Should Be 1
+        @((Get-TestAstCommands -Ast $ast -Name 'Copy-PeImportClosure') | Where-Object { $_.Extent.Text -match '\$engine \+ \$plugins \+ \$imageScanner' }).Count | Should -Be 1
         $script = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Build-Windows.ps1') -Raw
-        $script.Contains('Copy-Item -LiteralPath $bundlePlugins -Destination $stagingLib -Recurse -Force') | Should Be $true
-        $script.Contains("`$imagePlugins = @(if (`$OrtVariant -ne 'cpu')") | Should Be $true
-        $script.Contains('-RuntimeBin $gstBin') | Should Be $true
-        $script.Contains("`$payloadExtra += Join-Path `$payloadDir 'gst-plugin-scanner.exe'") | Should Be $true
-        $script.Contains('$search += $ffmpegBin') | Should Be $true
+        $script.Contains('Copy-Item -LiteralPath $bundlePlugins -Destination $stagingLib -Recurse -Force') | Should -Be $true
+        $script.Contains("`$imagePlugins = @(if (`$OrtVariant -ne 'cpu')") | Should -Be $true
+        $script.Contains('-RuntimeBin $gstBin') | Should -Be $true
+        $script.Contains("`$payloadExtra += Join-Path `$payloadDir 'gst-plugin-scanner.exe'") | Should -Be $true
+        $script.Contains('$search += $ffmpegBin') | Should -Be $true
         $cmake = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\..\cmake\CPackOptions.cmake') -Raw
-        $cmake.Contains('install(DIRECTORY "${KATAGLYPHIS_GST_PLUGIN_DIR}/" DESTINATION "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")') | Should Be $true
-        $cmake.Contains('install(PROGRAMS "${KATAGLYPHIS_GST_PLUGIN_SCANNER}" DESTINATION "${CMAKE_INSTALL_BINDIR}")') | Should Be $true
+        $cmake.Contains('install(DIRECTORY "${KATAGLYPHIS_GST_PLUGIN_DIR}/" DESTINATION "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")') | Should -Be $true
+        $cmake.Contains('install(PROGRAMS "${KATAGLYPHIS_GST_PLUGIN_SCANNER}" DESTINATION "${CMAKE_INSTALL_BINDIR}")') | Should -Be $true
     }
 
     It 'warns when the selected GStreamer bin is missing' {
@@ -113,8 +117,8 @@ Describe 'Windows media runtime reuse' {
             $null = New-Item -ItemType Directory -Path $missing
             Write-MissingGStreamerBinWarning -Context ([pscustomobject]@{})
         }
-        $warnings.Count | Should Be 1
-        ($warnings[0] -like "GStreamer bin not found ($missing)*") | Should Be $true
+        $warnings.Count | Should -Be 1
+        ($warnings[0] -like "GStreamer bin not found ($missing)*") | Should -Be $true
     }
 
     It 'copies image DLLs through the shared module and honors an explicit environment root' {
@@ -132,14 +136,14 @@ Describe 'Windows media runtime reuse' {
             }
             return (Get-Content -LiteralPath (Join-Path $target 'gstreamer-fixture-only.dll') -Raw).Trim()
         }
-        Copy-FixtureBundle $null 'without-env' | Should Be 'image'
-        Copy-FixtureBundle $override 'with-env' | Should Be 'override'
+        Copy-FixtureBundle $null 'without-env' | Should -Be 'image'
+        Copy-FixtureBundle $override 'with-env' | Should -Be 'override'
 
         foreach ($case in @(@{ Dll = 'onnxruntime.dll'; Pattern = 'outside the chain install' }, @{ Dll = 'DirectML.dll'; Pattern = 'outside the chain install.*DirectML\.dll' })) {
             $foreign = Join-Path $image $case.Dll
             [IO.File]::WriteAllText($foreign, 'foreign')
             $message = try { $null = Copy-FixtureBundle $null "foreign-$($case.Dll)"; '' } catch { $_.Exception.Message }
-            $message | Should Match $case.Pattern
+            $message | Should -Match $case.Pattern
             Remove-Item -LiteralPath $foreign
         }
     }

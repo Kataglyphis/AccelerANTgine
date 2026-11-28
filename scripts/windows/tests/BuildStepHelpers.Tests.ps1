@@ -2,9 +2,11 @@
 # This runs the shared build-step helpers against stubs; it builds nothing and runs no GPU check.
 
 Describe 'Windows build step helpers' {
-    Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
-    . (Get-BuildFunctionBlock 'Assert-GpuCandidatePackage')
-    . (Get-BuildFunctionBlock 'Invoke-BuildTreeStep')
+    BeforeAll {
+        Import-Module (Join-Path $PSScriptRoot 'BuildAstFixture.psm1') -ErrorAction Stop
+        . (Get-BuildFunctionBlock 'Assert-GpuCandidatePackage')
+        . (Get-BuildFunctionBlock 'Invoke-BuildTreeStep')
+    }
 
     It 'checks only a GPU candidate and forwards an MSIX only when the step names one (mutation)' {
         $checks = [Collections.Generic.List[string]]::new()
@@ -14,7 +16,7 @@ Describe 'Windows build step helpers' {
         Set-Variable -Name OrtVariant -Value 'nvidia'
         Assert-GpuCandidatePackage -Bundle 'bundle' -PackageDir 'packages'
         Assert-GpuCandidatePackage -Bundle 'bundle' -PackageDir 'packages' -MsixPath 'app.msix'
-        ($checks -join ';') | Should Be 'Test-WindowsGpuPackages.ps1 Bundle,PackageDir;Test-WindowsGpuPackages.ps1 Bundle,MsixPath,PackageDir'
+        ($checks -join ';') | Should -Be 'Test-WindowsGpuPackages.ps1 Bundle,PackageDir;Test-WindowsGpuPackages.ps1 Bundle,MsixPath,PackageDir'
     }
 
     It 'runs a build-tree step inside its tree and returns the caller to its directory, also after a failure (mutation)' {
@@ -22,9 +24,9 @@ Describe 'Windows build step helpers' {
         function Invoke-BuildStep { & $args[-1] }
         $tree = (New-Item -ItemType Directory -Path (Join-Path $TestDrive 'tree')).FullName
         $before = (Get-Location).ProviderPath
-        (Invoke-BuildTreeStep -StepName 'tree' -BuildRoot $tree -Script { (Get-Location).ProviderPath }) | Should Be $tree
-        (Get-Location).ProviderPath | Should Be $before
-        { Invoke-BuildTreeStep -StepName 'tree' -BuildRoot $tree -Script { throw 'step failed' } } | Should Throw 'step failed'
-        (Get-Location).ProviderPath | Should Be $before
+        (Invoke-BuildTreeStep -StepName 'tree' -BuildRoot $tree -Script { (Get-Location).ProviderPath }) | Should -Be $tree
+        (Get-Location).ProviderPath | Should -Be $before
+        { Invoke-BuildTreeStep -StepName 'tree' -BuildRoot $tree -Script { throw 'step failed' } } | Should -Throw -ExpectedMessage '*step failed*'
+        (Get-Location).ProviderPath | Should -Be $before
     }
 }

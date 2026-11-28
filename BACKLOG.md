@@ -115,12 +115,11 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The Pester suites still speak Pester 3.4** (M, ★). 14 suites under `scripts/windows/tests` hold
-  106 dash-less `Should Be` lines, so `windows-x64.yml`'s steps pin Pester 3.4.0, the runner's inbox copy, and nothing runs
-  them on Linux. Since 2026-11-27 the hub's `:latest` (`abb3030d…`) carries Pester 6.2.0 in `pwsh` (hub CON283;
-  the owner keeps 6.2), which refuses that dialect. Now: `Should -Be` and its kin, setup moved into `BeforeAll` or `BeforeEach`
-  (Pester 5 and 6 discover a file before they run it), the `3.4.0` pins dropped, and the suites run in the image
-  as well. Done when no workflow pins 3.4.0.
+- [ ] **The Pester suites run only on Windows** (M, ★). Since 2026-11-28 the 14 suites under `scripts/windows/tests`
+  speak Pester 6.2.0, the hub's `:latest` copy, and every workflow pins 6.2.0. Nothing runs them in the image yet:
+  about 35 `..\` paths, the drive letters in `WindowsGpuCleanHost`'s expectations and the package fixture's `7z` and
+  `makecab` are Windows-only. Now: paths through `Join-Path` segments, the Windows-only cases behind `$IsWindows`, and
+  a Linux lane step through the hub's `run-pester-suite` in the image. Done when the Linux lane runs every suite.
 
 - [ ] **C++ gates from the BeschleunigerBallett comparison** (M in all, ★★★; owner D1 to D12, 2026-11-21, as
   recommended). Each step is one commit, cheapest first; the shared pieces are hub CON290 to CON296. (1) **Fuzzing on
