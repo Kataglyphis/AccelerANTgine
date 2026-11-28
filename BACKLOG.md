@@ -122,12 +122,6 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
   `GStreamerPipeline.TheInferencePipelineNeedsNnstreamer` would skip, and so fail the Linux no-skip rule. The other
   unread fields (`class_confidences`, `output_path`, `PipelineConfig::timeout_ms`) are deleted.
 
-- [ ] **The Pester suites run only on Windows** (S, ★). Since 2026-11-28 the 14 suites under `scripts/windows/tests`
-  pass on Linux too, under pwsh 7.6 and Pester 6.2.0: 48 pass and 3 skip there, the two `WindowsGpuCleanHost` cases
-  that start `cmd.exe` and the package fixture, whose `makecab` is Windows-only. Windows still runs all 51. Left: a
-  Linux lane step in the image through `third_party/ANTfrastructure/.github/actions/run-pester-suite/Invoke-PesterSuite.ps1`,
-  which needs a hub pin at or after 4b8353a00. Done when the Linux lane runs every suite.
-
 - [ ] **C++ gates from the BeschleunigerBallett comparison** (M in all, ★★★; owner D1 to D12, 2026-11-21, as
   recommended). Each step is one commit, cheapest first; the shared pieces are hub CON290 to CON296. (1) **Fuzzing on
   a schedule before 2026-11-24** (D1): twice a week at 5 min per target (dispatches and the release keep 3), a

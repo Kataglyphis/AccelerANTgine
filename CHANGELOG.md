@@ -18,6 +18,12 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-28, the Pester suites run on Linux in CI)
+
+- Linux x64's `pester-linux` job (ed6de55) passed in run 46121177411: 51 cases, 48 pass and 3 skip off Windows, so
+  the BACKLOG item "The Pester suites run only on Windows" is done. The same run's commit suite passed the five
+  `UsableCpus` replay cases of hub CON304 on gcc and clang.
+
 ### Changed (2026-11-28, a C++ mutant that does not compile still counts as caught)
 
 - **The C++ mutation run does not refuse a recipe whose edit breaks the build yet.** `cxx-mutation-test.sh` prints
