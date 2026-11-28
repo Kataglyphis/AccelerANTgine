@@ -219,7 +219,8 @@ struct WebRTCStreamer::Impl
     ErrorCallback error_callback;
     std::string producer_id;
 
-    std::mutex callback_mutex;
+    // Recursive, each call on a copy: a callback may set a callback or pause() without relocking or freeing itself.
+    std::recursive_mutex callback_mutex;
     bool bus_watch{ false };
 
     ~Impl() { cleanup(); }
@@ -279,7 +280,7 @@ struct WebRTCStreamer::Impl
         }
         if (old_state != new_state) {
             std::scoped_lock lock(callback_mutex);
-            if (state_callback) { state_callback(old_state, new_state); }
+            if (const StateCallback callback = state_callback; callback) { callback(old_state, new_state); }
         }
     }
 
@@ -288,11 +289,12 @@ struct WebRTCStreamer::Impl
         set_state(StreamState::Error);
 
         std::scoped_lock lock(callback_mutex);
-        if (!error_callback) { return; }
+        const ErrorCallback callback = error_callback;
+        if (!callback) { return; }
 
         std::string full_message = error_to_string(error);
         if (!message.empty()) { full_message += ": " + message; }
-        error_callback(error, full_message);
+        callback(error, full_message);
     }
 
     // Callback for when pipeline encounters an error

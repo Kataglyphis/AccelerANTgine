@@ -152,7 +152,7 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer
     [[nodiscard]] auto is_streaming() const -> bool;
     [[nodiscard]] auto get_producer_id() const -> std::string;
 
-    // Event callbacks
+    // Safe from inside a callback too, which may replace itself; the replaced one finishes its call first.
     auto set_state_callback(StateCallback callback) -> void;
     auto set_error_callback(ErrorCallback callback) -> void;
 

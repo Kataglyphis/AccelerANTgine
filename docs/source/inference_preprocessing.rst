@@ -119,7 +119,8 @@ For asynchronous video, register ``VideoDetectorPipeline::set_error_callback`` t
 failed-frame errors and inspect ``last_error()`` for the most recent failure. Callbacks run on
 the streaming thread, one frame at a time, so ``stop()`` from inside one would wait for itself: it is
 refused with a log line there, and ``request_stop()`` ends the stream after the current frame instead,
-after which ``has_ended()`` is true. ``start()`` clears the stored error; subsequent successful frames do not.
+after which ``has_ended()`` is true. A callback may set any callback, its own included, which takes effect
+from the next frame. ``start()`` clears the stored error; subsequent successful frames do not.
 Without a callback, a changed error is printed to stderr instead of being silently discarded.
 
 Validation

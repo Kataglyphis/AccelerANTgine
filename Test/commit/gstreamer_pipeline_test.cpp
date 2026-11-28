@@ -2,11 +2,13 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <future>
 #include <initializer_list>
 #include <memory>
@@ -260,17 +262,20 @@ auto ends_in_time(const gstreamer::GStreamerPipeline &pipeline) -> bool
     return pipeline.has_ended();
 }
 
-// A pipeline whose first frame's callback tries stop() and create_pipeline(), then asks to stop; true per refusal.
-auto stopped_from_its_first_frame(gstreamer::GStreamerPipeline &pipeline, EventCounter &frames)
-  -> std::future<std::pair<bool, bool>>
+// Whether stop(), create_pipeline() and create_inference_pipeline() were refused, in that order.
+using Refusals = std::array<bool, 3>;
+
+// A pipeline whose first frame's callback tries the three calls, then asks to stop; true per refusal.
+auto stopped_from_its_first_frame(gstreamer::GStreamerPipeline &pipeline, EventCounter &frames) -> std::future<Refusals>
 {
-    const auto refused = std::make_shared<std::promise<std::pair<bool, bool>>>();
+    const auto refused = std::make_shared<std::promise<Refusals>>();
     pipeline.set_buffer_callback([&pipeline, &frames, refused](const gstreamer::BufferInfo &) -> void {
         if (frames.count() == 0) {
             const bool stop_refused = !pipeline.stop().has_value();
             const bool create_refused = !pipeline.create_pipeline_from_string("fakesrc ! fakesink").has_value();
+            const bool inference_refused = !pipeline.create_inference_pipeline("fakesrc", "m.onnx", {}).has_value();
             pipeline.request_stop();
-            refused->set_value({ stop_refused, create_refused });
+            refused->set_value({ stop_refused, create_refused, inference_refused });
         }
         frames.add();
     });
@@ -279,7 +284,7 @@ auto stopped_from_its_first_frame(gstreamer::GStreamerPipeline &pipeline, EventC
 
 // The endless source, started with that callback; nullopt when it could not start.
 auto start_stopping_itself(gstreamer::GStreamerPipeline &pipeline, EventCounter &frames)
-  -> std::optional<std::future<std::pair<bool, bool>>>
+  -> std::optional<std::future<Refusals>>
 {
     if (!pipeline.create_pipeline_from_string(std::string(kEndlessBlack)).has_value()) { return std::nullopt; }
     auto refused = stopped_from_its_first_frame(pipeline, frames);
@@ -289,6 +294,22 @@ auto start_stopping_itself(gstreamer::GStreamerPipeline &pipeline, EventCounter 
 
 auto has_test_source() -> bool
 { return kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "capsfilter", "appsink" }).empty(); }
+
+// Runs the body on a worker and ends the process when it hangs, which would otherwise hang the whole suite.
+void finishes_or_aborts(const std::function<void()> &body, const char *hang)
+{
+    std::promise<void> finished;
+    auto done = finished.get_future();
+    std::thread worker([&finished, &body] {
+        body();
+        finished.set_value();
+    });
+    if (done.wait_for(std::chrono::seconds(120)) != std::future_status::ready) {
+        ADD_FAILURE() << hang;
+        std::abort();
+    }
+    worker.join();
+}
 }// namespace
 
 // stop() from inside the callback would wait for that callback forever; request_stop() ends the stream instead.
@@ -300,7 +321,7 @@ TEST(GStreamerPipeline, StopFromInsideACallbackIsRefusedAndRequestStopEndsTheStr
     auto refused = start_stopping_itself(pipeline, frames);
     if (!refused) { FAIL() << "the endless source did not start"; }
     ASSERT_EQ(refused->wait_for(kataglyphis::test::kStreamTimeout), std::future_status::ready) << "no frame came";
-    EXPECT_EQ(refused->get(), std::make_pair(true, true));
+    EXPECT_EQ(refused->get(), (Refusals{ true, true, true }));
     EXPECT_TRUE(ends_in_time(pipeline) && !pipeline.stream_error().has_value()) << "no clean end after request_stop()";
     EXPECT_EQ(frames.count(), 1) << "frames after request_stop()";
     EXPECT_TRUE(pipeline.stop().has_value());
@@ -324,25 +345,43 @@ TEST(GStreamerPipeline, ARestartAfterRequestStopStreamsAgain)
 TEST(GStreamerPipeline, StopEndsWhenAPullTakesTheCallbacksFrame)
 {
     KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
-    std::promise<void> finished;
-    auto done = finished.get_future();
-    std::thread worker([&finished] {
-        for (int round = 0; round < 20; ++round) {
-            gstreamer::GStreamerPipeline pipeline;
-            EXPECT_TRUE(pipeline.create_pipeline_from_string(std::string(kThreeBlackFrames)).has_value());
-            pipeline.set_buffer_callback([](const gstreamer::BufferInfo &) {});
-            EXPECT_TRUE(pipeline.start().has_value());
-            // Either consumer may win each frame; only the end of stop() is the contract.
-            std::ignore = pipeline.pull_sample(static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count()));
-            EXPECT_TRUE(pipeline.stop().has_value());
-        }
-        finished.set_value();
-    });
-    if (done.wait_for(std::chrono::seconds(120)) != std::future_status::ready) {
-        ADD_FAILURE() << "stop() did not return";
-        std::abort();
-    }
-    worker.join();
+    finishes_or_aborts(
+      [] {
+          for (int round = 0; round < 20; ++round) {
+              gstreamer::GStreamerPipeline pipeline;
+              EXPECT_TRUE(pipeline.create_pipeline_from_string(std::string(kThreeBlackFrames)).has_value());
+              pipeline.set_buffer_callback([](const gstreamer::BufferInfo &) {});
+              EXPECT_TRUE(pipeline.start().has_value());
+              // Either consumer may win each frame; only the end of stop() is the contract.
+              std::ignore = pipeline.pull_sample(static_cast<std::uint32_t>(kataglyphis::test::kStreamTimeout.count()));
+              EXPECT_TRUE(pipeline.stop().has_value());
+          }
+      },
+      "stop() did not return");
+}
+
+// A one-shot grab: the callback replaces itself on the first frame, which relocked the mutex that frame held.
+TEST(GStreamerPipeline, ACallbackThatReplacesItselfHandsTheNextFramesOn)
+{
+    KATAGLYPHIS_REQUIRE_GSTREAMER_ELEMENTS("videotestsrc", "capsfilter", "appsink");
+    EventCounter grabbed;
+    EventCounter handed_on;
+    finishes_or_aborts(
+      [&grabbed, &handed_on] {
+          gstreamer::GStreamerPipeline pipeline;
+          EXPECT_TRUE(pipeline.create_pipeline_from_string(std::string(kThreeBlackFrames)).has_value());
+          pipeline.set_buffer_callback([&pipeline, &grabbed, &handed_on](const gstreamer::BufferInfo &) -> void {
+              pipeline.set_buffer_callback([&handed_on](const gstreamer::BufferInfo &) -> void { handed_on.add(); });
+              // Still running after the swap, so its captures must outlive it.
+              grabbed.add();
+          });
+          EXPECT_TRUE(pipeline.start().has_value());
+          EXPECT_TRUE(handed_on.wait_for(2, kataglyphis::test::kStreamTimeout));
+          EXPECT_TRUE(pipeline.stop().has_value());
+      },
+      "the streaming thread hung in set_buffer_callback");
+    EXPECT_EQ(grabbed.count(), 1);
+    EXPECT_EQ(handed_on.count(), 2);
 }
 
 TEST(GStreamerPipeline, ACallbackSetBeforeThePipelineStillGetsFrames)

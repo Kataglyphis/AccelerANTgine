@@ -149,7 +149,8 @@ struct GStreamerPipeline::Impl
     GstElement *appsink{ nullptr };
 
     BufferCallback buffer_callback;
-    std::mutex callback_mutex;
+    // Recursive, each frame on a copy: the callback may call set_buffer_callback without relocking or freeing itself.
+    std::recursive_mutex callback_mutex;
     std::atomic<bool> is_playing{ false };
     std::atomic<bool> is_paused{ false };
     // How the stream stands, written by the bus, the streaming thread and request_stop(), read from any thread.
@@ -222,7 +223,7 @@ struct GStreamerPipeline::Impl
         stream.stop_requested.store(false);
     }
 
-    // stop() and create_pipeline() from inside the callback would wait on callback_mutex, which this thread holds.
+    // stop() and the create calls from inside the callback would set NULL on the streaming thread that runs it.
     [[nodiscard]] auto refuse_from_callback(const char *what) const -> bool
     {
         if (stream.callback_thread.load() != std::this_thread::get_id()) { return false; }
@@ -281,9 +282,9 @@ struct GStreamerPipeline::Impl
             auto buffer_info = extract_buffer_info(sample);
             if (buffer_info) {
                 std::scoped_lock lock(self->callback_mutex);
-                if (self->buffer_callback) {
+                if (const BufferCallback callback = self->buffer_callback; callback) {
                     self->stream.callback_thread.store(std::this_thread::get_id());
-                    self->buffer_callback(*buffer_info);
+                    callback(*buffer_info);
                     self->stream.callback_thread.store(std::thread::id{});
                 }
             }
@@ -349,6 +350,9 @@ auto GStreamerPipeline::create_inference_pipeline(const std::string &input_sourc
 {
 
     if (!runtime::is_initialized()) { return std::unexpected(GStreamerError::InitializationFailed); }
+    if (impl_->refuse_from_callback("create_inference_pipeline")) {
+        return std::unexpected(GStreamerError::StateChangeFailed);
+    }
 
     impl_->cleanup();
 

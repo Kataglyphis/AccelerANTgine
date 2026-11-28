@@ -123,7 +123,7 @@ class KATAGLYPHIS_CPP_API GStreamerPipeline
     // What the first failing element reported, such as a camera that was unplugged or a device that is busy.
     [[nodiscard]] auto stream_error() const -> std::optional<std::string>;
 
-    // The callback runs on GStreamer's streaming thread; stop() and create_pipeline() are refused from inside it.
+    // Runs on GStreamer's streaming thread and may replace itself; stop() and the create calls are refused inside it.
     auto set_buffer_callback(BufferCallback callback) -> void;
 
     [[nodiscard]] auto pull_sample(std::uint32_t timeout_ms = 5000) -> std::expected<BufferInfo, GStreamerError>;

@@ -18,6 +18,19 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-28, a callback may replace the callbacks)
+
+- **A callback that sets a callback no longer hangs its thread.** `GStreamerPipeline` ran the buffer callback, and
+  `WebRTCStreamer` its state and error callbacks, under a plain mutex that the setters lock too: a one-shot frame
+  grab that cleared its own callback relocked it, and the streaming or loop thread hung, and `stop()` with it. The
+  mutex is recursive now, and each call runs a copy, so the swap cannot free the callback that is still running.
+  `create_inference_pipeline()` is refused from inside the buffer callback, as `create_pipeline()` was. New cases:
+  `GStreamerPipeline.ACallbackThatReplacesItselfHandsTheNextFramesOn`, `WebRtcStreamer.ACallbackMayReplaceTheCallbacks`,
+  and the inference call in the stop-from-callback case. Built with g++ 15 and ASan+UBSan against the host's
+  GStreamer 1.28 (`identity` standing in for `webrtcsink`), the old code hung both until the cases aborted, the
+  recursive mutex without the copy was a heap-use-after-free in both, and without the new refusal the inference call
+  never returned; all pass with the fix.
+
 ### Fixed (2026-11-28, configure() from a WebRTC callback is refused, not the end of the process)
 
 - **`WebRTCStreamer::configure()` is refused from inside a state or error callback**, as `stop()` already was. Both

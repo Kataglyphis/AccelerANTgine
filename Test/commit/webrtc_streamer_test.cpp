@@ -206,35 +206,39 @@ auto streams_here() -> bool
            && kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "videoconvert", "webrtcsink" }).empty();
 }
 
-// A call made from inside a callback; true when the streamer refused it.
+// A call made from inside a callback; true when the streamer answered it as it should.
 using LoopCall = bool (*)(webrtc::WebRTCStreamer &);
 
-// An error callback that, called from the loop thread, makes the call and then request_stop(); true when refused.
+// An error callback that, called from the loop thread, makes the call and then request_stop(); the call's answer.
 auto calling_from_its_error(webrtc::WebRTCStreamer &streamer, LoopCall call) -> std::future<bool>
 {
-    const auto refused = std::make_shared<std::promise<bool>>();
+    const auto answer = std::make_shared<std::promise<bool>>();
     const auto asked = std::make_shared<std::atomic<bool>>(false);
     const auto test_thread = std::this_thread::get_id();
     streamer.set_error_callback(
-      [&streamer, call, refused, asked, test_thread](webrtc::WebRTCError, const std::string &) -> void {
+      [&streamer, call, answer, asked, test_thread](webrtc::WebRTCError, const std::string &) -> void {
           // A start() that fails at once reports on the test's thread, which is no callback of the loop.
           if (std::this_thread::get_id() == test_thread || asked->exchange(true)) { return; }
-          const bool call_refused = call(streamer);
+          const bool answered = call(streamer);
           streamer.request_stop();
-          refused->set_value(call_refused);
+          answer->set_value(answered);
       });
-    return refused->get_future();
+    return answer->get_future();
 }
 
 // No signalling server listens, so the stream fails and the bus calls back from the loop thread, where the call is made.
-void expect_refused_from_its_error(webrtc::WebRTCStreamer &streamer, LoopCall call)
+void expect_from_its_error(webrtc::WebRTCStreamer &streamer, LoopCall call)
 {
-    auto refused = calling_from_its_error(streamer, call);
+    auto answer = calling_from_its_error(streamer, call);
     ASSERT_TRUE(streamer.configure(test_pattern_config()).has_value());
     // No skip, which the Linux lane refuses: a stream that failed before its loop ran has no loop to call from.
     if (streamer.start().has_value()) {
-        ASSERT_EQ(refused.wait_for(kataglyphis::test::kStreamTimeout), std::future_status::ready) << "no error came";
-        EXPECT_TRUE(refused.get()) << "the call from the error callback was not refused";
+        // A loop thread stuck in the call would also hang the teardown below.
+        if (answer.wait_for(kataglyphis::test::kStreamTimeout) != std::future_status::ready) {
+            ADD_FAILURE() << "no answer from the error callback";
+            std::abort();
+        }
+        EXPECT_TRUE(answer.get()) << "the call from the error callback was answered wrongly";
     }
     // From the owner's thread it tears down as always.
     EXPECT_TRUE(streamer.stop().has_value() && streamer.get_state() == webrtc::StreamState::Idle);
@@ -246,8 +250,7 @@ TEST(WebRtcStreamer, StopFromInsideACallbackIsRefused)
 {
     if (!streams_here()) { GTEST_SKIP() << "webrtcsink or the test source is not installed here"; }
     webrtc::WebRTCStreamer streamer;
-    expect_refused_from_its_error(
-      streamer, [](webrtc::WebRTCStreamer &self) -> bool { return !self.stop().has_value(); });
+    expect_from_its_error(streamer, [](webrtc::WebRTCStreamer &self) -> bool { return !self.stop().has_value(); });
 }
 
 // configure() joins that loop thread too, so it is refused there; the owner's thread still configures.
@@ -255,9 +258,24 @@ TEST(WebRtcStreamer, ConfigureFromInsideACallbackIsRefused)
 {
     if (!streams_here()) { GTEST_SKIP() << "webrtcsink or the test source is not installed here"; }
     webrtc::WebRTCStreamer streamer;
-    expect_refused_from_its_error(streamer,
+    expect_from_its_error(streamer,
       [](webrtc::WebRTCStreamer &self) -> bool { return !self.configure(test_pattern_config()).has_value(); });
     EXPECT_TRUE(streamer.configure(test_pattern_config()).has_value());
+}
+
+// Both callbacks run under their lock: one that set a callback relocked it and hung the loop thread.
+TEST(WebRtcStreamer, ACallbackMayReplaceTheCallbacks)
+{
+    if (!streams_here()) { GTEST_SKIP() << "webrtcsink or the test source is not installed here"; }
+    webrtc::WebRTCStreamer streamer;
+    streamer.set_state_callback([&streamer](webrtc::StreamState, webrtc::StreamState next) -> void {
+        if (next == webrtc::StreamState::Error) { streamer.set_state_callback({}); }
+    });
+    // The running callback replaces itself and then still reads its captures, which must outlive the swap.
+    expect_from_its_error(streamer, [](webrtc::WebRTCStreamer &self) -> bool {
+        self.set_error_callback({});
+        return true;
+    });
 }
 
 TEST(WebRtcStreamConfig, SourceNamesMapToTheirSources)
