@@ -18,6 +18,15 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-28, a C++ mutant that does not compile still counts as caught)
+
+- **The C++ mutation run does not refuse a recipe whose edit breaks the build yet.** `cxx-mutation-test.sh` prints
+  the build log and exits 3 for it, but `verify_mutations.py` at the pinned hub grades every non-zero exit as a
+  bite: a fixture whose test exits 3 printed `bites` and `OK: every recorded mutation is caught`, exit 0. The
+  2026-11-13 entry and the script's comment claimed the refusal; both now say only what the script does. Hub
+  b1ccc563b fails such a recipe with `FAIL: <id> -- the mutant does not build (test exit 3)`; `BACKLOG.md` holds
+  the pin bump until its preflight is green.
+
 ### Fixed (2026-11-28, a hardening gate that cannot run says why)
 
 - **`verify-package-hardening.sh` finds the hub's ELF gate as the rest of `ci-release.sh` does**, through
@@ -784,8 +793,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   letterbox offset dropped and the mapping's sides swapped. All eleven fail their tests (proved on the arm64 dev
   host, clang Debug, in about three minutes on incremental rebuilds).
 - **`cxx-mutations.yml` runs them weekly and on dispatch**, not on a push: it builds the clang Debug tree once and
-  proves each recipe in place through `scripts/linux/cxx-mutation-test.sh <ctest regex>`, which reports a mutant that
-  does not compile instead of counting it as caught. The lint gates' staleness check covers the new manifest.
+  proves each recipe in place through `scripts/linux/cxx-mutation-test.sh <ctest regex>`, which exits 3 for a mutant
+  that does not compile (the pinned hub runner still counts that as caught; see the 2026-11-28 entry). The lint
+  gates' staleness check covers the new manifest.
 
 ### Changed (2026-11-13, a schema failure has the same kind as in Rust; owner decision)
 - **A generator that refuses a schema is `GenerationFailed`.** With a schema set, `TextGenerator::generate` turned

@@ -6,6 +6,13 @@ says what each means). Effort S/M/L, impact ★ … ★★★.
 
 ## Open
 
+- [b] **A C++ mutant that does not compile still counts as caught** (S, ★★; blocked on the hub pin). For such a
+  mutant `cxx-mutation-test.sh` exits 3, but `verify_mutations.py` at the pinned hub (b224ed005) grades every non-zero
+  exit as a bite, so `cxx-mutations.yml` would pass a recipe whose edit only broke the build. Hub b1ccc563b fails it
+  with `FAIL: <id> -- the mutant does not build (test exit 3)`, proven by its `test-mutation-parse.sh` case. Done when
+  that commit is green on hub `develop` and pinned here with `pin-antfrastructure-submodule.py`; until then, check by
+  hand that a new recipe's mutant compiles.
+
 - [ ] **LAI-A4: a GStreamer audio appsink and Whisper captions** (L, ★★). Captions as `textoverlay`
   and WebRTC data, from the hub's language-AI milestone 3 (`docs/language-ai.md`).
 
