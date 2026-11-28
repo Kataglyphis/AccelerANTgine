@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-28, configure() from a WebRTC callback is refused, not the end of the process)
+
+- **`WebRTCStreamer::configure()` is refused from inside a state or error callback**, as `stop()` already was. Both
+  callbacks run on the loop thread, and `configure()` tore the old stream down by joining that thread: a join of
+  itself, which threw with exceptions off and ended the process, for example in an error callback that reconfigures
+  for a fallback server. Both now share one `refuse_from_callback`, and the WebRTC suite's
+  `ConfigureFromInsideACallbackIsRefused` shares its fixture with the `stop()` case. Built with g++ 15 and ASan+UBSan
+  against the host's GStreamer 1.28, with `identity error-after=3` in place of `webrtcsink`, which the host lacks,
+  the case aborted (`std::system_error`) without the check and passes with it.
+
 ### Fixed (2026-11-28, a config in a folder outside ASCII loads on Windows)
 
 - **`load_inference_config` gives toml++ the path as UTF-8.** It passed `path::string()`, which MSVC converts to

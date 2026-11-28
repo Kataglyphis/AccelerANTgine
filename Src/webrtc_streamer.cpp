@@ -224,6 +224,14 @@ struct WebRTCStreamer::Impl
 
     ~Impl() { cleanup(); }
 
+    // A callback runs on the loop thread, which stop() and configure() join: joining itself would end the process.
+    [[nodiscard]] auto refuse_from_callback(const char *what) const -> bool
+    {
+        if (std::this_thread::get_id() != main_loop_thread.get_id()) { return false; }
+        log::error("WebRTCStreamer::{} called from its own callback; call request_stop() there", what);
+        return true;
+    }
+
     void stop_main_loop()
     {
         if (main_loop != nullptr) {
@@ -456,6 +464,7 @@ auto WebRTCStreamer::configure(const StreamConfig &config) -> std::expected<void
     if (!g_webrtc_ready.load() || !gstreamer::runtime::is_initialized()) {
         return std::unexpected(WebRTCError::InitializationFailed);
     }
+    if (impl_->refuse_from_callback("configure")) { return std::unexpected(WebRTCError::StateChangeFailed); }
 
     // Validate configuration
     if (config.width == 0 || config.height == 0 || config.framerate == 0) {
@@ -551,11 +560,7 @@ auto WebRTCStreamer::start() -> std::expected<void, WebRTCError>
 auto WebRTCStreamer::stop() -> std::expected<void, WebRTCError>
 {
     if (impl_->pipeline == nullptr) { return {}; }
-    // A callback runs on the loop thread, which stop() joins: joining itself would end the process.
-    if (std::this_thread::get_id() == impl_->main_loop_thread.get_id()) {
-        log::error("WebRTCStreamer::stop called from its own callback; call request_stop() there");
-        return std::unexpected(WebRTCError::StateChangeFailed);
-    }
+    if (impl_->refuse_from_callback("stop")) { return std::unexpected(WebRTCError::StateChangeFailed); }
 
     log::info("Stopping pipeline");
 

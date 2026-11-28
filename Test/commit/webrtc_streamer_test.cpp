@@ -206,21 +206,38 @@ auto streams_here() -> bool
            && kataglyphis::test::missing_gstreamer_element({ "videotestsrc", "videoconvert", "webrtcsink" }).empty();
 }
 
-// An error callback that, called from the loop thread, tries stop() and then request_stop(); true when refused.
-auto stopping_from_its_error(webrtc::WebRTCStreamer &streamer) -> std::future<bool>
+// A call made from inside a callback; true when the streamer refused it.
+using LoopCall = bool (*)(webrtc::WebRTCStreamer &);
+
+// An error callback that, called from the loop thread, makes the call and then request_stop(); true when refused.
+auto calling_from_its_error(webrtc::WebRTCStreamer &streamer, LoopCall call) -> std::future<bool>
 {
     const auto refused = std::make_shared<std::promise<bool>>();
     const auto asked = std::make_shared<std::atomic<bool>>(false);
     const auto test_thread = std::this_thread::get_id();
     streamer.set_error_callback(
-      [&streamer, refused, asked, test_thread](webrtc::WebRTCError, const std::string &) -> void {
+      [&streamer, call, refused, asked, test_thread](webrtc::WebRTCError, const std::string &) -> void {
           // A start() that fails at once reports on the test's thread, which is no callback of the loop.
           if (std::this_thread::get_id() == test_thread || asked->exchange(true)) { return; }
-          const bool stop_refused = !streamer.stop().has_value();
+          const bool call_refused = call(streamer);
           streamer.request_stop();
-          refused->set_value(stop_refused);
+          refused->set_value(call_refused);
       });
     return refused->get_future();
+}
+
+// No signalling server listens, so the stream fails and the bus calls back from the loop thread, where the call is made.
+void expect_refused_from_its_error(webrtc::WebRTCStreamer &streamer, LoopCall call)
+{
+    auto refused = calling_from_its_error(streamer, call);
+    ASSERT_TRUE(streamer.configure(test_pattern_config()).has_value());
+    // No skip, which the Linux lane refuses: a stream that failed before its loop ran has no loop to call from.
+    if (streamer.start().has_value()) {
+        ASSERT_EQ(refused.wait_for(kataglyphis::test::kStreamTimeout), std::future_status::ready) << "no error came";
+        EXPECT_TRUE(refused.get()) << "the call from the error callback was not refused";
+    }
+    // From the owner's thread it tears down as always.
+    EXPECT_TRUE(streamer.stop().has_value() && streamer.get_state() == webrtc::StreamState::Idle);
 }
 }// namespace
 
@@ -229,16 +246,18 @@ TEST(WebRtcStreamer, StopFromInsideACallbackIsRefused)
 {
     if (!streams_here()) { GTEST_SKIP() << "webrtcsink or the test source is not installed here"; }
     webrtc::WebRTCStreamer streamer;
-    // No signalling server listens there, so the stream fails and the bus calls back from the loop thread.
-    auto refused = stopping_from_its_error(streamer);
-    ASSERT_TRUE(streamer.configure(test_pattern_config()).has_value());
-    // No skip, which the Linux lane refuses: a stream that failed before its loop ran has no loop to stop from.
-    if (streamer.start().has_value()) {
-        ASSERT_EQ(refused.wait_for(kataglyphis::test::kStreamTimeout), std::future_status::ready) << "no error came";
-        EXPECT_TRUE(refused.get()) << "stop() from the error callback was not refused";
-    }
-    // From the owner's thread it tears down as always.
-    EXPECT_TRUE(streamer.stop().has_value() && streamer.get_state() == webrtc::StreamState::Idle);
+    expect_refused_from_its_error(
+      streamer, [](webrtc::WebRTCStreamer &self) -> bool { return !self.stop().has_value(); });
+}
+
+// configure() joins that loop thread too, so it is refused there; the owner's thread still configures.
+TEST(WebRtcStreamer, ConfigureFromInsideACallbackIsRefused)
+{
+    if (!streams_here()) { GTEST_SKIP() << "webrtcsink or the test source is not installed here"; }
+    webrtc::WebRTCStreamer streamer;
+    expect_refused_from_its_error(streamer,
+      [](webrtc::WebRTCStreamer &self) -> bool { return !self.configure(test_pattern_config()).has_value(); });
+    EXPECT_TRUE(streamer.configure(test_pattern_config()).has_value());
 }
 
 TEST(WebRtcStreamConfig, SourceNamesMapToTheirSources)

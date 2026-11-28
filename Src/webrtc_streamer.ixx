@@ -136,7 +136,7 @@ class KATAGLYPHIS_CPP_API WebRTCStreamer
     // The plugin directory a Linux package carries; empty anywhere else.
     [[nodiscard]] static auto bundled_plugin_dir() -> std::string;
 
-    // Configure and start streaming
+    // Refused from inside a state or error callback as stop() is: it tears down the loop thread they run on.
     [[nodiscard]] auto configure(const StreamConfig &config) -> std::expected<void, WebRTCError>;
 
     [[nodiscard]] auto start() -> std::expected<void, WebRTCError>;
