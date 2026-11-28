@@ -65,8 +65,11 @@ belongs in the **Changed** list below with that consequence spelled out.
   MSVC 14.52 and `/EHs-` on a code page 1252 host, `TomlConfig.AConfigInAFolderWithLettersOutsideAsciiLoads` ended
   the process with `string()` (0xC0000409), failed its assert for a folder of `jörg` alone, and passes with the fix;
   `Log.APathIsWrittenAsUtf8WhateverTheCodePage` ended the process with a `string()` body. The WebRTC case
-  `AMissingConfigOutsideAsciiIsNamedInTheFallbackWarning` holds the factory's warning. The test support's
-  `outside_ascii_dir` spells the folder for them and for the GenAI case.
+  `AMissingConfigOutsideAsciiIsNamedInTheFallbackWarning` holds the factory's warning. No case holds the two
+  loaders' warnings: MSVC's `exists()` calls a 300-letter folder below `outside_ascii_dir` not found without an error
+  code, so no warning is written there, and on Linux `string()` is already UTF-8. The TOML case's load of that path
+  is gone, since it passed with `string()` in the warning. The test support's `outside_ascii_dir` spells the folder
+  for the TOML, log and WebRTC cases and for the GenAI case.
 
 ### Changed (2026-11-28, the shipped thread count honours the cgroup quota)
 
