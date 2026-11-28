@@ -34,6 +34,10 @@ endif()
 
 kataglyphis_configure_common_test_target(${COMMIT_TEST_SUITE} "${_commit_resource_path}" "${_commit_include_path}")
 kataglyphis_configure_library_test_target(${COMMIT_TEST_SUITE})
+# A case the hub appends is replayed by usable_cpus_test.cpp without an edit here.
+kataglyphis_embed_text_file(
+  ${COMMIT_TEST_SUITE} "${PROJECT_SOURCE_DIR}/third_party/ANTfrastructure/shared/contracts/usable-cpus.json"
+  kUsableCpusContract)
 
 target_sources(${COMMIT_TEST_SUITE} PRIVATE ${KataglyphisCppProject_COMMIT_TEST_FILTER})
 if(KATAGLYPHIS_TEST_MIGRAPHX)

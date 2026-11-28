@@ -11,6 +11,7 @@ module;
 #include "cuda_probe.hpp"
 #include "hip_probe.hpp"
 #include "ort_plugin.hpp"
+#include "usable_cpus.hpp"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -834,6 +835,7 @@ KATAGLYPHIS_CPP_API auto shipped_ort_threads() -> int
     cpu_set_t allowed;
     CPU_ZERO(&allowed);
     if (sched_getaffinity(0, sizeof(allowed), &allowed) == 0) { usable = CPU_COUNT(&allowed); }
+    usable = usable_cpus::usable_of(usable, usable_cpus::cgroup_cpu_max());
 #endif
     // A pool that fills the mask loses its tail latency to whatever else needs a CPU.
     return std::clamp(usable - 1, 1, kMaxThreads);

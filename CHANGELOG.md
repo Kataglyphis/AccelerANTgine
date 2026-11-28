@@ -18,6 +18,16 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Changed (2026-11-28, the shipped thread count honours the cgroup quota)
+
+- **`shipped_ort_threads()` counts the cgroup v2 quota on Linux**, as the hub's `shared/contracts/usable-cpus.json`
+  says (hub CON304): the affinity mask, capped by the smallest `cpu.max` from the process's own cgroup up to the root,
+  in whole CPUs, at least 1. A container run with `--cpus 3` on an eight-CPU host took seven threads before. The rule
+  is `Src/usable_cpus.hpp`; the commit suite's `UsableCpus` cases replay the embedded hub file and walk fake cgroup
+  trees. Built on Linux with g++ 15, `-Wconversion -Wsign-conversion -Werror` and ASan+UBSan, the five cases pass, and
+  reading only the own cgroup fails the walk case. The Python binding test now bounds the count by the mask's rule, as
+  a host quota may lower it. Windows keeps the affinity mask.
+
 ### Changed (2026-11-28, the Pester suites speak Pester 6)
 
 - **The 14 suites under `scripts/windows/tests` run under Pester 6.2.0**, the hub's `:latest` copy, and

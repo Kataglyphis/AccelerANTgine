@@ -116,7 +116,8 @@ def test_session_config_defaults():
     cfg = ki.SessionConfig()
     assert cfg.intra_op_num_threads == cfg.inter_op_num_threads == ki.shipped_ort_threads()
     if hasattr(os, "sched_getaffinity"):
-        assert ki.shipped_ort_threads() == min(max(len(os.sched_getaffinity(0)) - 1, 1), 8)
+        # A cgroup quota can lower it further; the commit suite replays that rule (hub CON304).
+        assert 1 <= ki.shipped_ort_threads() <= min(max(len(os.sched_getaffinity(0)) - 1, 1), 8)
     assert cfg.execution_mode == ki.ExecutionMode.Sequential
     assert cfg.execution_provider == ki.ExecutionProvider.Cpu
     assert cfg.device_id == 0
