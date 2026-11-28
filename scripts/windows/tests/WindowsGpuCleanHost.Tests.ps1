@@ -14,7 +14,8 @@ Describe 'Windows GPU clean-host startup' {
         }
     }
 
-    It 'isolates inherited paths and registry and restores the caller environment' {
+    # The candidate is cmd.exe under %SystemRoot%, so the two cases that start it run only on Windows.
+    It 'isolates inherited paths and registry and restores the caller environment' -Skip:(-not $IsWindows) {
         $command = Join-Path $TestDrive 'probe.cmd'
         @'
 @echo off
@@ -58,7 +59,7 @@ exit /b 0
         }
     }
 
-    It 'fails when the candidate exits unsuccessfully' {
+    It 'fails when the candidate exits unsuccessfully' -Skip:(-not $IsWindows) {
         Invoke-WithProcessEnvironment -Environment @{ GST_PLUGIN_PATH_1_0 = 'C:\contaminated-plugin' } -ScriptBlock {
             Get-StartupFailure (Join-Path $env:SystemRoot 'System32\cmd.exe') @('/d', '/c', 'exit 17') | Should -Match 'Candidate startup failed: 17'
             $env:GST_PLUGIN_PATH_1_0 | Should -Be 'C:\contaminated-plugin'

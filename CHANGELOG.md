@@ -27,6 +27,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   trees. Built on Linux with g++ 15, `-Wconversion -Wsign-conversion -Werror` and ASan+UBSan, the five cases pass, and
   reading only the own cgroup fails the walk case. The Python binding test now bounds the count by the mask's rule, as
   a host quota may lower it. Windows keeps the affinity mask.
+- **The Pester suites pass on Linux as well**: the two `WindowsGpuCleanHost` cases that start `cmd.exe` and the GPU
+  package fixture, whose `makecab` exists only on Windows, skip off Windows. Under pwsh 7.6 and Pester 6.2.0 on Linux
+  48 pass and 3 skip; on Windows all 51 still pass. No lane runs them on Linux yet.
 
 ### Changed (2026-11-28, the Pester suites speak Pester 6)
 
