@@ -139,16 +139,30 @@ expect fail 'executable replaced by a script' "${work}/p12" 'not exactly one ELF
 mkdir -p "${work}/hub-without-gate"
 ANTFRASTRUCTURE_DIR="${work}/hub-without-gate" expect fail 'a hub without the ELF gate' "${work}/good" \
   'the hub ELF gate is missing'
+# stub_hub <dir> <gate body>: a hub whose ELF gate is the given script.
+stub_hub() {
+  mkdir -p "$1/linux/scripts/06-packaging"
+  printf '#!/usr/bin/env bash\n%s\n' "$2" > "$1/linux/scripts/06-packaging/verify-elf-hardening.sh"
+}
+
+# expect_all_counted <name>: every check of both packages failed, so no package was skipped.
+expect_all_counted() {
+  if ! grep -q -e '^hardening: 6 check(s) failed$' "${work}/gate.log"; then
+    printf 'FAIL %s: not all six checks counted\n' "$1" >&2; cat "${work}/gate.log" >&2
+    failures=$((failures + 1))
+  fi
+}
+
 # A gate that cannot run names no check: each check fails in the gate's own words, and every package is graded.
-mkdir -p "${work}/hub/linux/scripts/06-packaging"
-printf '#!/usr/bin/env bash\necho "usage: verify-elf-hardening.sh SPEC..." >&2\nexit 2\n' \
-  > "${work}/hub/linux/scripts/06-packaging/verify-elf-hardening.sh"
+stub_hub "${work}/hub" 'echo "usage: verify-elf-hardening.sh SPEC..." >&2; exit 2'
 ANTFRASTRUCTURE_DIR="${work}/hub" expect fail 'a hub gate that cannot run' "${work}/good" \
   'fixture.tar.gz/libAccelerANTgine.so: the hub ELF gate exited 2 without a verdict: usage: verify-elf-hardening.sh'
-if ! grep -q -e '^hardening: 6 check(s) failed$' "${work}/gate.log"; then
-  printf 'FAIL a hub gate that cannot run: not all six checks counted\n' >&2; cat "${work}/gate.log" >&2
-  failures=$((failures + 1))
-fi
+expect_all_counted 'a hub gate that cannot run'
+# An exit 0 with no verdict graded nothing, so it must fail rather than read as a pass.
+stub_hub "${work}/hub-silent" 'echo "graded nothing"; exit 0'
+ANTFRASTRUCTURE_DIR="${work}/hub-silent" expect fail 'a hub gate that says nothing' "${work}/good" \
+  'fixture.tar.gz/libAccelerANTgine.so: the hub ELF gate exited 0 without a verdict: graded nothing'
+expect_all_counted 'a hub gate that says nothing'
 
 if [[ $failures -gt 0 ]]; then
   printf '%d package hardening case(s) failed\n' "$failures" >&2

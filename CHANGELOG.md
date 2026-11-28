@@ -27,7 +27,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   before, the empty `grep` ended the script under errexit with no output, and `ci-release.sh` called the packages
   unhardened. A hub without the gate is refused by name. `test-verify-package-hardening.sh` holds both: against the
   old script its two new cases returned 0, as the submodule's gate graded instead, and with only the lookup fixed the
-  stub gate's case ended with an empty log; all 18 cases pass with the fix.
+  stub gate's case ended with an empty log; all 18 cases pass with the fix. A gate that exits 0 with no
+  `hardening ok` line fails each check the same way, and the case `a hub gate that says nothing` holds it: with
+  `check_elf` returning 0 on any silent exit 0, it failed twice, while the 18 cases before it all passed.
 
 ### Fixed (2026-11-28, a callback may replace the callbacks)
 
