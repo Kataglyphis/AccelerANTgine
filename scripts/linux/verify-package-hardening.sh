@@ -7,7 +7,13 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 package_dir="$(realpath -e "$1")"
-gate="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/third_party/ANTfrastructure/linux/scripts/06-packaging/verify-elf-hardening.sh"
+# The hub as every other release step finds it: ANTFRASTRUCTURE_DIR, the submodule or a sibling clone.
+# shellcheck source=lib/antfrastructure.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/antfrastructure.sh"
+gate="$(antfrastructure_path linux/scripts/06-packaging/verify-elf-hardening.sh)" || {
+  echo 'hardening FAIL: the hub ELF gate is missing, so no package was graded' >&2
+  exit 1
+}
 library=libAccelerANTgine.so
 # The demo calls no libc function _FORTIFY_SOURCE can bound, so it never imports a __*_chk.
 targets=("AccelerANTgine executable fortify" "AccelerANTgine_demo executable no-fortify" "$library library fortify")
@@ -44,13 +50,22 @@ find_elf() {
 
 # The hub's gate grades one ELF (CON294); its lines name the extracted path, which this package label replaces.
 check_elf() {
-  local label="$1" file="$2" kind="$3" fortify="$4" out
-  if out="$(bash "${gate}" "${file}:${kind}:${fortify}" 2>&1)"; then
-    grep '^hardening ok: ' <<< "${out}" | sed "s#${file}#${label}#"
+  local label="$1" file="$2" kind="$3" fortify="$4" out rc=0 verdicts
+  out="$(bash "${gate}" "${file}:${kind}:${fortify}" 2>&1)" || rc=$?
+  out="${out//"${file}"/"${label}"}"
+  if [[ $rc -eq 0 ]]; then
+    verdicts="$(grep '^hardening ok: ' <<< "${out}" || true)"
+    if [[ -n "$verdicts" ]]; then printf '%s\n' "$verdicts"; return 0; fi
   else
-    grep '^hardening FAIL: ' <<< "${out}" | sed "s#${file}#${label}#" >&2
-    failures=$((failures + $(grep -c '^hardening FAIL: ' <<< "${out}")))
+    verdicts="$(grep '^hardening FAIL: ' <<< "${out}" || true)"
+    if [[ -n "$verdicts" ]]; then
+      printf '%s\n' "$verdicts" >&2
+      failures=$((failures + $(grep -c '' <<< "$verdicts")))
+      return 0
+    fi
   fi
+  # A gate that could not run (a missing file, a usage error) names no check, so its own words say why.
+  fail "${label}: the hub ELF gate exited ${rc} without a verdict: ${out}"
 }
 
 for package in "${packages[@]}"; do

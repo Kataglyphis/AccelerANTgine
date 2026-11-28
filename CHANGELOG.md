@@ -18,6 +18,17 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-28, a hardening gate that cannot run says why)
+
+- **`verify-package-hardening.sh` finds the hub's ELF gate as the rest of `ci-release.sh` does**, through
+  `antfrastructure_path`: `ANTFRASTRUCTURE_DIR`, the submodule, then a sibling clone. It named the submodule path
+  alone, so a release against a sibling hub ran a file that was not there. When the gate exits without a verdict
+  (that missing file, a usage error), each check now fails with the gate's own output and the loop grades the rest;
+  before, the empty `grep` ended the script under errexit with no output, and `ci-release.sh` called the packages
+  unhardened. A hub without the gate is refused by name. `test-verify-package-hardening.sh` holds both: against the
+  old script its two new cases returned 0, as the submodule's gate graded instead, and with only the lookup fixed the
+  stub gate's case ended with an empty log; all 18 cases pass with the fix.
+
 ### Fixed (2026-11-28, a callback may replace the callbacks)
 
 - **A callback that sets a callback no longer hangs its thread.** `GStreamerPipeline` ran the buffer callback, and

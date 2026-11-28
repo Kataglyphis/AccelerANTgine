@@ -135,6 +135,21 @@ printf '#!/bin/sh\n' > "${work}/tree-deb/usr/lib/accelerantgine/AccelerANTgine"
 dpkg-deb --build --root-owner-group "${work}/tree-deb" "${work}/p12/fixture.deb" > /dev/null
 expect fail 'executable replaced by a script' "${work}/p12" 'not exactly one ELF named AccelerANTgine$'
 
+# The hub comes from ANTFRASTRUCTURE_DIR as in ci-release.sh; one without the gate is refused aloud.
+mkdir -p "${work}/hub-without-gate"
+ANTFRASTRUCTURE_DIR="${work}/hub-without-gate" expect fail 'a hub without the ELF gate' "${work}/good" \
+  'the hub ELF gate is missing'
+# A gate that cannot run names no check: each check fails in the gate's own words, and every package is graded.
+mkdir -p "${work}/hub/linux/scripts/06-packaging"
+printf '#!/usr/bin/env bash\necho "usage: verify-elf-hardening.sh SPEC..." >&2\nexit 2\n' \
+  > "${work}/hub/linux/scripts/06-packaging/verify-elf-hardening.sh"
+ANTFRASTRUCTURE_DIR="${work}/hub" expect fail 'a hub gate that cannot run' "${work}/good" \
+  'fixture.tar.gz/libAccelerANTgine.so: the hub ELF gate exited 2 without a verdict: usage: verify-elf-hardening.sh'
+if ! grep -q -e '^hardening: 6 check(s) failed$' "${work}/gate.log"; then
+  printf 'FAIL a hub gate that cannot run: not all six checks counted\n' >&2; cat "${work}/gate.log" >&2
+  failures=$((failures + 1))
+fi
+
 if [[ $failures -gt 0 ]]; then
   printf '%d package hardening case(s) failed\n' "$failures" >&2
   exit 1
