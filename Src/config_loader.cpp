@@ -157,7 +157,9 @@ auto load_webrtc_config(const std::filesystem::path &config_path) -> std::expect
     // The throwing overload aborts without exceptions; a path the system refuses (ENAMETOOLONG, EACCES) is not found.
     std::error_code unreadable;
     if (!std::filesystem::exists(config_path, unreadable)) {
-        if (unreadable) { log::warning("config: {} cannot be read: {}", config_path.string(), unreadable.message()); }
+        if (unreadable) {
+            log::warning("config: {} cannot be read: {}", log::path_text(config_path), unreadable.message());
+        }
         return std::unexpected(ConfigError::FileNotFound);
     }
 

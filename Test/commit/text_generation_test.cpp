@@ -304,8 +304,7 @@ TEST_F(TextGeneration, EmptyMessagesOrNoBudgetAreInvalid)
 TEST_F(TextGeneration, AModelDirectoryWithLettersOutsideAsciiLoads)
 {
     // The path a Windows user called Jörg has: GenAI takes UTF-8, not the ANSI code page.
-    const auto directory =
-      std::filesystem::temp_directory_path() / std::filesystem::path(u8"kataglyphis-genai-j\u00F6rg-\u6A21\u578B");
+    const auto directory = kataglyphis::test::outside_ascii_dir("kataglyphis-genai");
     std::error_code ignored;
     std::filesystem::remove_all(directory, ignored);
     std::filesystem::copy(kModelDir, directory, std::filesystem::copy_options::recursive);

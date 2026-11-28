@@ -210,6 +210,22 @@ TEST(TomlConfig, APathTheSystemRefusesIsFileNotFound)
     EXPECT_EQ(config.error(), cfg::ConfigError::FileNotFound);
 }
 
+// toml++ reads a narrow path as UTF-8; the ANSI one refused this file on Windows or ended the process.
+TEST(TomlConfig, AConfigInAFolderWithLettersOutsideAsciiLoads)
+{
+    const auto folder = kataglyphis::test::outside_ascii_dir("kataglyphis-toml");
+    std::error_code ignored;
+    std::filesystem::create_directories(folder, ignored);
+    std::ofstream(folder / "inference.toml", std::ios::binary) << "[model]\ninput_width = 320\n";
+    const auto config = cfg::load_inference_config(folder / "inference.toml");
+    // Refused below that folder, the path goes into a warning, which also ended the process.
+    const auto refused = cfg::load_inference_config(folder / std::string(300, 'x') / "inference.toml");
+    std::filesystem::remove_all(folder, ignored);
+    ASSERT_TRUE(config.has_value());
+    EXPECT_EQ(config->model.input_width, 320U);
+    EXPECT_EQ(kataglyphis::test::error_of(refused), cfg::ConfigError::FileNotFound);
+}
+
 TEST(TomlConfig, MalformedFileIsAParseError)
 {
     const TempFile file("kataglyphis-inference-broken", ".toml", "[model\n");

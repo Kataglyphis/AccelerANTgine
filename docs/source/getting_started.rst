@@ -268,7 +268,9 @@ RelWithDebInfo) prints warnings and errors only; a Debug build prints everything
 ``ACCELERANTGINE_LOG_LEVEL`` (``debug``, ``info``, ``warning``, ``error`` or ``off``) overrides
 that default for any program that loads the library, and the CLI's ``--log_level`` takes the same
 values. An embedder can route messages with ``kataglyphis::log::set_sink``. Streaming errors still
-reach ``set_error_callback``; logging only adds text.
+reach ``set_error_callback``; logging only adds text. Messages are UTF-8, a path in one included:
+``kataglyphis::log::path_text`` writes it, where ``path::string()`` gives the Windows ANSI code page
+and throws for a letter outside it.
 
 .. code-block:: sh
 

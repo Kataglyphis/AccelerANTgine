@@ -18,6 +18,19 @@ belongs in the **Changed** list below with that consequence spelled out.
 
 ## [Unreleased]
 
+### Fixed (2026-11-28, a config in a folder outside ASCII loads on Windows)
+
+- **`load_inference_config` gives toml++ the path as UTF-8.** It passed `path::string()`, which MSVC converts to
+  the ANSI code page, while toml++ reads a narrow path as UTF-8. A valid file below a folder like `Jörg` came back
+  as `ParseError`, and a letter the code page lacks (`模型`) threw with exceptions off and ended the process. It
+  passes `u8string()` now. The three warnings that name a path (both config loaders' unreadable path, the WebRTC
+  factory's fallback) write it through the new `kataglyphis::log::path_text`, UTF-8 on every platform. Built with
+  MSVC 14.52 and `/EHs-` on a code page 1252 host, `TomlConfig.AConfigInAFolderWithLettersOutsideAsciiLoads` ended
+  the process with `string()` (0xC0000409), failed its assert for a folder of `jörg` alone, and passes with the fix;
+  `Log.APathIsWrittenAsUtf8WhateverTheCodePage` ended the process with a `string()` body. The WebRTC case
+  `AMissingConfigOutsideAsciiIsNamedInTheFallbackWarning` holds the factory's warning. The test support's
+  `outside_ascii_dir` spells the folder for them and for the GenAI case.
+
 ### Changed (2026-11-28, the shipped thread count honours the cgroup quota)
 
 - **`shipped_ort_threads()` counts the cgroup v2 quota on Linux**, as the hub's `shared/contracts/usable-cpus.json`

@@ -26,12 +26,14 @@
 
 import kataglyphis.config_loader;
 import kataglyphis.gstreamer_pipeline;
+import kataglyphis.log;
 import kataglyphis.webrtc_streamer;
 
 #include "gstreamer_test_support.h"
 
 namespace webrtc = kataglyphis::webrtc;
 namespace cfg = kataglyphis::config;
+namespace klog = kataglyphis::log;
 using kataglyphis::test::TempFile;
 
 namespace {
@@ -486,6 +488,23 @@ TEST(WebRtcStreamer, AConfigFileDrivesTheFactory)
       webrtc::ConfigOverrideMode::Override);
     ASSERT_TRUE(from_defaults.has_value());
     EXPECT_TRUE(from_defaults->get_producer_id().starts_with("stream-"));
+}
+
+// The fallback names the missing file in UTF-8; on Windows the ANSI path ended the process in this warning.
+TEST(WebRtcStreamer, AMissingConfigOutsideAsciiIsNamedInTheFallbackWarning)
+{
+    const auto saved = klog::level();
+    klog::set_level(klog::Level::Warning);
+    std::vector<std::string> warnings;
+    klog::set_sink([&warnings](klog::Level, std::string_view message) -> void { warnings.emplace_back(message); });
+    std::ignore =
+      webrtc::create_webrtc_stream_from_config(kataglyphis::test::outside_ascii_dir("kataglyphis-webrtc") / "w.json");
+    klog::set_sink({});
+    klog::set_level(saved);
+    EXPECT_TRUE(std::ranges::any_of(warnings, [](const std::string &warning) -> bool {
+        return warning.starts_with("Failed to load config")
+               && warning.find(kataglyphis::test::kOutsideAsciiUtf8) != std::string::npos;
+    }));
 }
 
 TEST(WebRTCError, EveryValueHasANameOfItsOwn)

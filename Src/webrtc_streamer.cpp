@@ -731,7 +731,7 @@ auto create_webrtc_stream_from_config(const std::filesystem::path &config_path,
     if (auto config_result = config::load_webrtc_config(config_path); config_result) {
         webrtc_config = *config_result;
     } else {
-        log::warning("Failed to load config from {}, using defaults", config_path.string());
+        log::warning("Failed to load config from {}, using defaults", log::path_text(config_path));
     }
 
     return create_configured_streamer(create_stream_config_from_webrtc_config(

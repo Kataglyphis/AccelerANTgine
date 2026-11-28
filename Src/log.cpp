@@ -6,6 +6,7 @@ module;
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -131,6 +132,12 @@ void write(Level message_level, std::string_view message)
       name.data(),
       static_cast<int>(message.size()),
       message.data());
+}
+
+auto path_text(const std::filesystem::path &path) -> std::string
+{
+    const std::u8string utf8 = path.u8string();
+    return { utf8.begin(), utf8.end() };
 }
 
 }// namespace kataglyphis::log

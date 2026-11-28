@@ -2,6 +2,7 @@ module;
 
 #include "kataglyphis_export.h"
 #include <cstdint>
+#include <filesystem>
 #include <format>
 #include <functional>
 #include <optional>
@@ -36,6 +37,9 @@ KATAGLYPHIS_CPP_API void set_level(Level threshold) noexcept;
 /// An empty sink restores the default stderr writer.
 KATAGLYPHIS_CPP_API void set_sink(Sink sink);
 KATAGLYPHIS_CPP_API void write(Level message_level, std::string_view message);
+
+/// A path as UTF-8 for a message: on Windows path::string() is the ANSI code page and throws outside it.
+[[nodiscard]] KATAGLYPHIS_CPP_API auto path_text(const std::filesystem::path &path) -> std::string;
 
 template<typename... Args> void debug(std::format_string<Args...> format, Args &&...args)
 {

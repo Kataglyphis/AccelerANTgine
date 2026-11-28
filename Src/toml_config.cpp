@@ -157,11 +157,14 @@ auto load_inference_config(const std::filesystem::path &config_path) -> std::exp
     // The throwing overload aborts without exceptions; a path the system refuses (ENAMETOOLONG, EACCES) is not found.
     std::error_code unreadable;
     if (!std::filesystem::exists(config_path, unreadable)) {
-        if (unreadable) { log::warning("config: {} cannot be read: {}", config_path.string(), unreadable.message()); }
+        if (unreadable) {
+            log::warning("config: {} cannot be read: {}", log::path_text(config_path), unreadable.message());
+        }
         return std::unexpected(ConfigError::FileNotFound);
     }
 
-    auto result = toml::parse_file(config_path.string());
+    // toml++ reads a narrow path as UTF-8, and string() is the ANSI code page on Windows.
+    auto result = toml::parse_file(config_path.u8string());
     if (!result) { return std::unexpected(ConfigError::ParseError); }
 
     InferenceConfig config;

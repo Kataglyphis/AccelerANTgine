@@ -283,6 +283,17 @@ inline auto all_differ(std::vector<std::string> names) -> bool
 inline auto missing_path(std::string_view name) -> std::filesystem::path
 { return std::filesystem::temp_directory_path() / "kataglyphis-test-does-not-exist" / std::string(name); }
 
+// What outside_ascii_dir appends, as the UTF-8 that a library call or a log line must receive.
+inline constexpr std::string_view kOutsideAsciiUtf8 = "-j\xC3\xB6rg-\xE6\xA8\xA1\xE5\x9E\x8B";
+
+// A temp folder the Windows ANSI code page cannot spell, so path::string() throws there.
+inline auto outside_ascii_dir(std::string_view stem) -> std::filesystem::path
+{
+    std::u8string name(stem.begin(), stem.end());
+    name += u8"-j\u00F6rg-\u6A21\u578B";
+    return std::filesystem::temp_directory_path() / name;
+}
+
 #ifdef KATAGLYPHIS_TINY_GENAI_MODEL
 // llguidance holds the tiny model to one key and three characters, so greedy decoding of abc must close the object.
 inline constexpr const char *kTinyJsonSchema =

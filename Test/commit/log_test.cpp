@@ -1,3 +1,5 @@
+#include "kataglyphis_test_support.h"
+
 #include <gtest/gtest.h>
 
 #include <optional>
@@ -52,6 +54,12 @@ TEST(Log, ParsesEveryLevelNameCaseInsensitively)
     EXPECT_FALSE(klog::parse_level("verbose").has_value());
     EXPECT_FALSE(klog::parse_level("").has_value());
     EXPECT_FALSE(klog::parse_level("debugx").has_value());
+}
+
+TEST(Log, APathIsWrittenAsUtf8WhateverTheCodePage)
+{
+    const auto name = kataglyphis::test::outside_ascii_dir("kataglyphis-log").filename();
+    EXPECT_EQ(klog::path_text(name), "kataglyphis-log" + std::string(kataglyphis::test::kOutsideAsciiUtf8));
 }
 
 TEST(Log, TheEnvironmentOverridesTheBuildDefaultOnlyWithAValidLevel)
