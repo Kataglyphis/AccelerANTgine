@@ -29,7 +29,9 @@ belongs in the **Changed** list below with that consequence spelled out.
   a host quota may lower it. Windows keeps the affinity mask.
 - **The Pester suites pass on Linux as well**: the two `WindowsGpuCleanHost` cases that start `cmd.exe` and the GPU
   package fixture, whose `makecab` exists only on Windows, skip off Windows. Under pwsh 7.6 and Pester 6.2.0 on Linux
-  48 pass and 3 skip; on Windows all 51 still pass. No lane runs them on Linux yet.
+  48 pass and 3 skip; on Windows all 51 still pass.
+  Linux x64's `pester-linux` job runs them in the image through the hub's `Invoke-PesterSuite.ps1` (hub pin
+  b224ed005).
 
 ### Changed (2026-11-28, the Pester suites speak Pester 6)
 
